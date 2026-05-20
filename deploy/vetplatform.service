@@ -1,0 +1,48 @@
+# ═══════════════════════════════════════════════════════════
+#  systemd service — Premium Animal Hospital Platform
+#  Copy to: /etc/systemd/system/vetplatform.service
+#  Then:    sudo systemctl daemon-reload
+#           sudo systemctl enable vetplatform
+#           sudo systemctl start vetplatform
+# ═══════════════════════════════════════════════════════════
+
+[Unit]
+Description=Premium Animal Hospital Platform (Gunicorn)
+Documentation=https://github.com/your-repo
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=notify
+User=ahmed
+Group=ahmed
+WorkingDirectory=/home/ahmed/vet/platform
+
+# Load all env vars from .env file
+EnvironmentFile=/home/ahmed/vet/platform/.env
+
+# Gunicorn command
+ExecStart=/home/ahmed/.venv/bin/gunicorn \
+          -c /home/ahmed/vet/platform/gunicorn.conf.py \
+          "app:create_app()"
+
+# Graceful shutdown
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+
+# Auto-restart on crash
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/ahmed/vet/platform/logs
+ReadWritePaths=/home/ahmed/vet/platform/data
+
+[Install]
+WantedBy=multi-user.target

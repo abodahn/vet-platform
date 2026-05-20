@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Invoices', 'الفواتير') }}{% endblock %}
+{% block page_title %}{{ t('Invoices', 'الفواتير') }}{% endblock %}
+{% block page_sub %}{{ invoices|length }} {{ t('result(s)', 'نتيجة') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('finance.invoice_new') }}" class="btn btn-primary">+ {{ t('New Invoice', 'فاتورة جديدة') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.filter-bar { background:var(--cl-surface); border-radius:12px; padding:16px 20px; margin-bottom:20px; display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+.filter-group { display:flex; flex-direction:column; gap:4px; }
+.filter-label { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); }
+.filter-control { padding:8px 12px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; }
+.table-wrap { background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.07); }
+table { width:100%; border-collapse:collapse; }
+th { background:var(--cl-primary); color:#fff; padding:12px 16px; text-align:left; font-size:12px; font-weight:600; text-transform:uppercase; }
+td { padding:11px 16px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+tr:hover td { background:rgba(0,0,0,.02); }
+.badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; }
+.badge-Paid { background:#dcfce7; color:#15803d; }
+.badge-Unpaid { background:#fee2e2; color:#dc2626; }
+.badge-Partial { background:#fef3c7; color:#d97706; }
+.badge-Cancelled { background:#f1f5f9; color:#64748b; }
+.totals-row td { background:var(--cl-bg); font-weight:700; border-top:2px solid var(--cl-border); }
+</style>
+
+<!-- Filters -->
+<div class="filter-bar">
+  <form method="get" style="display:contents">
+    <div class="filter-group">
+      <label class="filter-label">{{ t('Search', 'بحث') }}</label>
+      <input class="filter-control" name="q" type="text" value="{{ search }}" placeholder="{{ t('Owner / Invoice #', 'المالك / رقم الفاتورة') }}" style="width:180px">
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">{{ t('Status', 'الحالة') }}</label>
+      <select class="filter-control" name="status">
+        <option value="">{{ t('All Statuses', 'جميع الحالات') }}</option>
+        {% for s in ['Paid','Unpaid','Partial','Cancelled'] %}
+        <option value="{{ s }}" {% if status==s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">{{ t('From', 'من') }}</label>
+      <input class="filter-control" name="date_from" type="date" value="{{ date_from }}">
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">{{ t('To', 'إلى') }}</label>
+      <input class="filter-control" name="date_to" type="date" value="{{ date_to }}">
+    </div>
+    <button type="submit" style="padding:8px 20px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;">{{ t('Filter', 'تصفية') }}</button>
+    <a href="{{ url_for('finance.invoices_list') }}" style="padding:8px 16px; border:1.5px solid var(--cl-border); border-radius:8px; text-decoration:none; color:var(--cl-text); font-weight:600; font-size:13px;">{{ t('Reset', 'إعادة تعيين') }}</a>
+  </form>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>{{ t('Invoice #', 'رقم الفاتورة') }}</th>
+        <th>{{ t('Owner', 'المالك') }}</th>
+        <th>{{ t('Pet', 'الحيوان') }}</th>
+        <th>{{ t('Date', 'التاريخ') }}</th>
+        <th>{{ t('Doctor', 'الطبيب') }}</th>
+        <th style="text-align:right">{{ t('Total', 'الإجمالي') }}</th>
+        <th style="text-align:right">{{ t('Paid', 'مدفوع') }}</th>
+        <th style="text-align:right">{{ t('Due', 'المستحق') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in invoices %}
+      <tr>
+        <td style="font-weight:700; color:var(--cl-primary);">
+          <a href="{{ url_for('finance.invoice_detail', inv_id=inv.id) }}" style="text-decoration:none; color:inherit;">{{ inv.invoice_number }}</a>
+        </td>
+        <td>{{ inv.owner_name or '—' }}</td>
+        <td style="color:var(--cl-muted);">{{ inv.pet_name or '—' }}</td>
+        <td style="color:var(--cl-muted); white-space:nowrap;">{{ inv.issue_date }}</td>
+        <td style="color:var(--cl-muted);">{{ inv.doctor_name or '—' }}</td>
+        <td style="text-align:right; font-weight:600;">{{ "{:,.2f}".format(inv.total or 0) }}</td>
+        <td style="text-align:right; color:var(--cl-success); font-weight:600;">{{ "{:,.2f}".format(inv.paid_amount or 0) }}</td>
+        <td style="text-align:right; font-weight:600;
+                   color:{% if (inv.due_amount or 0) > 0 %}var(--cl-warning){% else %}var(--cl-success){% endif %}">
+          {{ "{:,.2f}".format(inv.due_amount or 0) }}
+        </td>
+        <td><span class="badge badge-{{ inv.status }}">{{ inv.status }}</span></td>
+        <td>
+          <a href="{{ url_for('finance.invoice_detail', inv_id=inv.id) }}" style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">{{ t('View', 'عرض') }} →</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" style="text-align:center; padding:32px; color:var(--cl-muted);">{{ t('No invoices found', 'لا توجد فواتير') }}</td></tr>
+      {% endfor %}
+      {% if invoices %}
+      <tr class="totals-row">
+        <td colspan="5" style="color:var(--cl-muted);">{{ t('Totals', 'الإجماليات') }} ({{ invoices|length }} {{ t('invoices', 'فواتير') }})</td>
+        <td style="text-align:right;">{{ "{:,.2f}".format(total_amount) }}</td>
+        <td style="text-align:right; color:var(--cl-success);">{{ "{:,.2f}".format(total_paid) }}</td>
+        <td style="text-align:right; color:var(--cl-warning);">{{ "{:,.2f}".format(total_due) }}</td>
+        <td colspan="2"></td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Attendance Report{% endblock %}
+{% block page_title %}Monthly Attendance Report{% endblock %}
+{% block page_sub %}{{ month_name }} {{ year }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filters -->
+<div class="pf-card" style="margin-bottom:16px">
+  <form method="GET" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+    <div class="pf-form-group" style="margin:0;min-width:100px">
+      <label class="pf-form-label">Year</label>
+      <select name="year" class="pf-form-control">
+        {% for y in range(2024, 2028) %}
+        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pf-form-group" style="margin:0;min-width:130px">
+      <label class="pf-form-label">Month</label>
+      <select name="month" class="pf-form-control">
+        {% for m in range(1, 13) %}
+        <option value="{{ m }}" {% if m == month %}selected{% endif %}>
+          {{ ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if is_manager %}
+    <div class="pf-form-group" style="margin:0;min-width:180px">
+      <label class="pf-form-label">Staff</label>
+      <select name="user_id" class="pf-form-control">
+        <option value="">All Staff</option>
+        {% for s in staff_list %}
+        <option value="{{ s.id }}" {% if selected_uid == s.id|string %}selected{% endif %}>{{ s.full_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <button type="submit" class="pf-btn pf-btn-primary">Generate</button>
+  </form>
+</div>
+
+{% if summary %}
+<!-- Per-Staff Summary Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:20px">
+  {% for uid_r, s in summary.items() %}
+  <div class="pf-card" style="border-top:3px solid #3b82f6">
+    <div style="font-weight:700;font-size:14px;margin-bottom:10px">{{ s.full_name }}</div>
+    <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:10px">{{ s.role }}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="background:#dcfce7;border-radius:4px;padding:8px;text-align:center">
+        <div style="font-size:10px;color:#166534">Present</div>
+        <div style="font-weight:700;color:#166534;font-size:18px">{{ s.present }}</div>
+      </div>
+      <div style="background:#fee2e2;border-radius:4px;padding:8px;text-align:center">
+        <div style="font-size:10px;color:#991b1b">Absent</div>
+        <div style="font-weight:700;color:#991b1b;font-size:18px">{{ s.absent }}</div>
+      </div>
+      <div style="background:#fef3c7;border-radius:4px;padding:8px;text-align:center">
+        <div style="font-size:10px;color:#92400e">Late</div>
+        <div style="font-weight:700;color:#92400e;font-size:18px">{{ s.late }}</div>
+      </div>
+      <div style="background:#ede9fe;border-radius:4px;padding:8px;text-align:center">
+        <div style="font-size:10px;color:#5b21b6">Total Hrs</div>
+        <div style="font-weight:700;color:#5b21b6;font-size:18px">{{ '%.0f'|format(s.total_hours) }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Approved Leaves This Month -->
+{% if approved_leaves %}
+<div class="pf-card" style="margin-bottom:20px">
+  <div class="pf-card-header">
+    <div>
+      <div class="pf-card-title">🏖 Approved Leaves in {{ month_name }}</div>
+      <div class="pf-card-sub">{{ approved_leaves|length }} approved</div>
+    </div>
+  </div>
+  <table class="pf-table">
+    <thead><tr><th>Staff</th><th>Type</th><th>Period</th><th>Days</th></tr></thead>
+    <tbody>
+      {% for lr in approved_leaves %}
+      <tr>
+        <td style="font-weight:600">{{ lr.staff_name }}</td>
+        <td><span style="color:{{ lr.color }}">{{ lr.leave_type_name }}</span></td>
+        <td style="font-size:12px">{{ lr.start_date }} → {{ lr.end_date }}</td>
+        <td style="font-weight:600">{{ lr.days_requested }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Detailed Records -->
+<div class="pf-card">
+  <div class="pf-card-header">
+    <div>
+      <div class="pf-card-title">📋 Daily Records — {{ month_name }} {{ year }}</div>
+      <div class="pf-card-sub">{{ records|length }} entries · {{ month_start }} to {{ month_end }}</div>
+    </div>
+  </div>
+  {% if records %}
+  <table class="pf-table">
+    <thead>
+      <tr>
+        {% if is_manager %}<th>Staff</th>{% endif %}
+        <th>Date</th><th>Day</th><th>In</th><th>Out</th><th>Break</th><th>Hours</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in records %}
+      {% set wd = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+      <tr>
+        {% if is_manager %}
+        <td style="font-weight:600">{{ r.full_name }}</td>
+        {% endif %}
+        <td>{{ r.work_date }}</td>
+        <td style="font-size:12px;color:var(--cl-text-muted)">
+          {%- set d = r.work_date | string -%}
+          {{ r.work_date }}
+        </td>
+        <td>{{ r.check_in or '—' }}</td>
+        <td>{{ r.check_out or '—' }}</td>
+        <td>{{ r.break_minutes or 0 }}m</td>
+        <td style="font-weight:600">{{ '%.1f'|format(r.hours_worked or 0) }}h</td>
+        <td>
+          {% if r.status == 'Present' %}<span class="pf-badge active">Present</span>
+          {% elif r.status == 'Late' %}<span class="pf-badge" style="background:#fef3c7;color:#92400e">Late</span>
+          {% elif r.status == 'Absent' %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b">Absent</span>
+          {% elif r.status == 'Leave' %}<span class="pf-badge beta">Leave</span>
+          {% else %}<span class="pf-badge">{{ r.status }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:40px;text-align:center;color:var(--cl-text-muted)">
+    No attendance records for {{ month_name }} {{ year }}.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

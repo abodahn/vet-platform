@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}System Diagnostics{% endblock %}
+{% block page_title %}System Diagnostics{% endblock %}
+{% block page_sub %}Platform health checks and integrity verification{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ request.url }}" class="pf-btn pf-btn-primary">🔄 Re-run Diagnostics</a>
+<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">🖥️ Monitor</a>
+<a href="{{ url_for('system.settings') }}" class="pf-btn pf-btn-secondary">⚙️ Settings</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.diag-summary { display:flex; gap:16px; margin-bottom:28px; flex-wrap:wrap; }
+.diag-pill { background:var(--cl-surface); border-radius:10px; padding:14px 22px; box-shadow:0 2px 8px rgba(0,0,0,.07); text-align:center; min-width:110px; }
+.diag-pill strong { font-size:28px; font-weight:800; display:block; line-height:1; margin-bottom:4px; }
+.diag-pill span { font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.4px; }
+.diag-card { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:20px; }
+.diag-card-title { font-size:15px; font-weight:700; color:var(--cl-primary); margin-bottom:16px; padding-bottom:10px; border-bottom:2px solid var(--cl-border); }
+.checks-table { width:100%; border-collapse:collapse; }
+.checks-table th { text-align:left; padding:10px 16px; background:var(--cl-bg); font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.4px; }
+.checks-table td { padding:14px 16px; border-bottom:1px solid var(--cl-border); font-size:14px; }
+.checks-table tr:last-child td { border-bottom:none; }
+.checks-table tr:hover td { background:rgba(0,0,0,.015); }
+.status-pass { display:inline-flex; align-items:center; gap:6px; background:#dcfce7; color:#166534; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:700; }
+.status-fail { display:inline-flex; align-items:center; gap:6px; background:#fee2e2; color:#991b1b; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:700; }
+.status-warn { display:inline-flex; align-items:center; gap:6px; background:#fef3c7; color:#92400e; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:700; }
+.check-name { font-weight:600; }
+.check-detail { font-size:12px; color:var(--cl-muted); margin-top:3px; font-family:monospace; word-break:break-all; }
+.overall-banner { border-radius:12px; padding:18px 24px; margin-bottom:24px; display:flex; align-items:center; gap:14px; }
+.overall-banner.all-pass { background:#dcfce7; border:2px solid #86efac; }
+.overall-banner.has-fail  { background:#fee2e2; border:2px solid #fca5a5; }
+.overall-banner.has-warn  { background:#fef3c7; border:2px solid #fde68a; }
+.overall-icon { font-size:36px; }
+.overall-title { font-size:17px; font-weight:700; }
+.overall-sub   { font-size:13px; color:var(--cl-muted); margin-top:2px; }
+.legacy-section { background:var(--cl-bg); border-radius:10px; padding:16px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.check-btn { padding:8px 18px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% set pass_count = checks | selectattr('status','equalto','Pass') | list | length %}
+{% set fail_count = checks | selectattr('status','equalto','Fail') | list | length %}
+{% set warn_count = checks | selectattr('status','equalto','Warning') | list | length %}
+
+<!-- Overall Banner -->
+{% if fail_count > 0 %}
+<div class="overall-banner has-fail">
+  <div class="overall-icon">🚨</div>
+  <div>
+    <div class="overall-title" style="color:#991b1b;">{{ fail_count }} Check{{ 's' if fail_count != 1 }} Failed</div>
+    <div class="overall-sub">Review the failed checks below and take corrective action.</div>
+  </div>
+</div>
+{% elif warn_count > 0 %}
+<div class="overall-banner has-warn">
+  <div class="overall-icon">⚠️</div>
+  <div>
+    <div class="overall-title" style="color:#92400e;">{{ warn_count }} Warning{{ 's' if warn_count != 1 }}</div>
+    <div class="overall-sub">Platform is operational but some items need attention.</div>
+  </div>
+</div>
+{% else %}
+<div class="overall-banner all-pass">
+  <div class="overall-icon">✅</div>
+  <div>
+    <div class="overall-title" style="color:#166534;">All Systems Operational</div>
+    <div class="overall-sub">All {{ pass_count }} diagnostic checks passed successfully.</div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Summary Pills -->
+<div class="diag-summary">
+  <div class="diag-pill">
+    <strong>{{ checks|length }}</strong>
+    <span>Total Checks</span>
+  </div>
+  <div class="diag-pill" style="border-top:3px solid #22c55e;">
+    <strong style="color:#166534;">{{ pass_count }}</strong>
+    <span>Passed</span>
+  </div>
+  <div class="diag-pill" style="border-top:3px solid #f59e0b;">
+    <strong style="color:#92400e;">{{ warn_count }}</strong>
+    <span>Warnings</span>
+  </div>
+  <div class="diag-pill" style="border-top:3px solid #ef4444;">
+    <strong style="color:#991b1b;">{{ fail_count }}</strong>
+    <span>Failed</span>
+  </div>
+</div>
+
+<!-- Checks Table -->
+<div class="diag-card">
+  <div class="diag-card-title">🔬 Diagnostic Results</div>
+  <table class="checks-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Check</th>
+        <th>Status</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for check in checks %}
+      <tr>
+        <td style="color:var(--cl-muted);font-weight:700;width:36px;">{{ loop.index }}</td>
+        <td>
+          <div class="check-name">{{ check.name }}</div>
+        </td>
+        <td>
+          {% if check.status == 'Pass' %}
+            <span class="status-pass">✓ Pass</span>
+          {% elif check.status == 'Fail' %}
+            <span class="status-fail">✗ Fail</span>
+          {% else %}
+            <span class="status-warn">⚠ Warning</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="check-detail">{{ check.details or '—' }}</div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Legacy App Check -->
+<div class="diag-card">
+  <div class="diag-card-title">🔗 Live Legacy App Connectivity</div>
+  <div class="legacy-section">
+    <div>
+      <div style="font-size:12px;color:var(--cl-muted);margin-bottom:4px;">Legacy App URL</div>
+      <div style="font-family:monospace;font-size:14px;color:var(--cl-primary);">{{ legacy_url }}</div>
+    </div>
+    <button class="check-btn" onclick="checkLegacyDiag()">🔍 Test Connectivity</button>
+    <span id="legacy-diag-result" style="font-size:14px;font-weight:600;"></span>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function checkLegacyDiag(){
+  var btn = document.querySelector('.check-btn');
+  var result = document.getElementById('legacy-diag-result');
+  btn.textContent = '⏳ Testing…';
+  btn.disabled = true;
+  result.textContent = '';
+  fetch('{{ legacy_url }}/', { method:'GET', mode:'no-cors', cache:'no-cache' })
+    .then(function(){ result.textContent = '✅ Legacy app reachable'; result.style.color='#166534'; })
+    .catch(function(){ result.textContent = '❌ Legacy app unreachable'; result.style.color='#dc2626'; })
+    .finally(function(){ btn.textContent = '🔍 Test Connectivity'; btn.disabled=false; });
+}
+</script>
+{% endblock %}

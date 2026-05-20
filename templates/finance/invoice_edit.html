@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ invoice.invoice_number }}{% endblock %}
+{% block page_title %}Edit {{ invoice.invoice_number }}{% endblock %}
+{% block page_sub %}{{ invoice.status }} · {{ invoice.issue_date }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('finance.invoice_detail', inv_id=invoice.id) }}" class="btn btn-secondary">← Back to Invoice</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.inv-edit-card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.08); padding:28px; margin-bottom:20px; }
+.inv-edit-card h3 { font-size:15px; font-weight:700; margin:0 0 16px; padding-bottom:12px; border-bottom:1px solid var(--cl-border); }
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.form-group { display:flex; flex-direction:column; gap:6px; }
+.form-group.full { grid-column:1/-1; }
+.form-label { font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; }
+.form-control { padding:9px 12px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; }
+.form-control:focus { outline:none; border-color:var(--cl-primary); }
+#lines-body tr td { vertical-align:middle; }
+#lines-body input,#lines-body select { padding:7px 8px; border:1px solid var(--cl-border); border-radius:6px; background:var(--cl-bg); color:var(--cl-text); font-size:12px; width:100%; }
+.btn-add-line { background:var(--cl-bg); border:1.5px dashed var(--cl-border); border-radius:8px; padding:9px 16px; cursor:pointer; font-size:13px; color:var(--cl-primary); font-weight:600; width:100%; margin-top:8px; }
+.btn-rm { background:#fee2e2; color:#dc2626; border:none; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:13px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="inv-edit-form">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+  <div class="inv-edit-card">
+    <h3>👤 Owner & Patient</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Owner *</label>
+        <select name="owner_id" class="form-control" id="owner-sel" required>
+          <option value="">— Select owner —</option>
+          {% for o in owners %}
+          <option value="{{ o.id }}" {{ 'selected' if o.id == invoice.owner_id }}>{{ o.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Pet</label>
+        <select name="pet_id" class="form-control" id="pet-sel">
+          <option value="">— Select pet —</option>
+          {% for p in pets %}
+          <option value="{{ p.id }}"
+                  data-owner="{{ p.owner_id }}"
+                  {{ 'selected' if p.id == invoice.pet_id }}>{{ p.pet_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Doctor</label>
+        <input type="text" name="doctor_name" class="form-control" value="{{ invoice.doctor_name or '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Due Date</label>
+        <input type="date" name="due_date" class="form-control" value="{{ invoice.due_date or '' }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="inv-edit-card">
+    <h3>📋 Line Items</h3>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="font-size:11px;color:var(--cl-muted);text-transform:uppercase">
+          <th style="text-align:left;padding:6px 8px">Description</th>
+          <th style="padding:6px 4px;width:90px">Type</th>
+          <th style="padding:6px 4px;width:60px">Qty</th>
+          <th style="padding:6px 4px;width:100px">Unit Price</th>
+          <th style="padding:6px 4px;width:70px">Disc %</th>
+          <th style="padding:6px 4px;width:100px">Total</th>
+          <th style="width:40px"></th>
+        </tr>
+      </thead>
+      <tbody id="lines-body">
+        {% for line in invoice.lines %}
+        <tr>
+          <td style="padding:4px 4px"><input type="text" name="description[]" value="{{ line.description }}" required placeholder="Service or product description"></td>
+          <td style="padding:4px"><select name="line_type[]"><option {{ 'selected' if line.line_type=='service' }}>service</option><option {{ 'selected' if line.line_type=='product' }}>product</option><option {{ 'selected' if line.line_type=='lab' }}>lab</option><option {{ 'selected' if line.line_type=='vaccine' }}>vaccine</option><option {{ 'selected' if line.line_type=='medication' }}>medication</option></select></td>
+          <td style="padding:4px"><input type="number" name="qty[]" value="{{ line.quantity }}" min="0.01" step="0.01" style="text-align:right" onchange="calcLine(this)"></td>
+          <td style="padding:4px"><input type="number" name="unit_price[]" value="{{ line.unit_price }}" min="0" step="0.01" style="text-align:right" onchange="calcLine(this)"></td>
+          <td style="padding:4px"><input type="number" name="discount[]" value="{{ line.discount or 0 }}" min="0" max="100" step="0.1" style="text-align:right" onchange="calcLine(this)"></td>
+          <td style="padding:4px"><input type="number" name="line_total[]" value="{{ line.total }}" readonly style="background:var(--cl-bg);text-align:right;font-weight:600"></td>
+          <td style="padding:4px"><button type="button" class="btn-rm" onclick="this.closest('tr').remove();calcTotals()">✕</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <button type="button" class="btn-add-line" onclick="addLine()">+ Add Line Item</button>
+  </div>
+
+  <div class="inv-edit-card">
+    <h3>🧮 Totals & Discount</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Discount Type</label>
+        <select name="discount_type" class="form-control" id="disc-type" onchange="calcTotals()">
+          <option value="value" {{ 'selected' if invoice.discount_type=='value' }}>Fixed Amount (EGP)</option>
+          <option value="percent" {{ 'selected' if invoice.discount_type=='percent' }}>Percentage (%)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Discount Value</label>
+        <input type="number" name="discount_value" class="form-control" id="disc-val"
+               value="{{ invoice.discount_value or 0 }}" min="0" step="0.01" onchange="calcTotals()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tax Rate (%)</label>
+        <input type="number" name="tax_rate" class="form-control" id="tax-rate"
+               value="{{ invoice.tax_rate or 0 }}" min="0" max="100" step="0.1" onchange="calcTotals()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estimated Total</label>
+        <input type="text" id="est-total" class="form-control" readonly style="font-weight:700;font-size:16px;color:var(--cl-primary)">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-control" rows="2">{{ invoice.notes or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;margin-bottom:40px">
+    <button type="submit" class="btn btn-primary" style="padding:12px 28px;font-size:15px">💾 Save Changes</button>
+    <a href="{{ url_for('finance.invoice_detail', inv_id=invoice.id) }}" class="btn btn-secondary" style="padding:12px 20px">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function calcLine(el){
+  const tr=el.closest('tr');
+  const qty=parseFloat(tr.querySelector('[name="qty[]"]').value)||0;
+  const up=parseFloat(tr.querySelector('[name="unit_price[]"]').value)||0;
+  const disc=parseFloat(tr.querySelector('[name="discount[]"]').value)||0;
+  const total=qty*up*(1-disc/100);
+  tr.querySelector('[name="line_total[]"]').value=total.toFixed(2);
+  calcTotals();
+}
+function calcTotals(){
+  let sub=0;
+  document.querySelectorAll('[name="line_total[]"]').forEach(i=>sub+=parseFloat(i.value)||0);
+  const dtype=document.getElementById('disc-type').value;
+  const dval=parseFloat(document.getElementById('disc-val').value)||0;
+  const disc=dtype==='value'?dval:sub*dval/100;
+  const tax=parseFloat(document.getElementById('tax-rate').value)||0;
+  const taxAmt=(sub-disc)*tax/100;
+  const total=sub-disc+taxAmt;
+  document.getElementById('est-total').value=total.toFixed(2)+' EGP';
+}
+function addLine(){
+  const tbody=document.getElementById('lines-body');
+  const tr=document.createElement('tr');
+  tr.innerHTML=`
+    <td style="padding:4px"><input type="text" name="description[]" required placeholder="Description"></td>
+    <td style="padding:4px"><select name="line_type[]"><option>service</option><option>product</option><option>lab</option><option>vaccine</option><option>medication</option></select></td>
+    <td style="padding:4px"><input type="number" name="qty[]" value="1" min="0.01" step="0.01" style="text-align:right" onchange="calcLine(this)"></td>
+    <td style="padding:4px"><input type="number" name="unit_price[]" value="0" min="0" step="0.01" style="text-align:right" onchange="calcLine(this)"></td>
+    <td style="padding:4px"><input type="number" name="discount[]" value="0" min="0" max="100" step="0.1" style="text-align:right" onchange="calcLine(this)"></td>
+    <td style="padding:4px"><input type="number" name="line_total[]" value="0" readonly style="background:var(--cl-bg);text-align:right;font-weight:600"></td>
+    <td style="padding:4px"><button type="button" class="btn-rm" onclick="this.closest('tr').remove();calcTotals()">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+document.addEventListener('DOMContentLoaded',calcTotals);
+</script>
+{% endblock %}

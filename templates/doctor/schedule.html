@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}My Schedule{% endblock %}
+{% block page_title %}My Schedule{% endblock %}
+{% block page_sub %}Weekly view for Dr. {{ doctor_name }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('doctor.my_schedule', week=week_offset - 1) }}" class="pf-btn pf-btn-ghost">← Prev Week</a>
+<a href="{{ url_for('doctor.my_schedule', week=0) }}" class="pf-btn pf-btn-secondary">This Week</a>
+<a href="{{ url_for('doctor.my_schedule', week=week_offset + 1) }}" class="pf-btn pf-btn-ghost">Next Week →</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:.75rem">
+  {% for d in week_days %}
+  {% set day_key = d.isoformat() %}
+  {% set is_today = d == today %}
+  {% set day_appts = schedule.get(day_key, []) %}
+  <div style="background:{% if is_today %}var(--pf-primary){% else %}var(--pf-bg-card){% endif %};
+              border:2px solid {% if is_today %}var(--pf-primary){% else %}var(--pf-border){% endif %};
+              border-radius:10px;overflow:hidden">
+    <!-- Day header -->
+    <div style="padding:.6rem .75rem;text-align:center;
+                background:{% if is_today %}var(--pf-primary){% else %}var(--pf-bg-subtle){% endif %};
+                color:{% if is_today %}#fff{% else %}var(--pf-text){% endif %}">
+      <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">
+        {{ d.strftime('%a') }}
+      </div>
+      <div style="font-size:1.4rem;font-weight:800">{{ d.day }}</div>
+      {% if day_appts %}
+      <div style="font-size:.7rem;opacity:.8">{{ day_appts|length }} appt{{ 's' if day_appts|length != 1 }}</div>
+      {% endif %}
+    </div>
+    <!-- Appointments -->
+    <div style="padding:.5rem;background:{% if is_today %}#eff6ff{% else %}var(--pf-bg-card){% endif %};min-height:120px">
+      {% for a in day_appts %}
+      <div style="background:#fff;border:1px solid var(--pf-border);border-radius:6px;padding:.4rem .6rem;margin-bottom:.4rem;font-size:.78rem;border-left:3px solid
+        {% if a.status == 'Completed' %}#10b981{% elif a.status == 'In Progress' %}#3b82f6{% elif a.status == 'Cancelled' %}#ef4444{% else %}#f59e0b{% endif %}">
+        <div style="font-weight:600">{{ (a.appointment_date or '')[-8:-3] }}</div>
+        <div style="color:var(--pf-text)">{{ a.pet_name }}</div>
+        <div style="color:var(--pf-muted)">{{ a.owner_name }}</div>
+        <div style="color:var(--pf-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">{{ a.reason or '' }}</div>
+      </div>
+      {% else %}
+      <div style="text-align:center;color:var(--pf-muted);font-size:.78rem;padding:.75rem 0;opacity:.6">Free</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div style="margin-top:1rem;font-size:.8rem;color:var(--pf-muted);display:flex;gap:1.5rem">
+  <span>Legend:</span>
+  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#f59e0b;border-radius:2px;display:inline-block"></span> Scheduled</span>
+  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#3b82f6;border-radius:2px;display:inline-block"></span> In Progress</span>
+  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#10b981;border-radius:2px;display:inline-block"></span> Completed</span>
+  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#ef4444;border-radius:2px;display:inline-block"></span> Cancelled</span>
+</div>
+{% endblock %}

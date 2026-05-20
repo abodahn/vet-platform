@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Order {{ order.order_number }}{% endblock %}
+{% block page_title %}Order {{ order.order_number }}{% endblock %}
+{% block page_sub %}{{ order.created_at[:16].replace('T',' ') if order.created_at else '' }} · {{ order.status|capitalize }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('petshop.orders') }}" class="pf-btn pf-btn-secondary">← Orders</a>
+<a href="{{ url_for('petshop.pos') }}" class="pf-btn pf-btn-primary">🛒 New Sale</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.od-grid { display:grid; grid-template-columns:1fr 340px; gap:20px; align-items:start; }
+.od-card { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:var(--cl-shadow-card); }
+.od-section-title { font-size:12px; font-weight:800; color:var(--cl-primary); text-transform:uppercase;
+                    letter-spacing:.06em; margin-bottom:14px; padding-bottom:10px; border-bottom:2px solid var(--cl-border); }
+.tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.tbl th { text-align:left; padding:9px 12px; background:var(--cl-bg); font-weight:700;
+          color:var(--cl-text-muted); font-size:11px; text-transform:uppercase; }
+.tbl td { padding:10px 12px; border-bottom:1px solid var(--cl-border); }
+.tbl tr:last-child td { border-bottom:none; }
+.status-paid       { background:#dcfce7; color:#15803d; padding:4px 12px; border-radius:999px; font-size:12px; font-weight:700; }
+.status-draft      { background:#fef3c7; color:#92400e; padding:4px 12px; border-radius:999px; font-size:12px; font-weight:700; }
+.status-cancelled  { background:#fee2e2; color:#991b1b; padding:4px 12px; border-radius:999px; font-size:12px; font-weight:700; }
+.meta-row { display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.meta-row:last-child { border-bottom:none; }
+.meta-label { color:var(--cl-text-muted); font-weight:600; }
+.meta-value { font-weight:700; }
+.total-row { display:flex; justify-content:space-between; padding:8px 0; font-size:13px; }
+.total-grand { font-size:18px; font-weight:900; color:var(--cl-primary); }
+</style>
+
+<div class="od-grid">
+  <!-- Left: items -->
+  <div>
+    <div class="od-card">
+      <div class="od-section-title">🧾 Order Items</div>
+      {% if items %}
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th style="text-align:center">Qty</th>
+            <th style="text-align:right">Unit Price</th>
+            <th style="text-align:right">Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+          <tr>
+            <td>
+              <div style="font-weight:700">{{ it.product_name }}</div>
+              {% if it.sku %}<div style="font-size:11px;color:var(--cl-text-muted);font-family:monospace">{{ it.sku }}</div>{% endif %}
+            </td>
+            <td style="text-align:center;font-weight:700">{{ it.qty }}</td>
+            <td style="text-align:right">{{ "{:,.2f}".format(it.unit_price) }} EGP</td>
+            <td style="text-align:right;font-weight:700">{{ "{:,.2f}".format(it.line_total) }} EGP</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div style="text-align:center;padding:24px;color:var(--cl-text-muted)">No items found</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Right: summary + meta -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <!-- Totals -->
+    <div class="od-card">
+      <div class="od-section-title">💰 Totals</div>
+      <div class="total-row">
+        <span style="color:var(--cl-text-muted)">Subtotal</span>
+        <span>{{ "{:,.2f}".format(order.subtotal) }} EGP</span>
+      </div>
+      {% if order.discount_amount and order.discount_amount > 0 %}
+      <div class="total-row">
+        <span style="color:#dc2626">Discount</span>
+        <span style="color:#dc2626">− {{ "{:,.2f}".format(order.discount_amount) }} EGP</span>
+      </div>
+      {% endif %}
+      {% if order.tax_amount and order.tax_amount > 0 %}
+      <div class="total-row">
+        <span style="color:var(--cl-text-muted)">Tax</span>
+        <span>{{ "{:,.2f}".format(order.tax_amount) }} EGP</span>
+      </div>
+      {% endif %}
+      <div style="border-top:2px solid var(--cl-border);margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:800">Grand Total</span>
+        <span class="total-grand">{{ "{:,.2f}".format(order.total) }} EGP</span>
+      </div>
+      {% if order.payment_method|lower == 'cash' and order.paid_amount and order.paid_amount > order.total %}
+      <div class="total-row" style="margin-top:8px">
+        <span style="color:var(--cl-text-muted)">Cash Tendered</span>
+        <span>{{ "{:,.2f}".format(order.paid_amount) }} EGP</span>
+      </div>
+      <div class="total-row">
+        <span style="color:#15803d;font-weight:700">Change</span>
+        <span style="color:#15803d;font-weight:700">{{ "{:,.2f}".format(order.change_amount) }} EGP</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Order meta -->
+    <div class="od-card">
+      <div class="od-section-title">📋 Details</div>
+      <div class="meta-row">
+        <span class="meta-label">Status</span>
+        <span class="meta-value"><span class="status-{{ order.status }}">{{ order.status }}</span></span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Customer</span>
+        <span class="meta-value">{{ order.owner_name or 'Walk-in' }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Payment</span>
+        <span class="meta-value">{{ (order.payment_method or 'cash')|capitalize }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Date</span>
+        <span class="meta-value">{{ order.created_at[:16].replace('T',' ') if order.created_at else '—' }}</span>
+      </div>
+      {% if order.notes %}
+      <div class="meta-row">
+        <span class="meta-label">Notes</span>
+        <span class="meta-value" style="font-size:12px">{{ order.notes }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Actions -->
+    <div class="od-card">
+      <div class="od-section-title">⚙️ Actions</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <a href="{{ url_for('petshop.order_detail', oid=order.id) }}?print=1" target="_blank"
+           style="display:block;text-align:center;padding:10px;background:var(--cl-primary-subtle);
+                  color:var(--cl-primary);border-radius:8px;font-weight:700;font-size:13px;text-decoration:none">
+          🖨️ Print Receipt
+        </a>
+        {% if order.status == 'paid' %}
+        <form method="post" action="{{ url_for('petshop.order_cancel', oid=order.id) }}"
+              onsubmit="return confirm('Cancel this order and restore stock?')">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <button type="submit" style="width:100%;padding:10px;background:#fee2e2;color:#991b1b;
+                  border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">
+            ❌ Cancel Order
+          </button>
+        </form>
+        {% elif order.status == 'cancelled' %}
+        <div style="text-align:center;padding:10px;background:var(--cl-bg);border-radius:8px;
+                    color:var(--cl-text-muted);font-size:12px">Order has been cancelled</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Pet Shop Reports{% endblock %}
+{% block page_title %}Pet Shop Reports{% endblock %}
+{% block page_sub %}Revenue, top products, stock health and daily breakdowns{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('petshop.orders') }}" class="pf-btn pf-btn-secondary">🧾 Orders</a>
+<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.rpt-kpi { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:16px; margin-bottom:24px; }
+.kpi-card { background:var(--cl-surface); border-radius:14px; padding:20px; box-shadow:var(--cl-shadow-card); }
+.kpi-card.accent { border-left:5px solid var(--cl-primary); }
+.kpi-card.green  { border-left:5px solid #22c55e; }
+.kpi-card.amber  { border-left:5px solid #f59e0b; }
+.kpi-card.red    { border-left:5px solid #ef4444; }
+.kpi-val  { font-size:26px; font-weight:900; color:var(--cl-primary); line-height:1; margin:6px 0 4px; }
+.kpi-lbl  { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--cl-text-muted); }
+.kpi-icon { font-size:22px; margin-bottom:4px; }
+.rpt-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+.sec-card { background:var(--cl-surface); border-radius:14px; padding:22px; box-shadow:var(--cl-shadow-card); }
+.sec-title { font-size:13px; font-weight:800; color:var(--cl-primary); margin-bottom:14px;
+             padding-bottom:10px; border-bottom:2px solid var(--cl-border); }
+.tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.tbl th { text-align:left; padding:8px 12px; background:var(--cl-bg); font-weight:700;
+          color:var(--cl-text-muted); font-size:11px; text-transform:uppercase; }
+.tbl td { padding:9px 12px; border-bottom:1px solid var(--cl-border); }
+.tbl tr:last-child td { border-bottom:none; }
+.rank-badge { display:inline-flex; align-items:center; justify-content:center;
+              width:22px; height:22px; border-radius:50%; font-size:10px; font-weight:900;
+              background:var(--cl-primary-subtle); color:var(--cl-primary); }
+.rank-1 { background:#fef3c7; color:#92400e; }
+.rank-2 { background:#f1f5f9; color:#475569; }
+.rank-3 { background:#fce7f3; color:#9d174d; }
+.low-pill { background:#fee2e2; color:#991b1b; border-radius:6px; padding:3px 8px; font-size:11px; font-weight:700; }
+.bar-wrap { background:var(--cl-bg); border-radius:6px; height:8px; overflow:hidden; margin-top:4px; }
+.bar-fill { height:100%; background:var(--cl-primary); border-radius:6px; transition:.3s; }
+.filter-row { background:var(--cl-surface); border-radius:12px; padding:14px 18px; margin-bottom:20px;
+              box-shadow:var(--cl-shadow-card); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.filter-row select, .filter-row input { padding:8px 11px; border:1.5px solid var(--cl-border);
+  border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; }
+</style>
+
+<!-- Date filter -->
+<form method="get" class="filter-row">
+  <span style="font-size:12px;font-weight:700;color:var(--cl-text-muted)">Period:</span>
+  <input type="date" name="date_from" value="{{ date_from }}">
+  <span style="color:var(--cl-text-muted)">→</span>
+  <input type="date" name="date_to" value="{{ date_to }}">
+  <button type="submit" class="pf-btn pf-btn-primary" style="padding:8px 18px">Apply</button>
+  <a href="{{ url_for('petshop.reports') }}" class="pf-btn pf-btn-secondary" style="padding:8px 14px">Reset</a>
+  <span style="font-size:11px;color:var(--cl-text-muted);margin-left:auto">
+    Showing: <strong>{{ date_from }}</strong> → <strong>{{ date_to }}</strong>
+  </span>
+</form>
+
+<!-- KPIs -->
+<div class="rpt-kpi">
+  <div class="kpi-card accent">
+    <div class="kpi-icon">🧾</div>
+    <div class="kpi-val">{{ stats.total_orders }}</div>
+    <div class="kpi-lbl">Total Orders</div>
+  </div>
+  <div class="kpi-card green">
+    <div class="kpi-icon">💰</div>
+    <div class="kpi-val">{{ "{:,.0f}".format(stats.total_revenue) }}</div>
+    <div class="kpi-lbl">Revenue (EGP)</div>
+  </div>
+  <div class="kpi-card amber">
+    <div class="kpi-icon">📦</div>
+    <div class="kpi-val">{{ "{:,.0f}".format(stats.total_cost) }}</div>
+    <div class="kpi-lbl">Cost (EGP)</div>
+  </div>
+  <div class="kpi-card green">
+    <div class="kpi-icon">📈</div>
+    <div class="kpi-val">{{ "{:,.0f}".format(stats.gross_profit) }}</div>
+    <div class="kpi-lbl">Gross Profit (EGP)</div>
+  </div>
+  <div class="kpi-card {% if stats.margin_pct < 20 %}red{% else %}accent{% endif %}">
+    <div class="kpi-icon">%</div>
+    <div class="kpi-val">{{ "{:.1f}".format(stats.margin_pct) }}%</div>
+    <div class="kpi-lbl">Margin %</div>
+  </div>
+  <div class="kpi-card accent">
+    <div class="kpi-icon">🛒</div>
+    <div class="kpi-val">{{ "{:,.0f}".format(stats.avg_order_value) }}</div>
+    <div class="kpi-lbl">Avg Order (EGP)</div>
+  </div>
+</div>
+
+<div class="rpt-grid">
+  <!-- Top products by revenue -->
+  <div class="sec-card">
+    <div class="sec-title">🏆 Top Products by Revenue</div>
+    {% if top_products %}
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Product</th><th style="text-align:right">Qty Sold</th><th style="text-align:right">Revenue</th></tr></thead>
+      <tbody>
+        {% for p in top_products %}
+        <tr>
+          <td><span class="rank-badge rank-{{ loop.index if loop.index <= 3 else '' }}">{{ loop.index }}</span></td>
+          <td>
+            <div style="font-weight:700">{{ p.product_name }}</div>
+            {% if p.sku %}<div style="font-size:10px;color:var(--cl-text-muted);font-family:monospace">{{ p.sku }}</div>{% endif %}
+            <div class="bar-wrap">
+              <div class="bar-fill" style="width:{{ ((p.revenue / top_products[0].revenue)*100)|int if top_products[0].revenue else 0 }}%"></div>
+            </div>
+          </td>
+          <td style="text-align:right;font-weight:600">{{ p.qty_sold }}</td>
+          <td style="text-align:right;font-weight:800;color:var(--cl-primary)">{{ "{:,.0f}".format(p.revenue) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:32px;color:var(--cl-text-muted)">No sales data in this period</div>
+    {% endif %}
+  </div>
+
+  <!-- Low stock -->
+  <div class="sec-card">
+    <div class="sec-title">⚠️ Low Stock Alerts</div>
+    {% if low_stock %}
+    <table class="tbl">
+      <thead><tr><th>Product</th><th>Stock</th><th>Reorder At</th></tr></thead>
+      <tbody>
+        {% for p in low_stock %}
+        <tr>
+          <td style="font-weight:700">{{ p.name }}</td>
+          <td><span class="low-pill">{{ p.stock_qty }} {{ p.unit }}</span></td>
+          <td style="color:var(--cl-text-muted)">≤ {{ p.reorder_level }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:32px;color:#15803d">
+      <div style="font-size:32px">✅</div>
+      <div style="font-weight:600;margin-top:8px">All stock levels healthy</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Daily breakdown -->
+<div class="sec-card">
+  <div class="sec-title">📅 Daily Sales Breakdown</div>
+  {% if daily %}
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th style="text-align:center">Orders</th>
+        <th style="text-align:right">Revenue</th>
+        <th style="text-align:right">Avg Order</th>
+        <th style="min-width:160px">Revenue Bar</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set max_rev = daily | map(attribute='revenue') | max %}
+      {% for d in daily %}
+      <tr>
+        <td style="font-weight:700;white-space:nowrap">{{ d.order_date }}</td>
+        <td style="text-align:center">{{ d.order_count }}</td>
+        <td style="text-align:right;font-weight:700;color:var(--cl-primary)">{{ "{:,.0f}".format(d.revenue) }} EGP</td>
+        <td style="text-align:right;color:var(--cl-text-muted)">
+          {{ "{:,.0f}".format(d.revenue / d.order_count) if d.order_count else '—' }} EGP
+        </td>
+        <td>
+          <div class="bar-wrap">
+            <div class="bar-fill" style="width:{{ ((d.revenue / max_rev)*100)|int if max_rev else 0 }}%"></div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:32px;color:var(--cl-text-muted)">No sales in this period</div>
+  {% endif %}
+</div>
+
+<!-- Payment method breakdown -->
+{% if payment_breakdown %}
+<div class="sec-card" style="margin-top:20px">
+  <div class="sec-title">💳 Payment Method Breakdown</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px">
+    {% for pm in payment_breakdown %}
+    <div style="background:var(--cl-bg);border-radius:10px;padding:16px;text-align:center">
+      <div style="font-size:22px;margin-bottom:6px">
+        {% if pm.payment_method == 'cash' %}💵
+        {% elif pm.payment_method == 'card' %}💳
+        {% elif pm.payment_method == 'instapay' %}📱
+        {% else %}🔄{% endif %}
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--cl-text-muted);text-transform:uppercase;margin-bottom:4px">
+        {{ pm.payment_method|capitalize }}
+      </div>
+      <div style="font-size:16px;font-weight:900;color:var(--cl-primary)">{{ "{:,.0f}".format(pm.revenue) }} EGP</div>
+      <div style="font-size:11px;color:var(--cl-text-muted)">{{ pm.order_count }} order(s)</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Telemedicine{% endblock %}
+{% block page_title %}Telemedicine{% endblock %}
+{% block page_sub %}Video consultations for remote patients{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('telemedicine.new_session') }}" class="pf-btn pf-btn-primary">+ New Session</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.tele-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+@media(max-width:700px){.tele-stats{grid-template-columns:1fr 1fr}}
+.tele-stat{background:var(--cl-surface);border-radius:10px;padding:16px 20px;box-shadow:0 2px 6px rgba(0,0,0,.07);text-align:center}
+.tele-stat-val{font-size:26px;font-weight:800;color:var(--cl-primary)}
+.tele-stat-label{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--cl-muted);margin-top:4px}
+.status-Scheduled{background:#dbeafe;color:#1d4ed8}
+.status-In.Progress{background:#fef3c7;color:#d97706}
+.status-Completed{background:#dcfce7;color:#15803d}
+.status-Cancelled{background:#fee2e2;color:#dc2626}
+</style>
+
+<div class="tele-stats">
+  <div class="tele-stat"><div class="tele-stat-val">{{ stats.total }}</div><div class="tele-stat-label">Total Sessions</div></div>
+  <div class="tele-stat"><div class="tele-stat-val" style="color:#1d4ed8">{{ stats.scheduled }}</div><div class="tele-stat-label">Scheduled</div></div>
+  <div class="tele-stat"><div class="tele-stat-val" style="color:#15803d">{{ stats.completed }}</div><div class="tele-stat-label">Completed</div></div>
+  <div class="tele-stat"><div class="tele-stat-val" style="color:#d97706">{{ stats.today }}</div><div class="tele-stat-label">Today</div></div>
+</div>
+
+<div class="pf-card" style="margin-bottom:24px">
+  <div class="pf-card-header"><h3 class="pf-card-title">📅 Upcoming Sessions</h3></div>
+  <table class="pf-table">
+    <thead><tr><th>#</th><th>Date / Time</th><th>Owner</th><th>Pet</th><th>Doctor</th><th>Duration</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for ts in upcoming %}
+      <tr>
+        <td>{{ ts.id }}</td>
+        <td style="white-space:nowrap;font-weight:600">{{ (ts.scheduled_at or '')[:16] }}</td>
+        <td>{{ ts.owner_name }}<br><small style="color:var(--cl-muted)">{{ ts.phone }}</small></td>
+        <td>{{ ts.pet_name or '—' }}<br><small style="color:var(--cl-muted)">{{ ts.species or '' }}</small></td>
+        <td>{{ ts.doctor_name or '—' }}</td>
+        <td>{{ ts.duration_min }} min</td>
+        <td><span class="pf-badge {% if ts.status=='Completed' %}success{% elif ts.status=='Cancelled' %}error{% else %}warning{% endif %}">{{ ts.status }}</span></td>
+        <td style="white-space:nowrap">
+          <a href="{{ url_for('telemedicine.session_detail', sid=ts.id) }}" class="pf-btn pf-btn-sm pf-btn-ghost">View</a>
+          {% if ts.status == 'Scheduled' %}
+          <a href="{{ ts.room_url }}" target="_blank" class="pf-btn pf-btn-sm pf-btn-primary">🎥 Join</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--cl-muted)">No upcoming sessions. <a href="{{ url_for('telemedicine.new_session') }}">Schedule one →</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="pf-card">
+  <div class="pf-card-header"><h3 class="pf-card-title">📋 Past Sessions</h3></div>
+  <table class="pf-table">
+    <thead><tr><th>#</th><th>Date</th><th>Owner</th><th>Pet</th><th>Doctor</th><th>Status</th><th>Invoice</th></tr></thead>
+    <tbody>
+      {% for ts in past %}
+      <tr>
+        <td><a href="{{ url_for('telemedicine.session_detail', sid=ts.id) }}" style="color:var(--cl-primary)">{{ ts.id }}</a></td>
+        <td style="white-space:nowrap;color:var(--cl-muted)">{{ (ts.scheduled_at or '')[:10] }}</td>
+        <td>{{ ts.owner_name }}</td>
+        <td>{{ ts.pet_name or '—' }}</td>
+        <td>{{ ts.doctor_name or '—' }}</td>
+        <td><span class="pf-badge {% if ts.status=='Completed' %}success{% else %}error{% endif %}">{{ ts.status }}</span></td>
+        <td>
+          {% if ts.invoice_id %}
+          <a href="{{ url_for('finance.invoice_detail', inv_id=ts.invoice_id) }}" class="pf-badge success" style="text-decoration:none">🧾 #{{ ts.invoice_id }}</a>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--cl-muted)">No past sessions.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

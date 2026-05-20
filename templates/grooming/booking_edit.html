@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Edit Grooming Booking #{{ booking.id }}{% endblock %}
+{% block page_title %}Edit Grooming Booking{% endblock %}
+{% block page_sub %}Booking #{{ booking.id }} — {{ booking.pet_name }} ({{ booking.owner_name }}){% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost">← Back to Bookings</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" action="{{ url_for('grooming.booking_edit_submit', booking_id=booking.id) }}" style="max-width:800px">
+
+  {# Read-only patient info #}
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Patient (read-only)</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Owner</label>
+        <div class="pf-input" style="background:var(--pf-bg-alt,#f8fafc);cursor:default">
+          {{ booking.owner_name }} &nbsp;<small style="color:var(--pf-muted)">{{ booking.phone }}</small>
+        </div>
+      </div>
+      <div>
+        <label class="pf-label">Pet</label>
+        <div class="pf-input" style="background:var(--pf-bg-alt,#f8fafc);cursor:default">
+          <strong>{{ booking.pet_name }}</strong> &nbsp;<small style="color:var(--pf-muted)">{{ booking.species }}</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Editable appointment details #}
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Appointment Details</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Service</label>
+        <select name="service_id" class="pf-input" onchange="fillPrice(this)">
+          <option value="">— No specific service —</option>
+          {% for s in services %}
+          <option value="{{ s.id }}" data-price="{{ s.price or 0 }}"
+            {% if booking.service_id == s.id %}selected{% endif %}>
+            {{ s.name }}{% if s.price %} — {{ "%.0f"|format(s.price|float) }} EGP{% endif %}
+            {% if s.duration_min %} ({{ s.duration_min }}min){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="pf-label">Price Override (EGP)</label>
+        <input type="number" name="price_override" id="priceOverride" class="pf-input"
+               step="0.01" min="0" placeholder="Leave blank to use service price"
+               value="{{ booking.price if booking.price else '' }}">
+        <small style="color:var(--pf-muted);font-size:.75rem">Override service price for this session only</small>
+      </div>
+      <div>
+        <label class="pf-label">Groomer Name</label>
+        <input type="text" name="groomer_name" class="pf-input"
+               value="{{ booking.groomer_name or '' }}" placeholder="Groomer name">
+      </div>
+      <div>
+        <label class="pf-label">Status</label>
+        <select name="status" class="pf-input">
+          {% for s in ['Scheduled', 'In Progress', 'Completed', 'Cancelled'] %}
+          <option value="{{ s }}" {% if booking.status == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="grid-column:span 2">
+        <label class="pf-label">Date &amp; Time *</label>
+        <input type="datetime-local" name="booking_date" class="pf-input" required
+               value="{{ (booking.booking_date or '')[:16] }}">
+      </div>
+      <div style="grid-column:span 2">
+        <label class="pf-label">Notes</label>
+        <textarea name="notes" class="pf-input" rows="3"
+                  placeholder="Special instructions, behaviour notes…">{{ booking.notes or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  {# Invoice info (if exists) #}
+  {% if booking.invoice_id %}
+  <div class="pf-card" style="margin-bottom:1.5rem;border-left:4px solid var(--pf-success,#16a34a)">
+    <div style="padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem">
+      <span style="font-size:1.4rem">🧾</span>
+      <div>
+        <strong>Invoice already generated</strong>
+        <div style="font-size:.85rem;color:var(--pf-muted)">Invoice #{{ booking.invoice_id }}</div>
+      </div>
+      <a href="{{ url_for('finance.invoice_detail', inv_id=booking.invoice_id) }}"
+         class="pf-btn pf-btn-secondary" style="margin-left:auto">View Invoice / Receipt</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <div style="display:flex;gap:1rem;flex-wrap:wrap">
+    <button type="submit" class="pf-btn pf-btn-primary">💾 Save Changes</button>
+    <a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost">Cancel</a>
+
+    {# Quick-complete with invoice #}
+    {% if booking.status not in ('Completed', 'Cancelled') and not booking.invoice_id %}
+    <form method="post" action="{{ url_for('grooming.update_booking_status', booking_id=booking.id) }}" style="display:inline">
+      <input type="hidden" name="status" value="Completed">
+      <button type="submit" class="pf-btn pf-btn-primary"
+              onclick="return confirm('Mark as completed and generate invoice?')"
+              style="background:var(--pf-success,#16a34a)">
+        ✅ Complete &amp; Generate Invoice
+      </button>
+    </form>
+    {% endif %}
+
+    {% if booking.status == 'Scheduled' %}
+    <form method="post" action="{{ url_for('grooming.update_booking_status', booking_id=booking.id) }}" style="display:inline">
+      <input type="hidden" name="status" value="In Progress">
+      <button type="submit" class="pf-btn pf-btn-secondary">▶ Start Session</button>
+    </form>
+    {% endif %}
+  </div>
+</form>
+
+<script>
+function fillPrice(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  var price = opt ? opt.getAttribute('data-price') : '';
+  if (price && price !== '0') {
+    document.getElementById('priceOverride').value = price;
+  }
+}
+</script>
+{% endblock %}

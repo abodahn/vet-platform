@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Stock Movements{% endblock %}
+{% block page_title %}Stock Movements{% endblock %}
+{% block page_sub %}Full movement history log{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('inventory.dashboard') }}" class="btn btn-secondary">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.filter-bar { background:var(--cl-surface); border-radius:12px; padding:16px 20px; margin-bottom:20px; display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+.filter-group { display:flex; flex-direction:column; gap:4px; }
+.filter-label { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); }
+.filter-control { padding:8px 12px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; }
+.movements-table { background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.07); }
+.movements-table table { width:100%; border-collapse:collapse; }
+.movements-table th { background:var(--cl-primary); color:#fff; padding:12px 16px; text-align:left; font-size:13px; font-weight:600; }
+.movements-table td { padding:11px 16px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.movements-table tr:hover td { background:rgba(0,0,0,.02); }
+.mv-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; text-transform:uppercase; }
+.mv-in { background:#dcfce7; color:#15803d; }
+.mv-out { background:#fee2e2; color:#dc2626; }
+.mv-adjustment { background:#dbeafe; color:#1d4ed8; }
+.mv-transfer { background:#ede9fe; color:#7c3aed; }
+.mv-expired { background:#fef3c7; color:#d97706; }
+.mv-damaged { background:#f1f5f9; color:#64748b; }
+</style>
+
+<div class="filter-bar">
+  <form method="get" style="display:contents">
+    <div class="filter-group">
+      <label class="filter-label">Item</label>
+      <select name="item_id" class="filter-control">
+        <option value="">All Items</option>
+        {% for i in items_for_filter %}
+        <option value="{{ i.id }}" {% if request.args.get('item_id')|int == i.id %}selected{% endif %}>{{ i.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Type</label>
+      <select name="type" class="filter-control">
+        <option value="">All Types</option>
+        <option value="in" {% if request.args.get('type')=='in' %}selected{% endif %}>Stock In</option>
+        <option value="out" {% if request.args.get('type')=='out' %}selected{% endif %}>Stock Out</option>
+        <option value="adjustment" {% if request.args.get('type')=='adjustment' %}selected{% endif %}>Adjustment</option>
+        <option value="expired" {% if request.args.get('type')=='expired' %}selected{% endif %}>Expired</option>
+        <option value="damaged" {% if request.args.get('type')=='damaged' %}selected{% endif %}>Damaged</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Limit</label>
+      <select name="limit" class="filter-control">
+        <option value="50" {% if request.args.get('limit','100')=='50' %}selected{% endif %}>Last 50</option>
+        <option value="100" {% if request.args.get('limit','100')=='100' %}selected{% endif %}>Last 100</option>
+        <option value="500" {% if request.args.get('limit','100')=='500' %}selected{% endif %}>Last 500</option>
+      </select>
+    </div>
+    <button type="submit" style="padding:8px 20px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Filter</button>
+    <a href="{{ url_for('inventory.movements') }}" style="padding:8px 16px; border:1.5px solid var(--cl-border); border-radius:8px; text-decoration:none; color:var(--cl-text); font-weight:600; font-size:13px;">Reset</a>
+  </form>
+</div>
+
+<div class="movements-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Date/Time</th>
+        <th>Item</th>
+        <th>Type</th>
+        <th style="text-align:right">Qty</th>
+        <th>Reference</th>
+        <th>By</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in movements %}
+      <tr>
+        <td style="color:var(--cl-muted); white-space:nowrap;">{{ m.created_at[:16] if m.created_at else '—' }}</td>
+        <td style="font-weight:600;">{{ m.item_name or ('Item #' + m.item_id|string) }}</td>
+        <td>
+          <span class="mv-badge mv-{{ m.movement_type }}">{{ m.movement_type }}</span>
+        </td>
+        <td style="text-align:right; font-weight:700;
+                   color:{% if m.movement_type == 'in' %}var(--cl-success){% else %}var(--cl-danger){% endif %}">
+          {% if m.movement_type == 'in' %}+{% else %}−{% endif %}{{ m.quantity|int }}
+        </td>
+        <td style="font-size:12px; color:var(--cl-muted);">{{ m.reference_type or '—' }}{% if m.reference_id %} #{{ m.reference_id }}{% endif %}</td>
+        <td style="font-size:12px;">{{ m.created_by or '—' }}</td>
+        <td style="font-size:12px; color:var(--cl-muted);">{{ m.notes or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center; padding:32px; color:var(--cl-muted);">No movements found</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

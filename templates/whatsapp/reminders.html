@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Pending Reminders{% endblock %}
+{% block page_title %}Pending Reminders{% endblock %}
+{% block page_sub %}Appointments, follow-ups, and vaccine reminders awaiting action{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">💬 Templates</a>
+<a href="{{ url_for('whatsapp.message_log') }}" class="pf-btn pf-btn-secondary">📋 Message Log</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.rem-table { width:100%; border-collapse:collapse; background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+.rem-table th { background:var(--cl-primary); color:#fff; padding:12px 16px; text-align:left; font-size:12px; font-weight:600; text-transform:uppercase; }
+.rem-table td { padding:12px 16px; border-bottom:1px solid var(--cl-border); font-size:13px; vertical-align:middle; }
+.rem-table tr:last-child td { border-bottom:none; }
+.rem-table tr:hover td { background:var(--cl-bg); }
+.type-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+.type-appointment { background:#dbeafe; color:#1d4ed8; }
+.type-followup    { background:#d1fae5; color:#065f46; }
+.type-vaccine     { background:#ede9fe; color:#5b21b6; }
+.type-medication  { background:#fce7f3; color:#9d174d; }
+.type-custom      { background:#f3f4f6; color:#374151; }
+.due-overdue  { color:#dc2626; font-weight:700; }
+.due-today    { color:#d97706; font-weight:700; }
+.due-upcoming { color:#166534; }
+.action-group { display:flex; gap:6px; align-items:center; }
+.btn-mark { padding:5px 11px; background:#dcfce7; color:#166534; border:1px solid #bbf7d0; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; }
+.btn-mark:hover { background:#166534; color:#fff; }
+.btn-send { padding:5px 11px; background:#25D366; color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; }
+.btn-send:hover { background:#128C7E; }
+.empty-state { text-align:center; padding:80px 20px; color:var(--cl-muted); }
+.send-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; align-items:center; justify-content:center; }
+.send-modal.open { display:flex; }
+.send-modal-box { background:var(--cl-surface); border-radius:16px; padding:28px; width:100%; max-width:480px; box-shadow:0 8px 40px rgba(0,0,0,.2); }
+.send-modal-title { font-size:17px; font-weight:700; margin-bottom:16px; color:var(--cl-primary); }
+.send-modal-box label { font-size:13px; font-weight:600; color:var(--cl-muted); display:block; margin-bottom:6px; }
+.send-modal-box input, .send-modal-box textarea, .send-modal-box select {
+  width:100%; padding:10px 12px; border:1.5px solid var(--cl-border); border-radius:8px;
+  background:var(--cl-bg); color:var(--cl-text); font-size:14px; box-sizing:border-box; margin-bottom:14px;
+}
+.send-modal-box textarea { min-height:90px; resize:vertical; font-family:inherit; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:4px; }
+.btn-modal-cancel { padding:9px 18px; background:var(--cl-bg); border:1.5px solid var(--cl-border); border-radius:8px; color:var(--cl-text); cursor:pointer; font-size:14px; }
+.btn-modal-send { padding:9px 20px; background:#25D366; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if reminders %}
+<div style="color:var(--cl-muted);font-size:13px;margin-bottom:16px;">
+  {{ reminders|length }} pending reminder{{ 's' if reminders|length != 1 }}
+</div>
+<div style="overflow-x:auto;">
+  <table class="rem-table">
+    <thead>
+      <tr>
+        <th>Due Date</th>
+        <th>Owner</th>
+        <th>Pet</th>
+        <th>Type</th>
+        <th>Message</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set today = now().strftime('%Y-%m-%d') if now is defined else '' %}
+      {% for r in reminders %}
+      {% set due = r.scheduled_for[:10] if r.scheduled_for else '' %}
+      {% set due_class = 'due-overdue' if due < today else ('due-today' if due == today else 'due-upcoming') %}
+      {% set type_cls = 'type-' ~ (r.reminder_type or 'custom') %}
+      <tr>
+        <td class="{{ due_class }}">{{ due or '—' }}</td>
+        <td>
+          <div style="font-weight:600;">{{ r.owner_name or '—' }}</div>
+          {% if r.whatsapp_phone %}
+          <div style="font-size:11px;color:var(--cl-muted);">{{ r.whatsapp_phone }}</div>
+          {% endif %}
+        </td>
+        <td>{{ r.pet_name or '—' }}</td>
+        <td>
+          <span class="type-badge {{ type_cls }}">
+            {{ (r.reminder_type or 'custom').replace('_',' ').title() }}
+          </span>
+        </td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+            title="{{ r.message or '' }}">
+          {{ r.message or '—' }}
+        </td>
+        <td>
+          <div class="action-group">
+            <form method="post" action="{{ url_for('whatsapp.mark_reminder_sent', rid=r.id) }}" style="display:inline;">
+              <button type="submit" class="btn-mark" title="Mark as sent without sending WhatsApp">
+                ✓ Mark Sent
+              </button>
+            </form>
+            <button class="btn-send"
+                    onclick="openSendModal('{{ r.whatsapp_phone or '' }}', {{ r.owner_id }}, '{{ (r.message or '')|replace("'","\\'") }}')"
+                    title="Send WhatsApp message">
+              📱 Send WA
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <div style="font-size:56px;">🎉</div>
+  <div style="font-size:20px;font-weight:700;margin:12px 0 8px;">No pending reminders</div>
+  <div>All reminders have been handled. Great work!</div>
+</div>
+{% endif %}
+
+<!-- Send WhatsApp Modal -->
+<div class="send-modal" id="send-modal">
+  <div class="send-modal-box">
+    <div class="send-modal-title">📱 Send WhatsApp Message</div>
+    <form method="post" action="{{ url_for('whatsapp.send_message') }}">
+      <label>Phone Number</label>
+      <input type="tel" name="phone" id="modal-phone" required placeholder="+20 10 xxxx xxxx">
+      <input type="hidden" name="owner_id" id="modal-owner-id">
+      <label>Message</label>
+      <textarea name="custom_message" id="modal-message" required placeholder="Type your message…"></textarea>
+      <div class="modal-actions">
+        <button type="button" class="btn-modal-cancel" onclick="closeSendModal()">Cancel</button>
+        <button type="submit" class="btn-modal-send">Send Message 📤</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openSendModal(phone, ownerId, message){
+  document.getElementById('modal-phone').value = phone || '';
+  document.getElementById('modal-owner-id').value = ownerId || '';
+  document.getElementById('modal-message').value = message || '';
+  document.getElementById('send-modal').classList.add('open');
+}
+function closeSendModal(){
+  document.getElementById('send-modal').classList.remove('open');
+}
+document.getElementById('send-modal').addEventListener('click', function(e){
+  if(e.target === this) closeSendModal();
+});
+</script>
+{% endblock %}

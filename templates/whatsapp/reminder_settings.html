@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Reminder Settings{% endblock %}
+{% block page_title %}WhatsApp Reminder Settings{% endblock %}
+{% block page_sub %}Configure automated daily reminders sent at 09:00{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">← Templates</a>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+  <div style="display:grid;gap:16px">
+
+    <!-- Toggle cards -->
+    <div class="pf-card">
+      <div style="font-weight:700;font-size:15px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--cl-border)">
+        🔔 Reminder Types
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+
+        {% for key, label, desc, icon in [
+          ('reminder_appt_enabled',    'Appointment Reminders',  'Next-day appointment alerts sent to owner', '📅'),
+          ('reminder_vaccine_enabled', 'Vaccine Due Reminders',  'Due or overdue vaccines — up to 7 days past due', '💉'),
+          ('reminder_invoice_enabled', 'Invoice Overdue Alerts', 'Invoices overdue by 3+ days', '🧾'),
+        ] %}
+        <div style="border:2px solid {{ 'var(--cl-success)' if settings.get(key,'1')=='1' else 'var(--cl-border)' }};
+                    border-radius:10px;padding:16px;transition:border-color .2s" id="card-{{ key }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:22px">{{ icon }}</div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <div style="position:relative;width:42px;height:22px">
+                <input type="checkbox" name="{{ key }}" value="1" id="{{ key }}"
+                       {{ 'checked' if settings.get(key,'1')=='1' else '' }}
+                       onchange="toggleCard(this)"
+                       style="opacity:0;position:absolute;width:0;height:0">
+                <span id="track-{{ key }}" style="display:block;width:42px;height:22px;border-radius:999px;
+                      background:{{ 'var(--cl-success)' if settings.get(key,'1')=='1' else '#cbd5e0' }};
+                      transition:background .2s;cursor:pointer"
+                      onclick="document.getElementById('{{ key }}').click()">
+                  <span style="display:block;width:18px;height:18px;border-radius:50%;background:#fff;
+                                margin:2px;transform:{{ 'translateX(20px)' if settings.get(key,'1')=='1' else 'none' }};
+                                transition:transform .2s" id="thumb-{{ key }}"></span>
+                </span>
+              </div>
+              <span style="font-size:12px;font-weight:600;color:{{ 'var(--cl-success)' if settings.get(key,'1')=='1' else 'var(--cl-text-light)' }}"
+                    id="lbl-{{ key }}">
+                {{ 'ON' if settings.get(key,'1')=='1' else 'OFF' }}
+              </span>
+            </label>
+          </div>
+          <div style="font-weight:700;font-size:14px">{{ label }}</div>
+          <div style="font-size:12px;color:var(--cl-text-light);margin-top:3px">{{ desc }}</div>
+        </div>
+        {% endfor %}
+
+      </div>
+    </div>
+
+    <!-- Message templates -->
+    <div class="pf-card">
+      <div style="font-weight:700;font-size:15px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--cl-border)">
+        ✉️ Message Templates
+        <span style="font-size:11px;font-weight:400;color:var(--cl-text-light);margin-left:8px">
+          Variables: {owner}, {pet}, {date}, {time}, {vaccine}, {invoice}, {amount}
+        </span>
+      </div>
+      <div style="display:grid;gap:14px">
+
+        {% for key, label, icon in [
+          ('reminder_appt_msg',     'Appointment Reminder Message',  '📅'),
+          ('reminder_vaccine_msg',  'Vaccine Reminder Message',      '💉'),
+          ('reminder_invoice_msg',  'Invoice Overdue Message',       '🧾'),
+        ] %}
+        <div class="pf-form-group" style="margin:0">
+          <label class="pf-label">{{ icon }} {{ label }}</label>
+          <textarea class="pf-input" name="{{ key }}" rows="3" style="resize:vertical;font-size:13px">{{ settings.get(key, '') }}</textarea>
+        </div>
+        {% endfor %}
+
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:10px">
+      <a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">Cancel</a>
+      <button type="submit" class="pf-btn pf-btn-primary">Save Settings</button>
+    </div>
+
+  </div>
+</form>
+
+<script>
+function toggleCard(cb) {
+  var key = cb.id;
+  var on  = cb.checked;
+  var card  = document.getElementById('card-' + key);
+  var track = document.getElementById('track-' + key);
+  var thumb = document.getElementById('thumb-' + key);
+  var lbl   = document.getElementById('lbl-' + key);
+  card.style.borderColor  = on ? 'var(--cl-success)' : 'var(--cl-border)';
+  track.style.background  = on ? 'var(--cl-success)' : '#cbd5e0';
+  thumb.style.transform   = on ? 'translateX(20px)' : 'none';
+  lbl.textContent         = on ? 'ON' : 'OFF';
+  lbl.style.color         = on ? 'var(--cl-success)' : 'var(--cl-text-light)';
+}
+</script>
+{% endblock %}

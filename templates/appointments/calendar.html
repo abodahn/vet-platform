@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Week Calendar{% endblock %}
+{% block page_title %}📆 Week Calendar{% endblock %}
+{% block page_sub %}{{ monday.strftime('%d %b') }} – {{ sunday.strftime('%d %b %Y') }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('appointments.appt_new') }}" class="pf-btn pf-btn-primary">➕ New Appointment</a>
+  <a href="{{ url_for('appointments.schedule') }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">📋 Today</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* ── Week nav ─────────────────────────────── */
+  .week-nav {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--cl-surface);
+    border-radius: 12px; padding: 14px 20px;
+    margin-bottom: 22px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    flex-wrap: wrap;
+  }
+  .week-nav-btn {
+    padding: 8px 18px; border-radius: 8px;
+    border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg); color: var(--cl-text);
+    font-size: 0.9rem; font-weight: 600;
+    text-decoration: none; transition: all 0.15s;
+  }
+  .week-nav-btn:hover { border-color: var(--cl-primary); color: var(--cl-primary); }
+  .week-nav-title { flex: 1; text-align: center; font-size: 1.05rem; font-weight: 800; color: var(--cl-primary); }
+  .week-today-btn {
+    padding: 8px 16px; border-radius: 8px;
+    background: var(--cl-primary); color: #fff;
+    font-size: 0.85rem; font-weight: 700;
+    text-decoration: none; border: none;
+    transition: opacity 0.15s;
+  }
+  .week-today-btn:hover { opacity: 0.88; }
+
+  /* ── Calendar grid ────────────────────────── */
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 800px) {
+    .cal-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 500px) {
+    .cal-grid { grid-template-columns: 1fr; }
+  }
+
+  .cal-day {
+    background: var(--cl-surface);
+    border-radius: 12px;
+    border: 1.5px solid var(--cl-border);
+    overflow: hidden;
+    min-height: 200px;
+    display: flex; flex-direction: column;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    transition: box-shadow 0.15s;
+    cursor: pointer;
+  }
+  .cal-day:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+  .cal-day.today {
+    border-color: var(--cl-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--cl-primary) 25%, transparent);
+  }
+  .cal-day.weekend { background: color-mix(in srgb, var(--cl-muted) 5%, var(--cl-surface)); }
+
+  .cal-day-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--cl-border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .cal-day-label { font-size: 0.78rem; font-weight: 700; color: var(--cl-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .cal-day-num {
+    font-size: 1.3rem; font-weight: 800; color: var(--cl-text);
+    width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+  }
+  .today .cal-day-num {
+    background: var(--cl-primary); color: #fff;
+  }
+  .cal-appt-count {
+    font-size: 0.75rem; font-weight: 700;
+    padding: 2px 8px; border-radius: 20px;
+    background: color-mix(in srgb, var(--cl-primary) 12%, transparent);
+    color: var(--cl-primary);
+  }
+
+  .cal-day-body { flex: 1; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; overflow: hidden; }
+
+  .cal-appt-chip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 8px; border-radius: 6px;
+    text-decoration: none; color: var(--cl-text);
+    font-size: 0.78rem; font-weight: 600;
+    border: 1px solid var(--cl-border);
+    background: var(--cl-bg);
+    transition: all 0.15s;
+    overflow: hidden;
+  }
+  .cal-appt-chip:hover { border-color: var(--cl-primary); }
+  .chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .chip-time { font-size: 0.72rem; color: var(--cl-muted); flex-shrink: 0; }
+  .chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .dot-blue   { background: #3b82f6; }
+  .dot-teal   { background: #0d9488; }
+  .dot-purple { background: #7c3aed; }
+  .dot-green  { background: #10b981; }
+  .dot-red    { background: #ef4444; }
+  .dot-gray   { background: #9ca3af; }
+
+  .cal-more {
+    font-size: 0.75rem; color: var(--cl-muted);
+    padding: 4px 8px; text-align: center;
+    font-style: italic;
+  }
+  .cal-empty {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    color: var(--cl-border); font-size: 0.78rem;
+    padding: 16px;
+  }
+
+  /* ── Legend ───────────────────────────────── */
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+    background: var(--cl-surface); border-radius: 10px;
+    padding: 12px 18px; margin-top: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .legend-title { font-size: 0.82rem; font-weight: 700; color: var(--cl-muted); margin-right: 4px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: var(--cl-text); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Week navigation -->
+<div class="week-nav">
+  <a href="{{ url_for('appointments.calendar', week=prev_week) }}" class="week-nav-btn">← Prev Week</a>
+  <div class="week-nav-title">
+    {{ monday.strftime('%d %B') }} — {{ sunday.strftime('%d %B %Y') }}
+  </div>
+  <a href="{{ url_for('appointments.calendar') }}" class="week-today-btn">This Week</a>
+  <a href="{{ url_for('appointments.calendar', week=next_week) }}" class="week-nav-btn">Next Week →</a>
+</div>
+
+<!-- 7-column calendar grid -->
+<div class="cal-grid">
+  {% for day in days %}
+  <div class="cal-day {% if day.is_today %}today{% endif %} {% if loop.index0 >= 5 %}weekend{% endif %}"
+       onclick="window.location='{{ url_for('appointments.schedule', date=day.date_str) }}'">
+
+    <div class="cal-day-header">
+      <div>
+        <div class="cal-day-label">{{ day.label }}</div>
+        <div class="cal-day-num">{{ day.day_num }}</div>
+      </div>
+      {% if day.appointments %}
+      <span class="cal-appt-count">{{ day.appointments | length }}</span>
+      {% endif %}
+    </div>
+
+    <div class="cal-day-body">
+      {% if day.appointments %}
+        {% for appt in day.appointments[:5] %}
+        {% set sc = status_colors.get(appt.status, 'gray') %}
+        <a href="{{ url_for('appointments.appt_detail', appt_id=appt.id) }}"
+           class="cal-appt-chip"
+           onclick="event.stopPropagation()">
+          <span class="chip-dot dot-{{ sc }}"></span>
+          <span class="chip-time">{{ appt.appt_start[:5] }}</span>
+          <span class="chip-label">{{ appt.pet_name }}</span>
+        </a>
+        {% endfor %}
+        {% if day.appointments | length > 5 %}
+        <div class="cal-more">+{{ day.appointments | length - 5 }} more</div>
+        {% endif %}
+      {% else %}
+        <div class="cal-empty">No appointments</div>
+      {% endif %}
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <span class="legend-title">Status:</span>
+  {% for label, cls in [
+    ('Scheduled','dot-blue'),
+    ('Confirmed','dot-teal'),
+    ('Checked-in','dot-purple'),
+    ('Completed','dot-green'),
+    ('Cancelled','dot-red'),
+    ('No-Show','dot-gray'),
+  ] %}
+  <div class="legend-item">
+    <span class="chip-dot {{ cls }}"></span>
+    {{ label }}
+  </div>
+  {% endfor %}
+  <span style="margin-left:auto;font-size:0.78rem;color:var(--cl-muted);">Click any day to view its schedule</span>
+</div>
+
+{% endblock %}

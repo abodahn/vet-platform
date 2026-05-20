@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Doctor Workspace{% endblock %}
+{% block page_title %}Doctor Workspace{% endblock %}
+{% block page_sub %}Welcome, Dr. {{ doctor_name }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary">+ New Visit</a>
+<a href="{{ url_for('doctor.queue') }}" class="pf-btn pf-btn-secondary">📋 Queue</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Welcome banner -->
+<div style="background:linear-gradient(135deg,var(--pf-primary) 0%,#2563eb 100%);border-radius:14px;padding:1.5rem 2rem;color:#fff;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center">
+  <div>
+    <div style="font-size:1.4rem;font-weight:800">Good day, Dr. {{ doctor_name }} 👨‍⚕️</div>
+    <div style="opacity:.85;margin-top:.3rem;font-size:.95rem">{{ self.page_sub() }}</div>
+  </div>
+  <div style="text-align:right;opacity:.8;font-size:.9rem">
+    <div style="font-size:1.2rem;font-weight:700">{{ stats.appointments_today }}</div>
+    <div>appointments today</div>
+  </div>
+</div>
+
+<!-- Stat cards -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-bottom:1.5rem">
+  <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #3b82f6">
+    <div style="font-size:2.5rem;font-weight:800;color:#3b82f6">{{ stats.appointments_today }}</div>
+    <div style="color:var(--pf-muted);margin-top:.25rem">📅 Today's Appointments</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #f59e0b">
+    <div style="font-size:2.5rem;font-weight:800;color:#f59e0b">{{ stats.open_visits }}</div>
+    <div style="color:var(--pf-muted);margin-top:.25rem">🔓 Open Visits</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #10b981">
+    <div style="font-size:2.5rem;font-weight:800;color:#10b981">{{ stats.completed_today }}</div>
+    <div style="color:var(--pf-muted);margin-top:.25rem">✅ Completed Today</div>
+  </div>
+</div>
+
+<!-- Main content: 2 columns -->
+<div style="display:grid;grid-template-columns:1fr 380px;gap:1.5rem">
+
+  <!-- LEFT: Today's queue -->
+  <div class="pf-card">
+    <div class="pf-card-header" style="display:flex;justify-content:space-between;align-items:center">
+      <h3 class="pf-card-title">📋 Today's Queue</h3>
+      <a href="{{ url_for('doctor.queue') }}" class="pf-btn pf-btn-ghost" style="font-size:.85rem">Full Queue →</a>
+    </div>
+    {% if todays_appointments %}
+    <table class="pf-table">
+      <thead>
+        <tr><th>Time</th><th>Pet</th><th>Owner</th><th>Reason</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for a in todays_appointments %}
+        <tr>
+          <td style="white-space:nowrap;font-weight:600">{{ (a.appointment_date or '')[-8:-3] }}</td>
+          <td>
+            <strong>{{ a.pet_name }}</strong><br>
+            <small style="color:var(--pf-muted)">
+              {% if a.species == 'Dog' %}🐶{% elif a.species == 'Cat' %}🐱{% elif a.species == 'Bird' %}🦜{% else %}🐾{% endif %}
+              {{ a.species }}
+            </small>
+          </td>
+          <td>{{ a.owner_name }}<br><small style="color:var(--pf-muted)">{{ a.owner_phone }}</small></td>
+          <td style="font-size:.85rem;color:var(--pf-muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.reason or '—' }}</td>
+          <td>
+            {% if a.status == 'Scheduled' %}<span class="pf-badge warning">Scheduled</span>
+            {% elif a.status == 'In Progress' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">In Progress</span>
+            {% elif a.status == 'Completed' %}<span class="pf-badge success">Done</span>
+            {% else %}<span class="pf-badge error">{{ a.status }}</span>{% endif %}
+          </td>
+          <td>
+            {% if a.status in ('Scheduled', 'Confirmed') %}
+            <form method="post" action="{{ url_for('doctor.checkin', appt_id=a.id) }}" style="display:inline">
+              <input type="hidden" name="next" value="{{ request.path }}">
+              <button type="submit" class="pf-btn pf-btn-ghost" style="padding:3px 8px;font-size:.78rem">Check In</button>
+            </form>
+            {% endif %}
+            <a href="{{ url_for('visits.visit_new_form', appt_id=a.id, owner_id=a.owner_id, pet_id=a.pet_id) }}"
+               class="pf-btn pf-btn-primary" style="padding:3px 8px;font-size:.78rem">+ Visit</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:2rem;text-align:center;color:var(--pf-muted)">
+      <div style="font-size:2.5rem;margin-bottom:.75rem">🗓️</div>
+      <div style="font-weight:600;margin-bottom:.3rem">No appointments today</div>
+      <div style="font-size:.85rem">Enjoy the quiet — or add a walk-in.</div>
+      <a href="{{ url_for('appointments.appt_new') }}" class="pf-btn pf-btn-primary" style="margin-top:1rem;display:inline-block">+ Walk-in Appointment</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- RIGHT: Open visits + vaccinations -->
+  <div style="display:flex;flex-direction:column;gap:1.25rem">
+
+    <!-- Open visits -->
+    <div class="pf-card">
+      <div class="pf-card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <h3 class="pf-card-title">🔓 Open Visits</h3>
+        <span class="pf-badge warning">{{ open_visits|length }}</span>
+      </div>
+      {% if open_visits %}
+      <div style="padding:0 .25rem">
+        {% for v in open_visits %}
+        <div style="padding:.75rem;border-bottom:1px solid var(--pf-border);display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:600">🐾 {{ v.pet_name }}</div>
+            <div style="font-size:.8rem;color:var(--pf-muted)">{{ v.owner_name }}</div>
+            <div style="font-size:.78rem;color:var(--pf-muted);margin-top:.15rem">{{ v.chief_complaint or 'No complaint noted' }}</div>
+          </div>
+          <a href="{{ url_for('visits.visit_detail', visit_id=v.visit_id) }}"
+             class="pf-btn pf-btn-primary" style="padding:4px 10px;font-size:.8rem;white-space:nowrap">Continue →</a>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="padding:1.25rem;text-align:center;color:var(--pf-muted);font-size:.9rem">✅ No open visits</div>
+      {% endif %}
+    </div>
+
+    <!-- Upcoming vaccinations -->
+    <div class="pf-card">
+      <div class="pf-card-header">
+        <h3 class="pf-card-title">💉 Vaccinations Due (7 days)</h3>
+      </div>
+      {% if upcoming_vaccinations %}
+      <div style="padding:0 .25rem">
+        {% for vac in upcoming_vaccinations %}
+        <div style="padding:.6rem .75rem;border-bottom:1px solid var(--pf-border);font-size:.85rem">
+          <div style="font-weight:600">{{ vac.pet_name }} <span style="color:var(--pf-muted);font-weight:400">— {{ vac.owner_name }}</span></div>
+          <div style="color:var(--pf-muted)">{{ vac.vaccine_name }} · Due: <strong style="color:#ef4444">{{ vac.next_due_date }}</strong></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="padding:1.25rem;text-align:center;color:var(--pf-muted);font-size:.85rem">✅ No vaccinations due this week</div>
+      {% endif %}
+    </div>
+
+    <!-- Quick actions -->
+    <div class="pf-card">
+      <div class="pf-card-header"><h3 class="pf-card-title">⚡ Quick Actions</h3></div>
+      <div style="padding:1rem;display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary" style="text-align:center">📋 New Visit</a>
+        <a href="{{ url_for('doctor.queue') }}" class="pf-btn pf-btn-secondary" style="text-align:center">👥 Queue</a>
+        <a href="{{ url_for('doctor.my_schedule') }}" class="pf-btn pf-btn-ghost" style="text-align:center">📅 Schedule</a>
+        <a href="{{ url_for('doctor.my_stats') }}" class="pf-btn pf-btn-ghost" style="text-align:center">📊 My Stats</a>
+        <a href="{{ url_for('doctor.my_patients') }}" class="pf-btn pf-btn-ghost" style="text-align:center;grid-column:span 2">🐾 My Patients</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Financial Reports{% endblock %}
+{% block page_title %}Financial Reports{% endblock %}
+{% block page_sub %}Revenue, payments, and financial summary{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('reports.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+<a href="{{ url_for('reports.clinical') }}" class="pf-btn pf-btn-secondary">🩺 Clinical</a>
+<a href="{{ url_for('reports.export_csv', type='invoices') }}" class="pf-btn pf-btn-primary">📥 Export CSV</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.date-filter { background:var(--cl-surface); border-radius:12px; padding:18px 24px; margin-bottom:24px; box-shadow:0 2px 8px rgba(0,0,0,.07); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.date-filter label { font-size:13px; font-weight:600; color:var(--cl-muted); }
+.date-filter input { padding:8px 12px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:14px; }
+.date-filter button { padding:9px 20px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+.summary-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:16px; margin-bottom:24px; }
+.summary-card { background:var(--cl-surface); border-radius:12px; padding:20px; box-shadow:0 2px 10px rgba(0,0,0,.07); text-align:center; border-top:4px solid var(--cl-border); }
+.summary-value { font-size:26px; font-weight:800; margin-bottom:4px; }
+.summary-label { font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.5px; }
+.chart-card { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:24px; }
+.chart-title { font-size:15px; font-weight:700; color:var(--cl-primary); margin-bottom:16px; }
+.fin-grid-2 { display:grid; grid-template-columns:2fr 1fr; gap:20px; }
+.payment-method-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--cl-border); }
+.payment-method-row:last-child { border-bottom:none; }
+.method-info { display:flex; align-items:center; gap:10px; }
+.method-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+.method-name { font-size:14px; font-weight:600; }
+.method-count { font-size:12px; color:var(--cl-muted); }
+.method-pct { font-size:18px; font-weight:800; color:var(--cl-primary); }
+.method-amount { font-size:13px; color:var(--cl-muted); }
+.pct-bar { height:6px; border-radius:3px; margin-top:6px; }
+.bar-label { font-size:9px; fill:var(--cl-muted); }
+.bar-value { font-size:9px; fill:var(--cl-text); font-weight:600; }
+@media(max-width:900px){ .fin-grid-2{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Date Range Filter -->
+<form method="get" class="date-filter">
+  <label>From</label>
+  <input type="date" name="date_from" value="{{ date_from }}">
+  <label>To</label>
+  <input type="date" name="date_to" value="{{ date_to }}">
+  <button type="submit">🔍 Apply</button>
+  <a href="{{ url_for('reports.financial_compare', date_from=date_from, date_to=date_to) }}"
+     class="pf-btn pf-btn-secondary" style="font-size:13px;padding:8px 14px">
+    📊 Compare Periods
+  </a>
+  <span style="color:var(--cl-muted);font-size:13px;">{{ date_from }} → {{ date_to }}</span>
+</form>
+
+{% if compare_mode %}
+<div style="background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:10px;
+            padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  <span style="font-weight:700;color:#1d4ed8">📊 Comparison Mode</span>
+  <span style="color:var(--cl-text-light)">
+    Current: <strong>{{ date_from }} → {{ date_to }}</strong>
+    vs Previous: <strong>{{ prev_from }} → {{ prev_to }}</strong>
+  </span>
+  <a href="{{ url_for('reports.financial', date_from=date_from, date_to=date_to) }}"
+     style="color:var(--cl-text-light);font-size:12px;margin-left:auto">✕ Exit compare</a>
+</div>
+{% endif %}
+
+<!-- Summary Cards -->
+{% macro delta_badge(pct) %}
+  {% if pct is not none %}
+    <div style="font-size:11px;font-weight:700;margin-top:4px;
+                color:{{ '#166534' if pct >= 0 else '#991b1b' }}">
+      {{ '▲' if pct >= 0 else '▼' }} {{ pct|abs }}% vs prev period
+    </div>
+  {% endif %}
+{% endmacro %}
+
+<div class="summary-grid">
+  <div class="summary-card" style="border-top-color:#22c55e;">
+    <div class="summary-value" style="color:#166534;">{{ "{:,.0f}".format(summary.revenue) }}</div>
+    <div class="summary-label">Revenue Collected (EGP)</div>
+    {% if compare_mode %}{{ delta_badge(revenue_change) }}{% endif %}
+  </div>
+  <div class="summary-card" style="border-top-color:#3b82f6;">
+    <div class="summary-value" style="color:#1d4ed8;">{{ "{:,.0f}".format(summary.invoiced) }}</div>
+    <div class="summary-label">Total Invoiced (EGP)</div>
+  </div>
+  <div class="summary-card" style="border-top-color:#f59e0b;">
+    <div class="summary-value" style="color:#92400e;">{{ "{:,.0f}".format(summary.outstanding) }}</div>
+    <div class="summary-label">Outstanding (EGP)</div>
+  </div>
+  <div class="summary-card" style="border-top-color:#ef4444;">
+    <div class="summary-value" style="color:#991b1b;">{{ "{:,.0f}".format(summary.expenses) }}</div>
+    <div class="summary-label">Expenses (EGP)</div>
+  </div>
+  <div class="summary-card" style="border-top-color:var(--cl-primary);">
+    {% set net_color = '#166534' if summary.net >= 0 else '#991b1b' %}
+    <div class="summary-value" style="color:{{ net_color }};">{{ "{:,.0f}".format(summary.net) }}</div>
+    <div class="summary-label">Net Revenue (EGP)</div>
+  </div>
+  <div class="summary-card" style="border-top-color:#14b8a6;">
+    <div class="summary-value" style="color:#0f766e;">{{ summary.invoice_count }}</div>
+    <div class="summary-label">Invoices Issued</div>
+    {% if compare_mode %}{{ delta_badge(invoices_change) }}{% endif %}
+  </div>
+</div>
+
+<div class="fin-grid-2">
+
+  <!-- Revenue by Day SVG Chart -->
+  <div class="chart-card">
+    <div class="chart-title">📊 Revenue by Day — Last 30 Days</div>
+    {% if revenue_by_day %}
+    {% set max_rev = namespace(val=1) %}
+    {% for d in revenue_by_day %}
+      {% if d.revenue > max_rev.val %}{% set max_rev.val = d.revenue %}{% endif %}
+    {% endfor %}
+    <svg viewBox="0 0 700 180" style="width:100%;height:180px;" preserveAspectRatio="none">
+      {% set bar_w = 18 %}
+      {% set gap   = 5 %}
+      {% set chart_h = 140 %}
+      {% set base_y  = 155 %}
+      {% for d in revenue_by_day %}
+        {% set idx = loop.index0 %}
+        {% set x = idx * (bar_w + gap) + 10 %}
+        {% set bar_h = [(d.revenue / max_rev.val * chart_h), 2] | max %}
+        {% set y = base_y - bar_h %}
+        <rect x="{{ x }}" y="{{ y }}" width="{{ bar_w }}" height="{{ bar_h }}"
+              rx="3" fill="#22c55e" opacity="0.78"/>
+        {% if d.revenue > 0 %}
+        <text x="{{ x + bar_w/2 }}" y="{{ y - 3 }}" text-anchor="middle" class="bar-value">
+          {{ "{:.0f}k".format(d.revenue/1000) if d.revenue >= 1000 else d.revenue|int }}
+        </text>
+        {% endif %}
+        {% if loop.index % 5 == 0 %}
+        <text x="{{ x + bar_w/2 }}" y="{{ base_y + 12 }}" text-anchor="middle" class="bar-label">
+          {{ d.date[5:] if d.date else '' }}
+        </text>
+        {% endif %}
+      {% endfor %}
+    </svg>
+    {% else %}
+    <div style="text-align:center;padding:40px;color:var(--cl-muted);">No revenue data in selected range</div>
+    {% endif %}
+  </div>
+
+  <!-- Payment Methods -->
+  <div class="chart-card">
+    <div class="chart-title">💳 Payment Methods</div>
+    {% set method_colors = ['#1a3a6b','#22c55e','#f59e0b','#0891b2','#7c3aed','#dc2626'] %}
+    {% if payment_methods %}
+      {% for pm in payment_methods %}
+      {% set color = method_colors[loop.index0 % method_colors|length] %}
+      <div class="payment-method-row">
+        <div class="method-info">
+          <div class="method-dot" style="background:{{ color }};"></div>
+          <div>
+            <div class="method-name">{{ pm.method or 'Unknown' }}</div>
+            <div class="method-count">{{ pm.count }} transaction{{ 's' if pm.count != 1 }}</div>
+            <div class="pct-bar" style="width:{{ pm.pct }}%;background:{{ color }};opacity:.35;"></div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="method-pct">{{ pm.pct }}%</div>
+          <div class="method-amount">{{ "{:,.0f}".format(pm.total) }} EGP</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <div style="text-align:center;padding:40px;color:var(--cl-muted);">No payment data in selected range</div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

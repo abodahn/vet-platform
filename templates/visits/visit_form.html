@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ t('New Visit', 'زيارة جديدة') }}{% endblock %}
+{% block page_title %}{{ t('New Medical Visit', 'زيارة طبية جديدة') }}{% endblock %}
+{% block page_sub %}{{ t('Create examination record', 'إنشاء سجل فحص') }}{% endblock %}
+
+{% block content %}
+<form method="post" action="{{ url_for('visits.visit_new_submit') }}">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+  {% if appointment %}
+  <input type="hidden" name="appointment_id" value="{{ appointment.id }}">
+  {% endif %}
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+
+    <!-- Left: Patient -->
+    <div>
+      <div class="pf-card" style="margin-bottom:1.5rem">
+        <div class="pf-card-header"><h3 class="pf-card-title">{{ t('Patient', 'المريض') }}</h3></div>
+        <div style="padding:1.25rem">
+          <div style="margin-bottom:1rem">
+            <label class="pf-label">{{ t('Owner', 'المالك') }} *</label>
+            <select name="owner_id" id="ownerSelect" class="pf-input" required onchange="filterPets(this.value)">
+              <option value="">— {{ t('Select Owner', 'اختر المالك') }} —</option>
+              {% for o in owners %}
+              <option value="{{ o.id }}" {% if owner and owner.id==o.id %}selected{% endif %}>{{ o.full_name }} · {{ o.phone }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="margin-bottom:1rem">
+            <label class="pf-label">{{ t('Pet', 'الحيوان') }} *</label>
+            <select name="pet_id" id="petSelect" class="pf-input" required>
+              <option value="">— {{ t('Select Owner First', 'اختر المالك أولاً') }} —</option>
+              {% if pet %}
+              <option value="{{ pet.id }}" selected>{{ pet.pet_name }} ({{ pet.species }})</option>
+              {% endif %}
+            </select>
+          </div>
+          {% if pet %}
+          <div style="background:var(--pf-bg-subtle);padding:.75rem;border-radius:8px;font-size:.85rem">
+            <strong>{{ pet.pet_name }}</strong> · {{ pet.species }} · {{ pet.breed or '' }}<br>
+            {% if pet.weight_kg %}{{ t('Weight', 'الوزن') }}: {{ pet.weight_kg }} kg · {% endif %}
+            {% if pet.allergies %}⚠ {{ t('Allergies', 'الحساسية') }}: {{ pet.allergies }}{% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="pf-card">
+        <div class="pf-card-header"><h3 class="pf-card-title">{{ t('Vitals', 'العلامات الحيوية') }}</h3></div>
+        <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div>
+            <label class="pf-label">{{ t('Weight (kg)', 'الوزن (كجم)') }}</label>
+            <input type="number" name="weight_kg" class="pf-input" step="0.01" min="0" placeholder="e.g. 4.5">
+          </div>
+          <div>
+            <label class="pf-label">{{ t('Temperature (°C)', 'درجة الحرارة (°م)') }}</label>
+            <input type="number" name="temp_c" class="pf-input" step="0.1" placeholder="e.g. 38.5">
+          </div>
+          <div>
+            <label class="pf-label">{{ t('Heart Rate (bpm)', 'معدل القلب') }}</label>
+            <input type="number" name="heart_rate" class="pf-input" placeholder="e.g. 90">
+          </div>
+          <div>
+            <label class="pf-label">{{ t('Resp. Rate (brpm)', 'معدل التنفس') }}</label>
+            <input type="number" name="respiratory_rate" class="pf-input" placeholder="e.g. 20">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Visit info -->
+    <div>
+      <div class="pf-card" style="margin-bottom:1.5rem">
+        <div class="pf-card-header"><h3 class="pf-card-title">{{ t('Visit Details', 'تفاصيل الزيارة') }}</h3></div>
+        <div style="padding:1.25rem">
+          <div style="margin-bottom:1rem">
+            <label class="pf-label">{{ t('Visit Type', 'نوع الزيارة') }}</label>
+            <select name="visit_type" class="pf-input">
+              {% for vt in ['Consultation','Follow-up','Vaccination','Surgery','Emergency','Dental','Wellness','Other'] %}
+              <option>{{ vt }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="margin-bottom:1rem">
+            <label class="pf-label">{{ t('Doctor Name', 'اسم الطبيب') }}</label>
+            <input type="text" name="doctor_name" class="pf-input"
+                   placeholder="Dr. ..." value="{{ session.get('user',{}).get('full_name','') }}">
+          </div>
+          <div style="margin-bottom:1rem">
+            <label class="pf-label">{{ t('Chief Complaint', 'الشكوى الرئيسية') }} *</label>
+            <input type="text" name="chief_complaint" class="pf-input" required
+                   placeholder="{{ t('Main reason for visit', 'السبب الرئيسي للزيارة') }}">
+          </div>
+          <div style="margin-bottom:1rem">
+            <label class="pf-label">{{ t('Symptoms / History', 'الأعراض / التاريخ المرضي') }}</label>
+            <textarea name="symptoms" class="pf-input" rows="4"
+                      placeholder="{{ t('Describe symptoms, duration, history...', 'صف الأعراض والمدة والتاريخ المرضي...') }}"></textarea>
+          </div>
+          <div>
+            <label class="pf-label">{{ t('Notes', 'ملاحظات') }}</label>
+            <textarea name="notes" class="pf-input" rows="3"
+                      placeholder="{{ t('Additional notes...', 'ملاحظات إضافية...') }}"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:1rem;margin-top:1rem">
+    <button type="submit" class="pf-btn pf-btn-primary">{{ t('Create Visit', 'إنشاء زيارة') }}</button>
+    <a href="{{ url_for('visits.visits_list') }}" class="pf-btn pf-btn-ghost">{{ t('Cancel', 'إلغاء') }}</a>
+  </div>
+</form>
+
+<script>
+function filterPets(ownerId) {
+  var sel = document.getElementById('petSelect');
+  sel.innerHTML = '<option value="">{{ t("Loading...", "جارٍ التحميل...") }}</option>';
+  if (!ownerId) { sel.innerHTML = '<option value="">— {{ t("Select Owner First", "اختر المالك أولاً") }} —</option>'; return; }
+  fetch('/crm/owners/' + ownerId + '/pets-json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      sel.innerHTML = '<option value="">— {{ t("Select Pet", "اختر الحيوان") }} —</option>';
+      (data.pets || []).forEach(function(p){
+        sel.innerHTML += '<option value="' + p.id + '">' + p.pet_name + ' (' + p.species + ')</option>';
+      });
+    })
+    .catch(function(){
+      sel.innerHTML = '<option value="">{{ t("Error loading pets", "خطأ في تحميل الحيوانات") }}</option>';
+    });
+}
+</script>
+{% endblock %}

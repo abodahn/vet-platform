@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}My Statistics{% endblock %}
+{% block page_title %}My Statistics{% endblock %}
+{% block page_sub %}Performance overview for Dr. {{ doctor_name }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('doctor.workspace') }}" class="pf-btn pf-btn-secondary">← Workspace</a>
+{% endblock %}
+
+{% block content %}
+<!-- KPI cards -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;margin-bottom:1.5rem">
+  <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid var(--pf-primary)">
+    <div style="font-size:2.2rem;font-weight:800;color:var(--pf-primary)">{{ total_visits }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Total Visits (All Time)</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #10b981">
+    <div style="font-size:2.2rem;font-weight:800;color:#10b981">{{ month_visits }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">This Month</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #f59e0b">
+    <div style="font-size:2.2rem;font-weight:800;color:#f59e0b">{{ avg_per_day }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Avg Visits / Day</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #8b5cf6">
+    <div style="font-size:2.2rem;font-weight:800;color:#8b5cf6">{{ unique_patients }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Unique Patients</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+
+  <!-- Monthly trend chart -->
+  <div class="pf-card">
+    <div class="pf-card-header"><h3 class="pf-card-title">📈 Monthly Visits Trend</h3></div>
+    <div style="padding:1.25rem">
+      {% set max_count = monthly_trend|map(attribute='count')|max if monthly_trend else 1 %}
+      {% set max_count = max_count if max_count > 0 else 1 %}
+      <svg viewBox="0 0 360 140" style="width:100%;height:140px">
+        {% for item in monthly_trend %}
+        {% set x = loop.index0 * 56 + 16 %}
+        {% set bar_h = (item.count / max_count * 100)|int %}
+        {% set bar_y = 110 - bar_h %}
+        <rect x="{{ x }}" y="{{ bar_y }}" width="40" height="{{ bar_h }}"
+              fill="var(--pf-primary)" rx="4" opacity=".85"/>
+        <text x="{{ x + 20 }}" y="128" text-anchor="middle" font-size="11" fill="var(--pf-muted)">{{ item.month }}</text>
+        {% if item.count > 0 %}
+        <text x="{{ x + 20 }}" y="{{ bar_y - 4 }}" text-anchor="middle" font-size="10" fill="var(--pf-text)" font-weight="600">{{ item.count }}</text>
+        {% endif %}
+        {% endfor %}
+      </svg>
+    </div>
+  </div>
+
+  <!-- Species breakdown -->
+  <div class="pf-card">
+    <div class="pf-card-header"><h3 class="pf-card-title">🐾 Species Breakdown</h3></div>
+    <div style="padding:1.25rem">
+      {% set total_sp = species_breakdown|sum(attribute='cnt') if species_breakdown else 0 %}
+      {% set colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'] %}
+      {% for sp in species_breakdown %}
+      {% set pct = ((sp.cnt / total_sp * 100)|int) if total_sp > 0 else 0 %}
+      <div style="margin-bottom:.9rem">
+        <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:.3rem">
+          <span style="font-weight:500">
+            {% if sp.species == 'Dog' %}🐶{% elif sp.species == 'Cat' %}🐱{% elif sp.species == 'Bird' %}🦜{% else %}🐾{% endif %}
+            {{ sp.species or 'Unknown' }}
+          </span>
+          <span style="color:var(--pf-muted)">{{ sp.cnt }} ({{ pct }}%)</span>
+        </div>
+        <div style="background:var(--pf-bg-subtle);border-radius:4px;height:10px;overflow:hidden">
+          <div style="height:100%;width:{{ pct }}%;background:{{ colors[loop.index0 % colors|length] }};border-radius:4px;transition:width .3s"></div>
+        </div>
+      </div>
+      {% else %}
+      <div style="text-align:center;color:var(--pf-muted);padding:1rem">No data yet</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Top diagnoses -->
+<div class="pf-card">
+  <div class="pf-card-header"><h3 class="pf-card-title">🔬 Top 5 Diagnoses</h3></div>
+  <div style="padding:1.25rem">
+    {% set max_diag = top_diagnoses[0].cnt if top_diagnoses else 1 %}
+    {% for d in top_diagnoses %}
+    {% set pct = ((d.cnt / max_diag * 100)|int) if max_diag > 0 else 0 %}
+    <div style="margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:.3rem">
+        <span style="font-weight:600">{{ loop.index }}. {{ d.diagnosis_text }}</span>
+        <span class="pf-badge success">{{ d.cnt }} case{{ 's' if d.cnt != 1 }}</span>
+      </div>
+      <div style="background:var(--pf-bg-subtle);border-radius:4px;height:12px;overflow:hidden">
+        <div style="height:100%;width:{{ pct }}%;background:var(--pf-primary);border-radius:4px;transition:width .3s"></div>
+      </div>
+    </div>
+    {% else %}
+    <div style="text-align:center;color:var(--pf-muted);padding:1.5rem">No diagnosis data yet</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

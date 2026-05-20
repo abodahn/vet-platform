@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Prescription RX-{{ rx.id }}{% endblock %}
+{% block page_title %}Prescription RX-{{ rx.id }}{% endblock %}
+{% block page_sub %}{{ rx.pet_name }} · {{ rx.owner_name }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('pharmacy.index') }}" class="pf-btn pf-btn-secondary">← Queue</a>
+{% endblock %}
+
+{% block content %}
+<!-- Header info -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px">
+  <div class="pf-card" style="padding:16px">
+    <div class="pf-label">Patient</div>
+    <div style="font-weight:700;font-size:16px">{{ rx.pet_name }}</div>
+    <div style="font-size:13px;color:var(--cl-text-light)">{{ rx.species }} · {{ rx.weight_kg or '?' }} kg</div>
+  </div>
+  <div class="pf-card" style="padding:16px">
+    <div class="pf-label">Owner</div>
+    <div style="font-weight:700">{{ rx.owner_name }}</div>
+    <div style="font-size:13px;color:var(--cl-text-light)">{{ rx.phone or '—' }}</div>
+  </div>
+  <div class="pf-card" style="padding:16px">
+    <div class="pf-label">Doctor / Visit</div>
+    <div style="font-weight:700">{{ rx.doctor_name or '—' }}</div>
+    <div style="font-size:13px;color:var(--cl-text-light)">{{ rx.visit_date or '—' }}</div>
+  </div>
+  <div class="pf-card" style="padding:16px">
+    <div class="pf-label">Status</div>
+    <span class="pf-badge {{ 'success' if rx.status == 'Dispensed' else ('warning' if rx.status == 'Partial' else '') }}"
+          style="font-size:14px">{{ rx.status }}</span>
+    {% if rx.dispensed_at %}
+    <div style="font-size:12px;color:var(--cl-text-light);margin-top:4px">{{ rx.dispensed_at[:16] }}</div>
+    {% endif %}
+  </div>
+</div>
+
+{% if rx.chief_complaint %}
+<div class="pf-card" style="margin-bottom:16px;padding:14px 16px">
+  <span class="pf-label">Chief Complaint: </span>{{ rx.chief_complaint }}
+</div>
+{% endif %}
+
+<!-- Dispense form -->
+{% if can_dispense and rx.status != 'Dispensed' %}
+<form method="post" action="{{ url_for('pharmacy.dispense', rx_id=rx.id) }}">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+{% endif %}
+
+<div class="pf-card">
+  <div style="font-weight:700;font-size:15px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--cl-border)">
+    Prescription Items
+  </div>
+  <div style="overflow-x:auto">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th>Medication</th>
+          <th>Prescribed Qty</th>
+          <th>Instructions</th>
+          <th>Stock</th>
+          {% if can_dispense and rx.status != 'Dispensed' %}
+          <th>Batch</th>
+          <th>Dispense Qty</th>
+          {% endif %}
+          <th>Status</th>
+          <th>Label</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr style="background:{{ 'rgba(72,187,120,.06)' if item.dispensed else 'inherit' }}">
+          <td>
+            <div style="font-weight:600">{{ item.medication_name or item.item_name or '—' }}</div>
+            {% if item.is_controlled %}
+            <span class="pf-badge danger" style="font-size:10px">Controlled</span>
+            {% endif %}
+            <div style="font-size:11px;color:var(--cl-text-light)">{{ item.unit or '' }}</div>
+          </td>
+          <td style="font-weight:600">{{ item.quantity }}</td>
+          <td style="font-size:12px;max-width:200px">{{ item.instructions or '—' }}</td>
+          <td>
+            {% if item.item_id %}
+            <span style="color:{{ 'var(--cl-danger)' if item.stock_qty <= 0 else ('var(--cl-warning)' if item.stock_qty < item.quantity|float else 'var(--cl-success)') }}">
+              {{ item.stock_qty }}
+            </span>
+            {% else %}—{% endif %}
+          </td>
+          {% if can_dispense and rx.status != 'Dispensed' %}
+          <td>
+            {% if item.dispensed %}
+              <span class="pf-badge success">Dispensed</span>
+            {% elif item.item_id and batches_by_item.get(item.item_id) %}
+              <select class="pf-select pf-select-sm" name="batch_{{ item.id }}" style="min-width:160px">
+                <option value="">Auto (FEFO)</option>
+                {% for b in batches_by_item[item.item_id] %}
+                <option value="{{ b.id }}">
+                  {{ b.batch_number or 'Batch #'+b.id|string }} · exp {{ b.expiry_date or '?' }} · {{ b.quantity }} {{ item.unit or '' }}
+                  {% if b.warehouse_name %} · {{ b.warehouse_name }}{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            {% elif not item.item_id %}
+              <em style="font-size:12px;color:var(--cl-text-light)">No inventory item</em>
+            {% else %}
+              <span class="pf-badge danger">No stock</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if not item.dispensed and item.item_id %}
+            <input class="pf-input" type="number" name="qty_{{ item.id }}"
+                   value="{{ item.quantity }}" min="0.01" step="0.01"
+                   style="width:80px">
+            {% else %}—{% endif %}
+          </td>
+          {% endif %}
+          <td>
+            <span class="pf-badge {{ 'success' if item.dispensed else '' }}">
+              {{ 'Dispensed' if item.dispensed else 'Pending' }}
+            </span>
+          </td>
+          <td>
+            <a href="{{ url_for('pharmacy.label', rx_id=rx.id, pi_id=item.id) }}"
+               class="pf-btn pf-btn-sm pf-btn-secondary" target="_blank">🖨 Label</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if can_dispense and rx.status != 'Dispensed' %}
+  <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div class="pf-form-group" style="margin:0;flex:1;min-width:200px">
+      <label class="pf-label">Dispensing Notes</label>
+      <input class="pf-input" name="notes" placeholder="Optional notes…">
+    </div>
+    <div style="padding-top:20px">
+      <button type="submit" class="pf-btn pf-btn-primary">💊 Dispense Selected</button>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if can_dispense and rx.status != 'Dispensed' %}
+</form>
+{% endif %}
+{% endblock %}

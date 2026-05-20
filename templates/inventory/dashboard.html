@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Inventory Dashboard', 'لوحة تحكم المخزون') }}{% endblock %}
+{% block page_title %}{{ t('Inventory & Pharmacy', 'المخزون والصيدلية') }}{% endblock %}
+{% block page_sub %}{{ t('Stock levels, alerts, and recent movements', 'مستويات المخزون والتنبيهات وحركات المخزون الأخيرة') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('inventory.item_new') }}" class="pf-btn pf-btn-primary">{{ t('+ New Item', '+ صنف جديد') }}</a>
+<a href="{{ url_for('inventory.batch_new') }}" class="pf-btn pf-btn-secondary">{{ t('Receive Stock', 'استلام مخزون') }}</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.inv-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:18px; margin-bottom:28px; }
+.inv-stat-card {
+  background: var(--cl-surface);
+  border-radius: 14px;
+  padding: 22px 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  border-left: 5px solid var(--cl-primary);
+  display: flex; align-items: center; gap: 18px;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.inv-stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 22px rgba(0,0,0,0.12); }
+.inv-stat-card.danger { border-left-color: var(--cl-danger); }
+.inv-stat-card.warning { border-left-color: var(--cl-warning); }
+.inv-stat-card.success { border-left-color: var(--cl-success); }
+.inv-stat-icon {
+  width: 54px; height: 54px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.7rem; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--cl-primary), #2563eb22);
+}
+.inv-stat-card.danger .inv-stat-icon { background: linear-gradient(135deg, #fee2e2, #fecaca); }
+.inv-stat-card.warning .inv-stat-icon { background: linear-gradient(135deg, #fef3c7, #fde68a); }
+.inv-stat-card.success .inv-stat-icon { background: linear-gradient(135deg, #d1fae5, #a7f3d0); }
+.inv-stat-val { font-size: 2rem; font-weight: 800; color: var(--cl-text); line-height:1; }
+.inv-stat-label { font-size: 0.8rem; color: var(--cl-muted); margin-top: 4px; }
+.inv-stat-sub { font-size: 0.75rem; color: var(--cl-muted); }
+
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 28px 0 14px;
+}
+.section-header h2 { font-size: 1.05rem; font-weight: 700; color: var(--cl-text); margin:0; }
+
+.alert-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap:14px; }
+.alert-card {
+  background: var(--cl-surface); border-radius: 12px; padding: 16px 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid var(--cl-danger);
+}
+.alert-card.warning { border-left-color: var(--cl-warning); }
+.alert-card-title { font-weight: 700; font-size: 0.9rem; color: var(--cl-text); margin-bottom:6px; }
+.alert-card-meta { font-size: 0.8rem; color: var(--cl-muted); }
+.alert-card-stock { font-size: 1.1rem; font-weight: 800; color: var(--cl-danger); }
+.alert-card.warning .alert-card-stock { color: var(--cl-warning); }
+
+.pf-table-wrap { background: var(--cl-surface); border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); overflow:hidden; }
+table.pf-table { width:100%; border-collapse:collapse; }
+table.pf-table thead { background: linear-gradient(135deg, var(--cl-primary) 0%, #1e40af 100%); }
+table.pf-table thead th { color:#fff; padding:12px 16px; text-align:left; font-size:0.8rem; font-weight:600; white-space:nowrap; }
+table.pf-table tbody tr { border-bottom: 1px solid var(--cl-border); transition: background 0.12s; }
+table.pf-table tbody tr:hover { background: var(--cl-bg); }
+table.pf-table tbody td { padding:11px 16px; font-size:0.85rem; color:var(--cl-text); }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.72rem; font-weight:600; }
+.badge-success { background:#d1fae5; color:#065f46; }
+.badge-warning { background:#fef3c7; color:#92400e; }
+.badge-danger  { background:#fee2e2; color:#991b1b; }
+.badge-secondary { background:#f1f5f9; color:#475569; }
+.badge-info { background:#dbeafe; color:#1e40af; }
+.empty-state { text-align:center; padding:40px; color:var(--cl-muted); font-size:0.9rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Stat Cards -->
+<div class="inv-stats">
+  <div class="inv-stat-card">
+    <div class="inv-stat-icon">📦</div>
+    <div>
+      <div class="inv-stat-val">{{ total_items }}</div>
+      <div class="inv-stat-label">{{ t('Total Active Items', 'إجمالي الأصناف النشطة') }}</div>
+    </div>
+  </div>
+  <div class="inv-stat-card danger">
+    <div class="inv-stat-icon">⚠️</div>
+    <div>
+      <div class="inv-stat-val" style="color:var(--cl-danger)">{{ low_stock_count }}</div>
+      <div class="inv-stat-label">{{ t('Low Stock Alerts', 'تنبيهات المخزون المنخفض') }}</div>
+      <div class="inv-stat-sub">{{ t('Items at or below reorder level', 'أصناف عند مستوى إعادة الطلب أو أدنى منه') }}</div>
+    </div>
+  </div>
+  <div class="inv-stat-card warning">
+    <div class="inv-stat-icon">⏰</div>
+    <div>
+      <div class="inv-stat-val" style="color:var(--cl-warning)">{{ expiry_count }}</div>
+      <div class="inv-stat-label">{{ t('Expiry Alerts (30 days)', 'تنبيهات انتهاء الصلاحية (30 يوم)') }}</div>
+      <div class="inv-stat-sub">{{ t('Batches expiring soon', 'دفعات تنتهي صلاحيتها قريباً') }}</div>
+    </div>
+  </div>
+  <div class="inv-stat-card success">
+    <div class="inv-stat-icon">💰</div>
+    <div>
+      <div class="inv-stat-val" style="color:var(--cl-success)">{{ "{:,.0f}".format(total_value) }}</div>
+      <div class="inv-stat-label">{{ t('Total Inventory Value', 'إجمالي قيمة المخزون') }}</div>
+      <div class="inv-stat-sub">{{ t('EGP (cost basis)', 'جنيه مصري (بالتكلفة)') }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Low Stock Alerts -->
+{% if low_stock %}
+<div class="section-header">
+  <h2>🔴 {{ t('Low Stock Items', 'أصناف المخزون المنخفض') }}</h2>
+  <a href="{{ url_for('inventory.alerts') }}" style="font-size:0.82rem;color:var(--cl-primary)">{{ t('View all alerts →', 'عرض كل التنبيهات →') }}</a>
+</div>
+<div class="alert-cards">
+  {% for item in low_stock[:8] %}
+  <div class="alert-card">
+    <div class="alert-card-title">{{ item.name }}</div>
+    <div class="alert-card-stock">{{ item.get('current_stock', 0) | round(1) }} {{ item.unit }}</div>
+    <div class="alert-card-meta">{{ t('Reorder level:', 'مستوى إعادة الطلب:') }} {{ item.reorder_level }} {{ item.unit }}</div>
+    <div style="margin-top:8px">
+      <a href="{{ url_for('inventory.item_detail', item_id=item.id) }}"
+         style="font-size:0.78rem;color:var(--cl-primary);font-weight:600;">{{ t('View Item →', 'عرض الصنف →') }}</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Expiry Alerts -->
+{% if expiry_alerts %}
+<div class="section-header">
+  <h2>🟡 {{ t('Expiring Soon (30 days)', 'تنتهي صلاحيتها قريباً (30 يوم)') }}</h2>
+  <a href="{{ url_for('inventory.alerts') }}" style="font-size:0.82rem;color:var(--cl-primary)">{{ t('View all →', 'عرض الكل →') }}</a>
+</div>
+<div class="alert-cards">
+  {% for batch in expiry_alerts[:6] %}
+  <div class="alert-card warning">
+    <div class="alert-card-title">{{ batch.item_name }}</div>
+    <div class="alert-card-stock" style="color:var(--cl-warning)">{{ batch.quantity | round(1) }} {{ batch.unit }}</div>
+    <div class="alert-card-meta">
+      {{ t('Batch:', 'الدفعة:') }} {{ batch.batch_number or 'N/A' }}<br>
+      {{ t('Expires:', 'تنتهي:') }} {{ batch.expiry_date or t('Unknown', 'غير معروف') }}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Recent Movements -->
+<div class="section-header">
+  <h2>📋 {{ t('Recent Stock Movements', 'حركات المخزون الأخيرة') }}</h2>
+  <a href="{{ url_for('inventory.movements') }}" style="font-size:0.82rem;color:var(--cl-primary)">{{ t('View all →', 'عرض الكل →') }}</a>
+</div>
+<div class="pf-table-wrap">
+  <table class="pf-table">
+    <thead>
+      <tr>
+        <th>{{ t('Date', 'التاريخ') }}</th>
+        <th>{{ t('Item', 'الصنف') }}</th>
+        <th>{{ t('Type', 'النوع') }}</th>
+        <th>{{ t('Quantity', 'الكمية') }}</th>
+        <th>{{ t('Reference', 'المرجع') }}</th>
+        <th>{{ t('By', 'بواسطة') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in movements %}
+      <tr>
+        <td>{{ m.created_at[:16] if m.created_at else '—' }}</td>
+        <td>{{ m.item_name or '—' }}</td>
+        <td>
+          {% if m.movement_type == 'in' %}
+            <span class="badge badge-success">{{ t('IN', 'وارد') }}</span>
+          {% elif m.movement_type == 'out' %}
+            <span class="badge badge-danger">{{ t('OUT', 'صادر') }}</span>
+          {% elif m.movement_type == 'adjustment' %}
+            <span class="badge badge-warning">{{ t('ADJ', 'تسوية') }}</span>
+          {% else %}
+            <span class="badge badge-secondary">{{ m.movement_type | upper }}</span>
+          {% endif %}
+        </td>
+        <td>{{ m.quantity | round(2) }}</td>
+        <td>{{ m.reference_type or '—' }}</td>
+        <td>{{ m.created_by or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty-state">{{ t('No movements recorded yet.', 'لا توجد حركات مسجلة بعد.') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

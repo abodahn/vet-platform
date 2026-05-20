@@ -1,0 +1,36 @@
+# ── Secrets (NEVER commit these) ─────────────────────────
+.env
+.env.development
+.env.production
+.env.staging
+!.env.example
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# ── Database files ────────────────────────────────────────
+data/*.db
+data/backups/
+*.sqlite3
+
+# ── Logs ─────────────────────────────────────────────────
+logs/*.log
+logs/*.log.*
+
+# ── Uploads ──────────────────────────────────────────────
+data/uploads/
+
+# ── OS / Editor ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

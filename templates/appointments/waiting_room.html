@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Waiting Room — Premium Animal Hospital</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      background:linear-gradient(160deg,#0a0f1e 0%,#0d1f3c 40%,#0a1628 100%);
+      color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;
+      min-height:100vh;overflow:hidden;
+    }
+
+    /* ── Header ── */
+    .wr-header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:20px 40px;border-bottom:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);backdrop-filter:blur(10px);
+    }
+    .wr-logo{display:flex;align-items:center;gap:16px}
+    .wr-logo-icon{
+      width:56px;height:56px;border-radius:14px;
+      background:linear-gradient(135deg,#1a5c38,#10b981);
+      display:flex;align-items:center;justify-content:center;font-size:2rem
+    }
+    .wr-clinic-name{font-size:1.5rem;font-weight:800;color:#f1f5f9}
+    .wr-clinic-sub{font-size:.85rem;color:#64748b;margin-top:2px}
+    .wr-time-block{text-align:right}
+    .wr-time{font-size:2.8rem;font-weight:800;color:#10b981;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+    .wr-date{font-size:.9rem;color:#64748b;margin-top:2px}
+
+    /* ── Main grid ── */
+    .wr-body{display:grid;grid-template-columns:1fr 340px;gap:0;height:calc(100vh - 100px)}
+
+    /* ── Queue table ── */
+    .wr-queue{padding:32px 40px;overflow:hidden}
+    .wr-queue-title{
+      font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.12em;
+      color:#475569;margin-bottom:20px;display:flex;align-items:center;gap:10px
+    }
+    .wr-queue-title::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
+
+    .wr-table{width:100%;border-collapse:collapse}
+    .wr-table th{
+      font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+      color:#475569;padding:0 16px 12px;text-align:left
+    }
+    .wr-row{
+      border-radius:12px;transition:all .4s;
+      animation:rowIn .5s ease both
+    }
+    @keyframes rowIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:none}}
+    .wr-row td{padding:14px 16px;vertical-align:middle}
+    .wr-row:nth-child(odd) td:first-child{border-radius:12px 0 0 12px}
+    .wr-row:nth-child(odd) td:last-child{border-radius:0 12px 12px 0}
+    .wr-row:nth-child(odd){background:rgba(255,255,255,.04)}
+    .wr-row.checked-in{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2)}
+    .wr-row.checked-in td:first-child{border-left:3px solid #10b981}
+
+    .wr-pos{
+      width:36px;height:36px;border-radius:50%;
+      background:rgba(139,92,246,.15);border:1.5px solid rgba(139,92,246,.3);
+      display:flex;align-items:center;justify-content:center;
+      font-size:.85rem;font-weight:700;color:#a78bfa
+    }
+    .wr-pos.active{background:rgba(16,185,129,.2);border-color:rgba(16,185,129,.5);color:#10b981}
+    .wr-pet-name{font-size:1rem;font-weight:700;color:#f1f5f9}
+    .wr-owner-name{font-size:.78rem;color:#64748b;margin-top:2px}
+    .wr-type{font-size:.8rem;color:#94a3b8}
+    .wr-doc{font-size:.8rem;color:#7c3aed}
+    .wr-wait{font-size:.88rem;font-weight:600;color:#f59e0b}
+    .wr-wait.now{color:#10b981;font-size:.78rem}
+    .wr-empty{
+      text-align:center;padding:60px 0;color:#334155;font-size:1.1rem
+    }
+
+    /* ── Right panel ── */
+    .wr-side{
+      border-left:1px solid rgba(255,255,255,.07);
+      display:flex;flex-direction:column;overflow:hidden;
+      background:rgba(255,255,255,.02)
+    }
+
+    /* Stats */
+    .wr-stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.07)}
+    .wr-stat{
+      background:#0a0f1e;padding:20px;text-align:center
+    }
+    .wr-stat-val{font-size:2.2rem;font-weight:800;color:#10b981;font-variant-numeric:tabular-nums}
+    .wr-stat-val.amber{color:#f59e0b}
+    .wr-stat-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:#475569;margin-top:4px}
+
+    /* Tips carousel */
+    .wr-tips{flex:1;padding:24px;display:flex;flex-direction:column;justify-content:center}
+    .wr-tip-label{
+      font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+      color:#475569;margin-bottom:16px;display:flex;align-items:center;gap:8px
+    }
+    .wr-tip-label::before{content:'💡';font-size:.9rem}
+    .wr-tip-content{
+      font-size:.92rem;color:#94a3b8;line-height:1.7;
+      animation:tipFade .8s ease both
+    }
+    @keyframes tipFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+    /* Pulse dot for "In Progress" */
+    .pulse-dot{
+      width:8px;height:8px;border-radius:50%;background:#10b981;
+      display:inline-block;animation:pulse 1.5s ease infinite
+    }
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+
+    /* Scrolling marquee */
+    .wr-marquee{
+      padding:10px 40px;border-top:1px solid rgba(255,255,255,.07);
+      font-size:.78rem;color:#475569;white-space:nowrap;overflow:hidden
+    }
+    .wr-marquee span{display:inline-block;animation:marquee 30s linear infinite}
+    @keyframes marquee{0%{transform:translateX(100vw)}100%{transform:translateX(-100%)}}
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="wr-header">
+  <div class="wr-logo">
+    <div class="wr-logo-icon">🐾</div>
+    <div>
+      <div class="wr-clinic-name">{{ clinic.name if clinic else 'Premium Animal Hospital' }}</div>
+      <div class="wr-clinic-sub">{{ clinic.address if clinic else 'Dr. Hatem El Khateeb' }}</div>
+    </div>
+  </div>
+  <div class="wr-time-block">
+    <div class="wr-time" id="liveTime">--:--</div>
+    <div class="wr-date">{{ today }}</div>
+  </div>
+</div>
+
+<div class="wr-body">
+
+  <!-- Queue -->
+  <div class="wr-queue">
+    <div class="wr-queue-title">Today's Queue &nbsp;<span class="pulse-dot"></span></div>
+
+    {% if queue %}
+    <table class="wr-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Patient</th>
+          <th>Type</th>
+          <th>Doctor</th>
+          <th>Est. Wait</th>
+        </tr>
+      </thead>
+      <tbody id="queueBody">
+        {% for q in queue %}
+        <tr class="wr-row {% if q.status == 'Checked-in' %}checked-in{% endif %}"
+            style="animation-delay:{{ loop.index0 * 0.08 }}s">
+          <td>
+            <div class="wr-pos {% if q.status == 'Checked-in' %}active{% endif %}">
+              {{ q.position }}
+            </div>
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:1.6rem">{{ q.emoji }}</span>
+              <div>
+                <div class="wr-pet-name">{{ q.pet_name or '—' }}</div>
+                <div class="wr-owner-name">{{ q.owner_name }}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="wr-type">{{ q.appointment_type or '—' }}</span></td>
+          <td><span class="wr-doc">Dr. {{ q.doctor_name or '?' }}</span></td>
+          <td>
+            {% if q.status == 'Checked-in' %}
+            <span class="wr-wait now">🟢 In Progress</span>
+            {% elif q.wait_min == 0 %}
+            <span class="wr-wait now">Next up</span>
+            {% else %}
+            <span class="wr-wait">~{{ q.wait_min }} min</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="wr-empty">
+      <div style="font-size:3rem;margin-bottom:12px">🌟</div>
+      <div>No patients in queue right now</div>
+      <div style="font-size:.85rem;color:#1e293b;margin-top:6px">Walk-ins welcome</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right side panel -->
+  <div class="wr-side">
+
+    <!-- Stats -->
+    <div class="wr-stats">
+      <div class="wr-stat">
+        <div class="wr-stat-val" id="statTotal">{{ queue|length }}</div>
+        <div class="wr-stat-label">In Queue</div>
+      </div>
+      <div class="wr-stat">
+        <div class="wr-stat-val amber" id="statActive">
+          {{ queue | selectattr('status','equalto','Checked-in') | list | length }}
+        </div>
+        <div class="wr-stat-label">In Consultation</div>
+      </div>
+      <div class="wr-stat">
+        <div class="wr-stat-val" id="statWait">
+          {{ (queue | selectattr('status','ne','Checked-in') | list | length) * 20 }}
+        </div>
+        <div class="wr-stat-label">Max Wait (min)</div>
+      </div>
+      <div class="wr-stat">
+        <div class="wr-stat-val" style="color:#3b82f6">24</div>
+        <div class="wr-stat-label">Yrs of Care</div>
+      </div>
+    </div>
+
+    <!-- Health Tips -->
+    <div class="wr-tips">
+      <div class="wr-tip-label">Health Tip of the Moment</div>
+      <div class="wr-tip-content" id="tipText">Loading tip...</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Marquee -->
+<div class="wr-marquee">
+  <span>
+    🐾 Welcome to Premium Animal Hospital &nbsp;·&nbsp;
+    💉 Keep your pet's vaccinations up to date &nbsp;·&nbsp;
+    🦷 Dental health is vital — annual cleanings recommended &nbsp;·&nbsp;
+    🏃 Regular exercise keeps pets healthy and happy &nbsp;·&nbsp;
+    💧 Always ensure fresh water is available &nbsp;·&nbsp;
+    📞 For emergencies call us anytime &nbsp;·&nbsp;
+    ❤️ Thank you for choosing us for your pet's care
+  </span>
+</div>
+
+<script>
+// Live clock
+function updateClock() {
+  var now = new Date();
+  var h = now.getHours().toString().padStart(2,'0');
+  var m = now.getMinutes().toString().padStart(2,'0');
+  document.getElementById('liveTime').textContent = h + ':' + m;
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// Health tips carousel
+var TIPS = [
+  "Regular veterinary check-ups catch problems before they become serious. Annual exams are recommended for all pets.",
+  "Cats are masters at hiding pain. Any change in behavior, appetite, or litter box habits warrants a vet visit.",
+  "Dogs should be dewormed every 3 months. Ask us about the right schedule for your pet.",
+  "Obesity is one of the most common preventable diseases in pets. We can help create a healthy diet plan.",
+  "Senior pets (7+ years) benefit from twice-yearly wellness exams to catch age-related conditions early.",
+  "Dental disease affects 80% of dogs and 70% of cats over age 3. Regular brushing makes a big difference.",
+  "Spaying or neutering your pet reduces cancer risk and helps control the stray animal population.",
+  "Keep your pet's vaccinations current — it protects them, your family, and the community.",
+  "Never give human medications to pets. Many are toxic to animals, including Ibuprofen and Paracetamol.",
+  "Microchipping is the most reliable way to be reunited with a lost pet. Ask us about it today.",
+];
+var tipIdx = 0;
+function rotateTip() {
+  var el = document.getElementById('tipText');
+  el.style.animation = 'none';
+  el.offsetHeight; // reflow
+  el.style.animation = 'tipFade .8s ease both';
+  el.textContent = TIPS[tipIdx % TIPS.length];
+  tipIdx++;
+}
+rotateTip();
+setInterval(rotateTip, 12000);
+
+// Auto-refresh queue every 30 seconds
+setInterval(function() {
+  fetch('/appointments/api/queue')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      document.getElementById('statTotal').textContent = data.length;
+      var active = data.filter(function(q){ return q.status === 'Checked-in'; }).length;
+      document.getElementById('statActive').textContent = active;
+      var waiting = data.filter(function(q){ return q.status !== 'Checked-in'; }).length;
+      document.getElementById('statWait').textContent = waiting * 20;
+    })
+    .catch(function(){});
+}, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="{{ current_theme or 'medical' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login — {{ app_title }}</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/platform.css') }}">
+
+  <style>
+    /* Extra login polish */
+    .pf-login-hero-float-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.15);
+      color: rgba(255,255,255,.85);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .pf-login-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 18px 0;
+      color: var(--cl-text-light);
+      font-size: 11.5px;
+    }
+    .pf-login-divider::before,
+    .pf-login-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--cl-border);
+    }
+    .pf-input-wrap {
+      position: relative;
+    }
+    .pf-input-icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 15px;
+      pointer-events: none;
+    }
+    .pf-input-wrap .pf-input {
+      padding-left: 36px;
+    }
+    .pf-input-wrap .pf-input-toggle {
+      position: absolute;
+      right: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--cl-text-light);
+      padding: 0;
+    }
+    /* Floating module badges on hero */
+    .pf-hero-feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: var(--cl-radius-md);
+      text-align: left;
+      transition: background .18s;
+    }
+    .pf-hero-feature:hover {
+      background: rgba(255,255,255,.12);
+    }
+    .pf-hero-feature-icon { font-size: 20px; flex-shrink: 0; }
+    .pf-hero-feature-text { }
+    .pf-hero-feature-name { font-size: 13px; font-weight: 700; color: #fff; }
+    .pf-hero-feature-sub  { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 1px; }
+    .pf-hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 24px;
+      width: 100%;
+      max-width: 460px;
+    }
+    [data-theme="logo"] .pf-login-hero {
+      background: linear-gradient(135deg, #0f2548 0%, #1a3a6b 45%, #1e4d9a 100%);
+    }
+    [data-theme="logo"] .pf-login-hero::after {
+      content: '';
+      position: absolute;
+      bottom: -60px; right: -40px;
+      width: 260px; height: 260px;
+      background: radial-gradient(circle, rgba(245,197,24,.12) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    [data-theme="logo"] .pf-login-panel {
+      background: linear-gradient(180deg, #f0f6ff 0%, #eef3ff 100%);
+    }
+  </style>
+</head>
+<body>
+
+<div class="pf-login-root">
+
+  <!-- ══ HERO PANEL ════════════════════════════════════════════ -->
+  <div class="pf-login-hero">
+    <div class="pf-login-hero-content">
+
+      <!-- Logo -->
+      <div class="pf-login-hero-logo">
+        <span class="pf-login-hero-logo-emoji">🐾</span>
+      </div>
+
+      <!-- Title -->
+      <div style="margin-bottom: 4px">
+        <span class="pf-login-hero-float-pill">
+          <span>✨</span>
+          <span>Veterinary ERP Platform v1.0</span>
+        </span>
+      </div>
+      <div class="pf-login-hero-title">{{ app_title }}</div>
+      <div class="pf-login-hero-title-ar">{{ app_title_ar }}</div>
+      <div class="pf-login-hero-sub">
+        <span class="pf-login-hero-accent">{{ app_subtitle }}</span><br>
+        Full-stack veterinary management platform —<br>
+        EMR · ERP · CRM · Inventory · Finance · AI
+      </div>
+
+      <!-- Feature grid -->
+      <div class="pf-hero-grid">
+        <div class="pf-hero-feature">
+          <span class="pf-hero-feature-icon">🩺</span>
+          <div class="pf-hero-feature-text">
+            <div class="pf-hero-feature-name">Examinations</div>
+            <div class="pf-hero-feature-sub">Medical records & diagnosis</div>
+          </div>
+        </div>
+        <div class="pf-hero-feature">
+          <span class="pf-hero-feature-icon">🐾</span>
+          <div class="pf-hero-feature-text">
+            <div class="pf-hero-feature-name">CRM</div>
+            <div class="pf-hero-feature-sub">Owners, pets & timelines</div>
+          </div>
+        </div>
+        <div class="pf-hero-feature">
+          <span class="pf-hero-feature-icon">📦</span>
+          <div class="pf-hero-feature-text">
+            <div class="pf-hero-feature-name">Inventory</div>
+            <div class="pf-hero-feature-sub">Batch · Expiry · Reorder</div>
+          </div>
+        </div>
+        <div class="pf-hero-feature">
+          <span class="pf-hero-feature-icon">💰</span>
+          <div class="pf-hero-feature-text">
+            <div class="pf-hero-feature-name">Finance</div>
+            <div class="pf-hero-feature-sub">Invoices · Payments · P&L</div>
+          </div>
+        </div>
+        <div class="pf-hero-feature">
+          <span class="pf-hero-feature-icon">💬</span>
+          <div class="pf-hero-feature-text">
+            <div class="pf-hero-feature-name">WhatsApp</div>
+            <div class="pf-hero-feature-sub">Reminders & campaigns</div>
+          </div>
+        </div>
+        <div class="pf-hero-feature">
+          <span class="pf-hero-feature-icon">🤖</span>
+          <div class="pf-hero-feature-text">
+            <div class="pf-hero-feature-name">AI Assistant</div>
+            <div class="pf-hero-feature-sub">Role-based AI copilot</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module pills -->
+      <div class="pf-login-hero-modules" style="margin-top:20px">
+        <span class="pf-login-hero-pill">📅 Appointments</span>
+        <span class="pf-login-hero-pill">💊 Pharmacy</span>
+        <span class="pf-login-hero-pill">🔬 Laboratory</span>
+        <span class="pf-login-hero-pill">✂️ Grooming</span>
+        <span class="pf-login-hero-pill">🏨 Boarding</span>
+        <span class="pf-login-hero-pill">📊 Reports</span>
+        <span class="pf-login-hero-pill">🌐 Multi-Branch</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ LOGIN FORM PANEL ══════════════════════════════════════ -->
+  <div class="pf-login-panel">
+    <div class="pf-login-form-wrap">
+
+      <!-- Header -->
+      <div class="pf-login-form-title">Welcome back 👋</div>
+      <div class="pf-login-form-sub">Sign in to access the platform</div>
+
+      <!-- Error -->
+      {% if error %}
+      <div class="pf-login-error">🔐 {{ error }}</div>
+      {% endif %}
+
+      <!-- Form -->
+      <form method="post" action="{{ url_for('auth.login') }}" autocomplete="on">
+        {% if request.args.get('next') %}
+          <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+        {% endif %}
+        <input type="hidden" name="theme" id="form-theme-val" value="{{ current_theme or 'medical' }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+        <div class="pf-form-group">
+          <label class="pf-label" for="username">Username</label>
+          <div class="pf-input-wrap">
+            <span class="pf-input-icon">👤</span>
+            <input class="pf-input" type="text" id="username" name="username"
+                   value="{{ username or '' }}" required autocomplete="username"
+                   placeholder="Enter your username">
+          </div>
+        </div>
+
+        <div class="pf-form-group">
+          <label class="pf-label" for="password">Password</label>
+          <div class="pf-input-wrap">
+            <span class="pf-input-icon">🔑</span>
+            <input class="pf-input" type="password" id="password" name="password"
+                   required autocomplete="current-password"
+                   placeholder="Enter your password">
+            <button type="button" class="pf-input-toggle" id="pw-toggle"
+                    title="Show/hide password">👁</button>
+          </div>
+        </div>
+
+        <button type="submit" class="pf-login-submit">
+          Sign In &rarr;
+        </button>
+      </form>
+
+      <!-- Theme switcher -->
+      <div class="pf-login-divider">Theme</div>
+      <div class="pf-login-theme-switch">
+        <button class="pf-login-theme-pill {% if (current_theme or 'medical') == 'medical' %}active{% endif %}"
+                data-theme-btn="medical"
+                onclick="switchLoginTheme('medical')">
+          ⚕️ Medical
+        </button>
+        <button class="pf-login-theme-pill {% if current_theme == 'logo' %}active{% endif %}"
+                data-theme-btn="logo"
+                onclick="switchLoginTheme('logo')">
+          🐾 Logo
+        </button>
+      </div>
+
+      <!-- Footer -->
+      <div class="pf-login-footer">
+        {{ app_title }} Platform v1.0<br>
+        {{ app_tagline }}
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- Platform JS -->
+<script src="{{ url_for('static', filename='js/platform.js') }}"></script>
+
+<script>
+// Password toggle
+document.getElementById('pw-toggle').addEventListener('click', function () {
+  var inp = document.getElementById('password');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  this.textContent = inp.type === 'password' ? '👁' : '🙈';
+});
+
+// Theme switch on login page (just visual + stores in form)
+function switchLoginTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('pah_platform_theme', theme);
+  document.getElementById('form-theme-val').value = theme;
+
+  // Update pill states
+  document.querySelectorAll('.pf-login-theme-pill').forEach(function(btn){
+    btn.classList.toggle('active', btn.getAttribute('data-theme-btn') === theme);
+  });
+}
+
+// Apply stored theme on load
+(function(){
+  var stored = localStorage.getItem('pah_platform_theme') || 'medical';
+  var serverTheme = document.documentElement.getAttribute('data-theme');
+  var theme = serverTheme || stored;
+  switchLoginTheme(theme);
+})();
+</script>
+
+</body>
+</html>

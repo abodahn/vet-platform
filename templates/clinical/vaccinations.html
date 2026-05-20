@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Vaccinations{% endblock %}
+{% block page_title %}Vaccinations{% endblock %}
+{% block page_sub %}Vaccination records and upcoming due dates{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('clinical.vaccination_new') }}" class="pf-btn pf-btn-primary">
+  ＋ Record Vaccination
+</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.due-soon-banner {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.due-soon-banner h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.due-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #fff;
+  border: 1px solid #f59e0b;
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.65rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.due-date-badge {
+  background: #f59e0b;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.due-overdue-badge {
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Due soon section -->
+{% if upcoming %}
+<div class="due-soon-banner">
+  <h3>⚠️ Vaccinations Due in Next 30 Days ({{ upcoming|length }})</h3>
+  {% for v in upcoming %}
+  <div class="due-card">
+    <div style="flex:1">
+      <div style="font-weight:700">{{ v.pet_name }}</div>
+      <div style="font-size:0.82rem;color:#92400e">{{ v.vaccine_name }}</div>
+      <div style="font-size:0.78rem;color:#b45309">Owner: {{ v.owner_name }}
+        {% if v.whatsapp_phone %} · {{ v.whatsapp_phone }}{% endif %}
+      </div>
+    </div>
+    <span class="due-date-badge">Due {{ v.next_due_at }}</span>
+    <a href="{{ url_for('clinical.vaccination_new') }}?pet_id={{ v.pet_id }}"
+       class="pf-btn pf-btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.65rem">
+      Record
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="pf-card" style="margin-bottom:1.25rem;border-left:4px solid #22c55e">
+  <div class="pf-card-body" style="padding:0.85rem 1.25rem;color:#166534;font-weight:600">
+    ✅ No vaccinations due in the next 30 days.
+  </div>
+</div>
+{% endif %}
+
+<!-- All vaccinations table -->
+<div class="pf-card">
+  <div class="pf-card-header">
+    <span>💉 All Vaccination Records</span>
+    <span style="font-size:0.82rem;color:var(--text-muted)">{{ all_vacs|length }} records</span>
+  </div>
+  {% if all_vacs %}
+  <div class="pf-table-wrap">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th>Pet</th>
+          <th>Vaccine</th>
+          <th>Brand / Batch</th>
+          <th>Date Given</th>
+          <th>Next Due</th>
+          <th>Administered By</th>
+          <th>Site</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in all_vacs %}
+        <tr>
+          <td>
+            <div style="font-weight:600">{{ v.pet_name }}</div>
+            {% if v.owner_name %}
+            <div style="font-size:0.78rem;color:var(--text-muted)">{{ v.owner_name }}</div>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-weight:500">{{ v.vaccine_name }}</div>
+            {% if v.dose_number %}
+            <div style="font-size:0.78rem;color:var(--text-muted)">Dose #{{ v.dose_number }}</div>
+            {% endif %}
+          </td>
+          <td style="font-size:0.83rem;color:var(--text-muted)">
+            {{ v.vaccine_brand or '—' }}
+            {% if v.batch_number %}<br><span style="font-size:0.75rem">Batch: {{ v.batch_number }}</span>{% endif %}
+          </td>
+          <td style="white-space:nowrap">{{ v.administered_at[:10] if v.administered_at else '—' }}</td>
+          <td style="white-space:nowrap">
+            {% if v.next_due_at %}
+              <span style="color:{% if v.next_due_at <= today %}#ef4444{% else %}var(--text){% endif %};font-weight:{% if v.next_due_at <= today %}700{% else %}400{% endif %}">
+                {{ v.next_due_at }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:0.85rem">{{ v.administered_by or '—' }}</td>
+          <td style="font-size:0.83rem;color:var(--text-muted)">{{ v.site or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="pf-card-body" style="text-align:center;color:var(--text-muted);padding:2rem">
+    No vaccination records found. <a href="{{ url_for('clinical.vaccination_new') }}">Record the first one →</a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Inject today for template comparison
+var today = '{{ today if today is defined else "" }}';
+</script>
+{% endblock %}

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('Reports Dashboard', 'لوحة تحكم التقارير') }}{% endblock %}
+{% block page_title %}{{ t('Reports & Analytics', 'التقارير والتحليلات') }}{% endblock %}
+{% block page_sub %}{{ t('Platform-wide KPIs and performance overview', 'مؤشرات الأداء الرئيسية ونظرة عامة على المنصة') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('reports.clinical') }}" class="pf-btn pf-btn-secondary">🩺 {{ t('Clinical', 'السريري') }}</a>
+<a href="{{ url_for('reports.financial') }}" class="pf-btn pf-btn-secondary">💰 {{ t('Financial', 'المالي') }}</a>
+<a href="{{ url_for('reports.inventory_report') }}" class="pf-btn pf-btn-secondary">📦 {{ t('Inventory', 'المخزون') }}</a>
+<a href="{{ url_for('reports.doctor_revenue') }}" class="pf-btn pf-btn-secondary">👨‍⚕️ {{ t('Doctor Revenue', 'إيرادات الأطباء') }}</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; margin-bottom:28px; }
+.kpi-card { background:var(--cl-surface); border-radius:12px; padding:20px; box-shadow:0 2px 10px rgba(0,0,0,.07); border-top:4px solid var(--cl-border); transition:transform .15s; }
+.kpi-card:hover { transform:translateY(-2px); }
+.kpi-icon { font-size:28px; margin-bottom:8px; }
+.kpi-value { font-size:28px; font-weight:800; color:var(--cl-primary); line-height:1; margin-bottom:4px; }
+.kpi-label { font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.5px; }
+.kpi-card.accent-green { border-top-color:#22c55e; } .kpi-card.accent-green .kpi-value { color:#166534; }
+.kpi-card.accent-blue  { border-top-color:#3b82f6; } .kpi-card.accent-blue  .kpi-value { color:#1d4ed8; }
+.kpi-card.accent-amber { border-top-color:#f59e0b; } .kpi-card.accent-amber .kpi-value { color:#92400e; }
+.kpi-card.accent-red   { border-top-color:#ef4444; } .kpi-card.accent-red   .kpi-value { color:#991b1b; }
+.kpi-card.accent-navy  { border-top-color:var(--cl-primary); }
+.kpi-card.accent-teal  { border-top-color:#14b8a6; } .kpi-card.accent-teal  .kpi-value { color:#0f766e; }
+.chart-card { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:24px; }
+.chart-title { font-size:16px; font-weight:700; color:var(--cl-primary); margin-bottom:20px; }
+.svg-chart { width:100%; overflow:visible; }
+.bar-label { font-size:9px; fill:var(--cl-muted); }
+.bar-value { font-size:9px; fill:var(--cl-text); font-weight:600; }
+.services-table { width:100%; border-collapse:collapse; }
+.services-table th { text-align:left; padding:10px 14px; background:var(--cl-bg); font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; }
+.services-table td { padding:10px 14px; border-bottom:1px solid var(--cl-border); font-size:14px; }
+.services-table tr:last-child td { border-bottom:none; }
+.dash-grid-2 { display:grid; grid-template-columns:2fr 1fr; gap:20px; }
+.export-bar { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+.export-btn { padding:7px 16px; border-radius:7px; background:var(--cl-bg); border:1.5px solid var(--cl-border); color:var(--cl-text); text-decoration:none; font-size:13px; font-weight:500; }
+.export-btn:hover { background:var(--cl-primary); color:#fff; border-color:var(--cl-primary); }
+@media(max-width:900px){ .dash-grid-2{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Export Bar -->
+<div class="export-bar">
+  <span style="font-size:13px;color:var(--cl-muted);padding:7px 0;">{{ t('Export data:', 'تصدير البيانات:') }}</span>
+  <a href="{{ url_for('reports.export_csv', type='owners') }}" class="export-btn">📥 {{ t('Owners CSV', 'ملاك CSV') }}</a>
+  <a href="{{ url_for('reports.export_csv', type='pets') }}" class="export-btn">📥 {{ t('Pets CSV', 'حيوانات CSV') }}</a>
+  <a href="{{ url_for('reports.export_csv', type='visits') }}" class="export-btn">📥 {{ t('Visits CSV', 'زيارات CSV') }}</a>
+  <a href="{{ url_for('reports.export_csv', type='invoices') }}" class="export-btn">📥 {{ t('Invoices CSV', 'فواتير CSV') }}</a>
+</div>
+
+<!-- KPI Grid -->
+<div class="kpi-grid">
+  <div class="kpi-card accent-blue">
+    <div class="kpi-icon">🐾</div>
+    <div class="kpi-value">{{ stats.owners_total | default(0) }}</div>
+    <div class="kpi-label">{{ t('Total Owners', 'إجمالي الملاك') }}</div>
+  </div>
+  <div class="kpi-card accent-teal">
+    <div class="kpi-icon">🐶</div>
+    <div class="kpi-value">{{ stats.pets_total | default(0) }}</div>
+    <div class="kpi-label">{{ t('Total Pets', 'إجمالي الحيوانات') }}</div>
+  </div>
+  <div class="kpi-card accent-navy">
+    <div class="kpi-icon">🩺</div>
+    <div class="kpi-value">{{ stats.visits_today | default(0) }}</div>
+    <div class="kpi-label">{{ t('Visits Today', 'زيارات اليوم') }}</div>
+  </div>
+  <div class="kpi-card accent-blue">
+    <div class="kpi-icon">📅</div>
+    <div class="kpi-value">{{ stats.appts_today | default(0) }}</div>
+    <div class="kpi-label">{{ t('Appointments Today', 'مواعيد اليوم') }}</div>
+  </div>
+  <div class="kpi-card accent-green">
+    <div class="kpi-icon">💵</div>
+    <div class="kpi-value">{{ "{:,.0f}".format(stats.revenue_today | default(0)) }}</div>
+    <div class="kpi-label">{{ t('Revenue Today (EGP)', 'إيرادات اليوم (جنيه)') }}</div>
+  </div>
+  <div class="kpi-card accent-green">
+    <div class="kpi-icon">📈</div>
+    <div class="kpi-value">{{ "{:,.0f}".format(stats.revenue_month | default(0)) }}</div>
+    <div class="kpi-label">{{ t('Revenue This Month', 'إيرادات هذا الشهر') }}</div>
+  </div>
+  <div class="kpi-card accent-amber">
+    <div class="kpi-icon">🧾</div>
+    <div class="kpi-value">{{ stats.invoices_unpaid | default(0) }}</div>
+    <div class="kpi-label">{{ t('Unpaid Invoices', 'فواتير غير مدفوعة') }}</div>
+  </div>
+  <div class="kpi-card accent-red">
+    <div class="kpi-icon">⚠️</div>
+    <div class="kpi-value">{{ "{:,.0f}".format(stats.outstanding | default(0)) }}</div>
+    <div class="kpi-label">{{ t('Outstanding (EGP)', 'المستحق (جنيه)') }}</div>
+  </div>
+  <div class="kpi-card accent-amber">
+    <div class="kpi-icon">📦</div>
+    <div class="kpi-value">{{ stats.low_stock_count | default(0) }}</div>
+    <div class="kpi-label">{{ t('Low Stock Items', 'أصناف منخفضة المخزون') }}</div>
+  </div>
+  <div class="kpi-card accent-red">
+    <div class="kpi-icon">⏳</div>
+    <div class="kpi-value">{{ stats.expiry_soon | default(0) }}</div>
+    <div class="kpi-label">{{ t('Expiring in 30 Days', 'تنتهي صلاحيتها خلال 30 يومًا') }}</div>
+  </div>
+  <div class="kpi-card accent-teal">
+    <div class="kpi-icon">🔔</div>
+    <div class="kpi-value">{{ stats.pending_reminders | default(0) }}</div>
+    <div class="kpi-label">{{ t('Pending Reminders', 'تذكيرات معلقة') }}</div>
+  </div>
+  <div class="kpi-card accent-navy">
+    <div class="kpi-icon">⭐</div>
+    <div class="kpi-value">{{ stats.vip_owners | default(0) }}</div>
+    <div class="kpi-label">{{ t('VIP Owners', 'ملاك VIP') }}</div>
+  </div>
+</div>
+
+<div class="dash-grid-2">
+
+  <!-- Revenue Bar Chart (SVG) -->
+  <div class="chart-card">
+    <div class="chart-title">📊 {{ t('Revenue — Last 30 Days', 'الإيرادات — آخر 30 يوم') }}</div>
+    {% if revenue_by_day %}
+    {% set max_rev = namespace(val=1) %}
+    {% for d in revenue_by_day %}
+      {% if d.revenue > max_rev.val %}{% set max_rev.val = d.revenue %}{% endif %}
+    {% endfor %}
+    <svg class="svg-chart" viewBox="0 0 700 180" preserveAspectRatio="none" style="height:180px;">
+      {% set bar_w = 18 %}
+      {% set gap = 5 %}
+      {% set chart_h = 140 %}
+      {% set base_y = 155 %}
+      {% for d in revenue_by_day %}
+        {% set idx = loop.index0 %}
+        {% set x = idx * (bar_w + gap) + 10 %}
+        {% set bar_h = [(d.revenue / max_rev.val * chart_h), 2] | max %}
+        {% set y = base_y - bar_h %}
+        <rect x="{{ x }}" y="{{ y }}" width="{{ bar_w }}" height="{{ bar_h }}"
+              rx="3" fill="var(--cl-primary)" opacity="0.82"/>
+        {% if d.revenue > 0 %}
+        <text x="{{ x + bar_w/2 }}" y="{{ y - 3 }}" text-anchor="middle" class="bar-value">
+          {{ "{:,.0f}".format(d.revenue) if d.revenue < 10000 else "{:.0f}k".format(d.revenue/1000) }}
+        </text>
+        {% endif %}
+        {% if loop.index % 5 == 0 %}
+        <text x="{{ x + bar_w/2 }}" y="{{ base_y + 12 }}" text-anchor="middle" class="bar-label">
+          {{ d.date[5:] if d.date else '' }}
+        </text>
+        {% endif %}
+      {% endfor %}
+    </svg>
+    <div style="text-align:right;font-size:12px;color:var(--cl-muted);margin-top:4px;">
+      {{ t('Total', 'الإجمالي') }}: <strong>{{ "{:,.0f}".format(revenue_by_day | sum(attribute='revenue')) }} EGP</strong>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:40px;color:var(--cl-muted);">{{ t('No revenue data for last 30 days', 'لا توجد بيانات إيرادات لآخر 30 يوم') }}</div>
+    {% endif %}
+  </div>
+
+  <!-- Top Services -->
+  <div class="chart-card">
+    <div class="chart-title">🏆 {{ t('Top Services', 'أبرز الخدمات') }}</div>
+    {% if top_services %}
+    <table class="services-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>{{ t('Service', 'الخدمة') }}</th>
+          <th>{{ t('Count', 'العدد') }}</th>
+          <th>{{ t('Revenue', 'الإيرادات') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for svc in top_services %}
+        <tr>
+          <td style="color:var(--cl-muted);font-weight:700;">{{ loop.index }}</td>
+          <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ svc.description }}">
+            {{ svc.description or '—' }}
+          </td>
+          <td style="font-weight:600;">{{ svc.count }}</td>
+          <td style="color:#166534;font-weight:600;">{{ "{:,.0f}".format(svc.revenue or 0) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:40px;color:var(--cl-muted);">{{ t('No service data yet', 'لا توجد بيانات خدمات بعد') }}</div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

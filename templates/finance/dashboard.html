@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Finance Dashboard', 'لوحة تحكم المالية') }}{% endblock %}
+{% block page_title %}{{ t('Finance Dashboard', 'لوحة تحكم المالية') }}{% endblock %}
+{% block page_sub %}{{ today }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('finance.invoice_new') }}" class="btn btn-primary">+ {{ t('New Invoice', 'فاتورة جديدة') }}</a>
+<a href="{{ url_for('finance.invoices_list') }}" class="btn btn-secondary">{{ t('All Invoices', 'جميع الفواتير') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:16px; margin-bottom:28px; }
+.stat-card { background:var(--cl-surface); border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.07); border-top:4px solid transparent; }
+.stat-card.revenue { border-top-color:var(--cl-success); }
+.stat-card.month { border-top-color:var(--cl-primary); }
+.stat-card.outstanding { border-top-color:var(--cl-warning); }
+.stat-card.paid { border-top-color:var(--cl-info); }
+.stat-icon { font-size:28px; margin-bottom:8px; }
+.stat-label { font-size:12px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); margin-bottom:6px; }
+.stat-value { font-size:26px; font-weight:800; color:var(--cl-text); }
+.stat-sub { font-size:12px; color:var(--cl-muted); margin-top:4px; }
+.section-card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); overflow:hidden; margin-bottom:24px; }
+.section-header { padding:16px 20px; border-bottom:1px solid var(--cl-border); font-weight:700; font-size:14px; display:flex; justify-content:space-between; align-items:center; }
+.chart-area { padding:20px; }
+.chart-bars { display:flex; align-items:flex-end; gap:3px; height:120px; }
+.chart-bar { flex:1; min-width:4px; background:var(--cl-primary); border-radius:3px 3px 0 0; opacity:.8; transition:.2s; position:relative; }
+.chart-bar:hover { opacity:1; }
+.chart-labels { display:flex; justify-content:space-between; margin-top:8px; font-size:10px; color:var(--cl-muted); }
+table { width:100%; border-collapse:collapse; }
+th { background:var(--cl-primary); color:#fff; padding:10px 16px; text-align:left; font-size:12px; font-weight:600; text-transform:uppercase; }
+td { padding:10px 16px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(0,0,0,.02); }
+.badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; }
+.badge-Paid { background:#dcfce7; color:#15803d; }
+.badge-Unpaid { background:#fee2e2; color:#dc2626; }
+.badge-Partial { background:#fef3c7; color:#d97706; }
+.badge-Cancelled { background:#f1f5f9; color:#64748b; }
+</style>
+
+<!-- Stats row -->
+<div class="stat-grid">
+  <div class="stat-card revenue">
+    <div class="stat-icon">💵</div>
+    <div class="stat-label">{{ t("Today's Revenue", 'إيرادات اليوم') }}</div>
+    <div class="stat-value">{{ "{:,.0f}".format(today_revenue) }} EGP</div>
+    <div class="stat-sub">{{ t('Payments received today', 'المدفوعات المستلمة اليوم') }}</div>
+  </div>
+  <div class="stat-card month">
+    <div class="stat-icon">📅</div>
+    <div class="stat-label">{{ t('Month Revenue', 'إيرادات الشهر') }}</div>
+    <div class="stat-value">{{ "{:,.0f}".format(month_revenue) }} EGP</div>
+    <div class="stat-sub">{{ t('This calendar month', 'هذا الشهر الميلادي') }}</div>
+  </div>
+  <div class="stat-card outstanding">
+    <div class="stat-icon">⏳</div>
+    <div class="stat-label">{{ t('Outstanding', 'المستحق') }}</div>
+    <div class="stat-value">{{ "{:,.0f}".format(outstanding) }} EGP</div>
+    <div class="stat-sub">{{ t('Unpaid + partial invoices', 'فواتير غير مدفوعة + جزئية') }}</div>
+  </div>
+  <div class="stat-card paid">
+    <div class="stat-icon">✅</div>
+    <div class="stat-label">{{ t('Payments Today', 'مدفوعات اليوم') }}</div>
+    <div class="stat-value">{{ paid_count_today }}</div>
+    <div class="stat-sub">{{ t('Transactions', 'المعاملات') }}</div>
+  </div>
+</div>
+
+<!-- Revenue chart -->
+{% if revenue_by_day %}
+<div class="section-card">
+  <div class="section-header">
+    <span>📈 {{ t('Revenue — Last 30 Days', 'الإيرادات — آخر 30 يوم') }}</span>
+    <a href="{{ url_for('finance.reports') }}" style="font-size:12px; color:var(--cl-primary); text-decoration:none; font-weight:600;">{{ t('Full Report', 'التقرير الكامل') }} →</a>
+  </div>
+  <div class="chart-area">
+    <div class="chart-bars">
+      {% for day in revenue_by_day %}
+      {% set h = ((day.revenue / max_rev) * 110)|int if max_rev > 0 else 2 %}
+      <div class="chart-bar" style="height:{{ [h, 2]|max }}px" title="{{ day.date }}: {{ '{:,.0f}'.format(day.revenue) }} EGP"></div>
+      {% endfor %}
+    </div>
+    <div class="chart-labels">
+      <span>{{ revenue_by_day[0].date if revenue_by_day else '' }}</span>
+      <span>{{ revenue_by_day[-1].date if revenue_by_day else '' }}</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Recent invoices -->
+<div class="section-card">
+  <div class="section-header">
+    <span>🧾 {{ t('Recent Invoices', 'الفواتير الأخيرة') }}</span>
+    <a href="{{ url_for('finance.invoices_list') }}" style="font-size:12px; color:var(--cl-primary); text-decoration:none; font-weight:600;">{{ t('View All', 'عرض الكل') }} →</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>{{ t('Invoice #', 'رقم الفاتورة') }}</th>
+        <th>{{ t('Owner', 'المالك') }}</th>
+        <th>{{ t('Pet', 'الحيوان') }}</th>
+        <th>{{ t('Date', 'التاريخ') }}</th>
+        <th style="text-align:right">{{ t('Total', 'الإجمالي') }}</th>
+        <th style="text-align:right">{{ t('Due', 'المستحق') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in recent_invoices %}
+      <tr>
+        <td style="font-weight:700; color:var(--cl-primary);">{{ inv.invoice_number }}</td>
+        <td>{{ inv.owner_name or '—' }}</td>
+        <td style="color:var(--cl-muted);">{{ inv.pet_name or '—' }}</td>
+        <td style="color:var(--cl-muted);">{{ inv.issue_date }}</td>
+        <td style="text-align:right; font-weight:600;">{{ "{:,.0f}".format(inv.total or 0) }}</td>
+        <td style="text-align:right; color:var(--cl-warning); font-weight:600;">{{ "{:,.0f}".format(inv.due_amount or 0) }}</td>
+        <td><span class="badge badge-{{ inv.status }}">{{ inv.status }}</span></td>
+        <td><a href="{{ url_for('finance.invoice_detail', inv_id=inv.id) }}" style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">{{ t('View', 'عرض') }} →</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="text-align:center; padding:24px; color:var(--cl-muted);">{{ t('No invoices yet', 'لا توجد فواتير بعد') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

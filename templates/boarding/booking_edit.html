@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Edit Boarding Booking #{{ booking.id }}{% endblock %}
+{% block page_title %}Edit Boarding Booking{% endblock %}
+{% block page_sub %}Booking #{{ booking.id }} — {{ booking.pet_name }} ({{ booking.owner_name }}){% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('boarding.bookings_list') }}" class="pf-btn pf-btn-ghost">← Back to Bookings</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" action="{{ url_for('boarding.booking_edit_submit', booking_id=booking.id) }}" style="max-width:800px">
+
+  {# Read-only patient info #}
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Patient (read-only)</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Owner</label>
+        <div class="pf-input" style="background:var(--pf-bg-alt,#f8fafc);cursor:default">
+          {{ booking.owner_name }} &nbsp;<small style="color:var(--pf-muted)">{{ booking.phone }}</small>
+        </div>
+      </div>
+      <div>
+        <label class="pf-label">Pet</label>
+        <div class="pf-input" style="background:var(--pf-bg-alt,#f8fafc);cursor:default">
+          <strong>{{ booking.pet_name }}</strong> &nbsp;<small style="color:var(--pf-muted)">{{ booking.species }}</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Editable stay details #}
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Stay Details</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Room</label>
+        <select name="room_id" class="pf-input" onchange="autoRate(this)">
+          <option value="">— No specific room —</option>
+          {% for r in rooms %}
+          <option value="{{ r.id }}" data-rate="{{ r.daily_rate or 0 }}"
+            {% if booking.room_id == r.id %}selected{% endif %}>
+            Room {{ r.room_number }} ({{ r.room_type }}) · {{ r.daily_rate or 0 }} EGP/day
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="pf-label">Status</label>
+        <select name="status" class="pf-input">
+          {% for s in ['Reserved', 'Checked-in', 'Checked-out', 'Cancelled'] %}
+          <option value="{{ s }}" {% if booking.status == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="pf-label">Check-in Date</label>
+        <input type="date" name="checkin_date" class="pf-input"
+               value="{{ (booking.check_in or '')[:10] }}">
+      </div>
+      <div>
+        <label class="pf-label">Expected Checkout</label>
+        <input type="date" name="expected_checkout" class="pf-input"
+               value="{{ (booking.check_out or '')[:10] }}">
+      </div>
+    </div>
+  </div>
+
+  {# Care instructions #}
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Care Instructions</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Diet / Feeding Notes</label>
+        <textarea name="diet_notes" class="pf-input" rows="4"
+                  placeholder="Feeding schedule, food brand, allergies…">{{ booking.feeding_instructions or '' }}</textarea>
+      </div>
+      <div>
+        <label class="pf-label">Medication Notes</label>
+        <textarea name="medication_notes" class="pf-input" rows="4"
+                  placeholder="Medications, dosage, schedule…">{{ booking.medication_instructions or '' }}</textarea>
+      </div>
+      <div style="grid-column:span 2">
+        <label class="pf-label">Additional / Vet Notes</label>
+        <textarea name="notes" class="pf-input" rows="3"
+                  placeholder="Behaviour, special care…">{{ booking.vet_notes or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  {# Invoice info (if exists) #}
+  {% if booking.invoice_id %}
+  <div class="pf-card" style="margin-bottom:1.5rem;border-left:4px solid var(--pf-success,#16a34a)">
+    <div style="padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem">
+      <span style="font-size:1.4rem">🧾</span>
+      <div>
+        <strong>Invoice already generated</strong>
+        <div style="font-size:.85rem;color:var(--pf-muted)">Invoice #{{ booking.invoice_id }}</div>
+      </div>
+      <a href="{{ url_for('finance.invoice_detail', inv_id=booking.invoice_id) }}"
+         class="pf-btn pf-btn-secondary" style="margin-left:auto">View Invoice</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <div style="display:flex;gap:1rem;flex-wrap:wrap">
+    <button type="submit" class="pf-btn pf-btn-primary">💾 Save Changes</button>
+    <a href="{{ url_for('boarding.bookings_list') }}" class="pf-btn pf-btn-ghost">Cancel</a>
+
+    {# Quick actions #}
+    {% if booking.status == 'Reserved' %}
+    <form method="post" action="{{ url_for('boarding.checkin', booking_id=booking.id) }}" style="display:inline">
+      <button type="submit" class="pf-btn pf-btn-primary"
+              onclick="return confirm('Check in this pet now?')">✅ Check In Now</button>
+    </form>
+    {% elif booking.status == 'Checked-in' %}
+    <form method="post" action="{{ url_for('boarding.checkout', booking_id=booking.id) }}" style="display:inline">
+      <button type="submit" class="pf-btn pf-btn-secondary"
+              onclick="return confirm('Check out this pet and generate invoice?')">🚪 Check Out & Invoice</button>
+    </form>
+    {% endif %}
+
+    {% if booking.status not in ('Checked-out', 'Cancelled') %}
+    <form method="post" action="{{ url_for('boarding.booking_cancel', booking_id=booking.id) }}" style="display:inline">
+      <button type="submit" class="pf-btn pf-btn-ghost" style="color:var(--pf-error,#dc2626)"
+              onclick="return confirm('Cancel this booking?')">✕ Cancel Booking</button>
+    </form>
+    {% endif %}
+  </div>
+</form>
+
+<script>
+function autoRate(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  var rate = opt ? opt.getAttribute('data-rate') : null;
+  if (rate) document.getElementById('dailyRate').value = rate;
+}
+</script>
+{% endblock %}

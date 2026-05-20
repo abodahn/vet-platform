@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Cash Flow', 'التدفق النقدي') }}{% endblock %}
+{% block page_title %}{{ t('Cash Flow', 'التدفق النقدي') }}{% endblock %}
+{% block page_sub %}{{ date_from }} to {{ date_to }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('accounting.dashboard') }}" class="pf-btn pf-btn-ghost">← {{ t('Dashboard', 'لوحة التحكم') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.cf-filter { background:var(--cl-surface); border-radius:10px; padding:16px 20px; margin-bottom:20px;
+             box-shadow:0 2px 6px rgba(0,0,0,.06); display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+.pf-label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; margin-bottom:4px; color:var(--cl-muted); }
+
+.cf-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
+@media(max-width:600px){ .cf-stats { grid-template-columns:1fr; } }
+.cf-stat { background:var(--cl-surface); border-radius:10px; padding:18px 20px;
+           box-shadow:0 2px 6px rgba(0,0,0,.06); text-align:center; }
+.cf-stat-label { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); margin-bottom:6px; }
+.cf-stat-val { font-size:22px; font-weight:800; }
+
+.cf-card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); overflow:hidden; }
+.cf-table { width:100%; border-collapse:collapse; }
+.cf-table th { background:var(--cl-primary); color:#fff; padding:9px 14px; text-align:left;
+               font-size:11px; font-weight:700; text-transform:uppercase; }
+.cf-table td { padding:9px 14px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.cf-table tr:last-child td { border-bottom:none; }
+.cf-table tr.row-in  td { background:rgba(34,197,94,.04); }
+.cf-table tr.row-out td { background:rgba(239,68,68,.04); }
+.cf-table tr:hover td { filter:brightness(.97); }
+.amount-in  { color:#15803d; font-weight:700; }
+.amount-out { color:#dc2626; font-weight:700; }
+.balance-pos { color:#15803d; font-weight:700; }
+.balance-neg { color:#dc2626; font-weight:700; }
+.dir-badge { display:inline-block; padding:2px 9px; border-radius:10px; font-size:11px; font-weight:700; }
+.dir-in  { background:#dcfce7; color:#15803d; }
+.dir-out { background:#fee2e2; color:#dc2626; }
+</style>
+
+<!-- Filter -->
+<form method="get" class="cf-filter">
+  <div>
+    <label class="pf-label">{{ t('From', 'من') }}</label>
+    <input type="date" name="date_from" value="{{ date_from }}" class="pf-input" style="width:150px;">
+  </div>
+  <div>
+    <label class="pf-label">{{ t('To', 'إلى') }}</label>
+    <input type="date" name="date_to" value="{{ date_to }}" class="pf-input" style="width:150px;">
+  </div>
+  <button type="submit" class="pf-btn pf-btn-primary">{{ t('Filter', 'تصفية') }}</button>
+  <a href="{{ url_for('accounting.cash_flow') }}" class="pf-btn pf-btn-ghost">{{ t('Reset', 'إعادة تعيين') }}</a>
+</form>
+
+<!-- Summary stats -->
+<div class="cf-stats">
+  <div class="cf-stat">
+    <div class="cf-stat-label">💵 {{ t('Total Cash In', 'إجمالي النقد الوارد') }}</div>
+    <div class="cf-stat-val amount-in">{{ "{:,.0f}".format(total_in) }} EGP</div>
+  </div>
+  <div class="cf-stat">
+    <div class="cf-stat-label">🔴 {{ t('Total Cash Out', 'إجمالي النقد الصادر') }}</div>
+    <div class="cf-stat-val amount-out">{{ "{:,.0f}".format(total_out) }} EGP</div>
+  </div>
+  <div class="cf-stat">
+    <div class="cf-stat-label">📊 {{ t('Net Flow', 'صافي التدفق') }}</div>
+    <div class="cf-stat-val {{ 'balance-pos' if net_flow >= 0 else 'balance-neg' }}">
+      {{ "{:+,.0f}".format(net_flow) }} EGP
+    </div>
+  </div>
+</div>
+
+<!-- Transactions table -->
+<div class="cf-card">
+  <table class="cf-table">
+    <thead>
+      <tr>
+        <th>{{ t('Date', 'التاريخ') }}</th>
+        <th>{{ t('Description', 'الوصف') }}</th>
+        <th>{{ t('Payment Method', 'طريقة الدفع') }}</th>
+        <th>{{ t('Direction', 'الاتجاه') }}</th>
+        <th style="text-align:right">{{ t('Amount (EGP)', 'المبلغ (جنيه)') }}</th>
+        <th style="text-align:right">{{ t('Running Balance', 'الرصيد الجاري') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in movements %}
+      <tr class="{{ 'row-in' if m.direction == 'in' else 'row-out' }}">
+        <td style="color:var(--cl-muted);white-space:nowrap;">{{ (m.tx_date or '')[:10] }}</td>
+        <td>{{ m.description or '—' }}</td>
+        <td style="color:var(--cl-muted);">{{ m.payment_method or t('Cash', 'نقداً') }}</td>
+        <td>
+          <span class="dir-badge {{ 'dir-in' if m.direction == 'in' else 'dir-out' }}">
+            {{ t('↑ In', '↑ وارد') if m.direction == 'in' else t('↓ Out', '↓ صادر') }}
+          </span>
+        </td>
+        <td style="text-align:right;" class="{{ 'amount-in' if m.direction == 'in' else 'amount-out' }}">
+          {{ '+' if m.direction == 'in' else '-' }}{{ "{:,.0f}".format(m.amount or 0) }}
+        </td>
+        <td style="text-align:right;" class="{{ 'balance-pos' if (m.running_balance or 0) >= 0 else 'balance-neg' }}">
+          {{ "{:,.0f}".format(m.running_balance or 0) }}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--cl-muted);">{{ t('No transactions in this period', 'لا توجد معاملات في هذه الفترة') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}{{ t('New Invoice', 'فاتورة جديدة') }}{% endblock %}
+{% block page_title %}{{ t('New Invoice', 'فاتورة جديدة') }}{% endblock %}
+{% block page_sub %}{{ t('Create invoice with line items', 'إنشاء فاتورة مع بنود التفصيل') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('finance.invoices_list') }}" class="btn btn-secondary">← {{ t('Invoices', 'الفواتير') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.inv-layout { display:grid; grid-template-columns:1fr 340px; gap:20px; align-items:start; }
+.form-card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); overflow:hidden; }
+.form-card-header { background:var(--cl-primary); color:#fff; padding:16px 24px; font-weight:700; }
+.form-card-body { padding:24px; }
+.section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--cl-muted); margin:20px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--cl-border); }
+.form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.form-group { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+.form-label { font-size:12px; font-weight:600; color:var(--cl-text); }
+.form-control { padding:9px 13px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; width:100%; box-sizing:border-box; }
+.form-control:focus { outline:none; border-color:var(--cl-primary); }
+/* Line items table */
+.lines-table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:12px; }
+.lines-table th { background:var(--cl-bg); padding:8px 10px; border:1px solid var(--cl-border); font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); }
+.lines-table td { padding:6px 8px; border:1px solid var(--cl-border); }
+.lines-table input, .lines-table select { border:none; background:transparent; width:100%; font-size:13px; color:var(--cl-text); padding:4px; }
+.lines-table input:focus, .lines-table select:focus { outline:1px solid var(--cl-primary); border-radius:4px; }
+.lines-table .line-total { font-weight:700; text-align:right; min-width:80px; }
+.add-line-btn { background:none; border:1.5px dashed var(--cl-border); color:var(--cl-primary); padding:8px 20px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; transition:.2s; }
+.add-line-btn:hover { border-color:var(--cl-primary); background:rgba(var(--cl-primary-rgb,.2,.2,.8),0.05); }
+.del-btn { background:none; border:none; color:var(--cl-danger); cursor:pointer; font-size:16px; padding:2px 6px; }
+/* Summary card */
+.summary-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--cl-border); font-size:14px; }
+.summary-row:last-child { border-bottom:none; font-size:16px; font-weight:800; }
+.summary-label { color:var(--cl-muted); }
+.summary-val { font-weight:700; }
+.submit-btn { width:100%; padding:14px; background:var(--cl-primary); color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; margin-top:16px; }
+@media(max-width:900px){ .inv-layout { grid-template-columns:1fr; } }
+</style>
+
+<form method="post" id="inv-form">
+<div class="inv-layout">
+
+  <!-- Left: form body -->
+  <div>
+    <div class="form-card">
+      <div class="form-card-header">🧾 {{ t('Invoice Details', 'تفاصيل الفاتورة') }}</div>
+      <div class="form-card-body">
+
+        <!-- Patient -->
+        <div class="section-title">{{ t('Patient', 'المريض') }}</div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">{{ t('Owner', 'المالك') }} *</label>
+            <select name="owner_id" id="owner-select" class="form-control" required onchange="filterPets(this.value)">
+              <option value="">— {{ t('Select owner', 'اختر المالك') }} —</option>
+              {% for o in owners %}
+              <option value="{{ o.id }}">{{ o.full_name }}{% if o.phone %} · {{ o.phone }}{% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Pet', 'الحيوان') }}</label>
+            <select name="pet_id" id="pet-select" class="form-control">
+              <option value="">— {{ t('Select pet', 'اختر الحيوان') }} —</option>
+              {% for p in pets %}
+              <option value="{{ p.id }}" data-owner="{{ p.owner_id }}">{{ p.pet_name }} ({{ p.species or '' }})</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Header info -->
+        <div class="section-title">{{ t('Invoice Header', 'رأس الفاتورة') }}</div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">{{ t('Issue Date', 'تاريخ الإصدار') }} *</label>
+            <input type="date" name="issue_date" class="form-control" value="{{ today }}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Due Date', 'تاريخ الاستحقاق') }}</label>
+            <input type="date" name="due_date" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Doctor', 'الطبيب') }}</label>
+            <input type="text" name="doctor_name" class="form-control" placeholder="{{ t('Doctor name', 'اسم الطبيب') }}">
+          </div>
+        </div>
+
+        <!-- Line items -->
+        <div class="section-title">{{ t('Line Items', 'بنود الفاتورة') }}</div>
+        <table class="lines-table" id="lines-table">
+          <thead>
+            <tr>
+              <th style="width:40%">{{ t('Description', 'الوصف') }}</th>
+              <th style="width:10%">{{ t('Type', 'النوع') }}</th>
+              <th style="width:10%">{{ t('Qty', 'الكمية') }}</th>
+              <th style="width:14%">{{ t('Unit Price', 'سعر الوحدة') }}</th>
+              <th style="width:10%">{{ t('Disc %', 'خصم %') }}</th>
+              <th style="width:12%">{{ t('Total', 'الإجمالي') }}</th>
+              <th style="width:4%"></th>
+            </tr>
+          </thead>
+          <tbody id="lines-body">
+            <tr class="line-row">
+              <td><input type="text" name="description[]" placeholder="{{ t('Service / Item description', 'وصف الخدمة / الصنف') }}" required></td>
+              <td>
+                <select name="line_type[]">
+                  <option value="service">{{ t('Service', 'الخدمة') }}</option>
+                  <option value="product">{{ t('Product', 'منتج') }}</option>
+                  <option value="medication">{{ t('Medication', 'دواء') }}</option>
+                </select>
+              </td>
+              <td><input type="number" name="qty[]" class="qty-input" value="1" min="0.01" step="0.01" style="text-align:right"></td>
+              <td><input type="number" name="unit_price[]" class="price-input" value="0" min="0" step="0.01" style="text-align:right"></td>
+              <td><input type="number" name="discount[]" class="disc-input" value="0" min="0" max="100" step="0.1" style="text-align:right"></td>
+              <td class="line-total">0.00</td>
+              <td><button type="button" class="del-btn" onclick="deleteLine(this)" title="{{ t('Remove', 'حذف') }}">×</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="add-line-btn" onclick="addLine()">+ {{ t('Add Line Item', 'إضافة بند') }}</button>
+
+        <!-- Discount & Tax -->
+        <div class="section-title">{{ t('Adjustments', 'التعديلات') }}</div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">{{ t('Discount Type', 'نوع الخصم') }}</label>
+            <select name="discount_type" id="disc-type" class="form-control" onchange="recalc()">
+              <option value="value">{{ t('Fixed Amount (EGP)', 'مبلغ ثابت (جنيه)') }}</option>
+              <option value="percent">{{ t('Percentage (%)', 'نسبة مئوية (%)') }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Discount Value', 'قيمة الخصم') }}</label>
+            <input type="number" name="discount_value" id="disc-val" class="form-control" value="0" min="0" step="0.01" oninput="recalc()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Tax Rate (%)', 'نسبة الضريبة (%)') }}</label>
+            <input type="number" name="tax_rate" id="tax-rate" class="form-control" value="0" min="0" max="100" step="0.1" oninput="recalc()">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">{{ t('Notes', 'ملاحظات') }}</label>
+          <textarea name="notes" class="form-control" rows="3" placeholder="{{ t('Any notes for this invoice…', 'أي ملاحظات لهذه الفاتورة…') }}"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: summary -->
+  <div>
+    <div class="form-card">
+      <div class="form-card-header">💰 {{ t('Summary', 'الملخص') }}</div>
+      <div class="form-card-body">
+        <div class="summary-row"><span class="summary-label">{{ t('Subtotal', 'المجموع الفرعي') }}</span><span class="summary-val" id="s-subtotal">0.00 EGP</span></div>
+        <div class="summary-row"><span class="summary-label">{{ t('Discount', 'خصم') }}</span><span class="summary-val" id="s-discount" style="color:var(--cl-success)">— 0.00 EGP</span></div>
+        <div class="summary-row"><span class="summary-label">{{ t('Tax', 'الضريبة') }}</span><span class="summary-val" id="s-tax">+ 0.00 EGP</span></div>
+        <div class="summary-row"><span class="summary-label">{{ t('TOTAL', 'الإجمالي') }}</span><span class="summary-val" id="s-total" style="color:var(--cl-primary);font-size:20px">0.00 EGP</span></div>
+      </div>
+    </div>
+    <button type="submit" class="submit-btn">🧾 {{ t('Create Invoice', 'إنشاء الفاتورة') }}</button>
+  </div>
+
+</div>
+</form>
+
+<script>
+var pets_data = {{ pets | tojson }};
+
+function filterPets(ownerId) {
+  var sel = document.getElementById('pet-select');
+  var opts = sel.querySelectorAll('option');
+  opts.forEach(function(o) {
+    if (!o.value) return;
+    o.style.display = (o.dataset.owner == ownerId || !ownerId) ? '' : 'none';
+  });
+  sel.value = '';
+}
+
+function recalc() {
+  var rows = document.querySelectorAll('.line-row');
+  var subtotal = 0;
+  rows.forEach(function(row) {
+    var qty   = parseFloat(row.querySelector('.qty-input').value)   || 0;
+    var price = parseFloat(row.querySelector('.price-input').value) || 0;
+    var disc  = parseFloat(row.querySelector('.disc-input').value)  || 0;
+    var lt    = qty * price * (1 - disc / 100);
+    row.querySelector('.line-total').textContent = lt.toFixed(2);
+    subtotal += lt;
+  });
+  var discType = document.getElementById('disc-type').value;
+  var discVal  = parseFloat(document.getElementById('disc-val').value) || 0;
+  var taxRate  = parseFloat(document.getElementById('tax-rate').value) || 0;
+  var discAmt  = discType === 'percent' ? subtotal * discVal / 100 : discVal;
+  var afterDisc = subtotal - discAmt;
+  var taxAmt   = afterDisc * taxRate / 100;
+  var total    = afterDisc + taxAmt;
+  document.getElementById('s-subtotal').textContent = subtotal.toFixed(2) + ' EGP';
+  document.getElementById('s-discount').textContent = '— ' + discAmt.toFixed(2) + ' EGP';
+  document.getElementById('s-tax').textContent      = '+ ' + taxAmt.toFixed(2) + ' EGP';
+  document.getElementById('s-total').textContent    = total.toFixed(2) + ' EGP';
+}
+
+function addLine() {
+  var tbody = document.getElementById('lines-body');
+  var tpl = tbody.querySelector('.line-row').cloneNode(true);
+  tpl.querySelectorAll('input').forEach(function(i) {
+    if (i.classList.contains('qty-input'))   i.value = '1';
+    else if (i.classList.contains('price-input') || i.classList.contains('disc-input')) i.value = '0';
+    else i.value = '';
+  });
+  tpl.querySelector('.line-total').textContent = '0.00';
+  tpl.querySelectorAll('input, select').forEach(function(el) { el.addEventListener('input', recalc); });
+  tbody.appendChild(tpl);
+}
+
+function deleteLine(btn) {
+  var rows = document.querySelectorAll('.line-row');
+  if (rows.length <= 1) return;
+  btn.closest('.line-row').remove();
+  recalc();
+}
+
+document.querySelectorAll('.qty-input, .price-input, .disc-input').forEach(function(el) {
+  el.addEventListener('input', recalc);
+});
+recalc();
+</script>
+{% endblock %}

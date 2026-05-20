@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Today's Queue{% endblock %}
+{% block page_title %}Today's Queue{% endblock %}
+{% block page_sub %}{{ today }} · Current time: {{ now }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('doctor.workspace') }}" class="pf-btn pf-btn-secondary">← Workspace</a>
+<a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary">+ New Visit</a>
+{% endblock %}
+
+{% block content %}
+<meta http-equiv="refresh" content="60">
+
+<div style="display:flex;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap">
+  {% set waiting = appointments|selectattr('status','in',['Scheduled','Confirmed','Waiting'])|list %}
+  {% set inprog  = appointments|selectattr('status','equalto','In Progress')|list %}
+  {% set done    = appointments|selectattr('status','equalto','Completed')|list %}
+  <div class="pf-card" style="padding:.75rem 1.25rem;display:flex;align-items:center;gap:.75rem">
+    <span style="font-size:1.5rem;font-weight:800;color:#f59e0b">{{ waiting|length }}</span>
+    <span style="color:var(--pf-muted);font-size:.85rem">Waiting</span>
+  </div>
+  <div class="pf-card" style="padding:.75rem 1.25rem;display:flex;align-items:center;gap:.75rem">
+    <span style="font-size:1.5rem;font-weight:800;color:#3b82f6">{{ inprog|length }}</span>
+    <span style="color:var(--pf-muted);font-size:.85rem">In Progress</span>
+  </div>
+  <div class="pf-card" style="padding:.75rem 1.25rem;display:flex;align-items:center;gap:.75rem">
+    <span style="font-size:1.5rem;font-weight:800;color:#10b981">{{ done|length }}</span>
+    <span style="color:var(--pf-muted);font-size:.85rem">Completed</span>
+  </div>
+  <div class="pf-card" style="padding:.75rem 1.25rem;display:flex;align-items:center;gap:.75rem">
+    <span style="font-size:1.5rem;font-weight:800;color:var(--pf-primary)">{{ appointments|length }}</span>
+    <span style="color:var(--pf-muted);font-size:.85rem">Total</span>
+  </div>
+</div>
+
+<div class="pf-card">
+  <table class="pf-table">
+    <thead>
+      <tr><th>#</th><th>Time</th><th>Pet</th><th>Owner</th><th>Phone</th><th>Reason</th><th>Status</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for a in appointments %}
+      <tr style="{% if a.status == 'In Progress' %}background:#eff6ff{% elif a.status == 'Completed' %}opacity:.6{% endif %}">
+        <td style="color:var(--pf-muted)">{{ loop.index }}</td>
+        <td style="font-weight:700;white-space:nowrap">{{ (a.appointment_date or '')[-8:-3] }}</td>
+        <td>
+          <strong>{{ a.pet_name }}</strong><br>
+          <small style="color:var(--pf-muted)">
+            {% if a.species == 'Dog' %}🐶{% elif a.species == 'Cat' %}🐱{% elif a.species == 'Bird' %}🦜{% else %}🐾{% endif %}
+            {{ a.species }}{% if a.breed %} · {{ a.breed }}{% endif %}
+          </small>
+        </td>
+        <td>{{ a.owner_name }}</td>
+        <td><a href="tel:{{ a.owner_phone }}" style="color:var(--pf-primary)">{{ a.owner_phone }}</a></td>
+        <td style="font-size:.85rem;color:var(--pf-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.reason or '—' }}</td>
+        <td>
+          {% if a.status in ('Scheduled','Confirmed','Waiting') %}<span class="pf-badge warning">Waiting</span>
+          {% elif a.status == 'In Progress' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">In Progress</span>
+          {% elif a.status == 'Completed' %}<span class="pf-badge success">Done</span>
+          {% elif a.status == 'Cancelled' %}<span class="pf-badge error">Cancelled</span>
+          {% else %}<span class="pf-badge">{{ a.status }}</span>{% endif %}
+        </td>
+        <td style="display:flex;gap:.4rem;flex-wrap:wrap">
+          {% if a.status in ('Scheduled','Confirmed','Waiting') %}
+          <form method="post" action="{{ url_for('doctor.checkin', appt_id=a.id) }}" style="display:inline">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="pf-btn pf-btn-secondary" style="padding:3px 8px;font-size:.78rem">✓ In</button>
+          </form>
+          {% endif %}
+          <a href="{{ url_for('visits.visit_new_form', appt_id=a.id, owner_id=a.owner_id, pet_id=a.pet_id) }}"
+             class="pf-btn pf-btn-primary" style="padding:3px 8px;font-size:.78rem">+ Visit</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="8" style="text-align:center;padding:3rem;color:var(--pf-muted)">
+          <div style="font-size:2rem;margin-bottom:.5rem">🎉</div>
+          <strong>Queue is empty today!</strong><br>
+          <small>No appointments scheduled for today.</small>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div style="margin-top:.75rem;font-size:.8rem;color:var(--pf-muted);text-align:right">Auto-refreshes every 60 seconds</div>
+{% endblock %}

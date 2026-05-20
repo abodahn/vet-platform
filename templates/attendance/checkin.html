@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Check In / Out{% endblock %}
+{% block page_title %}Check In / Out{% endblock %}
+{% block page_sub %}{{ today }} — Current time: <span id="live-time">{{ now }}</span>{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:grid;grid-template-columns:380px 1fr;gap:20px">
+
+  <!-- My Status Card -->
+  <div>
+    <div class="pf-card">
+      <div class="pf-card-header">
+        <div class="pf-card-title">⏱ My Status Today</div>
+      </div>
+      <div style="padding:8px 0">
+        {% if not my_record %}
+          <div style="text-align:center;padding:24px 0">
+            <div style="font-size:48px;margin-bottom:8px">🟡</div>
+            <div style="font-weight:600;color:var(--cl-text-muted)">Not checked in</div>
+          </div>
+          <form method="POST">
+            <input type="hidden" name="action" value="checkin">
+            <input type="hidden" name="user_id" value="{{ current_user.id }}">
+            <div class="pf-form-group">
+              <label class="pf-form-label">Notes (optional)</label>
+              <textarea name="notes" class="pf-form-control" rows="2" placeholder="e.g. Working from home"></textarea>
+            </div>
+            <button type="submit" class="pf-btn pf-btn-primary" style="width:100%;font-size:15px;padding:12px">
+              ✅ Check In Now
+            </button>
+          </form>
+
+        {% elif not my_record.check_out %}
+          <div style="text-align:center;padding:16px 0">
+            <div style="font-size:48px;margin-bottom:8px">🟢</div>
+            <div style="font-weight:700;color:#10b981;font-size:16px">Checked In</div>
+            <div style="font-size:13px;color:var(--cl-text-muted);margin-top:4px">Since {{ my_record.check_in }}</div>
+          </div>
+          <form method="POST">
+            <input type="hidden" name="action" value="checkout">
+            <input type="hidden" name="user_id" value="{{ current_user.id }}">
+            <div class="pf-form-group">
+              <label class="pf-form-label">Break Time (minutes)</label>
+              <input type="number" name="break_minutes" class="pf-form-control" value="0" min="0" max="240">
+            </div>
+            <button type="submit" class="pf-btn pf-btn-accent" style="width:100%;font-size:15px;padding:12px">
+              🔴 Check Out Now
+            </button>
+          </form>
+
+        {% else %}
+          <div style="text-align:center;padding:16px 0">
+            <div style="font-size:48px;margin-bottom:8px">✅</div>
+            <div style="font-weight:700;color:#6366f1;font-size:16px">Day Complete</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+            <div style="background:var(--cl-surface-2);border-radius:var(--cl-radius-sm);padding:12px;text-align:center">
+              <div style="font-size:11px;color:var(--cl-text-muted)">Check In</div>
+              <div style="font-weight:700;font-size:16px">{{ my_record.check_in }}</div>
+            </div>
+            <div style="background:var(--cl-surface-2);border-radius:var(--cl-radius-sm);padding:12px;text-align:center">
+              <div style="font-size:11px;color:var(--cl-text-muted)">Check Out</div>
+              <div style="font-weight:700;font-size:16px">{{ my_record.check_out }}</div>
+            </div>
+          </div>
+          <div style="text-align:center;margin-top:12px;padding:12px;background:var(--cl-surface-2);border-radius:var(--cl-radius-sm)">
+            <div style="font-size:11px;color:var(--cl-text-muted)">Hours Worked</div>
+            <div style="font-weight:700;font-size:24px;color:#10b981">{{ '%.1f'|format(my_record.hours_worked or 0) }}h</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Manager Panel: All Staff Today -->
+  <div>
+    {% if is_manager %}
+    <div class="pf-card" style="margin-bottom:20px">
+      <div class="pf-card-header">
+        <div class="pf-card-title">👥 Record Attendance for Staff</div>
+      </div>
+      <form method="POST" style="display:grid;grid-template-columns:1fr 150px 120px 1fr auto;gap:10px;align-items:end">
+        <div class="pf-form-group" style="margin:0">
+          <label class="pf-form-label">Staff Member</label>
+          <select name="user_id" class="pf-form-control">
+            {% for s in staff_list %}
+            <option value="{{ s.id }}">{{ s.full_name }} ({{ s.role }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="pf-form-group" style="margin:0">
+          <label class="pf-form-label">Action</label>
+          <select name="action" class="pf-form-control">
+            <option value="checkin">Check In</option>
+            <option value="checkout">Check Out</option>
+          </select>
+        </div>
+        <div class="pf-form-group" style="margin:0">
+          <label class="pf-form-label">Break (min)</label>
+          <input type="number" name="break_minutes" class="pf-form-control" value="0" min="0">
+        </div>
+        <div class="pf-form-group" style="margin:0">
+          <label class="pf-form-label">Notes</label>
+          <input type="text" name="notes" class="pf-form-control" placeholder="Optional">
+        </div>
+        <button type="submit" class="pf-btn pf-btn-primary">Record</button>
+      </form>
+    </div>
+
+    <div class="pf-card">
+      <div class="pf-card-header">
+        <div>
+          <div class="pf-card-title">📋 All Staff — Today</div>
+          <div class="pf-card-sub">{{ all_today|length }} records</div>
+        </div>
+        <a href="{{ url_for('attendance.records_list') }}" class="pf-btn pf-btn-sm">Full Records</a>
+      </div>
+      {% if all_today %}
+      <table class="pf-table">
+        <thead><tr><th>Staff</th><th>Check In</th><th>Check Out</th><th>Break</th><th>Hours</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {% for r in all_today %}
+          <tr>
+            <td>
+              <div style="font-weight:600">{{ r.full_name }}</div>
+              <div style="font-size:11px;color:var(--cl-text-muted)">{{ r.role }}</div>
+            </td>
+            <td>{{ r.check_in or '—' }}</td>
+            <td>{{ r.check_out or '—' }}</td>
+            <td>{{ r.break_minutes or 0 }}m</td>
+            <td>{{ '%.1f'|format(r.hours_worked or 0) }}h</td>
+            <td>
+              {% if r.status == 'Present' %}<span class="pf-badge active">Present</span>
+              {% elif r.status == 'Late' %}<span class="pf-badge" style="background:#fef3c7;color:#92400e">Late</span>
+              {% else %}<span class="pf-badge">{{ r.status }}</span>{% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('attendance.record_edit', rec_id=r.id) }}" class="pf-btn pf-btn-sm">Edit</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div style="padding:32px;text-align:center;color:var(--cl-text-muted)">No records yet today.</div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="pf-card">
+      <div style="padding:40px;text-align:center;color:var(--cl-text-muted)">
+        <div style="font-size:48px;margin-bottom:12px">📅</div>
+        <div style="font-size:15px">Use the panel on the left to record your attendance for today.</div>
+        <div style="margin-top:16px">
+          <a href="{{ url_for('attendance.records_list') }}" class="pf-btn pf-btn-primary pf-btn-sm">View My Records</a>
+          <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm" style="margin-left:8px">My Leaves</a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Live clock update
+function updateTime() {
+  var el = document.getElementById('live-time');
+  if (!el) return;
+  var now = new Date();
+  el.textContent = now.toTimeString().slice(0,5);
+}
+setInterval(updateTime, 10000);
+</script>
+{% endblock %}

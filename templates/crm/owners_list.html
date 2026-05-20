@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Owners & Clients{% endblock %}
+
+{% block page_title %}Owners & Clients{% endblock %}
+{% block page_sub %}{{ total }} registered clients{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('crm.owner_new') }}" class="pf-btn pf-btn-primary">
+    ➕ New Owner
+  </a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  .crm-search-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .crm-search-bar input[type="search"] {
+    flex: 1;
+    min-width: 220px;
+    padding: 10px 16px;
+    border: 1.5px solid var(--cl-border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: var(--cl-surface);
+    color: var(--cl-text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .crm-search-bar input[type="search"]:focus {
+    border-color: var(--cl-primary);
+  }
+  .crm-search-bar button {
+    padding: 10px 22px;
+    background: var(--cl-primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .crm-search-bar button:hover { opacity: 0.88; }
+  .crm-search-bar .clear-btn {
+    background: var(--cl-surface);
+    color: var(--cl-muted);
+    border: 1.5px solid var(--cl-border);
+  }
+
+  .owners-table-wrap {
+    background: var(--cl-surface);
+    border-radius: 14px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+    overflow: hidden;
+  }
+  .owners-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.93rem;
+  }
+  .owners-table thead th {
+    background: linear-gradient(135deg, var(--cl-primary) 0%, color-mix(in srgb, var(--cl-primary) 80%, var(--cl-accent)) 100%);
+    color: #fff;
+    font-weight: 700;
+    padding: 14px 16px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    white-space: nowrap;
+  }
+  .owners-table tbody tr {
+    border-bottom: 1px solid var(--cl-border);
+    transition: background 0.15s;
+    cursor: pointer;
+  }
+  .owners-table tbody tr:last-child { border-bottom: none; }
+  .owners-table tbody tr:hover { background: color-mix(in srgb, var(--cl-primary) 5%, transparent); }
+  .owners-table td {
+    padding: 13px 16px;
+    color: var(--cl-text);
+    vertical-align: middle;
+  }
+  .owner-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .owner-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--cl-primary), var(--cl-accent));
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .owner-name { font-weight: 600; color: var(--cl-text); }
+  .owner-email { font-size: 0.82rem; color: var(--cl-muted); }
+
+  .badge-vip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .balance-due {
+    font-weight: 700;
+    color: var(--cl-danger);
+  }
+  .balance-zero { color: var(--cl-muted); }
+
+  .action-btns { display: flex; gap: 8px; align-items: center; }
+  .btn-sm {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-sm:hover { opacity: 0.82; }
+  .btn-view { background: var(--cl-primary); color: #fff; }
+  .btn-edit { background: var(--cl-surface); color: var(--cl-primary); border: 1.5px solid var(--cl-primary); }
+
+  .pagination-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 0 4px;
+  }
+  .page-btn {
+    padding: 7px 14px;
+    border-radius: 7px;
+    border: 1.5px solid var(--cl-border);
+    background: var(--cl-surface);
+    color: var(--cl-text);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .page-btn:hover { border-color: var(--cl-primary); color: var(--cl-primary); }
+  .page-btn.active {
+    background: var(--cl-primary);
+    color: #fff;
+    border-color: var(--cl-primary);
+  }
+  .page-btn.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--cl-muted);
+  }
+  .empty-state .emoji { font-size: 3rem; display: block; margin-bottom: 12px; }
+
+  .stats-row {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  .stat-chip {
+    background: var(--cl-surface);
+    border: 1.5px solid var(--cl-border);
+    border-radius: 10px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+  }
+  .stat-chip strong { color: var(--cl-primary); font-size: 1.1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="stats-row">
+  <div class="stat-chip">📋 <span>Total Owners:</span> <strong>{{ total }}</strong></div>
+  {% if q %}
+  <div class="stat-chip">🔍 <span>Search results for:</span> <strong>{{ q }}</strong></div>
+  {% endif %}
+</div>
+
+<!-- Search bar -->
+<form method="get" action="{{ url_for('crm.owners_list') }}" class="crm-search-bar">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search by name, phone, or email…" autocomplete="off">
+  <button type="submit">🔍 Search</button>
+  {% if q %}
+  <a href="{{ url_for('crm.owners_list') }}" class="btn-sm clear-btn" style="padding:10px 16px;text-decoration:none;border-radius:8px;border:1.5px solid var(--cl-border);background:var(--cl-surface);color:var(--cl-muted);">✕ Clear</a>
+  {% endif %}
+</form>
+
+{% if owners %}
+<div class="owners-table-wrap">
+  <table class="owners-table">
+    <thead>
+      <tr>
+        <th>Owner</th>
+        <th>Phone</th>
+        <th>Pets</th>
+        <th>Balance</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for owner in owners %}
+      <tr onclick="window.location='{{ url_for('crm.owner_detail', owner_id=owner.id) }}'">
+        <td>
+          <div class="owner-name-cell">
+            <div class="owner-avatar">{{ (owner.full_name or 'U')[:2] | upper }}</div>
+            <div>
+              <div class="owner-name">{{ owner.full_name }}</div>
+              {% if owner.email %}
+              <div class="owner-email">{{ owner.email }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+        <td>
+          {% if owner.phone %}📱 {{ owner.phone }}{% endif %}
+          {% if owner.whatsapp_phone and owner.whatsapp_phone != owner.phone %}
+          <br><span style="font-size:0.82rem;color:var(--cl-muted);">💬 {{ owner.whatsapp_phone }}</span>
+          {% endif %}
+        </td>
+        <td style="text-align:center;font-weight:700;">
+          🐾 {{ owner.pet_count or 0 }}
+        </td>
+        <td>
+          {% set bal = owner.outstanding_balance or 0 %}
+          {% if bal > 0 %}
+          <span class="balance-due">{{ "%.2f"|format(bal) }} EGP</span>
+          {% else %}
+          <span class="balance-zero">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if owner.vip_flag %}
+          <span class="badge-vip">⭐ VIP</span>
+          {% else %}
+          <span style="color:var(--cl-muted);font-size:0.85rem;">Standard</span>
+          {% endif %}
+          {% if owner.loyalty_balance and owner.loyalty_balance > 0 %}
+          <span style="display:inline-block;margin-left:4px;padding:2px 7px;
+                       background:#eff6ff;color:#1d4ed8;border-radius:10px;
+                       font-size:.75rem;font-weight:700">
+            🎁 {{ owner.loyalty_balance }}
+          </span>
+          {% endif %}
+        </td>
+        <td onclick="event.stopPropagation()">
+          <div class="action-btns">
+            <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn-sm btn-view">View</a>
+            <a href="{{ url_for('crm.owner_edit', owner_id=owner.id) }}" class="btn-sm btn-edit">Edit</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="pagination-bar">
+  {% if page > 1 %}
+  <a href="{{ url_for('crm.owners_list', q=q, page=page-1) }}" class="page-btn">← Prev</a>
+  {% else %}
+  <span class="page-btn disabled">← Prev</span>
+  {% endif %}
+
+  {% for p in range(1, total_pages + 1) %}
+    {% if p == page %}
+    <span class="page-btn active">{{ p }}</span>
+    {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+    <a href="{{ url_for('crm.owners_list', q=q, page=p) }}" class="page-btn">{{ p }}</a>
+    {% elif p == page - 3 or p == page + 3 %}
+    <span class="page-btn disabled">…</span>
+    {% endif %}
+  {% endfor %}
+
+  {% if page < total_pages %}
+  <a href="{{ url_for('crm.owners_list', q=q, page=page+1) }}" class="page-btn">Next →</a>
+  {% else %}
+  <span class="page-btn disabled">Next →</span>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  <span class="emoji">🐾</span>
+  <p>{% if q %}No owners found matching "<strong>{{ q }}</strong>"{% else %}No owners registered yet{% endif %}</p>
+  <a href="{{ url_for('crm.owner_new') }}" class="pf-btn pf-btn-primary" style="margin-top:16px;display:inline-block;">➕ Add First Owner</a>
+</div>
+{% endif %}
+
+{% endblock %}

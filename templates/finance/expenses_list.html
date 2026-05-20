@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Expenses', 'المصروفات') }}{% endblock %}
+{% block page_title %}{{ t('Expenses', 'المصروفات') }}{% endblock %}
+{% block page_sub %}{{ t('Record and track clinic expenses', 'تسجيل ومتابعة مصروفات العيادة') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('finance.dashboard') }}" class="btn btn-secondary">← {{ t('Dashboard', 'لوحة التحكم') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.exp-layout { display:grid; grid-template-columns:1fr 360px; gap:20px; align-items:start; }
+.card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); overflow:hidden; }
+.card-header { background:var(--cl-primary); color:#fff; padding:16px 22px; font-weight:700; font-size:14px; }
+.card-body { padding:22px; }
+.form-group { margin-bottom:14px; }
+.form-label { display:block; font-size:12px; font-weight:600; margin-bottom:5px; }
+.form-control { width:100%; padding:9px 13px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; box-sizing:border-box; }
+.form-control:focus { outline:none; border-color:var(--cl-primary); }
+.form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.submit-btn { width:100%; padding:12px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:14px; margin-top:4px; }
+.filter-bar { display:flex; gap:12px; align-items:flex-end; padding:16px 22px; border-bottom:1px solid var(--cl-border); flex-wrap:wrap; }
+.filter-label { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); display:block; margin-bottom:4px; }
+table { width:100%; border-collapse:collapse; }
+th { background:var(--cl-bg); padding:10px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); border-bottom:2px solid var(--cl-border); }
+td { padding:10px 16px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+tr:hover td { background:rgba(0,0,0,.02); }
+.total-row td { background:var(--cl-bg); font-weight:700; border-top:2px solid var(--cl-border); }
+.cat-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; background:color-mix(in srgb,var(--cl-primary) 12%,transparent); color:var(--cl-primary); }
+@media(max-width:900px){ .exp-layout { grid-template-columns:1fr; } }
+</style>
+
+<div class="exp-layout">
+
+  <!-- Expense list -->
+  <div>
+    <div class="card">
+      <!-- Filters -->
+      <div class="filter-bar">
+        <form method="get" style="display:contents">
+          <div>
+            <label class="filter-label">{{ t('From', 'من') }}</label>
+            <input class="form-control" name="date_from" type="date" value="{{ date_from }}" style="width:150px">
+          </div>
+          <div>
+            <label class="filter-label">{{ t('To', 'إلى') }}</label>
+            <input class="form-control" name="date_to" type="date" value="{{ date_to }}" style="width:150px">
+          </div>
+          <button type="submit" style="padding:9px 18px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px;">{{ t('Filter', 'تصفية') }}</button>
+          <a href="{{ url_for('finance.expenses_list') }}" style="padding:9px 14px; border:1.5px solid var(--cl-border); border-radius:8px; text-decoration:none; color:var(--cl-text); font-size:13px; font-weight:600;">{{ t('Reset', 'إعادة تعيين') }}</a>
+        </form>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t('Date', 'التاريخ') }}</th>
+            <th>{{ t('Category', 'الفئة') }}</th>
+            <th>{{ t('Description', 'الوصف') }}</th>
+            <th>{{ t('Vendor', 'المورد') }}</th>
+            <th style="text-align:right">{{ t('Amount (EGP)', 'المبلغ (جنيه)') }}</th>
+            <th>{{ t('Ref', 'المرجع') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for exp in expenses %}
+          <tr>
+            <td style="color:var(--cl-muted); white-space:nowrap;">{{ exp.expense_date }}</td>
+            <td><span class="cat-badge">{{ exp.category or t('General', 'عام') }}</span></td>
+            <td style="font-weight:500;">{{ exp.description }}</td>
+            <td style="color:var(--cl-muted);">{{ exp.vendor or '—' }}</td>
+            <td style="text-align:right; font-weight:700; color:var(--cl-danger);">{{ "{:,.2f}".format(exp.amount) }}</td>
+            <td style="font-size:12px; color:var(--cl-muted);">{{ exp.receipt_ref or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" style="text-align:center; padding:32px; color:var(--cl-muted);">{{ t('No expenses recorded yet', 'لا توجد مصروفات مسجلة بعد') }}</td></tr>
+          {% endfor %}
+          {% if expenses %}
+          <tr class="total-row">
+            <td colspan="4" style="color:var(--cl-muted);">{{ t('Total', 'الإجمالي') }} ({{ expenses|length }} {{ t('records', 'سجل') }})</td>
+            <td style="text-align:right; color:var(--cl-danger);">{{ "{:,.2f}".format(total_expenses) }}</td>
+            <td></td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add expense form -->
+  <div>
+    <div class="card">
+      <div class="card-header">➕ {{ t('Record Expense', 'تسجيل مصروف') }}</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('finance.expenses_list') }}">
+          <div class="form-group">
+            <label class="form-label">{{ t('Category', 'الفئة') }} *</label>
+            <select name="category" class="form-control" required>
+              <option value="">— {{ t('select', 'اختر') }} —</option>
+              <option>{{ t('Supplies', 'المستلزمات') }}</option>
+              <option>{{ t('Medications', 'الأدوية') }}</option>
+              <option>{{ t('Utilities', 'المرافق') }}</option>
+              <option>{{ t('Salaries', 'الرواتب') }}</option>
+              <option>{{ t('Rent', 'الإيجار') }}</option>
+              <option>{{ t('Maintenance', 'الصيانة') }}</option>
+              <option>{{ t('Equipment', 'المعدات') }}</option>
+              <option>{{ t('Marketing', 'التسويق') }}</option>
+              <option>{{ t('Lab', 'المختبر') }}</option>
+              <option>{{ t('Other', 'أخرى') }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Description', 'الوصف') }} *</label>
+            <input type="text" name="description" class="form-control" placeholder="{{ t('What was purchased/paid?', 'ما الذي تم شراؤه/دفعه؟') }}" required>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">{{ t('Amount (EGP)', 'المبلغ (جنيه)') }} *</label>
+              <input type="number" name="amount" class="form-control" step="0.01" min="0.01" placeholder="0.00" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">{{ t('Date', 'التاريخ') }} *</label>
+              <input type="date" name="expense_date" class="form-control" value="{{ today }}" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Vendor / Supplier', 'المورد / المزود') }}</label>
+            <input type="text" name="vendor" class="form-control" placeholder="{{ t('Vendor name', 'اسم المورد') }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Receipt / Reference #', 'الإيصال / رقم المرجع') }}</label>
+            <input type="text" name="receipt_ref" class="form-control" placeholder="{{ t('Receipt number', 'رقم الإيصال') }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Notes', 'ملاحظات') }}</label>
+            <textarea name="notes" class="form-control" rows="2" placeholder="{{ t('Additional notes…', 'ملاحظات إضافية…') }}"></textarea>
+          </div>
+          <button type="submit" class="submit-btn">💾 {{ t('Save Expense', 'حفظ المصروف') }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}My Patients{% endblock %}
+{% block page_title %}My Patients{% endblock %}
+{% block page_sub %}All patients seen by Dr. {{ doctor_name }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('doctor.workspace') }}" class="pf-btn pf-btn-secondary">← Workspace</a>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:1.25rem">
+  <input type="text" id="searchInput" class="pf-input" style="max-width:380px" placeholder="🔍 Search pet name or owner..." oninput="filterCards()">
+  <span style="color:var(--pf-muted);font-size:.85rem;margin-left:.75rem">{{ patients|length }} patient(s) found</span>
+</div>
+
+<div id="patientGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1.25rem">
+  {% for p in patients %}
+  <div class="pf-card patient-card" data-name="{{ (p.pet_name or '')|lower }} {{ (p.owner_name or '')|lower }}">
+    <div style="padding:1.25rem">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+        <div style="font-size:2rem">
+          {% if p.species == 'Dog' %}🐶
+          {% elif p.species == 'Cat' %}🐱
+          {% elif p.species == 'Bird' %}🦜
+          {% elif p.species == 'Rabbit' %}🐰
+          {% else %}🐾{% endif %}
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:1rem">{{ p.pet_name }}</div>
+          <div style="font-size:.8rem;color:var(--pf-muted)">{{ p.species }}{% if p.breed %} · {{ p.breed }}{% endif %}</div>
+        </div>
+      </div>
+      <div style="font-size:.85rem;margin-bottom:.3rem">👤 {{ p.owner_name }}</div>
+      <div style="font-size:.8rem;color:var(--pf-muted);margin-bottom:.3rem">📞 {{ p.phone or '—' }}</div>
+      {% if p.last_visit %}
+      <div style="font-size:.78rem;color:var(--pf-muted)">Last visit: {{ (p.last_visit or '')[:10] }}</div>
+      {% endif %}
+      <div style="margin-top:1rem;display:flex;gap:.5rem">
+        <a href="{{ url_for('visits.visits_list') }}" class="pf-btn pf-btn-primary" style="flex:1;text-align:center;font-size:.8rem;padding:5px 8px">📋 Visits</a>
+        <a href="{{ url_for('crm.owner_detail', owner_id=p.id) }}" class="pf-btn pf-btn-ghost" style="font-size:.8rem;padding:5px 8px">Profile</a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div style="grid-column:span 4;text-align:center;padding:3rem;color:var(--pf-muted)">
+    <div style="font-size:2rem;margin-bottom:.5rem">🐾</div>
+    <strong>No patients found yet.</strong><br>
+    <small>Patients appear here after you complete visits.</small>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+function filterCards() {
+  var q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('.patient-card').forEach(function(card) {
+    var name = card.getAttribute('data-name') || '';
+    card.style.display = name.includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

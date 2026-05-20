@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Lab Request — {{ lab.test_name }}{% endblock %}
+{% block page_title %}{{ lab.test_name }}{% endblock %}
+{% block page_sub %}Lab request detail and results entry{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('clinical.lab_list') }}" class="pf-btn pf-btn-secondary">← Back to Lab Requests</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.lab-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.lab-info-item label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+}
+.lab-info-item .val {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.priority-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 99px;
+  text-transform: uppercase;
+}
+.priority-Routine  { background: var(--surface-raised); color: var(--text-muted); border: 1px solid var(--border); }
+.priority-Urgent   { background: #fef3c7; color: #92400e; }
+.priority-STAT     { background: #fee2e2; color: #991b1b; }
+.status-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 99px;
+}
+.status-Pending     { background: #e0f2fe; color: #0369a1; }
+.status-In-Progress { background: #fef3c7; color: #92400e; }
+.status-Completed   { background: #dcfce7; color: #166534; }
+.result-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.result-card.abnormal {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+.result-abnormal-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #ef4444;
+  color: #fff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 99px;
+  margin-left: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Request info card -->
+<div class="pf-card" style="margin-bottom:1.25rem">
+  <div class="pf-card-header">
+    <span>🧪 Request Information</span>
+    <div style="display:flex;gap:0.5rem;align-items:center">
+      <span class="priority-badge priority-{{ lab.priority }}">{{ lab.priority }}</span>
+      <span class="status-badge status-{{ lab.status|replace(' ','-') }}">{{ lab.status }}</span>
+    </div>
+  </div>
+  <div class="pf-card-body">
+    <div class="lab-info-grid">
+      <div class="lab-info-item">
+        <label>Test Name</label>
+        <div class="val">{{ lab.test_name }}</div>
+      </div>
+      {% if lab.test_code %}
+      <div class="lab-info-item">
+        <label>Test Code</label>
+        <div class="val">{{ lab.test_code }}</div>
+      </div>
+      {% endif %}
+      <div class="lab-info-item">
+        <label>Patient</label>
+        <div class="val">{{ lab.pet_name }}</div>
+        <div style="font-size:0.8rem;color:var(--text-muted)">{{ lab.species }}</div>
+      </div>
+      <div class="lab-info-item">
+        <label>Owner</label>
+        <div class="val">{{ lab.owner_name }}</div>
+      </div>
+      {% if lab.doctor_name %}
+      <div class="lab-info-item">
+        <label>Requesting Doctor</label>
+        <div class="val">{{ lab.doctor_name }}</div>
+      </div>
+      {% endif %}
+      {% if lab.sample_type %}
+      <div class="lab-info-item">
+        <label>Sample Type</label>
+        <div class="val">{{ lab.sample_type }}</div>
+      </div>
+      {% endif %}
+      <div class="lab-info-item">
+        <label>Requested</label>
+        <div class="val">{{ lab.created_at[:16] }}</div>
+      </div>
+    </div>
+    {% if lab.notes %}
+    <div style="border-top:1px solid var(--border);padding-top:0.85rem;margin-top:0.25rem">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:0.35rem">NOTES</div>
+      <p style="margin:0;font-size:0.9rem;color:var(--text)">{{ lab.notes }}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Previous results -->
+{% if results %}
+<div class="pf-card" style="margin-bottom:1.25rem">
+  <div class="pf-card-header">
+    <span>📊 Results ({{ results|length }})</span>
+  </div>
+  <div class="pf-card-body">
+    {% for r in results %}
+    <div class="result-card {% if r.is_abnormal %}abnormal{% endif %}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem">
+        <div>
+          <span style="font-weight:600;font-size:0.95rem">Result entered</span>
+          {% if r.is_abnormal %}<span class="result-abnormal-badge">⚠ ABNORMAL</span>{% endif %}
+        </div>
+        <div style="font-size:0.78rem;color:var(--text-muted)">
+          {{ r.reviewed_by or '' }}{% if r.reviewed_at %} · {{ r.reviewed_at[:16] }}{% endif %}
+        </div>
+      </div>
+      {% if r.result_value is not none %}
+      <div style="margin-bottom:0.4rem">
+        <strong>Value:</strong> {{ r.result_value }} {{ r.unit or '' }}
+        {% if r.reference_range %} &nbsp;|&nbsp; <span style="color:var(--text-muted)">Ref: {{ r.reference_range }}</span>{% endif %}
+      </div>
+      {% endif %}
+      {% if r.result_text %}
+      <div style="font-size:0.875rem;white-space:pre-wrap;color:var(--text)">{{ r.result_text }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Enter results form -->
+{% if lab.status != 'Completed' %}
+<div class="pf-card">
+  <div class="pf-card-header">
+    <span>✏️ Enter Results</span>
+  </div>
+  <div class="pf-card-body">
+    <form method="post" action="{{ url_for('clinical.lab_results', lab_id=lab.id) }}">
+      <div class="pf-form-grid">
+
+        <div class="pf-field" style="grid-column:1/-1">
+          <label class="pf-label" for="result_text">Result Text / Report</label>
+          <textarea id="result_text" name="result_text" class="pf-input" rows="5"
+                    placeholder="Enter full result report, findings, or interpretation…"></textarea>
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="result_value">Numeric Value</label>
+          <input type="number" step="any" id="result_value" name="result_value"
+                 class="pf-input" placeholder="e.g. 6.5">
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="unit">Unit</label>
+          <input type="text" id="unit" name="unit" class="pf-input"
+                 placeholder="e.g. g/dL, cells/µL">
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="reference_range">Reference Range</label>
+          <input type="text" id="reference_range" name="reference_range"
+                 class="pf-input" placeholder="e.g. 4.0–5.5 g/dL">
+        </div>
+
+        <div class="pf-field" style="display:flex;align-items:center;gap:0.65rem;padding-top:1.5rem">
+          <input type="checkbox" id="is_abnormal" name="is_abnormal" value="1"
+                 style="width:18px;height:18px;accent-color:var(--danger)">
+          <label for="is_abnormal" style="font-weight:600;color:var(--danger);cursor:pointer">
+            Mark as Abnormal
+          </label>
+        </div>
+
+      </div>
+
+      <div style="margin-top:1.5rem;display:flex;gap:0.75rem">
+        <button type="submit" class="pf-btn pf-btn-primary">Save Results &amp; Mark Complete</button>
+        <a href="{{ url_for('clinical.lab_list') }}" class="pf-btn pf-btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% else %}
+<div class="pf-card" style="border-left:4px solid #22c55e">
+  <div class="pf-card-body" style="padding:1rem 1.25rem;color:#166534;font-weight:600">
+    ✅ This lab request is complete. Results have been recorded above.
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

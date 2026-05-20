@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}New Boarding Booking{% endblock %}
+{% block page_title %}New Boarding Booking{% endblock %}
+{% block page_sub %}Register a pet hotel stay{% endblock %}
+
+{% block content %}
+<form method="post" action="{{ url_for('boarding.booking_new_submit') }}" style="max-width:750px">
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Patient</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Owner *</label>
+        <select name="owner_id" id="ownerSel" class="pf-input" required data-searchable onchange="loadPets(this.value)">
+          <option value="">— Select Owner —</option>
+          {% for o in owners %}
+          <option value="{{ o.id }}">{{ o.full_name }} · {{ o.phone }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="pf-label">Pet *</label>
+        <select name="pet_id" id="petSel" class="pf-input" required>
+          <option value="">— Select owner first —</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Stay Details</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Room</label>
+        <select name="room_id" id="roomSel" class="pf-input" onchange="autoRate(this)">
+          <option value="">— No specific room —</option>
+          {% for r in rooms %}
+          <option value="{{ r.id }}" data-rate="{{ r.daily_rate or 0 }}">
+            Room {{ r.room_number }} ({{ r.room_type }}) · {{ r.daily_rate or 0 }} EGP/day
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="pf-label">Daily Rate (EGP)</label>
+        <input type="number" name="daily_rate" id="dailyRate" class="pf-input" step="0.01" min="0" value="0" placeholder="0.00">
+      </div>
+      <div>
+        <label class="pf-label">Check-in Date *</label>
+        <input type="date" name="checkin_date" class="pf-input" required>
+      </div>
+      <div>
+        <label class="pf-label">Expected Checkout</label>
+        <input type="date" name="expected_checkout" class="pf-input">
+      </div>
+      <div>
+        <label class="pf-label">Status</label>
+        <select name="status" class="pf-input">
+          <option value="Reserved">Reserved</option>
+          <option value="Checked-in">Checked-in</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Care Instructions</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Diet Notes</label>
+        <textarea name="diet_notes" class="pf-input" rows="3" placeholder="Feeding schedule, food brand, allergies..."></textarea>
+      </div>
+      <div>
+        <label class="pf-label">Medication Notes</label>
+        <textarea name="medication_notes" class="pf-input" rows="3" placeholder="Medications to administer, schedule..."></textarea>
+      </div>
+      <div style="grid-column:span 2">
+        <label class="pf-label">Additional Notes</label>
+        <textarea name="notes" class="pf-input" rows="2" placeholder="Special care, behavior notes..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:1rem">
+    <button type="submit" class="pf-btn pf-btn-primary">Create Booking</button>
+    <a href="{{ url_for('boarding.bookings_list') }}" class="pf-btn pf-btn-ghost">Cancel</a>
+  </div>
+</form>
+
+<script>
+function loadPets(ownerId) {
+  var sel = document.getElementById('petSel');
+  sel.innerHTML = '<option value="">Loading...</option>';
+  if (!ownerId) { sel.innerHTML = '<option value="">— Select owner first —</option>'; return; }
+  fetch('/crm/owners/' + ownerId + '/pets-json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      sel.innerHTML = '<option value="">— Select Pet —</option>';
+      (data.pets || []).forEach(function(p){
+        sel.innerHTML += '<option value="' + p.id + '">' + p.pet_name + ' (' + p.species + ')</option>';
+      });
+    })
+    .catch(function(){ sel.innerHTML = '<option value="">Error loading</option>'; });
+}
+function autoRate(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  var rate = opt ? opt.getAttribute('data-rate') : null;
+  if (rate) document.getElementById('dailyRate').value = rate;
+}
+</script>
+{% endblock %}

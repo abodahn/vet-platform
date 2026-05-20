@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Boarding Rooms{% endblock %}
+{% block page_title %}Boarding Rooms{% endblock %}
+{% block page_sub %}Manage hotel rooms and suites{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('boarding.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 400px;gap:1.5rem;align-items:start">
+
+  <!-- Rooms table -->
+  <div class="pf-card">
+    <div class="pf-card-header"><h3 class="pf-card-title">Rooms ({{ rooms|length }})</h3></div>
+    <table class="pf-table">
+      <thead>
+        <tr><th>Room #</th><th>Type</th><th>Capacity</th><th>Rate/Day</th><th>Status</th><th>Active</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for r in rooms %}
+        <tr>
+          <td><strong>{{ r.room_number }}</strong></td>
+          <td>{{ r.room_type or 'Standard' }}</td>
+          <td style="text-align:center">{{ r.capacity or 1 }}</td>
+          <td>{{ r.daily_rate or 0 }} EGP</td>
+          <td>
+            {% if r.active_bookings and r.active_bookings > 0 %}
+            <span class="pf-badge warning">Occupied</span>
+            {% else %}
+            <span class="pf-badge success">Available</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if r.is_active %}<span class="pf-badge success">Yes</span>
+            {% else %}<span class="pf-badge error">No</span>{% endif %}
+          </td>
+          <td>
+            <button type="button"
+              onclick="editRoom({{ r.id }}, '{{ r.room_number|e }}', '{{ (r.room_type or 'Standard')|e }}', {{ r.capacity or 1 }}, {{ r.daily_rate or 0 }}, {{ 1 if r.is_active else 0 }})"
+              class="pf-btn pf-btn-ghost" style="padding:3px 8px;font-size:.8rem">Edit</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" style="text-align:center;color:var(--pf-muted);padding:2rem">No rooms yet. Add a room to get started.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Add/Edit Room form -->
+  <div class="pf-card">
+    <div class="pf-card-header"><h3 class="pf-card-title" id="formTitle">Add Room</h3></div>
+    <div style="padding:1.25rem">
+      <form method="post" action="{{ url_for('boarding.room_new') }}" id="roomForm">
+        <input type="hidden" name="room_id" id="roomId" value="">
+
+        <div style="margin-bottom:1rem">
+          <label class="pf-label">Room Number *</label>
+          <input type="text" name="room_number" id="rNum" class="pf-input" required placeholder="e.g. A1, Suite-3">
+        </div>
+        <div style="margin-bottom:1rem">
+          <label class="pf-label">Room Type</label>
+          <select name="room_type" id="rType" class="pf-input">
+            <option value="Standard">Standard</option>
+            <option value="Suite">Suite</option>
+            <option value="ICU">ICU</option>
+            <option value="Isolation">Isolation</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+          <div>
+            <label class="pf-label">Capacity</label>
+            <input type="number" name="capacity" id="rCapacity" class="pf-input" min="1" value="1">
+          </div>
+          <div>
+            <label class="pf-label">Daily Rate (EGP)</label>
+            <input type="number" name="daily_rate" id="rRate" class="pf-input" step="0.01" min="0" value="0">
+          </div>
+        </div>
+        <div style="margin-bottom:1.25rem;display:flex;align-items:center;gap:.5rem">
+          <input type="checkbox" name="is_active" id="rActive" value="1" checked style="width:16px;height:16px">
+          <label for="rActive" class="pf-label" style="margin:0">Active</label>
+        </div>
+        <div style="display:flex;gap:.75rem">
+          <button type="submit" class="pf-btn pf-btn-primary">Save Room</button>
+          <button type="button" onclick="resetForm()" class="pf-btn pf-btn-ghost">Clear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function editRoom(id, num, type, capacity, rate, isActive) {
+  document.getElementById('roomId').value = id;
+  document.getElementById('rNum').value = num;
+  document.getElementById('rType').value = type;
+  document.getElementById('rCapacity').value = capacity;
+  document.getElementById('rRate').value = rate;
+  document.getElementById('rActive').checked = isActive === 1;
+  document.getElementById('formTitle').textContent = 'Edit Room ' + num;
+  document.getElementById('rNum').focus();
+}
+function resetForm() {
+  document.getElementById('roomId').value = '';
+  document.getElementById('roomForm').reset();
+  document.getElementById('formTitle').textContent = 'Add Room';
+}
+</script>
+{% endblock %}

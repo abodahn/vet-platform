@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="{{ current_lang or 'en' }}"
+      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}"
+      data-theme="medical">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="application-name" content="{{ app_title }}">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}{{ page_title or 'Platform' }}{% endblock %} — {{ app_title }}</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Platform CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/platform.css') }}">
+
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Mobile overlay ────────────────────────────────── -->
+<div id="pf-overlay" class="pf-overlay"></div>
+
+<div class="pf-layout">
+
+  <!-- ════════════════════════════════════════════════
+       SIDEBAR
+  ═════════════════════════════════════════════════ -->
+  <aside id="pf-sidebar" class="pf-sidebar" role="navigation"
+         aria-label="{{ t('Main navigation', 'التنقل الرئيسي') }}">
+
+    <!-- Brand -->
+    <div class="pf-brand">
+      <div class="pf-brand-logo">
+        {% if clinic.get('logo_data') %}
+          <img src="{{ clinic.logo_data }}" alt="{{ app_title }} logo">
+        {% else %}
+          🐾
+        {% endif %}
+      </div>
+      <div class="pf-brand-text">
+        <div class="pf-brand-name">{{ t(app_title, app_title_ar) }}</div>
+        <div class="pf-brand-sub">{{ app_subtitle }}</div>
+      </div>
+    </div>
+
+    <!-- User panel -->
+    {% if current_user %}
+    <div class="pf-user-panel">
+      <div class="pf-user-avatar">
+        {{ (current_user.get('full_name') or current_user.get('username') or 'U')[:2] | upper }}
+      </div>
+      <div style="overflow:hidden;">
+        <div class="pf-user-name pf-truncate">{{ current_user.get('full_name') or current_user.get('username') }}</div>
+        <div class="pf-user-role">{{ current_user.get('role','').replace('_',' ') }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Navigation -->
+    <nav class="pf-nav">
+
+      {# ── PLATFORM ── #}
+      <div class="pf-nav-section" data-section="platform">
+        <div class="pf-nav-section-label pf-nav-section-toggle" style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6366f1;flex-shrink:0"></span>
+          <span style="flex:1">{{ t('PLATFORM', 'المنصة') }}</span>
+          <span class="pf-nav-chevron">▾</span>
+        </div>
+        <div class="pf-nav-items">
+          <a href="{{ url_for('launcher.index') }}"
+             class="pf-nav-item {% if active == 'launcher' %}active{% endif %}">
+            <span class="pf-nav-icon">🚀</span>
+            <span class="pf-nav-label">{{ t('Module Launcher', 'لوحة الوحدات') }}</span>
+          </a>
+          {% if current_user %}
+          <a href="{{ url_for('notifications.index') }}"
+             class="pf-nav-item {% if active == 'notifications' %}active{% endif %}">
+            <span class="pf-nav-icon">🔔</span>
+            <span class="pf-nav-label">{{ t('Notifications', 'الإشعارات') }}
+              {% if unread_count and unread_count > 0 %}
+              <span style="background:#e53e3e;color:#fff;border-radius:999px;font-size:10px;
+                           font-weight:700;padding:1px 6px;margin-left:4px">{{ unread_count if unread_count < 100 else '99+' }}</span>
+              {% endif %}
+            </span>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      {# ── CLINICAL ── #}
+      <div class="pf-nav-section" data-section="clinical">
+        <div class="pf-nav-section-label pf-nav-section-toggle" style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#0ea5e9;flex-shrink:0"></span>
+          <span style="flex:1">{{ t('CLINICAL', 'السريري') }}</span>
+          <span class="pf-nav-chevron">▾</span>
+        </div>
+        <div class="pf-nav-items">
+          <a href="{{ url_for('visits.visits_list') }}"
+             class="pf-nav-item {% if active == 'examination' or active == 'visits' %}active{% endif %}">
+            <span class="pf-nav-icon">🩺</span>
+            <span class="pf-nav-label">{{ t('Examinations', 'الفحوصات') }}</span>
+          </a>
+          <a href="{{ url_for('appointments.schedule') }}"
+             class="pf-nav-item {% if active == 'appointments' %}active{% endif %}">
+            <span class="pf-nav-icon">📅</span>
+            <span class="pf-nav-label">{{ t('Appointments', 'المواعيد') }}</span>
+          </a>
+          <a href="{{ url_for('visits.visits_list') }}"
+             class="pf-nav-item {% if active == 'visits' %}active{% endif %}">
+            <span class="pf-nav-icon">🏥</span>
+            <span class="pf-nav-label">{{ t('Medical Visits', 'الزيارات الطبية') }}</span>
+          </a>
+          <a href="{{ url_for('doctor.workspace') }}"
+             class="pf-nav-item {% if active == 'doctor' %}active{% endif %}">
+            <span class="pf-nav-icon">👨‍⚕️</span>
+            <span class="pf-nav-label">{{ t('Doctor Workspace', 'مساحة الطبيب') }}</span>
+          </a>
+          <a href="{{ url_for('clinical.lab_list') }}"
+             class="pf-nav-item {% if active == 'clinical' %}active{% endif %}">
+            <span class="pf-nav-icon">🔬</span>
+            <span class="pf-nav-label">{{ t('Lab & Vaccination', 'المختبر والتطعيمات') }}</span>
+          </a>
+        </div>
+      </div>
+
+      {# ── CRM ── #}
+      <div class="pf-nav-section" data-section="crm">
+        <div class="pf-nav-section-label pf-nav-section-toggle" style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b5cf6;flex-shrink:0"></span>
+          <span style="flex:1">{{ t('CRM', 'إدارة العملاء') }}</span>
+          <span class="pf-nav-chevron">▾</span>
+        </div>
+        <div class="pf-nav-items">
+          <a href="{{ url_for('crm.owners_list') }}"
+             class="pf-nav-item {% if active == 'crm' %}active{% endif %}">
+            <span class="pf-nav-icon">🐾</span>
+            <span class="pf-nav-label">{{ t('Owners & Pets', 'الملاك والحيوانات') }}</span>
+          </a>
+          <a href="{{ url_for('whatsapp.control_center') }}"
+             class="pf-nav-item {% if active == 'whatsapp' %}active{% endif %}">
+            <span class="pf-nav-icon">💬</span>
+            <span class="pf-nav-label">{{ t('WhatsApp', 'واتساب') }}</span>
+          </a>
+          <a href="{{ url_for('whatsapp.scheduler') }}"
+             class="pf-nav-item {% if active == 'whatsapp_scheduler' %}active{% endif %}">
+            <span class="pf-nav-icon">⏰</span>
+            <span class="pf-nav-label">{{ t('WA Scheduler', 'جدول الواتساب') }}</span>
+          </a>
+        </div>
+      </div>
+
+      {# ── SERVICES ── #}
+      <div class="pf-nav-section" data-section="services">
+        <div class="pf-nav-section-label pf-nav-section-toggle" style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0"></span>
+          <span style="flex:1">{{ t('SERVICES', 'الخدمات') }}</span>
+          <span class="pf-nav-chevron">▾</span>
+        </div>
+        <div class="pf-nav-items">
+          <a href="{{ url_for('grooming.dashboard') }}"
+             class="pf-nav-item {% if active == 'grooming' %}active{% endif %}">
+            <span class="pf-nav-icon">✂️</span>
+            <span class="pf-nav-label">{{ t('Grooming', 'التجميل') }}</span>
+          </a>
+          <a href="{{ url_for('boarding.dashboard') }}"
+             class="pf-nav-item {% if active == 'boarding' %}active{% endif %}">
+            <span class="pf-nav-icon">🏨</span>
+            <span class="pf-nav-label">{{ t('Boarding', 'الإيواء') }}</span>
+          </a>
+          <a href="{{ url_for('inpatient.dashboard') }}"
+             class="pf-nav-item {% if active == 'inpatient' %}active{% endif %}">
+            <span class="pf-nav-icon">🏥</span>
+            <span class="pf-nav-label">{{ t('Inpatient', 'تنويم') }}</span>
+          </a>
+          <a href="{{ url_for('pharmacy.index') }}"
+             class="pf-nav-item {% if active == 'pharmacy' %}active{% endif %}">
+            <span class="pf-nav-icon">💊</span>
+            <span class="pf-nav-label">{{ t('Pharmacy', 'الصيدلية') }}</span>
+          </a>
+          <a href="{{ url_for('catalog.index') }}"
+             class="pf-nav-item {% if active == 'catalog' %}active{% endif %}">
+            <span class="pf-nav-icon">🏷️</span>
+            <span class="pf-nav-label">{{ t('Price Catalog', 'كتالوج الأسعار') }}</span>
+          </a>
+          <a href="{{ url_for('telemedicine.dashboard') }}"
+             class="pf-nav-item {% if active == 'telemedicine' %}active{% endif %}">
+            <span class="pf-nav-icon">🎥</span>
+            <span class="pf-nav-label">{{ t('Telemedicine', 'الاستشارة عن بُعد') }}</span>
+          </a>
+          <a href="{{ url_for('appointments.waiting_room') }}" target="_blank"
+             class="pf-nav-item">
+            <span class="pf-nav-icon">📺</span>
+            <span class="pf-nav-label">{{ t('Waiting Room TV', 'شاشة الانتظار') }}</span>
+          </a>
+        </div>
+      </div>
+
+      {# ── PET SHOP ── #}
+      <div class="pf-nav-section" data-section="petshop">
+        <div class="pf-nav-section-label pf-nav-section-toggle" style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f97316;flex-shrink:0"></span>
+          <span style="flex:1">{{ t('PET SHOP', 'متجر الحيوانات') }}</span>
+          <span class="pf-nav-chevron">▾</span>
+        </div>
+        <div class="pf-nav-items">
+          <a href="{{ url_for('petshop.index') }}"
+             class="pf-nav-item {% if active == 'petshop' %}active{% endif %}">
+            <span class="pf-nav-icon">🛒</span>
+            <span class="pf-nav-label">{{ t('Pet Shop', 'متجر الحيوانات') }}</span>
+          </a>
+          <a href="{{ url_for('petshop.pos') }}"
+             class="pf-nav-item {% if active == 'pos' %}active{% endif %}">
+            <span class="pf-nav-icon">🧾</span>
+            <span class="pf-nav-label">{{ t('Point of Sale', 'نقطة البيع') }}</span>
+          </a>
+          <a href="{{ url_for('petshop.products') }}"
+             class="pf-nav-item {% if active == 'ps_products' %}active{% endif %}">
+            <span class="pf-nav-icon">📦</span>
+            <span class="pf-nav-label">{{ t('Products', 'المنتجات') }}</span>
+          </a>
+          <a href="{{ url_for('petshop.orders') }}"
+             class="pf-nav-item {% if active == 'ps_orders' %}active{% endif %}">
+            <span class="pf-nav-icon">📋</span>
+            <span class="pf-nav-label">{{ t('Orders', 'الطلبات') }}</span>
+          </a>
+        </div>
+      </div>
+
+      {# ── FINANCE & STOCK ── #}
+      <div class="pf-nav-section" data-section="finance">
+        <div class="pf-nav-section-label pf-nav-section-toggle" style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0"></span>
+          <span style="flex:1">{{ t('FINANCE & STOCK', 'المالية والمخزون') }}</span>
+          <span class="pf-nav-chevron">▾</span>
+        </div>
+        <div class="pf-nav-items">
+          <a href="{{ url_for('inventory.dashboard') }}"
+             class="pf-nav-item {% if active == 'inventory' %}active{% endif %}">
+            <span class="pf-nav-icon">📦</span>
+            <span class="pf-nav-label">{{ t('Inventory', 'المخزون') }}</span>
+          </a>
+          <a href="{{ url_for('procurement.dashboard') }}"
+             class="pf-nav-item {% if active == 'procurement' %}active{% endif %}">
+            <span class="pf-nav-icon">🛒</span>
+            <span class="pf-nav-label">{{ t('Procurement', 'المشتريات') }}</span>
+          </a>
+          <a href="{{ url_for('finance.dashboard') }}"
+             class="pf-nav-item {% if active == 'finance' %}active{% endif %}">
+            <span class="pf-nav-icon">🧾</span>
+            <span class="pf-nav-label">{{ t('Invoicing', 'الفواتير') }}</span>
+          </a>
+          <a href="{{ url_for('accounting.dashboard') }}"
+             class="pf-nav-item {% if active == 'accounting' %}active{% endif %}">
+            <span class="pf-nav-icon">💰</span>
+            <span class="pf-nav-label">{{ t('Accounting', 'المحاسبة') }}</span>
+          </a>
+          <a href="{{ url_for('reports.dashboard') }}"
+             class="pf-nav-item {% if active == 'reports' %}active{% endif %}">
+            <span class="pf-nav-icon">📊</span>
+            <span class="pf-nav-label">{{ t('Reports', 'التقارير') }}</span>
+          </a>
+          <a href="{{ url_for('reports.builder') }}"
+             class="pf-nav-item {% if active == 'report_builder' %}active{% endif %}">
+            <span class="pf-nav-icon">🔧</span>
+            <span class="pf-nav-label">{{ t('Report Builder', 'منشئ التقارير') }}</span>
+          </a>
+        </div>
+      </div>
+
+      {# ── AI & TOOLS ── #}
+      <div class="pf-nav-section" data-section="ai">
+        <div class="pf-nav-section-label pf-nav-section-toggle" style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#a855f7;flex-shrink:0"></span>
+          <span style="flex:1">{{ t('AI & TOOLS', 'الذكاء الاصطناعي') }}</span>
+          <span class="pf-nav-chevron">▾</span>
+        </div>
+        <div class="pf-nav-items">
+          <a href="{{ url_for('ai_assistant.index') }}"
+             class="pf-nav-item {% if active == 'ai' %}active{% endif %}">
+            <span class="pf-nav-icon">🤖</span>
+            <span class="pf-nav-label">{{ t('AI Assistant', 'المساعد الذكي') }}</span>
+          </a>
+        </div>
+      </div>
+
+      {# ── ADMIN & HR (managers only) ── #}
+      {% if current_user and current_user.get('role') in ('super_admin','clinic_owner','branch_manager','support_admin','hr') %}
+      <div class="pf-nav-section" data-section="admin">
+        <div class="pf-nav-section-label pf-nav-section-toggle" style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#64748b;flex-shrink:0"></span>
+          <span style="flex:1">{{ t('ADMIN & HR', 'الإدارة والموارد البشرية') }}</span>
+          <span class="pf-nav-chevron">▾</span>
+        </div>
+        <div class="pf-nav-items">
+          <a href="{{ url_for('hr.staff_list') }}"
+             class="pf-nav-item {% if active == 'hr' %}active{% endif %}">
+            <span class="pf-nav-icon">👥</span>
+            <span class="pf-nav-label">{{ t('HR & Staff', 'الموارد البشرية') }}</span>
+          </a>
+          <a href="{{ url_for('attendance.dashboard') }}"
+             class="pf-nav-item {% if active == 'attendance' %}active{% endif %}">
+            <span class="pf-nav-icon">⏱</span>
+            <span class="pf-nav-label">{{ t('Attendance & Leave', 'الحضور والإجازات') }}</span>
+          </a>
+          <a href="{{ url_for('payroll.dashboard') }}"
+             class="pf-nav-item {% if active == 'payroll' %}active{% endif %}">
+            <span class="pf-nav-icon">💰</span>
+            <span class="pf-nav-label">{{ t('Payroll', 'الرواتب') }}</span>
+          </a>
+          {% if current_user.get('role') in ('super_admin','clinic_owner','branch_manager','support_admin') %}
+          <a href="{{ url_for('whatsapp.reminder_settings') }}"
+             class="pf-nav-item {% if active == 'whatsapp_settings' %}active{% endif %}">
+            <span class="pf-nav-icon">⏰</span>
+            <span class="pf-nav-label">{{ t('Reminder Settings', 'إعدادات التذكير') }}</span>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# ── SYSTEM (super admin only) ── #}
+      {% if current_user and current_user.get('role') in ('super_admin','clinic_owner','support_admin') %}
+      <div class="pf-nav-section" data-section="system">
+        <div class="pf-nav-section-label pf-nav-section-toggle" style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0"></span>
+          <span style="flex:1">{{ t('SYSTEM', 'النظام') }}</span>
+          <span class="pf-nav-chevron">▾</span>
+        </div>
+        <div class="pf-nav-items">
+          <a href="{{ url_for('system.roles_list') }}"
+             class="pf-nav-item {% if active == 'roles' %}active{% endif %}">
+            <span class="pf-nav-icon">🔐</span>
+            <span class="pf-nav-label">{{ t('Roles & Permissions', 'الأدوار والصلاحيات') }}</span>
+          </a>
+          <a href="{{ url_for('system.monitor') }}"
+             class="pf-nav-item {% if active == 'system' %}active{% endif %}">
+            <span class="pf-nav-icon">🖥</span>
+            <span class="pf-nav-label">{{ t('System Monitor', 'مراقبة النظام') }}</span>
+          </a>
+          <a href="{{ url_for('system.backup') }}"
+             class="pf-nav-item {% if active == 'backup' %}active{% endif %}">
+            <span class="pf-nav-icon">💾</span>
+            <span class="pf-nav-label">{{ t('Backup Manager', 'مدير النسخ الاحتياطية') }}</span>
+          </a>
+          <a href="{{ url_for('system.audit_log') }}"
+             class="pf-nav-item {% if active == 'audit' %}active{% endif %}">
+            <span class="pf-nav-icon">📋</span>
+            <span class="pf-nav-label">{{ t('Audit Log', 'سجل المراجعة') }}</span>
+          </a>
+          <a href="{{ url_for('system.settings') }}"
+             class="pf-nav-item {% if active == 'settings' %}active{% endif %}">
+            <span class="pf-nav-icon">⚙️</span>
+            <span class="pf-nav-label">{{ t('Settings', 'الإعدادات') }}</span>
+          </a>
+          <a href="{{ url_for('migration.index') }}"
+             class="pf-nav-item {% if active == 'migration' %}active{% endif %}">
+            <span class="pf-nav-icon">🔄</span>
+            <span class="pf-nav-label">{{ t('Data Migration', 'ترحيل البيانات') }}</span>
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
+    </nav>
+
+    <!-- Footer: language + logout -->
+    <div class="pf-sidebar-footer">
+
+      <!-- Language toggle -->
+      <div class="pf-theme-toggle" style="gap:5px">
+        <span class="pf-theme-toggle-label">{{ t('Lang', 'اللغة') }}</span>
+        <button class="pf-theme-btn {% if (current_lang or 'en') == 'en' %}current{% endif %}"
+                data-lang-btn="en">EN</button>
+        <button class="pf-theme-btn {% if current_lang == 'ar' %}current{% endif %}"
+                data-lang-btn="ar">عربي</button>
+      </div>
+
+      {% if current_user %}
+      <a href="{{ url_for('auth.profile') }}"
+         class="pf-nav-item {% if active == 'profile' %}active{% endif %}">
+        <span class="pf-nav-icon">👤</span>
+        <span class="pf-nav-label">{{ t('Profile', 'الملف الشخصي') }}</span>
+      </a>
+      <a href="{{ url_for('auth.logout') }}" class="pf-nav-item">
+        <span class="pf-nav-icon">🔓</span>
+        <span class="pf-nav-label">{{ t('Logout', 'تسجيل الخروج') }}</span>
+      </a>
+      {% endif %}
+
+    </div>
+
+  </aside>
+
+  <!-- ════════════════════════════════════════════════
+       MAIN
+  ═════════════════════════════════════════════════ -->
+  <main class="pf-main">
+
+    <!-- Topbar -->
+    <header class="pf-topbar">
+      <div class="pf-topbar-left">
+        <button id="pf-sidebar-toggle" class="pf-icon-btn"
+                aria-label="{{ t('Toggle sidebar', 'تبديل الشريط الجانبي') }}"
+                style="display:none">☰</button>
+        <div>
+          <div class="pf-page-title">{% block page_title %}{% endblock %}</div>
+          <div class="pf-page-sub">{% block page_sub %}{% endblock %}</div>
+        </div>
+      </div>
+      <div class="pf-topbar-right">
+        {% block topbar_actions %}{% endblock %}
+
+        <!-- AI Command Palette trigger -->
+        {% if current_user %}
+        <button onclick="openCmdPalette()" title="AI Command Search (Ctrl+K)"
+                style="background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(99,102,241,.1));
+                       border:1px solid rgba(139,92,246,.3);color:var(--cl-muted);
+                       border-radius:8px;padding:5px 10px;cursor:pointer;font-size:.75rem;
+                       display:flex;align-items:center;gap:6px;transition:all .2s"
+                onmouseover="this.style.borderColor='rgba(139,92,246,.6)'"
+                onmouseout="this.style.borderColor='rgba(139,92,246,.3)'">
+          <span style="font-size:.9rem">✨</span>
+          <span style="font-weight:500">Ask AI</span>
+          <kbd style="background:rgba(0,0,0,.12);border-radius:4px;padding:1px 5px;
+                      font-size:.68rem;font-family:monospace">Ctrl+K</kbd>
+        </button>
+        {% endif %}
+
+        {% if current_user %}
+        <a href="{{ url_for('notifications.index') }}" class="pf-icon-btn"
+           title="{{ t('Notifications', 'الإشعارات') }}"
+           style="position:relative;text-decoration:none;font-size:18px">
+          🔔
+          {% if unread_count and unread_count > 0 %}
+          <span style="position:absolute;top:-4px;right:-4px;background:var(--cl-danger,#e53e3e);color:#fff;
+                       border-radius:999px;font-size:10px;font-weight:700;min-width:16px;height:16px;
+                       display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1">
+            {{ unread_count if unread_count < 100 else '99+' }}
+          </span>
+          {% endif %}
+        </a>
+        {% endif %}
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="pf-content">
+
+      <!-- Flash messages -->
+      {% with msgs = get_flashed_messages(with_categories=True) %}
+        {% if msgs %}
+          {% for category, msg in msgs %}
+            <div class="pf-flash {{ category }}" data-autodismiss="5000">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+
+    </div>
+
+  </main>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PETSY — Global AI chatbot (visible on every page)
+═══════════════════════════════════════════════════════════════════ -->
+{% if current_user %}
+<style>
+#petsy-fab-global {
+  position: fixed; bottom: 28px; right: 28px; z-index: 1050;
+  width: 62px; height: 62px; border-radius: 50%; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  box-shadow: 0 4px 22px rgba(124,58,237,.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 8px; transition: transform .2s, box-shadow .2s;
+  /* Slightly above any visit AI button which sits at bottom:28px same corner */
+}
+#petsy-fab-global:hover {
+  transform: scale(1.12);
+  box-shadow: 0 6px 30px rgba(124,58,237,.7);
+}
+#petsy-fab-global svg { width: 100%; height: 100%; }
+
+/* Pulse ring */
+#petsy-fab-global::before {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%;
+  background: transparent; border: 2px solid rgba(124,58,237,.4);
+  animation: petsy-pulse 2.4s ease-out infinite;
+}
+@keyframes petsy-pulse {
+  0%   { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* Tooltip bubble */
+#petsy-hint {
+  position: fixed; bottom: 102px; right: 20px; z-index: 1051;
+  background: white; color: #1e1b4b; padding: 9px 13px;
+  border-radius: 12px; font-size: .82rem; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,.14);
+  white-space: nowrap; pointer-events: none;
+  animation: petsy-pop .4s ease;
+}
+#petsy-hint::after {
+  content: ""; position: absolute; bottom: -7px; right: 18px;
+  border: 7px solid transparent;
+  border-top-color: white; border-bottom: none;
+}
+@keyframes petsy-pop {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Slide-in panel */
+#petsy-panel-global {
+  position: fixed; bottom: 102px; right: 24px; z-index: 1055;
+  width: 380px; height: 580px;
+  border-radius: 22px; overflow: hidden;
+  box-shadow: 0 12px 44px rgba(0,0,0,.22);
+  display: none; flex-direction: column;
+  transition: opacity .25s, transform .25s;
+  opacity: 0; transform: scale(.88) translateY(20px);
+}
+#petsy-panel-global.open {
+  display: flex; opacity: 1; transform: scale(1) translateY(0);
+}
+#petsy-panel-global iframe { width: 100%; height: 100%; border: none; }
+
+/* Close X inside panel */
+#petsy-panel-close {
+  position: absolute; top: 14px; right: 14px; z-index: 1060;
+  width: 28px; height: 28px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,.25); color: white; font-size: 14px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+
+@media (max-width: 480px) {
+  #petsy-panel-global {
+    width: calc(100vw - 16px); right: 8px;
+    height: 78vh; bottom: 96px;
+  }
+}
+</style>
+
+<!-- Petsy FAB -->
+<button id="petsy-fab-global" onclick="petsyToggle()" title="Chat with Petsy">
+  <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+    <!-- Ears -->
+    <ellipse cx="18" cy="14" rx="9" ry="12" transform="rotate(-20,18,14)" fill="white" opacity=".35"/>
+    <ellipse cx="62" cy="14" rx="9" ry="12" transform="rotate(20,62,14)" fill="white" opacity=".35"/>
+    <ellipse cx="18" cy="15" rx="5" ry="7" transform="rotate(-20,18,15)" fill="#f9a8d4" opacity=".8"/>
+    <ellipse cx="62" cy="15" rx="5" ry="7" transform="rotate(20,62,15)" fill="#f9a8d4" opacity=".8"/>
+    <!-- Body -->
+    <rect x="6" y="14" width="68" height="50" rx="18" fill="white" opacity=".18"/>
+    <!-- Eyes -->
+    <circle cx="28" cy="32" r="7" fill="white"/>
+    <circle cx="52" cy="32" r="7" fill="white"/>
+    <circle cx="29" cy="33" r="4" fill="#1e0a3c"/>
+    <circle cx="53" cy="33" r="4" fill="#1e0a3c"/>
+    <circle cx="31" cy="31" r="1.5" fill="white"/>
+    <circle cx="55" cy="31" r="1.5" fill="white"/>
+    <!-- Nose -->
+    <ellipse cx="40" cy="43" rx="5" ry="3.5" fill="white" opacity=".5"/>
+    <!-- Smile -->
+    <path d="M32 49 Q40 57 48 49" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <!-- Blush -->
+    <ellipse cx="22" cy="44" rx="5" ry="3" fill="rgba(251,113,133,0.5)"/>
+    <ellipse cx="58" cy="44" rx="5" ry="3" fill="rgba(251,113,133,0.5)"/>
+    <!-- Whiskers -->
+    <line x1="8" y1="42" x2="26" y2="44" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linecap="round"/>
+    <line x1="8" y1="46" x2="26" y2="46" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linecap="round"/>
+    <line x1="72" y1="42" x2="54" y2="44" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linecap="round"/>
+    <line x1="72" y1="46" x2="54" y2="46" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linecap="round"/>
+  </svg>
+</button>
+
+<!-- Hint bubble (shown once on load) -->
+<div id="petsy-hint">🐾 Hi! I'm Petsy — ask me anything! <span style="opacity:.7;font-size:.85em">(Alt+P)</span></div>
+
+<!-- Slide-in chat panel -->
+<div id="petsy-panel-global">
+  <button id="petsy-panel-close" onclick="petsyToggle()" title="Close">&times;</button>
+  <iframe id="petsy-iframe" src="" title="Petsy AI Chat"
+          allow="clipboard-write"></iframe>
+</div>
+
+<script>
+(function(){
+  var open      = false;
+  var iframeLoaded = false;
+
+  // Hide hint after 5 s
+  setTimeout(function(){
+    var h = document.getElementById('petsy-hint');
+    if (h) h.style.display = 'none';
+  }, 5000);
+
+  window.petsyToggle = function() {
+    var panel = document.getElementById('petsy-panel-global');
+    var fab   = document.getElementById('petsy-fab-global');
+    var hint  = document.getElementById('petsy-hint');
+
+    open = !open;
+    if (open) {
+      // Lazy-load iframe on first open
+      if (!iframeLoaded) {
+        document.getElementById('petsy-iframe').src = '{{ url_for("petsy.embed") }}';
+        iframeLoaded = true;
+      }
+      panel.classList.add('open');
+      fab.style.transform = 'scale(0)';
+      fab.style.opacity   = '0';
+      if (hint) hint.style.display = 'none';
+    } else {
+      panel.classList.remove('open');
+      fab.style.transform = '';
+      fab.style.opacity   = '';
+    }
+  };
+
+  // Alt+P keyboard shortcut to open/close Petsy from anywhere
+  document.addEventListener('keydown', function(e) {
+    if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+      e.preventDefault();
+      window.petsyToggle();
+    }
+  });
+})();
+</script>
+{% endif %}
+<!-- END PETSY -->
+
+<!-- Platform JS -->
+<script src="{{ url_for('static', filename='js/platform.js') }}"></script>
+
+<!-- Show mobile toggle on small screens -->
+<script>
+(function(){
+  function checkWidth(){
+    var btn = document.getElementById('pf-sidebar-toggle');
+    if(btn) btn.style.display = window.innerWidth <= 900 ? 'flex' : 'none';
+  }
+  checkWidth();
+  window.addEventListener('resize', checkWidth);
+})();
+</script>
+
+{% block scripts %}{% endblock %}
+
+<!-- ── AI Global Command Palette ─────────────────────────── -->
+<div id="cmdPalette" style="display:none;position:fixed;inset:0;z-index:99999;
+     background:rgba(0,0,0,.65);backdrop-filter:blur(6px);align-items:flex-start;
+     justify-content:center;padding-top:80px">
+  <div style="background:linear-gradient(160deg,#0f172a 0%,#1e1b4b 100%);
+              border:1px solid rgba(139,92,246,.45);border-radius:16px;
+              width:600px;max-width:95vw;
+              box-shadow:0 0 60px rgba(139,92,246,.2),0 20px 60px rgba(0,0,0,.5);
+              overflow:hidden">
+
+    <!-- Input row -->
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;
+                border-bottom:1px solid rgba(139,92,246,.2)">
+      <span style="font-size:1.2rem;flex-shrink:0">✨</span>
+      <input id="cmdInput" type="text" autocomplete="off"
+             placeholder="Ask AI anything about your clinic…"
+             style="flex:1;background:none;border:none;outline:none;color:#e2e8f0;
+                    font-size:1rem;font-family:inherit"
+             oninput="cmdSearch(this.value)"
+             onkeydown="cmdKey(event)">
+      <kbd onclick="closeCmdPalette()"
+           style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+                  border-radius:6px;padding:2px 8px;font-size:.72rem;color:#94a3b8;cursor:pointer">
+        ESC
+      </kbd>
+    </div>
+
+    <!-- Quick nav links -->
+    <div id="cmdQuickLinks" style="padding:10px 14px;border-bottom:1px solid rgba(139,92,246,.15)">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;
+                  letter-spacing:.08em;color:rgba(148,163,184,.5);margin-bottom:8px">Quick Navigate</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px" id="cmdNav">
+        <a href="/finance/invoices" onclick="closeCmdPalette()" class="cmd-quick">🧾 Invoices</a>
+        <a href="/appointments" onclick="closeCmdPalette()" class="cmd-quick">📅 Appointments</a>
+        <a href="/crm/owners" onclick="closeCmdPalette()" class="cmd-quick">👥 Owners</a>
+        <a href="/visits" onclick="closeCmdPalette()" class="cmd-quick">🏥 Visits</a>
+        <a href="/reports/builder" onclick="closeCmdPalette()" class="cmd-quick">📊 Reports</a>
+        <a href="/telemedicine" onclick="closeCmdPalette()" class="cmd-quick">🎥 Telemedicine</a>
+        <a href="/ai" onclick="closeCmdPalette()" class="cmd-quick">🤖 AI Chat</a>
+      </div>
+    </div>
+
+    <!-- AI response area -->
+    <div id="cmdResponse" style="padding:16px 20px;min-height:80px;max-height:320px;overflow-y:auto;
+         color:#cbd5e1;font-size:.88rem;line-height:1.6;display:none">
+    </div>
+
+    <!-- Status bar -->
+    <div style="padding:8px 18px;border-top:1px solid rgba(139,92,246,.15);
+                display:flex;align-items:center;gap:12px">
+      <span style="font-size:.7rem;color:rgba(148,163,184,.5)">Powered by Gemini 2.5 Flash</span>
+      <span style="margin-left:auto;font-size:.7rem;color:rgba(148,163,184,.4)">Enter to ask · ESC to close</span>
+    </div>
+  </div>
+</div>
+
+<style>
+.cmd-quick{background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.25);
+           border-radius:7px;padding:4px 10px;font-size:.78rem;color:#c4b5fd;
+           text-decoration:none;transition:all .15s;white-space:nowrap}
+.cmd-quick:hover{background:rgba(139,92,246,.25);border-color:rgba(139,92,246,.5)}
+.cmd-typing::after{content:'▊';animation:blink .7s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+</style>
+
+<script>
+(function(){
+  var _open = false;
+  var _debounce = null;
+
+  window.openCmdPalette = function() {
+    _open = true;
+    var el = document.getElementById('cmdPalette');
+    el.style.display = 'flex';
+    setTimeout(function(){ document.getElementById('cmdInput').focus(); }, 50);
+  };
+
+  window.closeCmdPalette = function() {
+    _open = false;
+    document.getElementById('cmdPalette').style.display = 'none';
+    document.getElementById('cmdInput').value = '';
+    document.getElementById('cmdResponse').style.display = 'none';
+  };
+
+  // Ctrl+K / Cmd+K shortcut
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      _open ? closeCmdPalette() : openCmdPalette();
+    }
+    if (e.key === 'Escape' && _open) closeCmdPalette();
+  });
+
+  // Click outside
+  document.getElementById('cmdPalette').addEventListener('click', function(e) {
+    if (e.target === this) closeCmdPalette();
+  });
+
+  window.cmdKey = function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var q = document.getElementById('cmdInput').value.trim();
+      if (q) askCmdAi(q);
+    }
+  };
+
+  window.cmdSearch = function(val) {
+    clearTimeout(_debounce);
+    if (!val.trim()) { document.getElementById('cmdResponse').style.display = 'none'; return; }
+    // Show quick-ask hint
+    _debounce = setTimeout(function() { /* auto-ask after 1.5s pause */ }, 1500);
+  };
+
+  window.askCmdAi = function(question) {
+    var resp = document.getElementById('cmdResponse');
+    resp.style.display = '';
+    resp.innerHTML = '<span class="cmd-typing" style="color:rgba(148,163,184,.6)">AI is thinking</span>';
+
+    fetch('/ai/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': (document.querySelector('meta[name=csrf-token]')||{}).content || ''
+      },
+      body: JSON.stringify({message: question})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      resp.innerHTML = '';
+      var text = d.content || d.error || 'No response.';
+      // Typewriter effect
+      var i = 0;
+      function typeNext() {
+        if (i < text.length) {
+          resp.textContent = text.slice(0, ++i);
+          if (i < text.length) requestAnimationFrame(typeNext);
+        }
+      }
+      typeNext();
+    })
+    .catch(function() {
+      resp.innerHTML = '<span style="color:#fca5a5">⚠️ AI service unavailable right now.</span>';
+    });
+  };
+})();
+</script>
+
+</body>
+</html>

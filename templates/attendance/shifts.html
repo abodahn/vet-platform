@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Shifts{% endblock %}
+{% block page_title %}Work Shifts{% endblock %}
+{% block page_sub %}{{ shifts|length }} shift{{ 's' if shifts|length != 1 }} configured{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px">
+
+  <!-- Shifts Table -->
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div class="pf-card-title">🕐 All Shifts</div>
+    </div>
+    {% if shifts %}
+    <table class="pf-table">
+      <thead>
+        <tr><th>Name</th><th>Start</th><th>End</th><th>Break</th><th>Days</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% set day_names = {1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',0:'Sun'} %}
+        {% for s in shifts %}
+        <tr>
+          <td>
+            <span style="display:inline-flex;align-items:center;gap:6px">
+              <span style="width:10px;height:10px;border-radius:50%;background:{{ s.color }};flex-shrink:0"></span>
+              <strong>{{ s.name }}</strong>
+            </span>
+          </td>
+          <td>{{ s.start_time }}</td>
+          <td>{{ s.end_time }}</td>
+          <td>{{ s.break_minutes }}m</td>
+          <td style="font-size:11px">
+            {% for d in (s.days_of_week or '').split(',') %}
+              <span style="background:var(--cl-surface-2);border-radius:3px;padding:1px 5px;margin-right:2px">
+                {{ day_names.get(d|int, d) }}
+              </span>
+            {% endfor %}
+          </td>
+          <td>
+            {% if s.is_active %}<span class="pf-badge active">Active</span>
+            {% else %}<span class="pf-badge">Inactive</span>{% endif %}
+          </td>
+          <td>
+            <button class="pf-btn pf-btn-sm" onclick="editShift({{ s.id }},'{{ s.name }}','{{ s.start_time }}','{{ s.end_time }}',{{ s.break_minutes }},'{{ s.days_of_week }}','{{ s.color }}',{{ s.is_active }})">Edit</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:40px;text-align:center;color:var(--cl-text-muted)">No shifts configured yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Shift Form -->
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div class="pf-card-title" id="form-title">➕ Add Shift</div>
+    </div>
+    <form method="POST" action="{{ url_for('attendance.shift_save') }}" id="shift-form">
+      <input type="hidden" name="shift_id" id="shift-id" value="">
+      <div class="pf-form-group">
+        <label class="pf-form-label">Shift Name <span style="color:#ef4444">*</span></label>
+        <input type="text" name="name" id="shift-name" class="pf-form-control" placeholder="e.g. Morning Shift" required>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="pf-form-group">
+          <label class="pf-form-label">Start Time</label>
+          <input type="time" name="start_time" id="shift-start" class="pf-form-control" value="08:00">
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-form-label">End Time</label>
+          <input type="time" name="end_time" id="shift-end" class="pf-form-control" value="17:00">
+        </div>
+      </div>
+      <div class="pf-form-group">
+        <label class="pf-form-label">Break (minutes)</label>
+        <input type="number" name="break_minutes" id="shift-break" class="pf-form-control" value="60" min="0" max="240">
+      </div>
+      <div class="pf-form-group">
+        <label class="pf-form-label">Working Days</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+          {% for val, label in [(1,'Mon'),(2,'Tue'),(3,'Wed'),(4,'Thu'),(5,'Fri'),(6,'Sat'),(0,'Sun')] %}
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:4px 8px;border:1px solid var(--cl-border);border-radius:4px">
+            <input type="checkbox" name="days_of_week" value="{{ val }}" class="day-cb" {% if val < 6 %}checked{% endif %}>
+            {{ label }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="pf-form-group">
+          <label class="pf-form-label">Color</label>
+          <input type="color" name="color" id="shift-color" class="pf-form-control" value="#3b82f6" style="height:40px;padding:4px">
+        </div>
+        <div class="pf-form-group" style="display:flex;align-items:flex-end;padding-bottom:4px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" name="is_active" id="shift-active" value="1" checked>
+            Active
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="pf-btn pf-btn-primary" id="form-submit-btn">Add Shift</button>
+        <button type="button" class="pf-btn pf-btn-sm" onclick="resetForm()">Reset</button>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editShift(id, name, start, end, brk, days, color, active) {
+  document.getElementById('shift-id').value = id;
+  document.getElementById('shift-name').value = name;
+  document.getElementById('shift-start').value = start;
+  document.getElementById('shift-end').value = end;
+  document.getElementById('shift-break').value = brk;
+  document.getElementById('shift-color').value = color;
+  document.getElementById('shift-active').checked = active == 1;
+  document.getElementById('form-title').textContent = '✏️ Edit Shift';
+  document.getElementById('form-submit-btn').textContent = 'Update Shift';
+  var dayArr = days ? days.split(',') : [];
+  document.querySelectorAll('.day-cb').forEach(function(cb) {
+    cb.checked = dayArr.includes(cb.value);
+  });
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+function resetForm() {
+  document.getElementById('shift-id').value = '';
+  document.getElementById('shift-form').reset();
+  document.getElementById('form-title').textContent = '➕ Add Shift';
+  document.getElementById('form-submit-btn').textContent = 'Add Shift';
+}
+</script>
+{% endblock %}

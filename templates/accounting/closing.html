@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Daily Closing', 'الإغلاق اليومي') }}{% endblock %}
+{% block page_title %}{{ t('Daily Closing', 'الإغلاق اليومي') }}{% endblock %}
+{% block page_sub %}{{ today }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('accounting.dashboard') }}" class="pf-btn pf-btn-ghost">← {{ t('Dashboard', 'لوحة التحكم') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.closing-grid { display:grid; grid-template-columns:1fr 380px; gap:20px; align-items:start; }
+@media(max-width:900px){ .closing-grid { grid-template-columns:1fr; } }
+
+.closing-summary { background:var(--cl-surface); border-radius:12px; padding:28px;
+                   box-shadow:0 2px 8px rgba(0,0,0,.07); margin-bottom:20px; }
+.closing-summary h2 { font-size:16px; font-weight:700; margin-bottom:20px; }
+.cl-stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:14px; margin-bottom:20px; }
+.cl-stat { border-radius:8px; padding:16px; text-align:center; }
+.cl-stat-label { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); margin-bottom:6px; }
+.cl-stat-val { font-size:20px; font-weight:800; }
+.cl-divider { height:1px; background:var(--cl-border); margin:16px 0; }
+
+.note-card { background:var(--cl-surface); border-radius:12px; padding:20px;
+             box-shadow:0 2px 8px rgba(0,0,0,.07); position:sticky; top:20px; }
+.note-card h3 { font-size:14px; font-weight:700; margin-bottom:14px; }
+
+.prev-card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); overflow:hidden; }
+.prev-table { width:100%; border-collapse:collapse; }
+.prev-table th { background:var(--cl-primary); color:#fff; padding:9px 14px; text-align:left;
+                 font-size:11px; font-weight:700; text-transform:uppercase; }
+.prev-table td { padding:9px 14px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.prev-table tr:last-child td { border-bottom:none; }
+.prev-table tr:hover td { background:rgba(0,0,0,.02); }
+
+.net-positive { color:#15803d; font-weight:800; }
+.net-negative { color:#dc2626; font-weight:800; }
+</style>
+
+<div class="closing-grid">
+
+  <!-- LEFT: Summary + History -->
+  <div>
+    <!-- Today's closing summary card -->
+    <div class="closing-summary">
+      <h2>🔒 {{ t("Today's Closing Summary", 'ملخص إغلاق اليوم') }} — {{ today }}</h2>
+      <div class="cl-stats">
+        <div class="cl-stat" style="background:#f0fdf4;">
+          <div class="cl-stat-label">💵 {{ t('Cash Collected', 'النقد المحصّل') }}</div>
+          <div class="cl-stat-val" style="color:#15803d;">{{ "{:,.0f}".format(today_revenue) }}</div>
+          <div style="font-size:11px;color:var(--cl-muted);margin-top:4px;">EGP</div>
+        </div>
+        <div class="cl-stat" style="background:#fef2f2;">
+          <div class="cl-stat-label">🧾 {{ t('Expenses Paid', 'المصروفات المدفوعة') }}</div>
+          <div class="cl-stat-val" style="color:#dc2626;">{{ "{:,.0f}".format(today_expenses) }}</div>
+          <div style="font-size:11px;color:var(--cl-muted);margin-top:4px;">EGP</div>
+        </div>
+        <div class="cl-stat" style="background:{{ '#f0fdf4' if net_cash >= 0 else '#fef2f2' }};">
+          <div class="cl-stat-label">📊 {{ t('Net Cash', 'صافي النقد') }}</div>
+          <div class="cl-stat-val {{ 'net-positive' if net_cash >= 0 else 'net-negative' }}">
+            {{ "{:+,.0f}".format(net_cash) }}
+          </div>
+          <div style="font-size:11px;color:var(--cl-muted);margin-top:4px;">EGP</div>
+        </div>
+        <div class="cl-stat" style="background:#eff6ff;">
+          <div class="cl-stat-label">🔢 {{ t('Transactions', 'المعاملات') }}</div>
+          <div class="cl-stat-val" style="color:#1d4ed8;">{{ total_tx }}</div>
+          <div style="font-size:11px;color:var(--cl-muted);margin-top:4px;">{{ tx_count_in }} {{ t('in', 'وارد') }} / {{ tx_count_out }} {{ t('out', 'صادر') }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Previous 7-day closings -->
+    <div class="prev-card">
+      <div style="padding:14px 20px; border-bottom:1px solid var(--cl-border); font-weight:700; font-size:14px;">
+        📅 {{ t('Previous Closing Notes (Last 7)', 'ملاحظات الإغلاق السابقة (آخر 7)') }}
+      </div>
+      <table class="prev-table">
+        <thead>
+          <tr>
+            <th>{{ t('Date', 'التاريخ') }}</th>
+            <th>{{ t('Note', 'الملاحظة') }}</th>
+            <th>{{ t('Recorded By', 'سجّله') }}</th>
+            <th>{{ t('Time', 'الوقت') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in previous_closings %}
+          <tr>
+            <td style="white-space:nowrap;">{{ c.closing_date }}</td>
+            <td>{{ c.note or '—' }}</td>
+            <td style="color:var(--cl-muted);">{{ c.created_by or '—' }}</td>
+            <td style="color:var(--cl-muted);font-size:11px;">{{ (c.created_at or '')[:16] }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" style="text-align:center;padding:24px;color:var(--cl-muted);">
+              {{ t('No closing notes recorded yet', 'لا توجد ملاحظات إغلاق مسجلة بعد') }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RIGHT: Note form -->
+  <div class="note-card">
+    <h3>📝 {{ t('Add Closing Note', 'إضافة ملاحظة إغلاق') }}</h3>
+    <form method="post" action="{{ url_for('accounting.daily_closing') }}">
+      <div style="margin-bottom:12px;">
+        <label class="pf-label" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--cl-muted);margin-bottom:6px;">
+          {{ t('Closing Note for', 'ملاحظة الإغلاق ليوم') }} {{ today }}
+        </label>
+        <textarea name="closing_note" class="pf-input"
+                  style="width:100%;height:140px;resize:vertical;font-family:inherit;font-size:13px;"
+                  placeholder="{{ t('Summarize today: cash on hand, any discrepancies, notes for manager...', 'لخّص اليوم: النقد الموجود، أي فروقات، ملاحظات للمدير...') }}"></textarea>
+      </div>
+      <button type="submit" class="pf-btn pf-btn-primary" style="width:100%;">
+        💾 {{ t('Save Closing Note', 'حفظ ملاحظة الإغلاق') }}
+      </button>
+    </form>
+
+    <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--cl-border);">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--cl-muted);margin-bottom:10px;">{{ t('Quick Links', 'روابط سريعة') }}</div>
+      <a href="{{ url_for('accounting.cash_flow') }}" class="pf-btn pf-btn-ghost" style="width:100%;margin-bottom:8px;display:block;text-align:center;">
+        💧 {{ t('View Cash Flow', 'عرض التدفق النقدي') }}
+      </a>
+      <a href="{{ url_for('accounting.profit_loss') }}" class="pf-btn pf-btn-ghost" style="width:100%;display:block;text-align:center;">
+        📋 {{ t('P&L Report', 'تقرير الأرباح والخسائر') }}
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

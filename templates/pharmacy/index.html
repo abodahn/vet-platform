@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Pharmacy Queue{% endblock %}
+{% block page_title %}Pharmacy Dispensing Queue{% endblock %}
+{% block page_sub %}Prescriptions awaiting dispensing{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('pharmacy.history') }}" class="pf-btn pf-btn-secondary">Dispensing History</a>
+{% endblock %}
+
+{% block content %}
+{% if prescriptions %}
+<div style="overflow-x:auto">
+  <table class="pf-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Pet / Owner</th>
+        <th>Doctor</th>
+        <th>Visit Date</th>
+        <th>Items</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rx in prescriptions %}
+      <tr>
+        <td><strong>RX-{{ rx.id }}</strong></td>
+        <td>
+          <div style="font-weight:600">{{ rx.pet_name }}
+            <span class="pf-badge" style="font-size:10px">{{ rx.species }}</span>
+          </div>
+          <div style="font-size:12px;color:var(--cl-text-light)">
+            {{ rx.owner_name }}
+            {% if rx.owner_phone %} · {{ rx.owner_phone }}{% endif %}
+          </div>
+        </td>
+        <td>{{ rx.doctor_name or '—' }}</td>
+        <td>{{ rx.visit_date or '—' }}</td>
+        <td>
+          <span class="pf-badge {{ 'success' if rx.dispensed_count == rx.item_count else ('warning' if rx.dispensed_count > 0 else '') }}">
+            {{ rx.dispensed_count }}/{{ rx.item_count }} dispensed
+          </span>
+        </td>
+        <td>
+          <span class="pf-badge {{ 'warning' if rx.status == 'Partial' else ('success' if rx.status == 'Dispensed' else '') }}">
+            {{ rx.status }}
+          </span>
+        </td>
+        <td style="font-size:12px">{{ rx.created_at[:10] if rx.created_at else '—' }}</td>
+        <td>
+          <a href="{{ url_for('pharmacy.rx_detail', rx_id=rx.id) }}"
+             class="pf-btn pf-btn-sm pf-btn-primary">Dispense</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="pf-card pf-empty" style="padding:60px;text-align:center">
+  <div style="font-size:48px;margin-bottom:12px">💊</div>
+  <div style="font-size:16px;font-weight:600">Queue is clear</div>
+  <div style="color:var(--cl-text-light);margin-top:6px">All prescriptions have been dispensed.</div>
+</div>
+{% endif %}
+{% endblock %}

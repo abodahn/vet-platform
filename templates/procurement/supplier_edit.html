@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Edit Supplier{% endblock %}
+{% block page_title %}Edit Supplier{% endblock %}
+{% block page_sub %}Update supplier information{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('procurement.supplier_detail', supplier_id=supplier.id) }}" class="pf-btn pf-btn-ghost">← Back</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:640px">
+<form method="post">
+  <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><div class="pf-card-title">Supplier Details</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;padding:.5rem 0">
+
+      <div style="grid-column:1/-1">
+        <label class="pf-label">Supplier Name *</label>
+        <input type="text" name="name" class="pf-input" style="width:100%" required value="{{ supplier.name or '' }}">
+      </div>
+      <div>
+        <label class="pf-label">Contact Person</label>
+        <input type="text" name="contact_person" class="pf-input" style="width:100%" value="{{ supplier.contact_person or '' }}">
+      </div>
+      <div>
+        <label class="pf-label">Phone</label>
+        <input type="text" name="phone" class="pf-input" style="width:100%" value="{{ supplier.phone or '' }}">
+      </div>
+      <div>
+        <label class="pf-label">Email</label>
+        <input type="email" name="email" class="pf-input" style="width:100%" value="{{ supplier.email or '' }}">
+      </div>
+      <div>
+        <label class="pf-label">Payment Terms</label>
+        <select name="payment_terms" class="pf-input" style="width:100%">
+          {% for t in ['Net 30','Net 15','Net 60','Due on Receipt','Prepaid'] %}
+          <option {{ 'selected' if supplier.payment_terms == t }}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="grid-column:1/-1">
+        <label class="pf-label">Address</label>
+        <input type="text" name="address" class="pf-input" style="width:100%" value="{{ supplier.address or '' }}">
+      </div>
+      <div style="grid-column:1/-1">
+        <label class="pf-label">Notes</label>
+        <textarea name="notes" class="pf-input" style="width:100%;min-height:80px;resize:vertical">{{ supplier.notes or '' }}</textarea>
+      </div>
+      <div>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:6px">
+          <input type="checkbox" name="is_active" value="1" {{ 'checked' if supplier.is_active }} style="width:18px;height:18px">
+          <span class="pf-label" style="margin:0">Active</span>
+        </label>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:12px">
+    <button type="submit" class="pf-btn pf-btn-primary">💾 Save Changes</button>
+    <a href="{{ url_for('procurement.supplier_detail', supplier_id=supplier.id) }}" class="pf-btn pf-btn-ghost">Cancel</a>
+  </div>
+</form>
+</div>
+{% endblock %}

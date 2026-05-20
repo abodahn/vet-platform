@@ -1,0 +1,441 @@
+{% extends "base.html" %}
+{% block title %}Campaign {{ campaign_id }}{% endblock %}
+{% block page_title %}Campaign Details{% endblock %}
+{% block page_sub %}ID: {{ campaign_id }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.campaigns_list') }}" class="pf-btn pf-btn-ghost">← Campaigns</a>
+<button class="pf-btn pf-btn-primary"    onclick="campaignAction('start')">▶ Start</button>
+<button class="pf-btn pf-btn-secondary"  onclick="campaignAction('pause')">⏸ Pause</button>
+<button class="pf-btn pf-btn-ghost"      onclick="showDelayModal()">⏱ Delay</button>
+<button class="pf-btn pf-btn-ghost"      onclick="showBulkAdd()">➕ Add Contacts</button>
+<button class="pf-btn pf-btn-danger"     onclick="campaignAction('reset-failed')">↩ Reset Failed</button>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.cmp-layout  { display:grid; grid-template-columns:280px 1fr; gap:24px; align-items:start; }
+.side-card   { background:var(--card-bg,#fff); border:1px solid var(--border,#e2e8f0);
+               border-radius:14px; padding:22px; margin-bottom:20px; }
+.side-card h3{ font-size:.82rem; font-weight:700; text-transform:uppercase;
+               letter-spacing:.06em; color:var(--muted,#64748b); margin:0 0 14px; }
+.stat-row    { display:flex; justify-content:space-between; align-items:center;
+               padding:7px 0; border-bottom:1px solid var(--border,#e2e8f0); font-size:.88rem; }
+.stat-row:last-child { border:none; }
+.stat-val    { font-weight:700; font-size:1rem; }
+.stat-sent   { color:#166534; }
+.stat-failed { color:#991b1b; }
+.stat-queue  { color:#92400e; }
+.msg-table   { width:100%; border-collapse:collapse; font-size:.84rem; }
+.msg-table th{ background:var(--muted-bg,#f8fafc); font-weight:600;
+               text-align:left; padding:9px 12px; border-bottom:1px solid var(--border,#e2e8f0); }
+.msg-table td{ padding:7px 12px; border-bottom:1px solid var(--border,#e2e8f0);
+               max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.badge-done  { background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-size:.77rem; }
+.badge-fail  { background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:10px; font-size:.77rem; }
+.badge-pend  { background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:10px; font-size:.77rem; }
+.tab-bar     { display:flex; gap:4px; border-bottom:2px solid var(--border,#e2e8f0);
+               margin-bottom:16px; }
+.tab-btn     { padding:8px 16px; border:none; background:none; cursor:pointer;
+               font-weight:500; color:var(--muted,#64748b); border-bottom:3px solid transparent;
+               margin-bottom:-2px; border-radius:6px 6px 0 0; }
+.tab-btn.active { color:var(--primary,#2563eb); border-bottom-color:var(--primary,#2563eb);
+                  background:var(--primary-light,#eff6ff); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+@media(max-width:800px){ .cmp-layout{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cmp-layout">
+  <!-- Sidebar stats + actions -->
+  <div>
+    <div class="side-card">
+      <h3>📊 Stats</h3>
+      {% set total   = stats.get('total',   stats.get('messages_count', 0)) %}
+      {% set sent    = stats.get('sent',    stats.get('done', 0)) %}
+      {% set failed  = stats.get('failed',  0) %}
+      {% set queued  = stats.get('queued',  0) %}
+      <div class="stat-row"><span>Total</span>  <span class="stat-val">{{ total }}</span></div>
+      <div class="stat-row"><span>✅ Sent</span> <span class="stat-val stat-sent">{{ sent }}</span></div>
+      <div class="stat-row"><span>❌ Failed</span><span class="stat-val stat-failed">{{ failed }}</span></div>
+      <div class="stat-row"><span>⏳ Queued</span><span class="stat-val stat-queue">{{ queued }}</span></div>
+      {% if total > 0 %}
+      <div style="margin-top:14px">
+        <div style="background:var(--border,#e2e8f0);border-radius:6px;height:8px;overflow:hidden">
+          <div style="background:#22c55e;height:100%;width:{{ ((sent/total)*100)|round }}%;transition:.3s"></div>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted,#64748b);margin-top:4px">
+          {{ ((sent/total)*100)|round }}% delivered
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if delay %}
+    <div class="side-card">
+      <h3>⏱ Delay Settings</h3>
+      <div class="stat-row"><span>Msg delay</span>
+        <span>{{ delay.get('wait_between_messages_from','—') }}–{{ delay.get('wait_between_messages_to','—') }}s</span></div>
+      <div class="stat-row"><span>Sleep after</span>
+        <span>{{ delay.get('sleep_after_from','—') }}–{{ delay.get('sleep_after_to','—') }} msgs</span></div>
+      <div class="stat-row"><span>Sleep time</span>
+        <span>{{ delay.get('sleep_time_from','—') }}–{{ delay.get('sleep_time_to','—') }}s</span></div>
+    </div>
+    {% endif %}
+
+    <div class="side-card">
+      <h3>🔧 Actions</h3>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="pf-btn pf-btn-primary"   onclick="campaignAction('start')">▶ Start Campaign</button>
+        <button class="pf-btn pf-btn-secondary"  onclick="campaignAction('pause')">⏸ Pause</button>
+        <button class="pf-btn pf-btn-ghost"      onclick="showSchedule()">📅 Schedule</button>
+        <button class="pf-btn pf-btn-ghost"      onclick="unschedule()">🗑 Unschedule</button>
+        <button class="pf-btn pf-btn-ghost"      onclick="campaignAction('copy')">📋 Copy</button>
+        <button class="pf-btn pf-btn-ghost"      onclick="finishCampaign()">✅ Mark Finished</button>
+        <button class="pf-btn pf-btn-danger"     onclick="campaignAction('reset-failed')">↩ Reset Failed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main content tabs -->
+  <div style="background:var(--card-bg,#fff);border:1px solid var(--border,#e2e8f0);border-radius:14px;padding:22px">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab('all')">All Messages ({{ messages|length }})</button>
+      <button class="tab-btn"        onclick="loadQueue()">⏳ Queue</button>
+      <button class="tab-btn"        onclick="loadDone()">✅ Done</button>
+    </div>
+
+    <!-- All messages tab -->
+    <div id="tab-all" class="tab-content active">
+      <div style="margin-bottom:14px;display:flex;gap:10px">
+        <input type="text" id="msg-search" placeholder="Filter by phone or text…"
+               oninput="filterMessages()" class="pf-input" style="flex:1">
+        <button class="pf-btn pf-btn-ghost" onclick="loadAllMessages()">🔄 Refresh</button>
+        <button class="pf-btn pf-btn-danger" onclick="showDeleteSelected()">🗑 Delete Selected</button>
+      </div>
+      <div id="all-messages-content">
+        {% if messages %}
+        {{ _render_messages(messages) | safe }}
+        {% else %}
+        <em style="color:var(--muted,#64748b)">No messages. Click Refresh or Add Contacts.</em>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Queue snapshot tab -->
+    <div id="tab-queue" class="tab-content">
+      <button class="pf-btn pf-btn-ghost" onclick="loadQueue()" style="margin-bottom:14px">🔄 Refresh</button>
+      <div id="queue-content"><em style="color:var(--muted,#64748b)">Click Refresh to load.</em></div>
+    </div>
+
+    <!-- Done snapshot tab -->
+    <div id="tab-done" class="tab-content">
+      <button class="pf-btn pf-btn-ghost" onclick="loadDone()" style="margin-bottom:14px">🔄 Refresh</button>
+      <div id="done-content"><em style="color:var(--muted,#64748b)">Click Refresh to load.</em></div>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Add modal -->
+<div id="bulk-modal" style="display:none;position:fixed;inset:0;z-index:1000;
+     background:rgba(0,0,0,.5);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:560px;max-width:95vw">
+    <h3 style="margin:0 0 16px">➕ Add Contacts to Campaign</h3>
+    <p style="font-size:.85rem;color:var(--muted,#64748b);margin:0 0 12px">
+      One per line: <code>phone_number|message text</code> (message optional, uses campaign default)
+    </p>
+    <textarea id="bulk-input" rows="10" placeholder="201012345678|Hello {name}, your appointment is tomorrow&#10;201098765432&#10;..."
+              style="width:100%;border:1px solid var(--border,#e2e8f0);border-radius:8px;
+                     padding:10px;font-size:.85rem;font-family:monospace;resize:vertical"></textarea>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="pf-btn pf-btn-primary" style="flex:1" onclick="doBulkAdd()">Add Contacts</button>
+      <button class="pf-btn pf-btn-ghost"   style="flex:1" onclick="closeBulk()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule modal -->
+<div id="sched-modal" style="display:none;position:fixed;inset:0;z-index:1000;
+     background:rgba(0,0,0,.5);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:380px;max-width:90vw">
+    <h3 style="margin:0 0 16px">📅 Schedule Campaign</h3>
+    <input type="datetime-local" id="sched-dt" class="pf-input" style="width:100%;margin-bottom:16px">
+    <div style="display:flex;gap:10px">
+      <button class="pf-btn pf-btn-primary" style="flex:1" onclick="doSchedule()">Schedule</button>
+      <button class="pf-btn pf-btn-ghost"   style="flex:1" onclick="closeSched()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delay modal -->
+<div id="delay-modal" style="display:none;position:fixed;inset:0;z-index:1000;
+     background:rgba(0,0,0,.5);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:420px;max-width:95vw">
+    <h3 style="margin:0 0 16px">⏱ Update Delay Settings</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><label style="font-size:.82rem;font-weight:500">Min delay (s)</label>
+        <input type="number" id="d-wf" class="pf-input" min="0"></div>
+      <div><label style="font-size:.82rem;font-weight:500">Max delay (s)</label>
+        <input type="number" id="d-wt" class="pf-input" min="0"></div>
+      <div><label style="font-size:.82rem;font-weight:500">Sleep after (min)</label>
+        <input type="number" id="d-sf" class="pf-input" min="1"></div>
+      <div><label style="font-size:.82rem;font-weight:500">Sleep after (max)</label>
+        <input type="number" id="d-st" class="pf-input" min="1"></div>
+      <div><label style="font-size:.82rem;font-weight:500">Sleep time min (s)</label>
+        <input type="number" id="d-stf" class="pf-input" min="0"></div>
+      <div><label style="font-size:.82rem;font-weight:500">Sleep time max (s)</label>
+        <input type="number" id="d-stt" class="pf-input" min="0"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="pf-btn pf-btn-primary" style="flex:1" onclick="saveDelay()">Save</button>
+      <button class="pf-btn pf-btn-ghost"   style="flex:1" onclick="closeDelay()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="wa-toast" style="position:fixed;bottom:24px;right:24px;z-index:9999;
+     background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;
+     font-size:.9rem;display:none;max-width:320px;box-shadow:0 4px 20px rgba(0,0,0,.3)"></div>
+{% endblock %}
+
+{% macro _render_messages(msgs) %}
+{% if msgs %}
+<table class="msg-table">
+  <thead><tr>
+    <th><input type="checkbox" onchange="toggleAll(this)"></th>
+    <th>Phone</th><th>Message</th><th>Status</th><th>Actions</th>
+  </tr></thead>
+  <tbody id="msg-tbody">
+    {% for m in msgs %}
+    <tr data-phone="{{ m.phone_number or m.chat_id or '' }}" data-text="{{ (m.text or '')[:80] }}">
+      <td><input type="checkbox" class="msg-cb" value="{{ m.id }}"></td>
+      <td>{{ m.phone_number or m.chat_id or '—' }}</td>
+      <td title="{{ m.text or '' }}">{{ (m.text or '')[:60] }}</td>
+      <td>
+        {% set st = (m.status or '')|lower %}
+        {% if st in ('done','sent') %}<span class="badge-done">Sent</span>
+        {% elif st == 'failed' %}<span class="badge-fail">Failed</span>
+        {% else %}<span class="badge-pend">{{ st|title }}</span>{% endif %}
+      </td>
+      <td>
+        {% if (m.status or '')|lower == 'failed' %}
+        <button class="pf-btn pf-btn-ghost" style="font-size:.75rem;padding:2px 7px"
+                onclick="retryMsg('{{ m.id }}')">↩</button>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<em style="color:var(--muted,#64748b)">No messages found.</em>
+{% endif %}
+{% endmacro %}
+
+{% block scripts %}
+<script>
+const CID  = '{{ campaign_id }}';
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+function toast(msg, ok=true) {
+  const el = document.getElementById('wa-toast');
+  el.textContent = msg;
+  el.style.background = ok ? '#166534' : '#991b1b';
+  el.style.display = 'block';
+  setTimeout(() => el.style.display='none', 4000);
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['all','queue','done'][i]===name);
+  });
+  document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+async function campaignAction(action) {
+  const r    = await fetch(`/whatsapp/api/campaigns/${CID}/${action}`, {
+    method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? `${action} triggered` : `Error: ${json.error}`, json.ok);
+}
+
+async function finishCampaign() {
+  const r    = await fetch(`/whatsapp/api/campaigns/${CID}/finish`, {
+    method:'PATCH', headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? 'Marked as finished' : `Error: ${json.error}`, json.ok);
+}
+
+async function retryMsg(id) {
+  const r    = await fetch(`/whatsapp/api/messages/${id}/retry`, {
+    method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? 'Retried' : `Error: ${json.error}`, json.ok);
+}
+
+async function loadAllMessages() {
+  const el   = document.getElementById('all-messages-content');
+  el.innerHTML = '<div style="color:var(--muted,#64748b)">Loading…</div>';
+  const r    = await fetch(`/whatsapp/api/campaigns/${CID}/messages`);
+  const json = await r.json();
+  let msgs = json.data?.data || json.data?.messages || json.data || [];
+  if (!Array.isArray(msgs)) msgs = [];
+  renderMessages(el, msgs);
+}
+
+async function loadQueue() {
+  showTab('queue');
+  const el   = document.getElementById('queue-content');
+  el.innerHTML = '<div style="color:var(--muted,#64748b)">Loading…</div>';
+  const r    = await fetch(`/whatsapp/api/campaigns/${CID}/queue`);
+  const json = await r.json();
+  let msgs = json.data?.data || json.data || [];
+  if (!Array.isArray(msgs)) msgs = [];
+  renderMessages(el, msgs);
+}
+
+async function loadDone() {
+  showTab('done');
+  const el   = document.getElementById('done-content');
+  el.innerHTML = '<div style="color:var(--muted,#64748b)">Loading…</div>';
+  const r    = await fetch(`/whatsapp/api/campaigns/${CID}/done`);
+  const json = await r.json();
+  let msgs = json.data?.data || json.data || [];
+  if (!Array.isArray(msgs)) msgs = [];
+  renderMessages(el, msgs);
+}
+
+function renderMessages(el, msgs) {
+  if (!msgs.length) { el.innerHTML='<em style="color:var(--muted,#64748b)">No messages.</em>'; return; }
+  let html = `<table class="msg-table"><thead><tr>
+    <th><input type="checkbox" onchange="toggleAll(this)"></th>
+    <th>Phone</th><th>Message</th><th>Status</th><th></th>
+  </tr></thead><tbody id="msg-tbody">`;
+  msgs.forEach(m => {
+    const st  = (m.status||'').toLowerCase();
+    const cls = (st==='done'||st==='sent') ? 'badge-done' : (st==='failed' ? 'badge-fail' : 'badge-pend');
+    html += `<tr data-phone="${m.phone_number||m.chat_id||''}" data-text="${(m.text||'').substring(0,80)}">
+      <td><input type="checkbox" class="msg-cb" value="${m.id}"></td>
+      <td>${m.phone_number||m.chat_id||'—'}</td>
+      <td title="${(m.text||'').replace(/"/g,"'")}">
+        ${(m.text||'').substring(0,60)}
+      </td>
+      <td><span class="${cls}">${st||'—'}</span></td>
+      <td>${st==='failed' ? `<button class="pf-btn pf-btn-ghost" style="font-size:.75rem;padding:2px 7px"
+             onclick="retryMsg('${m.id}')">↩</button>` : ''}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function filterMessages() {
+  const q = document.getElementById('msg-search').value.toLowerCase();
+  document.querySelectorAll('#msg-tbody tr').forEach(tr => {
+    const phone = (tr.dataset.phone||'').toLowerCase();
+    const text  = (tr.dataset.text||'').toLowerCase();
+    tr.style.display = (phone.includes(q)||text.includes(q)) ? '' : 'none';
+  });
+}
+
+function toggleAll(cb) {
+  document.querySelectorAll('.msg-cb').forEach(c => c.checked = cb.checked);
+}
+
+async function showDeleteSelected() {
+  const ids = [...document.querySelectorAll('.msg-cb:checked')].map(c => c.value);
+  if (!ids.length) { toast('Select messages first', false); return; }
+  if (!confirm(`Delete ${ids.length} message(s)?`)) return;
+  const r    = await fetch(`/whatsapp/api/campaigns/${CID}/messages`, {
+    method:'DELETE', body:JSON.stringify({ids}),
+    headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? `${ids.length} deleted` : `Error: ${json.error}`, json.ok);
+  if (json.ok) loadAllMessages();
+}
+
+// Bulk add
+function showBulkAdd() { document.getElementById('bulk-modal').style.display='flex'; }
+function closeBulk()   { document.getElementById('bulk-modal').style.display='none'; }
+async function doBulkAdd() {
+  const raw  = document.getElementById('bulk-input').value.trim().split('\n');
+  const msgs = raw.filter(l=>l.trim()).map(line => {
+    const [phone, ...rest] = line.split('|');
+    const obj = {phone_number: phone.trim()};
+    if (rest.length) obj.text = rest.join('|').trim();
+    return obj;
+  });
+  if (!msgs.length) { toast('No contacts found', false); return; }
+  const r = await fetch(`/whatsapp/api/campaigns/${CID}/messages`, {
+    method:'POST', body:JSON.stringify({messages: msgs}),
+    headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? `${msgs.length} contacts added` : `Error: ${json.error}`, json.ok);
+  closeBulk();
+  if (json.ok) loadAllMessages();
+}
+
+// Schedule
+function showSchedule() { document.getElementById('sched-modal').style.display='flex'; }
+function closeSched()   { document.getElementById('sched-modal').style.display='none'; }
+async function doSchedule() {
+  const dt = document.getElementById('sched-dt').value;
+  if (!dt) { toast('Select date/time', false); return; }
+  const r = await fetch(`/whatsapp/api/campaigns/${CID}/schedule`, {
+    method:'POST', body:JSON.stringify({schedule_date: dt}),
+    headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? 'Scheduled' : `Error: ${json.error}`, json.ok);
+  closeSched();
+}
+async function unschedule() {
+  if (!confirm('Remove schedule?')) return;
+  const r = await fetch(`/whatsapp/api/campaigns/${CID}/schedule`, {
+    method:'DELETE', headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? 'Unscheduled' : `Error: ${json.error}`, json.ok);
+}
+
+// Delay modal
+function showDelayModal() {
+  document.getElementById('delay-modal').style.display='flex';
+  fetch(`/whatsapp/api/campaigns/${CID}/delay`).then(r=>r.json()).then(j=>{
+    const d = j.data?.data || j.data || {};
+    document.getElementById('d-wf').value  = d.wait_between_messages_from||3;
+    document.getElementById('d-wt').value  = d.wait_between_messages_to||8;
+    document.getElementById('d-sf').value  = d.sleep_after_from||20;
+    document.getElementById('d-st').value  = d.sleep_after_to||50;
+    document.getElementById('d-stf').value = d.sleep_time_from||30;
+    document.getElementById('d-stt').value = d.sleep_time_to||60;
+  });
+}
+function closeDelay() { document.getElementById('delay-modal').style.display='none'; }
+async function saveDelay() {
+  const body = {
+    wait_between_messages_from: +document.getElementById('d-wf').value,
+    wait_between_messages_to:   +document.getElementById('d-wt').value,
+    sleep_after_from:            +document.getElementById('d-sf').value,
+    sleep_after_to:              +document.getElementById('d-st').value,
+    sleep_time_from:             +document.getElementById('d-stf').value,
+    sleep_time_to:               +document.getElementById('d-stt').value,
+  };
+  const r = await fetch(`/whatsapp/api/campaigns/${CID}/delay`, {
+    method:'PATCH', body:JSON.stringify(body),
+    headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? 'Delay updated' : `Error: ${json.error}`, json.ok);
+  closeDelay();
+}
+</script>
+{% endblock %}

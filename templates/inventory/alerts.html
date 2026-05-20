@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Stock Alerts{% endblock %}
+{% block page_title %}Stock Alerts{% endblock %}
+{% block page_sub %}Low stock and expiry warnings{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('inventory.dashboard') }}" class="btn btn-secondary">← Dashboard</a>
+<a href="{{ url_for('inventory.items_list') }}" class="btn btn-primary">View All Items</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.alert-section { margin-bottom:32px; }
+.section-title { font-size:18px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+.alert-cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px; }
+.alert-card { background:var(--cl-surface); border-radius:12px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.07); border-left:4px solid transparent; }
+.alert-card.danger { border-left-color:var(--cl-danger); }
+.alert-card.warning { border-left-color:var(--cl-warning); }
+.alert-card.info { border-left-color:var(--cl-info); }
+.alert-name { font-weight:700; font-size:15px; margin-bottom:4px; }
+.alert-meta { font-size:12px; color:var(--cl-muted); margin-bottom:12px; }
+.stock-bar-wrap { background:var(--cl-border); border-radius:4px; height:6px; margin-bottom:6px; }
+.stock-bar { border-radius:4px; height:6px; }
+.stock-bar.danger { background:var(--cl-danger); }
+.stock-bar.warning { background:var(--cl-warning); }
+.stock-bar.info { background:var(--cl-info); }
+.stock-nums { display:flex; justify-content:space-between; font-size:12px; color:var(--cl-muted); }
+.empty-state { text-align:center; padding:48px; color:var(--cl-muted); }
+.empty-state-icon { font-size:48px; margin-bottom:12px; }
+.badge-exp { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; }
+.badge-expired { background:#fee2e2; color:#dc2626; }
+.badge-critical { background:#fef3c7; color:#d97706; }
+.badge-warning { background:#fef9c3; color:#a16207; }
+</style>
+
+<div class="alert-section">
+  <div class="section-title">🔴 Low Stock ({{ low_stock|length }} items)</div>
+  {% if low_stock %}
+  <div class="alert-cards">
+    {% for item in low_stock %}
+    {% set pct = [(item.current_stock / item.reorder_level * 100 if item.reorder_level else 0)|int, 100]|min %}
+    <div class="alert-card danger">
+      <div class="alert-name">{{ item.name }}</div>
+      <div class="alert-meta">{{ item.category_name or 'Uncategorized' }} · {{ item.unit or 'unit' }}</div>
+      <div class="stock-bar-wrap"><div class="stock-bar danger" style="width:{{ pct }}%"></div></div>
+      <div class="stock-nums">
+        <span>Current: <strong>{{ item.current_stock|int }}</strong></span>
+        <span>Reorder at: {{ item.reorder_level|int }}</span>
+      </div>
+      <div style="margin-top:12px;">
+        <a href="{{ url_for('inventory.item_detail', item_id=item.id) }}"
+           style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">View Item →</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">✅</div>
+    <div>No low stock items. All inventory levels are healthy.</div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="alert-section">
+  <div class="section-title">⚠️ Expiring Soon ({{ expiry_alerts|length }} batches)</div>
+  {% if expiry_alerts %}
+  <div style="background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.07);">
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="background:var(--cl-primary); color:#fff;">
+          <th style="padding:12px 16px; text-align:left; font-size:13px;">Item</th>
+          <th style="padding:12px 16px; text-align:left; font-size:13px;">Batch</th>
+          <th style="padding:12px 16px; text-align:left; font-size:13px;">Expiry Date</th>
+          <th style="padding:12px 16px; text-align:right; font-size:13px;">Qty</th>
+          <th style="padding:12px 16px; text-align:center; font-size:13px;">Status</th>
+          <th style="padding:12px 16px; text-align:center; font-size:13px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in expiry_alerts %}
+        <tr style="border-bottom:1px solid var(--cl-border);">
+          <td style="padding:12px 16px; font-weight:600;">{{ b.item_name or '—' }}</td>
+          <td style="padding:12px 16px; font-size:13px; color:var(--cl-muted);">{{ b.batch_number or '—' }}</td>
+          <td style="padding:12px 16px; font-size:13px;">
+            {% if b.expiry_date %}
+              {{ b.expiry_date }}
+            {% else %}—{% endif %}
+          </td>
+          <td style="padding:12px 16px; text-align:right; font-weight:600;">{{ b.quantity|int }}</td>
+          <td style="padding:12px 16px; text-align:center;">
+            {% if b.expiry_date and b.expiry_date <= today %}
+              <span class="badge-exp badge-expired">Expired</span>
+            {% elif b in expiry_7 %}
+              <span class="badge-exp badge-critical">Critical</span>
+            {% else %}
+              <span class="badge-exp badge-warning">Warning</span>
+            {% endif %}
+          </td>
+          <td style="padding:12px 16px; text-align:center;">
+            <a href="{{ url_for('inventory.item_detail', item_id=b.item_id) }}"
+               style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">View →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">✅</div>
+    <div>No items expiring within the next 30 days.</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

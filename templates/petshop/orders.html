@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block page_title %}Pet Shop Orders{% endblock %}
+{% block page_sub %}All sales transactions and order history{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('petshop.pos') }}" class="pf-btn pf-btn-primary">🛒 New Sale</a>
+<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.filter-bar { background:var(--cl-surface); border-radius:12px; padding:16px 20px;
+              box-shadow:var(--cl-shadow-card); margin-bottom:20px;
+              display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+.filter-bar input, .filter-bar select { padding:9px 12px; border:1.5px solid var(--cl-border);
+  border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; }
+.filter-bar input { flex:1; min-width:180px; }
+.orders-table { background:var(--cl-surface); border-radius:14px; box-shadow:var(--cl-shadow-card); overflow:hidden; }
+.tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.tbl th { text-align:left; padding:11px 16px; background:var(--cl-bg); font-weight:700;
+          color:var(--cl-text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+.tbl td { padding:11px 16px; border-bottom:1px solid var(--cl-border); vertical-align:middle; }
+.tbl tr:last-child td { border-bottom:none; }
+.tbl tr:hover td { background:var(--cl-bg); }
+.status-paid       { background:#dcfce7; color:#15803d; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
+.status-draft      { background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
+.status-cancelled  { background:#fee2e2; color:#991b1b; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
+.pay-badge { display:inline-block; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;
+             background:var(--cl-primary-subtle); color:var(--cl-primary); }
+</style>
+
+<!-- Filters -->
+<form method="get" class="filter-bar">
+  <input type="search" name="q" placeholder="Search order #, customer name…" value="{{ q }}">
+  <select name="status">
+    <option value="">All Statuses</option>
+    {% for s in ['paid','draft','cancelled'] %}
+    <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s|capitalize }}</option>
+    {% endfor %}
+  </select>
+  <input type="date" name="date_from" value="{{ date_from }}" title="From date">
+  <input type="date" name="date_to"   value="{{ date_to }}"   title="To date">
+  <button type="submit" class="pf-btn pf-btn-primary" style="padding:9px 18px">Search</button>
+  {% if q or status or date_from or date_to %}
+  <a href="{{ url_for('petshop.orders') }}" class="pf-btn pf-btn-secondary" style="padding:9px 14px">Clear</a>
+  {% endif %}
+</form>
+
+{% if orders %}
+<div style="font-size:12px;color:var(--cl-text-muted);margin-bottom:12px">{{ orders|length }} order(s) found</div>
+<div class="orders-table">
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>Order #</th>
+        <th>Date</th>
+        <th>Customer</th>
+        <th>Items</th>
+        <th>Payment</th>
+        <th>Total</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in orders %}
+      <tr>
+        <td><a href="{{ url_for('petshop.order_detail', oid=o.id) }}"
+               style="color:var(--cl-primary);font-weight:700;font-family:monospace">{{ o.order_number }}</a></td>
+        <td style="color:var(--cl-text-muted);white-space:nowrap">
+          {{ o.created_at[:16].replace('T',' ') if o.created_at else '—' }}
+        </td>
+        <td style="font-weight:600">{{ o.owner_name or 'Walk-in' }}</td>
+        <td style="color:var(--cl-text-muted)">{{ o.item_count or '—' }}</td>
+        <td><span class="pay-badge">{{ (o.payment_method or 'cash')|capitalize }}</span></td>
+        <td style="font-weight:800;color:var(--cl-primary)">{{ "{:,.2f}".format(o.total) }} EGP</td>
+        <td><span class="status-{{ o.status }}">{{ o.status }}</span></td>
+        <td>
+          <a href="{{ url_for('petshop.order_detail', oid=o.id) }}"
+             style="font-size:12px;color:var(--cl-primary);font-weight:600">View →</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:60px;color:var(--cl-text-muted)">
+  <div style="font-size:48px;margin-bottom:12px">🧾</div>
+  <div style="font-size:16px;font-weight:600">No orders found</div>
+  {% if q or status %}
+  <div style="margin-top:8px;font-size:13px">Try adjusting your filters</div>
+  {% else %}
+  <div style="margin-top:12px">
+    <a href="{{ url_for('petshop.pos') }}" class="pf-btn pf-btn-primary">Create First Sale</a>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

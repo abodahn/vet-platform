@@ -1,0 +1,478 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp Control Center{% endblock %}
+{% block page_title %}WhatsApp Control Center{% endblock %}
+{% block page_sub %}Manage your WhatsApp instance, campaigns, templates & messaging{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.send_center') }}"    class="pf-btn pf-btn-primary">✉️ Send Message</a>
+<a href="{{ url_for('whatsapp.campaigns_list') }}" class="pf-btn pf-btn-secondary">📣 Campaigns</a>
+<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">📋 Templates</a>
+<a href="{{ url_for('whatsapp.wa_settings') }}"    class="pf-btn pf-btn-ghost">⚙️ Settings</a>
+<a href="{{ url_for('whatsapp.reminder_admin') }}" class="pf-btn pf-btn-secondary">🔔 Reminder Admin</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+/* ── Layout ─────────────────────────────────────────────────── */
+.wa-grid        { display:grid; grid-template-columns:380px 1fr; gap:24px; align-items:start; }
+.wa-card        { background:var(--card-bg,#fff); border:1px solid var(--border,#e2e8f0);
+                  border-radius:14px; padding:24px; }
+.wa-card h3     { font-size:.85rem; font-weight:600; color:var(--muted,#64748b);
+                  text-transform:uppercase; letter-spacing:.06em; margin:0 0 16px; }
+
+/* ── Status indicator ───────────────────────────────────────── */
+.status-badge   { display:inline-flex; align-items:center; gap:8px;
+                  padding:6px 16px; border-radius:20px; font-weight:600; font-size:.9rem; }
+.status-badge.connected    { background:#dcfce7; color:#166534; }
+.status-badge.disconnected { background:#fee2e2; color:#991b1b; }
+.status-badge.qr           { background:#fef3c7; color:#92400e; }
+.status-badge.unknown      { background:#f1f5f9; color:#475569; }
+.status-dot     { width:10px; height:10px; border-radius:50%; }
+.connected  .status-dot    { background:#22c55e; animation:pulse 2s infinite; }
+.disconnected .status-dot  { background:#ef4444; }
+.qr .status-dot            { background:#f59e0b; animation:pulse 1s infinite; }
+.unknown .status-dot       { background:#94a3b8; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── QR section ─────────────────────────────────────────────── */
+#qr-box         { text-align:center; padding:16px 0; min-height:80px; }
+#qr-img         { max-width:220px; border:3px solid #e2e8f0; border-radius:8px; }
+#qr-instruction { margin-top:10px; font-size:.83rem; color:var(--muted,#64748b); }
+
+/* ── Action buttons ─────────────────────────────────────────── */
+.wa-actions     { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+.wa-actions .pf-btn { flex:1; min-width:100px; text-align:center; }
+
+/* ── Stats strip ────────────────────────────────────────────── */
+.stats-strip    { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.stat-card      { background:var(--card-bg,#fff); border:1px solid var(--border,#e2e8f0);
+                  border-radius:12px; padding:18px 20px; text-align:center; }
+.stat-card .num { font-size:1.9rem; font-weight:700; color:var(--primary,#2563eb); }
+.stat-card .lbl { font-size:.8rem; color:var(--muted,#64748b); margin-top:4px; }
+
+/* ── Tabs ───────────────────────────────────────────────────── */
+.wa-tabs        { display:flex; gap:4px; border-bottom:2px solid var(--border,#e2e8f0);
+                  margin-bottom:20px; }
+.wa-tab         { padding:9px 18px; border:none; background:none; cursor:pointer;
+                  font-weight:500; color:var(--muted,#64748b); border-bottom:3px solid transparent;
+                  margin-bottom:-2px; border-radius:6px 6px 0 0; transition:.15s; }
+.wa-tab.active, .wa-tab:hover { color:var(--primary,#2563eb); }
+.wa-tab.active  { border-bottom-color:var(--primary,#2563eb); background:var(--primary-light,#eff6ff); }
+.wa-panel       { display:none; }
+.wa-panel.active{ display:block; }
+
+/* ── Log table ──────────────────────────────────────────────── */
+.log-table      { width:100%; border-collapse:collapse; font-size:.85rem; }
+.log-table th   { background:var(--muted-bg,#f8fafc); font-weight:600;
+                  text-align:left; padding:8px 12px; border-bottom:1px solid var(--border,#e2e8f0); }
+.log-table td   { padding:7px 12px; border-bottom:1px solid var(--border,#e2e8f0);
+                  max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.badge-sent     { background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-size:.78rem; }
+.badge-failed   { background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:10px; font-size:.78rem; }
+.badge-pending  { background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:10px; font-size:.78rem; }
+
+/* ── Instance info table ────────────────────────────────────── */
+.info-kv        { width:100%; border-collapse:collapse; font-size:.86rem; }
+.info-kv td     { padding:7px 6px; border-bottom:1px solid var(--border,#e2e8f0); }
+.info-kv td:first-child { color:var(--muted,#64748b); font-weight:500; width:42%; }
+
+/* ── Screenshot ─────────────────────────────────────────────── */
+#ss-box         { text-align:center; }
+#ss-img         { max-width:100%; border-radius:8px; border:2px solid var(--border,#e2e8f0); }
+
+/* ── Queue form ─────────────────────────────────────────────── */
+.q-grid         { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.q-field label  { display:block; font-size:.82rem; font-weight:500; margin-bottom:4px; }
+.q-field input  { width:100%; padding:7px 10px; border:1px solid var(--border,#e2e8f0);
+                  border-radius:6px; font-size:.9rem; }
+
+@media(max-width:900px){ .wa-grid{ grid-template-columns:1fr; } }
+@media(max-width:600px){ .stats-strip{ grid-template-columns:1fr 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Stats strip -->
+<div class="stats-strip">
+  <div class="stat-card">
+    <div class="num" id="stat-status-label">—</div>
+    <div class="lbl">Instance Status</div>
+  </div>
+  <div class="stat-card">
+    <div class="num">{{ template_count }}</div>
+    <div class="lbl">Active Templates</div>
+  </div>
+  <div class="stat-card">
+    <div class="num">{{ reminder_count }}</div>
+    <div class="lbl">Pending Reminders</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" id="stat-queued">—</div>
+    <div class="lbl">Messages Queued</div>
+  </div>
+</div>
+
+<div class="wa-grid">
+
+  <!-- ── LEFT: Instance Panel ──────────────────────────────── -->
+  <div>
+    <!-- Connection Card -->
+    <div class="wa-card" style="margin-bottom:20px">
+      <h3>📱 Instance — {{ instance_id }}</h3>
+
+      <div style="margin-bottom:16px">
+        <span id="status-badge" class="status-badge unknown">
+          <span class="status-dot"></span>
+          <span id="status-text">Checking…</span>
+        </span>
+      </div>
+
+      <!-- QR code section (visible when status=qr) -->
+      <div id="qr-section" style="display:none">
+        <div id="qr-box">
+          <div style="color:var(--muted,#64748b); font-size:.85rem;">Loading QR…</div>
+        </div>
+        <p id="qr-instruction">Open WhatsApp → Linked Devices → Scan this QR code</p>
+      </div>
+
+      <!-- Instance action buttons -->
+      <div class="wa-actions">
+        <button class="pf-btn pf-btn-primary"   onclick="waAction('start')">▶ Start</button>
+        <button class="pf-btn pf-btn-secondary"  onclick="waAction('restart')">🔄 Restart</button>
+        <button class="pf-btn pf-btn-ghost"      onclick="waAction('logout')">↩ Logout</button>
+        <button class="pf-btn pf-btn-danger"     onclick="waAction('troubleshoot')">🛠 Fix</button>
+        <button class="pf-btn pf-btn-ghost"      onclick="loadQR()" style="width:100%">📷 Show QR</button>
+      </div>
+    </div>
+
+    <!-- Screenshot Card -->
+    <div class="wa-card" style="margin-bottom:20px">
+      <h3>🖼 Live Screenshot</h3>
+      <div id="ss-box"><em style="color:var(--muted,#64748b);font-size:.85rem">Click to load…</em></div>
+      <button class="pf-btn pf-btn-ghost" style="width:100%;margin-top:12px" onclick="loadScreenshot()">
+        🔄 Refresh Screenshot
+      </button>
+    </div>
+
+    <!-- Queue Settings Card -->
+    <div class="wa-card">
+      <h3>⚙️ Queue Settings</h3>
+      <div class="q-grid" id="queue-form">
+        <div class="q-field">
+          <label>Min delay (s)</label>
+          <input type="number" id="q-wf" min="0" placeholder="e.g. 3">
+        </div>
+        <div class="q-field">
+          <label>Max delay (s)</label>
+          <input type="number" id="q-wt" min="0" placeholder="e.g. 8">
+        </div>
+        <div class="q-field">
+          <label>Sleep after (min)</label>
+          <input type="number" id="q-sf" min="1" placeholder="e.g. 20">
+        </div>
+        <div class="q-field">
+          <label>Sleep after (max)</label>
+          <input type="number" id="q-st" min="1" placeholder="e.g. 50">
+        </div>
+        <div class="q-field">
+          <label>Sleep time min (s)</label>
+          <input type="number" id="q-stf" min="0" placeholder="e.g. 30">
+        </div>
+        <div class="q-field">
+          <label>Sleep time max (s)</label>
+          <input type="number" id="q-stt" min="0" placeholder="e.g. 60">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="pf-btn pf-btn-ghost"    onclick="loadQueueSettings()" style="flex:1">🔄 Load</button>
+        <button class="pf-btn pf-btn-primary"  onclick="saveQueueSettings()" style="flex:1">💾 Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: Main tabs ───────────────────────────────────── -->
+  <div class="wa-card" style="padding:0">
+    <div style="padding:20px 20px 0">
+      <div class="wa-tabs">
+        <button class="wa-tab active" onclick="showTab('log')">📜 Message Log</button>
+        <button class="wa-tab"       onclick="showTab('messages')">📨 API Messages</button>
+        <button class="wa-tab"       onclick="showTab('details')">ℹ️ Details</button>
+      </div>
+    </div>
+
+    <!-- Tab: Recent log from DB -->
+    <div id="tab-log" class="wa-panel active" style="padding:0 20px 20px">
+      {% if recent_log %}
+      <table class="log-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Owner</th>
+            <th>Phone</th>
+            <th>Message</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in recent_log %}
+          <tr>
+            <td style="white-space:nowrap;font-size:.8rem">{{ (l.sent_at or '')[:16] }}</td>
+            <td>{{ l.owner_name or '—' }}</td>
+            <td>{{ l.phone or '—' }}</td>
+            <td title="{{ l.message }}">{{ (l.message or '')[:50] }}</td>
+            <td>
+              {% if l.status == 'Sent' %}
+                <span class="badge-sent">Sent</span>
+              {% elif l.status == 'Failed' %}
+                <span class="badge-failed">Failed</span>
+              {% else %}
+                <span class="badge-pending">{{ l.status }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <p style="color:var(--muted,#64748b);padding:20px 0">No messages yet.</p>
+      {% endif %}
+      <div style="margin-top:12px">
+        <a href="{{ url_for('whatsapp.message_log') }}" class="pf-btn pf-btn-ghost">View All Logs →</a>
+      </div>
+    </div>
+
+    <!-- Tab: Live API messages -->
+    <div id="tab-messages" class="wa-panel" style="padding:0 20px 20px">
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <button class="pf-btn pf-btn-ghost" onclick="loadApiMessages()">🔄 Refresh</button>
+        <button class="pf-btn pf-btn-secondary" onclick="retryAll()">↩ Retry All Failed</button>
+      </div>
+      <div id="api-messages-content">
+        <em style="color:var(--muted,#64748b);font-size:.85rem">Click Refresh to load live messages from Wapilot.</em>
+      </div>
+    </div>
+
+    <!-- Tab: Instance details -->
+    <div id="tab-details" class="wa-panel" style="padding:0 20px 20px">
+      <button class="pf-btn pf-btn-ghost" onclick="loadDetails()" style="margin-bottom:14px">🔄 Refresh</button>
+      <div id="instance-details-content">
+        <em style="color:var(--muted,#64748b);font-size:.85rem">Click Refresh to load instance details.</em>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="wa-toast" style="position:fixed;bottom:24px;right:24px;z-index:9999;
+     background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;
+     font-size:.9rem;display:none;max-width:320px;box-shadow:0 4px 20px rgba(0,0,0,.3)"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+function toast(msg, ok=true) {
+  const el = document.getElementById('wa-toast');
+  el.textContent = msg;
+  el.style.background = ok ? '#166534' : '#991b1b';
+  el.style.display = 'block';
+  setTimeout(() => el.style.display='none', 4000);
+}
+
+function showTab(name) {
+  document.querySelectorAll('.wa-tab').forEach((b,i) => {
+    const panels = ['log','messages','details'];
+    b.classList.toggle('active', panels[i] === name);
+  });
+  document.querySelectorAll('.wa-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('tab-'+name);
+  if (panel) panel.classList.add('active');
+}
+
+// ── Instance status ─────────────────────────────────────────────
+async function refreshStatus() {
+  try {
+    const r    = await fetch('/whatsapp/api/instance/status');
+    const json = await r.json();
+    const d    = json.data || {};
+    const st   = (d.status || d.state || 'unknown').toLowerCase();
+    const badge = document.getElementById('status-badge');
+    const text  = document.getElementById('status-text');
+    const stat  = document.getElementById('stat-status-label');
+    badge.className = `status-badge ${st}`;
+    text.textContent = st.charAt(0).toUpperCase() + st.slice(1);
+    stat.textContent = st.toUpperCase();
+    const qrSec = document.getElementById('qr-section');
+    if (st === 'qr' || st === 'scan') {
+      qrSec.style.display = 'block';
+      loadQR();
+    } else {
+      qrSec.style.display = 'none';
+    }
+  } catch(e) {
+    document.getElementById('status-text').textContent = 'Unreachable';
+  }
+}
+
+// ── QR code ─────────────────────────────────────────────────────
+async function loadQR() {
+  document.getElementById('qr-section').style.display = 'block';
+  document.getElementById('qr-box').innerHTML = '<div style="color:var(--muted,#64748b)">Loading QR…</div>';
+  const r    = await fetch('/whatsapp/api/instance/qr');
+  const json = await r.json();
+  const d    = json.data || {};
+  // Wapilot returns qr as base64 image or url
+  const qr   = d.qr || d.qr_code || d.base64 || d.image || '';
+  if (qr) {
+    const src = qr.startsWith('data:') ? qr : `data:image/png;base64,${qr}`;
+    document.getElementById('qr-box').innerHTML =
+      `<img id="qr-img" src="${src}" alt="QR Code" style="max-width:220px;border-radius:8px">`;
+  } else {
+    document.getElementById('qr-box').innerHTML =
+      `<p style="color:#ef4444;font-size:.85rem">${json.error || 'QR not available yet. Make sure instance is started.'}</p>`;
+  }
+}
+
+// ── Screenshot ──────────────────────────────────────────────────
+async function loadScreenshot() {
+  document.getElementById('ss-box').innerHTML = '<div style="color:var(--muted,#64748b)">Loading…</div>';
+  const r    = await fetch('/whatsapp/api/instance/screenshot');
+  const json = await r.json();
+  const d    = json.data || {};
+  const img  = d.screenshot || d.image || d.base64 || '';
+  if (img) {
+    const src = img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
+    document.getElementById('ss-box').innerHTML =
+      `<img id="ss-img" src="${src}" alt="Screenshot">`;
+  } else {
+    document.getElementById('ss-box').innerHTML =
+      `<p style="color:#ef4444;font-size:.85rem">${json.error || 'Screenshot unavailable'}</p>`;
+  }
+}
+
+// ── Instance actions ────────────────────────────────────────────
+async function waAction(action) {
+  const labels = {start:'Starting…',restart:'Restarting…',logout:'Logging out…',troubleshoot:'Troubleshooting…'};
+  toast(labels[action] || 'Processing…', true);
+  const r    = await fetch(`/whatsapp/api/instance/${action}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? `${action} successful` : `Error: ${json.error}`, json.ok);
+  setTimeout(refreshStatus, 2000);
+}
+
+// ── Queue settings ───────────────────────────────────────────────
+async function loadQueueSettings() {
+  const r    = await fetch('/whatsapp/api/instance/queue-settings');
+  const json = await r.json();
+  const d    = json.data?.data || json.data || {};
+  document.getElementById('q-wf').value  = d.wait_between_messages_from || '';
+  document.getElementById('q-wt').value  = d.wait_between_messages_to   || '';
+  document.getElementById('q-sf').value  = d.sleep_after_from            || '';
+  document.getElementById('q-st').value  = d.sleep_after_to              || '';
+  document.getElementById('q-stf').value = d.sleep_time_from             || '';
+  document.getElementById('q-stt').value = d.sleep_time_to               || '';
+  toast('Queue settings loaded', true);
+}
+
+async function saveQueueSettings() {
+  const body = {
+    wait_between_messages_from: +document.getElementById('q-wf').value,
+    wait_between_messages_to:   +document.getElementById('q-wt').value,
+    sleep_after_from:            +document.getElementById('q-sf').value,
+    sleep_after_to:              +document.getElementById('q-st').value,
+    sleep_time_from:             +document.getElementById('q-stf').value,
+    sleep_time_to:               +document.getElementById('q-stt').value,
+  };
+  const r    = await fetch('/whatsapp/api/instance/queue-settings', {
+    method:'PUT', body:JSON.stringify(body),
+    headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? 'Queue settings saved' : `Error: ${json.error}`, json.ok);
+}
+
+// ── API messages ────────────────────────────────────────────────
+async function loadApiMessages() {
+  const el = document.getElementById('api-messages-content');
+  el.innerHTML = '<div style="color:var(--muted,#64748b)">Loading…</div>';
+  const r    = await fetch('/whatsapp/api/messages');
+  const json = await r.json();
+  let msgs = json.data?.data || json.data?.messages || json.data || [];
+  if (!Array.isArray(msgs)) msgs = [];
+  if (!msgs.length) {
+    el.innerHTML = '<p style="color:var(--muted,#64748b)">No messages found.</p>'; return;
+  }
+  let html = '<table class="log-table"><thead><tr><th>ID</th><th>Phone</th><th>Text</th><th>Status</th><th></th></tr></thead><tbody>';
+  msgs.slice(0,50).forEach(m => {
+    const status = m.status || '';
+    const cls    = status==='done'||status==='sent' ? 'badge-sent' : (status==='failed'?'badge-failed':'badge-pending');
+    html += `<tr>
+      <td style="font-size:.78rem">${m.id||''}</td>
+      <td>${m.phone_number||m.chat_id||''}</td>
+      <td title="${(m.text||'').replace(/"/g,"'")}">
+        ${(m.text||'').substring(0,60)}
+      </td>
+      <td><span class="${cls}">${status}</span></td>
+      <td>
+        ${status==='failed'
+          ? `<button class="pf-btn pf-btn-ghost" style="padding:2px 8px;font-size:.78rem"
+               onclick="retryMsg('${m.id}')">↩</button>` : ''}
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  if (msgs.length > 50) html += `<p style="margin-top:8px;font-size:.82rem;color:var(--muted,#64748b)">Showing 50 of ${msgs.length} messages.</p>`;
+  el.innerHTML = html;
+
+  // Update queued stat
+  const queued = msgs.filter(m => m.status==='queued'||m.status==='pending').length;
+  document.getElementById('stat-queued').textContent = queued;
+}
+
+async function retryMsg(id) {
+  const r    = await fetch(`/whatsapp/api/messages/${id}/retry`, {
+    method:'POST', headers:{'X-CSRF-Token':CSRF,'Content-Type':'application/json'}
+  });
+  const json = await r.json();
+  toast(json.ok ? 'Message retried' : `Error: ${json.error}`, json.ok);
+  loadApiMessages();
+}
+
+async function retryAll() {
+  const r    = await fetch('/whatsapp/api/messages/retry-all', {
+    method:'POST', headers:{'X-CSRF-Token':CSRF,'Content-Type':'application/json'}
+  });
+  const json = await r.json();
+  toast(json.ok ? 'Retry-all triggered' : `Error: ${json.error}`, json.ok);
+}
+
+// ── Instance details ─────────────────────────────────────────────
+async function loadDetails() {
+  const el = document.getElementById('instance-details-content');
+  el.innerHTML = '<div style="color:var(--muted,#64748b)">Loading…</div>';
+  const r    = await fetch('/whatsapp/api/instance/details');
+  const json = await r.json();
+  const d    = json.data?.data || json.data || {};
+  if (!Object.keys(d).length) {
+    el.innerHTML = `<p style="color:#ef4444">${json.error || 'No details available'}</p>`; return;
+  }
+  let html = '<table class="info-kv">';
+  Object.entries(d).forEach(([k,v]) => {
+    const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    html += `<tr><td>${k}</td><td>${val}</td></tr>`;
+  });
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  refreshStatus();
+  setInterval(refreshStatus, 30000);  // auto-refresh every 30s
+});
+</script>
+{% endblock %}

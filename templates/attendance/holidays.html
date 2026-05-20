@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Public Holidays{% endblock %}
+{% block page_title %}Public Holidays{% endblock %}
+{% block page_sub %}{{ year }} — {{ holidays|length }} holiday{{ 's' if holidays|length != 1 }}{% endblock %}
+
+{% block topbar_actions %}
+  <form method="GET" style="display:flex;gap:8px;align-items:center">
+    <select name="year" class="pf-form-control" style="width:100px" onchange="this.form.submit()">
+      {% for y in range(2024, 2028) %}
+      <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px">
+
+  <!-- Holidays List -->
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div class="pf-card-title">🗓 Holidays — {{ year }}</div>
+    </div>
+    {% if holidays %}
+    <table class="pf-table">
+      <thead><tr><th>Date</th><th>Name</th><th>Arabic</th><th></th></tr></thead>
+      <tbody>
+        {% for h in holidays %}
+        <tr>
+          <td style="font-weight:600">{{ h.holiday_date }}</td>
+          <td>{{ h.name }}</td>
+          <td style="font-family:var(--cl-font-ar)">{{ h.name_ar }}</td>
+          <td>
+            <div style="display:flex;gap:6px">
+              <button class="pf-btn pf-btn-sm"
+                onclick="editHoliday({{ h.id }},'{{ h.name }}','{{ h.name_ar }}','{{ h.holiday_date }}')">Edit</button>
+              <form method="POST" action="{{ url_for('attendance.holiday_delete', hid=h.id) }}"
+                    onsubmit="return confirm('Delete this holiday?')">
+                <button type="submit" class="pf-btn pf-btn-sm" style="background:#fee2e2;color:#991b1b">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:40px;text-align:center;color:var(--cl-text-muted)">
+      No holidays defined for {{ year }}.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Add/Edit Form -->
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div class="pf-card-title" id="form-title">➕ Add Holiday</div>
+    </div>
+    <form method="POST" action="{{ url_for('attendance.holiday_save') }}" id="holiday-form">
+      <input type="hidden" name="holiday_id" id="h-id" value="">
+      <div class="pf-form-group">
+        <label class="pf-form-label">Date <span style="color:#ef4444">*</span></label>
+        <input type="date" name="holiday_date" id="h-date" class="pf-form-control" required>
+      </div>
+      <div class="pf-form-group">
+        <label class="pf-form-label">Name (English) <span style="color:#ef4444">*</span></label>
+        <input type="text" name="name" id="h-name" class="pf-form-control" placeholder="e.g. National Day" required>
+      </div>
+      <div class="pf-form-group">
+        <label class="pf-form-label">Name (Arabic)</label>
+        <input type="text" name="name_ar" id="h-name-ar" class="pf-form-control" placeholder="e.g. اليوم الوطني" dir="rtl">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="pf-btn pf-btn-primary" id="form-submit-btn">Add Holiday</button>
+        <button type="button" class="pf-btn pf-btn-sm" onclick="resetForm()">Reset</button>
+      </div>
+    </form>
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--cl-border)">
+      <div style="font-size:12px;font-weight:600;color:var(--cl-text-muted);margin-bottom:8px">QUICK ADD — {{ year }} Egyptian Holidays</div>
+      {% set eg_holidays = [
+        ('New Year','رأس السنة','2026-01-01'),
+        ('Coptic Christmas','عيد الميلاد القبطي','2026-01-07'),
+        ('25 January Revolution','ثورة 25 يناير','2026-01-25'),
+        ('Sinai Liberation Day','تحرير سيناء','2026-04-25'),
+        ('Labour Day','عيد العمال','2026-05-01'),
+        ('June 30 Revolution','ثورة 30 يونيو','2026-06-30'),
+        ('Revolution Day','ثورة 23 يوليو','2026-07-23'),
+        ('Armed Forces Day','يوم القوات المسلحة','2026-10-06'),
+      ] %}
+      {% for name_en, name_ar, hdate in eg_holidays %}
+      {% if hdate[:4] == year|string %}
+      <form method="POST" action="{{ url_for('attendance.holiday_save') }}" style="margin-bottom:4px">
+        <input type="hidden" name="name" value="{{ name_en }}">
+        <input type="hidden" name="name_ar" value="{{ name_ar }}">
+        <input type="hidden" name="holiday_date" value="{{ hdate }}">
+        <button type="submit" class="pf-btn pf-btn-sm" style="width:100%;text-align:left;font-size:11px">
+          + {{ hdate }} — {{ name_en }}
+        </button>
+      </form>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editHoliday(id, name, nameAr, date) {
+  document.getElementById('h-id').value = id;
+  document.getElementById('h-name').value = name;
+  document.getElementById('h-name-ar').value = nameAr;
+  document.getElementById('h-date').value = date;
+  document.getElementById('form-title').textContent = '✏️ Edit Holiday';
+  document.getElementById('form-submit-btn').textContent = 'Update Holiday';
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+function resetForm() {
+  document.getElementById('h-id').value = '';
+  document.getElementById('holiday-form').reset();
+  document.getElementById('form-title').textContent = '➕ Add Holiday';
+  document.getElementById('form-submit-btn').textContent = 'Add Holiday';
+}
+</script>
+{% endblock %}

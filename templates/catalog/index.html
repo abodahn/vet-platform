@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Service Catalog{% endblock %}
+{% block page_title %}Service & Price Catalog{% endblock %}
+{% block page_sub %}Manage billable services, prices and tax rates{% endblock %}
+
+{% block topbar_actions %}
+{% if is_manager %}
+<button class="pf-btn pf-btn-primary" onclick="openModal('modal-svc')">+ Add Service</button>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="pf-card" style="margin-bottom:16px">
+  <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <div class="pf-form-group" style="margin:0;flex:1;min-width:160px">
+      <label class="pf-label">Category</label>
+      <select name="category" class="pf-select" onchange="this.form.submit()">
+        <option value="">All Categories</option>
+        {% for cat in categories %}
+        <option value="{{ cat }}" {% if selected_cat==cat %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="pf-form-group" style="margin:0;flex:2;min-width:200px">
+      <label class="pf-label">Search</label>
+      <input class="pf-input" name="q" value="{{ search }}" placeholder="Name or code…">
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:0">
+      <button class="pf-btn pf-btn-secondary" type="submit">Filter</button>
+      {% if is_manager %}
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" name="all" value="1" {% if show_all %}checked{% endif %} onchange="this.form.submit()">
+        Show inactive
+      </label>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Services table -->
+<div class="pf-card">
+  <div style="overflow-x:auto">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Category</th>
+          <th>Species</th>
+          <th style="text-align:right">Price</th>
+          <th style="text-align:right">Tax %</th>
+          <th style="text-align:right">Duration</th>
+          <th>Status</th>
+          {% if is_manager %}<th>Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in services %}
+        <tr style="opacity:{{ '0.5' if not s.is_active else '1' }}">
+          <td><code style="font-size:12px">{{ s.code or '—' }}</code></td>
+          <td>
+            <div style="font-weight:600">{{ s.name }}</div>
+            {% if s.name_ar %}<div style="font-size:11px;color:var(--cl-text-light);direction:rtl">{{ s.name_ar }}</div>{% endif %}
+          </td>
+          <td><span class="pf-badge">{{ s.category }}</span></td>
+          <td>{{ s.species or 'All' }}</td>
+          <td style="text-align:right;font-weight:600">{{ '%.2f'|format(s.standard_price|float) }}</td>
+          <td style="text-align:right">{{ s.tax_rate or 0 }}%</td>
+          <td style="text-align:right">{{ s.duration_min or '—' }}{% if s.duration_min %} min{% endif %}</td>
+          <td>
+            <span class="pf-badge {{ 'success' if s.is_active else 'danger' }}">
+              {{ 'Active' if s.is_active else 'Inactive' }}
+            </span>
+          </td>
+          {% if is_manager %}
+          <td style="white-space:nowrap">
+            <button class="pf-btn pf-btn-sm pf-btn-secondary"
+                    onclick="editService({{ s|tojson }})">Edit</button>
+            <form method="post" action="{{ url_for('catalog.toggle', svc_id=s.id) }}"
+                  style="display:inline" onsubmit="return confirm('Toggle service status?')">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+              <button class="pf-btn pf-btn-sm {{ 'pf-btn-danger' if s.is_active else 'pf-btn-primary' }}">
+                {{ 'Deactivate' if s.is_active else 'Activate' }}
+              </button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="pf-empty">No services found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if is_manager %}
+<!-- Add/Edit Modal -->
+<div id="modal-svc" class="pf-modal-overlay" style="display:none" onclick="if(event.target===this)closeModal('modal-svc')">
+  <div class="pf-modal" style="max-width:560px;width:95%">
+    <div class="pf-modal-header">
+      <h3 id="modal-svc-title">Add Service</h3>
+      <button class="pf-icon-btn" onclick="closeModal('modal-svc')">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('catalog.save') }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="svc_id" id="svc_id" value="">
+      <div class="pf-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="pf-form-group" style="grid-column:span 2">
+          <label class="pf-label">Service Name <span style="color:var(--cl-danger)">*</span></label>
+          <input class="pf-input" name="name" id="svc_name" required placeholder="e.g. General Consultation">
+        </div>
+        <div class="pf-form-group" style="grid-column:span 2">
+          <label class="pf-label">Arabic Name (اختياري)</label>
+          <input class="pf-input" name="name_ar" id="svc_name_ar" dir="rtl" placeholder="الاسم بالعربية">
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-label">Code</label>
+          <input class="pf-input" name="code" id="svc_code" placeholder="e.g. CONSULT-GEN" style="text-transform:uppercase">
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-label">Category</label>
+          <select class="pf-select" name="category" id="svc_category">
+            {% for cat in categories %}
+            <option value="{{ cat }}">{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-label">Standard Price</label>
+          <input class="pf-input" name="standard_price" id="svc_price" type="number" step="0.01" min="0" value="0">
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-label">Tax Rate (%)</label>
+          <input class="pf-input" name="tax_rate" id="svc_tax" type="number" step="0.01" min="0" max="100" value="0">
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-label">Duration (minutes)</label>
+          <input class="pf-input" name="duration_min" id="svc_duration" type="number" min="0" value="30">
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-label">Species</label>
+          <select class="pf-select" name="species" id="svc_species">
+            <option>All</option><option>Dog</option><option>Cat</option>
+            <option>Bird</option><option>Rabbit</option><option>Exotic</option>
+          </select>
+        </div>
+        <div class="pf-form-group" style="grid-column:span 2">
+          <label class="pf-label">Description</label>
+          <textarea class="pf-input" name="description" id="svc_desc" rows="2" style="resize:vertical"></textarea>
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-label">Sort Order</label>
+          <input class="pf-input" name="sort_order" id="svc_sort" type="number" value="0">
+        </div>
+        <div class="pf-form-group" style="display:flex;align-items:center;gap:8px;padding-top:22px">
+          <input type="checkbox" name="is_active" id="svc_active" value="1" checked style="width:16px;height:16px">
+          <label for="svc_active" class="pf-label" style="margin:0">Active</label>
+        </div>
+      </div>
+      <div class="pf-modal-footer">
+        <button type="button" class="pf-btn pf-btn-secondary" onclick="closeModal('modal-svc')">Cancel</button>
+        <button type="submit" class="pf-btn pf-btn-primary">Save Service</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModal(id){ document.getElementById(id).style.display='flex'; }
+function closeModal(id){ document.getElementById(id).style.display='none'; }
+
+function editService(s){
+  document.getElementById('modal-svc-title').textContent = 'Edit Service';
+  document.getElementById('svc_id').value       = s.id || '';
+  document.getElementById('svc_name').value     = s.name || '';
+  document.getElementById('svc_name_ar').value  = s.name_ar || '';
+  document.getElementById('svc_code').value     = s.code || '';
+  document.getElementById('svc_price').value    = s.standard_price || 0;
+  document.getElementById('svc_tax').value      = s.tax_rate || 0;
+  document.getElementById('svc_duration').value = s.duration_min || 30;
+  document.getElementById('svc_sort').value     = s.sort_order || 0;
+  document.getElementById('svc_desc').value     = s.description || '';
+  document.getElementById('svc_active').checked = !!s.is_active;
+  var catSel = document.getElementById('svc_category');
+  for(var i=0;i<catSel.options.length;i++){
+    if(catSel.options[i].value===s.category){ catSel.selectedIndex=i; break; }
+  }
+  var spSel = document.getElementById('svc_species');
+  for(var i=0;i<spSel.options.length;i++){
+    if(spSel.options[i].value===s.species){ spSel.selectedIndex=i; break; }
+  }
+  openModal('modal-svc');
+}
+</script>
+{% endif %}
+{% endblock %}

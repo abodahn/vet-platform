@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% block title %}Send WhatsApp{% endblock %}
+{% block page_title %}Send Message{% endblock %}
+{% block page_sub %}Send text, images, files or videos via WhatsApp{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">← Control Center</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.send-layout { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.send-card   { background:var(--card-bg,#fff); border:1px solid var(--border,#e2e8f0);
+               border-radius:14px; padding:24px; }
+.send-card h3{ font-size:.85rem; font-weight:700; text-transform:uppercase;
+               letter-spacing:.06em; color:var(--muted,#64748b); margin:0 0 18px; }
+.field       { margin-bottom:16px; }
+.field label { display:block; font-size:.83rem; font-weight:500; margin-bottom:6px; }
+.tpl-grid    { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+               gap:10px; max-height:260px; overflow-y:auto; margin-bottom:16px; }
+.tpl-card    { border:2px solid var(--border,#e2e8f0); border-radius:8px;
+               padding:10px 12px; cursor:pointer; transition:.15s; }
+.tpl-card:hover, .tpl-card.selected { border-color:var(--primary,#2563eb);
+               background:var(--primary-light,#eff6ff); }
+.tpl-name    { font-weight:600; font-size:.85rem; margin-bottom:4px; }
+.tpl-preview { font-size:.78rem; color:var(--muted,#64748b);
+               overflow:hidden; text-overflow:ellipsis;
+               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.send-tabs   { display:flex; gap:4px; margin-bottom:18px; }
+.stab        { flex:1; padding:9px; border:2px solid var(--border,#e2e8f0);
+               border-radius:8px; background:none; cursor:pointer; font-weight:500;
+               color:var(--muted,#64748b); transition:.15s; font-size:.85rem; }
+.stab.active { border-color:var(--primary,#2563eb); color:var(--primary,#2563eb);
+               background:var(--primary-light,#eff6ff); }
+.send-panel  { display:none; }
+.send-panel.active { display:block; }
+.result-box  { border-radius:8px; padding:12px 16px; margin-top:14px;
+               font-size:.85rem; display:none; }
+.result-ok   { background:#dcfce7; color:#166534; }
+.result-err  { background:#fee2e2; color:#991b1b; }
+@media(max-width:800px){ .send-layout{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="send-layout">
+
+  <!-- LEFT: Send form -->
+  <div class="send-card">
+    <h3>✉️ Send</h3>
+
+    <!-- Tabs: Text / Image / File / Video -->
+    <div class="send-tabs">
+      <button class="stab active" onclick="showSendTab('text')">💬 Text</button>
+      <button class="stab"        onclick="showSendTab('image')">🖼 Image</button>
+      <button class="stab"        onclick="showSendTab('file')">📎 File</button>
+      <button class="stab"        onclick="showSendTab('video')">🎬 Video</button>
+    </div>
+
+    <!-- Phone (shared) -->
+    <div class="field">
+      <label>Phone Number *</label>
+      <input type="text" id="send-phone" class="pf-input" placeholder="e.g. 201012345678 or chat_id@c.us">
+    </div>
+
+    <!-- TEXT panel -->
+    <div id="panel-text" class="send-panel active">
+      <div class="field">
+        <label style="display:flex;align-items:center;justify-content:space-between">
+          <span>Message *</span>
+          <button type="button" onclick="openAiDraft()"
+                  style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;
+                         border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.75rem;font-weight:600">
+            ✨ AI Draft
+          </button>
+        </label>
+        <textarea id="send-text" rows="5" class="pf-input" placeholder="Type your message…"
+                  style="width:100%;resize:vertical"></textarea>
+      </div>
+      <button class="pf-btn pf-btn-primary" style="width:100%" onclick="sendText()">
+        📤 Send Message
+      </button>
+    </div>
+
+    <!-- AI Draft Modal -->
+    <div id="aiDraftModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+         z-index:9999;align-items:center;justify-content:center">
+      <div style="background:var(--cl-surface,#fff);border-radius:14px;padding:24px;width:460px;
+                  max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.3);
+                  border:1px solid rgba(139,92,246,.3)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <span style="background:linear-gradient(135deg,#8b5cf6,#6366f1);border-radius:8px;
+                       padding:5px 9px;font-size:1rem">✨</span>
+          <h3 style="margin:0;font-size:1rem">AI Message Drafter</h3>
+          <button onclick="closeAiDraft()" style="margin-left:auto;background:none;border:none;
+                  font-size:1.2rem;cursor:pointer;color:var(--cl-muted)">×</button>
+        </div>
+        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:6px">What's the message about?</label>
+        <textarea id="aiDraftContext" rows="3" class="pf-input"
+                  placeholder="e.g. Remind owner about vaccination due next week for their cat Mimi…"
+                  style="width:100%;margin-bottom:10px;resize:vertical"></textarea>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <select id="aiDraftLang" class="pf-input" style="flex:0 0 120px">
+            <option value="en">English</option>
+            <option value="ar">Arabic</option>
+          </select>
+          <button onclick="generateAiDraft()"
+                  style="flex:1;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;
+                         border:none;border-radius:8px;padding:8px;cursor:pointer;font-weight:600;
+                         font-size:.88rem" id="aiDraftBtn">
+            🤖 Generate Message
+          </button>
+        </div>
+        <div id="aiDraftResult" style="display:none;background:var(--cl-bg,#f8fafc);
+             border:1px solid var(--cl-border);border-radius:8px;padding:10px 14px;
+             font-size:.85rem;white-space:pre-wrap;margin-bottom:12px;max-height:150px;overflow-y:auto"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button onclick="useAiDraft()" id="aiUseBtn" style="display:none"
+                  class="pf-btn pf-btn-primary pf-btn-sm">✅ Use This Message</button>
+          <button onclick="closeAiDraft()" class="pf-btn pf-btn-ghost pf-btn-sm">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <script>
+    function openAiDraft()  { document.getElementById('aiDraftModal').style.display = 'flex'; }
+    function closeAiDraft() { document.getElementById('aiDraftModal').style.display = 'none'; }
+    function generateAiDraft() {
+      var ctx  = document.getElementById('aiDraftContext').value.trim();
+      var lang = document.getElementById('aiDraftLang').value;
+      var btn  = document.getElementById('aiDraftBtn');
+      if (!ctx) { alert('Please describe what the message should say.'); return; }
+      btn.disabled = true; btn.textContent = '...';
+      document.getElementById('aiDraftResult').style.display = 'none';
+      document.getElementById('aiUseBtn').style.display = 'none';
+      var _csrf = document.querySelector('meta[name=csrf-token]')?.content || '';
+      fetch('/ai/draft-message', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrf},
+        body: JSON.stringify({context: ctx, lang: lang})
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d) {
+        var el = document.getElementById('aiDraftResult');
+        el.textContent = d.message || '(no response)';
+        el.style.display = '';
+        document.getElementById('aiUseBtn').style.display = '';
+      })
+      .catch(function() { alert('AI unavailable. Please write the message manually.'); })
+      .finally(function() { btn.disabled = false; btn.textContent = '🤖 Generate Message'; });
+    }
+    function useAiDraft() {
+      var msg = document.getElementById('aiDraftResult').textContent;
+      document.getElementById('send-text').value = msg;
+      closeAiDraft();
+    }
+    </script>
+
+    <!-- IMAGE panel -->
+    <div id="panel-image" class="send-panel">
+      <div class="field">
+        <label>Image File *</label>
+        <input type="file" id="img-file" accept="image/*" class="pf-input">
+      </div>
+      <div class="field">
+        <label>Caption (optional)</label>
+        <input type="text" id="img-caption" class="pf-input" placeholder="Caption…">
+      </div>
+      <button class="pf-btn pf-btn-primary" style="width:100%" onclick="sendMedia('image')">
+        📤 Send Image
+      </button>
+    </div>
+
+    <!-- FILE panel -->
+    <div id="panel-file" class="send-panel">
+      <div class="field">
+        <label>Document File *</label>
+        <input type="file" id="doc-file" class="pf-input">
+      </div>
+      <div class="field">
+        <label>Caption (optional)</label>
+        <input type="text" id="doc-caption" class="pf-input" placeholder="Caption…">
+      </div>
+      <button class="pf-btn pf-btn-primary" style="width:100%" onclick="sendMedia('file')">
+        📤 Send File
+      </button>
+    </div>
+
+    <!-- VIDEO panel -->
+    <div id="panel-video" class="send-panel">
+      <div class="field">
+        <label>Video File *</label>
+        <input type="file" id="vid-file" accept="video/*" class="pf-input">
+      </div>
+      <div class="field">
+        <label>Caption (optional)</label>
+        <input type="text" id="vid-caption" class="pf-input" placeholder="Caption…">
+      </div>
+      <button class="pf-btn pf-btn-primary" style="width:100%" onclick="sendMedia('video')">
+        📤 Send Video
+      </button>
+    </div>
+
+    <div id="send-result" class="result-box"></div>
+  </div>
+
+  <!-- RIGHT: Template picker -->
+  <div class="send-card">
+    <h3>📋 Templates</h3>
+    <p style="font-size:.83rem;color:var(--muted,#64748b);margin:0 0 14px">
+      Click a template to load its text into the message box.
+    </p>
+    <input type="text" placeholder="Search templates…" oninput="filterTemplates(this.value)"
+           class="pf-input" style="width:100%;margin-bottom:12px">
+
+    <div class="tpl-grid" id="tpl-grid">
+      {% for t in templates %}
+      <div class="tpl-card" onclick="selectTemplate('{{ t.id }}','{{ t.template_text | replace("'","") | truncate(200) }}')"
+           data-name="{{ t.name|lower }}" data-text="{{ (t.template_text or '')|lower }}" id="tpl-{{ t.id }}">
+        <div class="tpl-name">{{ t.name }}</div>
+        <div class="tpl-preview">{{ t.template_text or '(empty)' }}</div>
+      </div>
+      {% else %}
+      <div style="color:var(--muted,#64748b);font-size:.85rem;padding:10px">
+        No templates yet.
+        <a href="{{ url_for('whatsapp.template_new') }}">Create one →</a>
+      </div>
+      {% endfor %}
+    </div>
+
+    <a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-ghost" style="width:100%;margin-top:8px">
+      Manage Templates →
+    </a>
+
+    <!-- Quick phone lookup -->
+    <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border,#e2e8f0)">
+      <h3>🔍 Phone Lookup</h3>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="lookup-phone" class="pf-input" placeholder="Phone number…" style="flex:1">
+        <button class="pf-btn pf-btn-ghost" onclick="lookupPhone()">Lookup</button>
+      </div>
+      <div id="lookup-result" style="margin-top:10px;font-size:.83rem;color:var(--muted,#64748b)"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+let selectedTemplateId = null;
+
+function showSendTab(name) {
+  document.querySelectorAll('.stab').forEach((b,i) => {
+    b.classList.toggle('active', ['text','image','file','video'][i]===name);
+  });
+  document.querySelectorAll('.send-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+}
+
+function selectTemplate(id, text) {
+  document.querySelectorAll('.tpl-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('tpl-'+id).classList.add('selected');
+  document.getElementById('send-text').value = text;
+  selectedTemplateId = id;
+  showSendTab('text');
+}
+
+function filterTemplates(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.tpl-card').forEach(c => {
+    const match = c.dataset.name.includes(q) || c.dataset.text.includes(q);
+    c.style.display = match ? '' : 'none';
+  });
+}
+
+function showResult(msg, ok) {
+  const el = document.getElementById('send-result');
+  el.textContent = msg;
+  el.className = 'result-box ' + (ok ? 'result-ok' : 'result-err');
+  el.style.display = 'block';
+  setTimeout(() => el.style.display='none', 6000);
+}
+
+async function sendText() {
+  const phone = document.getElementById('send-phone').value.trim();
+  const text  = document.getElementById('send-text').value.trim();
+  if (!phone || !text) { showResult('Phone and message required', false); return; }
+  const r    = await fetch('/whatsapp/api/send/text', {
+    method:'POST', body: JSON.stringify({phone, text, template_name: selectedTemplateId||''}),
+    headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  showResult(json.ok ? `✅ Sent to ${phone}` : `❌ Error: ${json.error}`, json.ok);
+}
+
+async function sendMedia(type) {
+  const phone = document.getElementById('send-phone').value.trim();
+  const fileId = {image:'img-file', file:'doc-file', video:'vid-file'}[type];
+  const capId  = {image:'img-caption', file:'doc-caption', video:'vid-caption'}[type];
+  const file   = document.getElementById(fileId)?.files[0];
+  const caption= document.getElementById(capId)?.value || '';
+  if (!phone || !file) { showResult('Phone and file required', false); return; }
+  const fd = new FormData();
+  fd.append('phone',   phone);
+  fd.append('caption', caption);
+  fd.append('media',   file);
+  const r    = await fetch(`/whatsapp/api/send/${type}`, {
+    method:'POST', body: fd,
+    headers:{'X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  showResult(json.ok ? `✅ ${type} sent` : `❌ Error: ${json.error}`, json.ok);
+}
+
+async function lookupPhone() {
+  const phone = document.getElementById('lookup-phone').value.trim();
+  if (!phone) return;
+  const el   = document.getElementById('lookup-result');
+  el.textContent = 'Looking up…';
+  const r    = await fetch(`/whatsapp/api/lookup/phone/${phone}`);
+  const json = await r.json();
+  if (json.ok && json.data) {
+    const d = json.data?.data || json.data;
+    el.innerHTML = `<strong>LID:</strong> ${d.lid||'?'} &nbsp; <strong>PN:</strong> ${d.pn||phone}
+      <button class="pf-btn pf-btn-ghost" style="font-size:.78rem;padding:2px 8px;margin-left:8px"
+              onclick="document.getElementById('send-phone').value='${d.pn||phone}'">Use</button>`;
+  } else {
+    el.textContent = json.error || 'Not found';
+  }
+}
+</script>
+{% endblock %}

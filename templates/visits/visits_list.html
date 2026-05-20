@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Visits', 'الزيارات') }}{% endblock %}
+{% block page_title %}{{ t('Medical Visits', 'الزيارات الطبية') }}{% endblock %}
+{% block page_sub %}{{ t('Clinical examination records', 'سجلات الفحص السريري') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary">+ {{ t('New Visit', 'زيارة جديدة') }}</a>
+{% endblock %}
+
+{% block content %}
+<form method="get" class="pf-filter-bar" style="margin-bottom:1.5rem">
+  <select name="status" class="pf-input" style="width:140px">
+    {% for s in ['All','Open','Completed','Cancelled'] %}
+    <option value="{{ s }}" {% if status_filter==s %}selected{% endif %}>
+      {% if s == 'All' %}{{ t('All', 'الكل') }}
+      {% elif s == 'Open' %}{{ t('Open', 'مفتوح') }}
+      {% elif s == 'Completed' %}{{ t('Completed', 'مكتمل') }}
+      {% elif s == 'Cancelled' %}{{ t('Cancelled', 'ملغى') }}
+      {% else %}{{ s }}{% endif %}
+    </option>
+    {% endfor %}
+  </select>
+  <input type="date" name="date_from" value="{{ date_from }}" class="pf-input" style="width:150px">
+  <input type="date" name="date_to"   value="{{ date_to }}"   class="pf-input" style="width:150px">
+  <select name="doctor" class="pf-input" style="width:180px">
+    <option value="">{{ t('All Doctors', 'جميع الأطباء') }}</option>
+    {% for d in doctors %}
+    <option value="{{ d.doctor_name }}" {% if doctor_filter==d.doctor_name %}selected{% endif %}>{{ d.doctor_name }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="pf-btn pf-btn-secondary">{{ t('Filter', 'تصفية') }}</button>
+  <a href="{{ url_for('visits.visits_list') }}" class="pf-btn pf-btn-ghost">{{ t('Clear', 'مسح') }}</a>
+</form>
+
+<div class="pf-card">
+  <table class="pf-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>{{ t('Date', 'التاريخ') }}</th>
+        <th>{{ t('Pet', 'الحيوان') }}</th>
+        <th>{{ t('Owner', 'المالك') }}</th>
+        <th>{{ t('Type', 'النوع') }}</th>
+        <th>{{ t('Doctor', 'الطبيب') }}</th>
+        <th>{{ t('Chief Complaint', 'الشكوى الرئيسية') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in visits %}
+      <tr>
+        <td>{{ v.id }}</td>
+        <td style="white-space:nowrap">{{ (v.visit_date or '')[:16] }}</td>
+        <td><strong>{{ v.pet_name }}</strong><br><small style="color:var(--pf-muted)">{{ v.species }}{% if v.breed %} · {{ v.breed }}{% endif %}</small></td>
+        <td>{{ v.owner_name }}<br><small style="color:var(--pf-muted)">{{ v.owner_phone }}</small></td>
+        <td>{{ v.visit_type }}</td>
+        <td>{{ v.doctor_name or '—' }}</td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ v.chief_complaint or '—' }}</td>
+        <td>
+          {% if v.status == 'Open' %}<span class="pf-badge warning">{{ t('Open', 'مفتوح') }}</span>
+          {% elif v.status == 'Completed' %}<span class="pf-badge success">{{ t('Completed', 'مكتمل') }}</span>
+          {% else %}<span class="pf-badge error">{{ v.status }}</span>{% endif %}
+        </td>
+        <td><a href="{{ url_for('visits.visit_detail', visit_id=v.id) }}" class="pf-btn pf-btn-ghost" style="padding:4px 10px;font-size:.8rem">{{ t('Open', 'فتح') }}</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" style="text-align:center;color:var(--pf-muted);padding:2rem">{{ t('No visits found.', 'لا توجد زيارات.') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Grooming Services{% endblock %}
+{% block page_title %}Grooming Services{% endblock %}
+{% block page_sub %}Manage available grooming services{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('grooming.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 400px;gap:1.5rem;align-items:start">
+
+  <!-- Services table -->
+  <div class="pf-card">
+    <div class="pf-card-header"><h3 class="pf-card-title">Services ({{ services|length }})</h3></div>
+    <table class="pf-table">
+      <thead>
+        <tr><th>Name</th><th>Species</th><th>Duration</th><th>Price</th><th>Active</th><th>Description</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for s in services %}
+        <tr>
+          <td><strong>{{ s.name }}</strong></td>
+          <td>{{ s.species or 'All' }}</td>
+          <td>{{ s.duration_min or '—' }} min</td>
+          <td>{{ "%.2f"|format(s.price|float) }} EGP</td>
+          <td>
+            {% if s.is_active %}<span class="pf-badge success">Active</span>
+            {% else %}<span class="pf-badge error">Inactive</span>{% endif %}
+          </td>
+          <td style="font-size:.85rem;color:var(--pf-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.description or '—' }}</td>
+          <td>
+            <button type="button" onclick="editService({{ s.id }}, '{{ s.name|replace("'","\\'")|e }}', '{{ s.species or "All" }}', {{ s.duration_min or 60 }}, {{ s.price or 0 }}, {{ 1 if s.is_active else 0 }}, '{{ s.description|replace("'","\\'")|e }}')" class="pf-btn pf-btn-ghost" style="padding:3px 8px;font-size:.8rem">Edit</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--pf-muted);padding:2rem">No services yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Add / Edit form -->
+  <div class="pf-card">
+    <div class="pf-card-header"><h3 class="pf-card-title" id="formTitle">Add Service</h3></div>
+    <div style="padding:1.25rem">
+      <form method="post" action="{{ url_for('grooming.service_new') }}" id="serviceForm">
+        <input type="hidden" name="service_id" id="serviceId" value="">
+
+        <div style="margin-bottom:1rem">
+          <label class="pf-label">Service Name *</label>
+          <input type="text" name="name" id="svcName" class="pf-input" required placeholder="e.g. Full Bath & Trim">
+        </div>
+        <div style="margin-bottom:1rem">
+          <label class="pf-label">Species</label>
+          <select name="species" id="svcSpecies" class="pf-input">
+            <option value="All">All</option>
+            <option value="Dog">Dog</option>
+            <option value="Cat">Cat</option>
+            <option value="Bird">Bird</option>
+            <option value="Rabbit">Rabbit</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+          <div>
+            <label class="pf-label">Duration (min)</label>
+            <input type="number" name="duration_min" id="svcDuration" class="pf-input" min="5" value="60" placeholder="60">
+          </div>
+          <div>
+            <label class="pf-label">Price (EGP)</label>
+            <input type="number" name="price" id="svcPrice" class="pf-input" step="0.01" min="0" value="0" placeholder="0.00">
+          </div>
+        </div>
+        <div style="margin-bottom:1rem">
+          <label class="pf-label">Description</label>
+          <textarea name="description" id="svcDesc" class="pf-input" rows="3" placeholder="Service details..."></textarea>
+        </div>
+        <div style="margin-bottom:1.25rem;display:flex;align-items:center;gap:.5rem">
+          <input type="checkbox" name="is_active" id="svcActive" value="1" checked style="width:16px;height:16px">
+          <label for="svcActive" class="pf-label" style="margin:0">Active</label>
+        </div>
+        <div style="display:flex;gap:.75rem">
+          <button type="submit" class="pf-btn pf-btn-primary">Save Service</button>
+          <button type="button" onclick="resetForm()" class="pf-btn pf-btn-ghost">Clear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function editService(id, name, species, duration, price, isActive, desc) {
+  document.getElementById('serviceId').value = id;
+  document.getElementById('svcName').value = name;
+  document.getElementById('svcSpecies').value = species;
+  document.getElementById('svcDuration').value = duration;
+  document.getElementById('svcPrice').value = price;
+  document.getElementById('svcDesc').value = desc;
+  document.getElementById('svcActive').checked = isActive === 1;
+  document.getElementById('formTitle').textContent = 'Edit Service #' + id;
+  document.getElementById('svcName').focus();
+}
+function resetForm() {
+  document.getElementById('serviceId').value = '';
+  document.getElementById('serviceForm').reset();
+  document.getElementById('formTitle').textContent = 'Add Service';
+}
+</script>
+{% endblock %}

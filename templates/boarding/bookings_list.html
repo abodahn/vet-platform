@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Boarding Bookings{% endblock %}
+{% block page_title %}Boarding Bookings{% endblock %}
+{% block page_sub %}All pet hotel bookings{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('boarding.booking_new_form') }}" class="pf-btn pf-btn-primary">+ New Booking</a>
+<a href="{{ url_for('boarding.dashboard') }}" class="pf-btn pf-btn-secondary">Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<form method="get" class="pf-filter-bar" style="margin-bottom:1.5rem">
+  <select name="status" class="pf-input" style="width:160px">
+    {% for s in ['All','Reserved','Checked-in','Checked-out','Cancelled'] %}
+    <option value="{{ s }}" {% if status_filter==s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <input type="date" name="date_from" value="{{ date_from }}" class="pf-input" style="width:150px">
+  <input type="date" name="date_to"   value="{{ date_to }}"   class="pf-input" style="width:150px">
+  <button type="submit" class="pf-btn pf-btn-secondary">Filter</button>
+  <a href="{{ url_for('boarding.bookings_list') }}" class="pf-btn pf-btn-ghost">Clear</a>
+</form>
+
+<div class="pf-card">
+  <table class="pf-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Pet</th>
+        <th>Owner</th>
+        <th>Room</th>
+        <th>Check-in</th>
+        <th>Expected Out</th>
+        <th>Rate/Day</th>
+        <th>Status</th>
+        <th>Invoice</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in bookings %}
+      <tr>
+        <td>{{ b.id }}</td>
+        <td><strong>{{ b.pet_name }}</strong><br><small style="color:var(--pf-muted)">{{ b.species }}</small></td>
+        <td>{{ b.owner_name }}<br><small style="color:var(--pf-muted)">{{ b.phone }}</small></td>
+        <td>
+          {% if b.room_number %}
+          <strong>{{ b.room_number }}</strong><br><small style="color:var(--pf-muted)">{{ b.room_type }}</small>
+          {% else %}—{% endif %}
+        </td>
+        <td style="white-space:nowrap">{{ (b.checkin_date or '')[:10] }}</td>
+        <td style="white-space:nowrap">{{ (b.expected_checkout or '')[:10] }}</td>
+        <td>{{ b.daily_rate or '—' }} {% if b.daily_rate %}EGP{% endif %}</td>
+        <td>
+          {% if b.status == 'Reserved' %}<span class="pf-badge warning">Reserved</span>
+          {% elif b.status == 'Checked-in' %}<span class="pf-badge success">Checked-in</span>
+          {% elif b.status == 'Checked-out' %}<span class="pf-badge" style="background:#6b7280;color:#fff">Checked-out</span>
+          {% else %}<span class="pf-badge error">{{ b.status }}</span>{% endif %}
+        </td>
+        <td>
+          {% if b.invoice_id %}
+            <a href="{{ url_for('finance.invoice_detail', inv_id=b.invoice_id) }}"
+               class="pf-badge success" style="text-decoration:none;font-size:.75rem">
+              🧾 #{{ b.invoice_id }}
+            </a>
+          {% else %}
+            <span style="color:var(--pf-muted);font-size:.78rem">—</span>
+          {% endif %}
+        </td>
+        <td style="white-space:nowrap">
+          <div style="display:flex;gap:.3rem;flex-wrap:wrap">
+            {# Edit button — always available #}
+            <a href="{{ url_for('boarding.booking_edit_form', booking_id=b.id) }}"
+               class="pf-btn pf-btn-sm pf-btn-ghost">✏️ Edit</a>
+
+            {# Status-specific actions #}
+            {% if b.status in ('Reserved', 'Booked') %}
+              <form method="post" action="{{ url_for('boarding.checkin', booking_id=b.id) }}" style="display:inline">
+                <button type="submit" class="pf-btn pf-btn-sm pf-btn-primary"
+                        onclick="return confirm('Check in this pet now?')">✅ Check In</button>
+              </form>
+            {% elif b.status == 'Checked-in' %}
+              <form method="post" action="{{ url_for('boarding.checkout', booking_id=b.id) }}" style="display:inline">
+                <button type="submit" class="pf-btn pf-btn-sm pf-btn-secondary"
+                        onclick="return confirm('Check out and generate invoice?')">🚪 Check Out</button>
+              </form>
+            {% endif %}
+
+            {# View invoice if it exists and not already shown as link #}
+            {% if b.invoice_id and b.status == 'Checked-out' %}
+              <a href="{{ url_for('finance.invoice_detail', inv_id=b.invoice_id) }}"
+                 class="pf-btn pf-btn-sm pf-btn-ghost">🧾 Receipt</a>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" style="text-align:center;color:var(--pf-muted);padding:2rem" class="pf-empty">No bookings found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

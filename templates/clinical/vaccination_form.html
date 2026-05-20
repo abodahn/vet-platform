@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Record Vaccination{% endblock %}
+{% block page_title %}Record Vaccination{% endblock %}
+{% block page_sub %}Add a new vaccination record{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('clinical.vaccinations') }}" class="pf-btn pf-btn-secondary">← Back to Vaccinations</a>
+{% endblock %}
+
+{% block content %}
+
+{% if pet %}
+<div class="pf-card" style="margin-bottom:1rem;border-left:4px solid var(--primary)">
+  <div class="pf-card-body" style="display:flex;gap:2rem;align-items:center;padding:0.85rem 1.25rem">
+    <div>
+      <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin-bottom:0.2rem">Patient</div>
+      <div style="font-weight:700;font-size:1.05rem">{{ pet.pet_name }}</div>
+      <div style="font-size:0.82rem;color:var(--text-muted)">{{ pet.species }}{% if pet.breed %} · {{ pet.breed }}{% endif %}</div>
+    </div>
+    <div>
+      <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin-bottom:0.2rem">Owner</div>
+      <div style="font-weight:600">{{ pet.owner_name }}</div>
+      <div style="font-size:0.82rem;color:var(--text-muted)">{{ pet.owner_phone or '' }}</div>
+    </div>
+    {% if pet.allergies %}
+    <div>
+      <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:#dc2626;margin-bottom:0.2rem">⚠ Allergies</div>
+      <div style="font-size:0.85rem;color:#dc2626">{{ pet.allergies }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <div class="pf-card-header">
+    <span>💉 Vaccination Details</span>
+  </div>
+  <div class="pf-card-body">
+    <form method="post" action="{{ url_for('clinical.vaccination_new') }}">
+
+      {% if pet %}
+      <input type="hidden" name="pet_id" value="{{ pet.id }}">
+      {% else %}
+      <div class="pf-field" style="margin-bottom:1rem">
+        <label class="pf-label" for="pet_id">Pet ID <span style="color:var(--danger)">*</span></label>
+        <input type="number" id="pet_id" name="pet_id" class="pf-input" required
+               placeholder="Enter pet ID">
+      </div>
+      {% endif %}
+
+      <div class="pf-form-grid">
+
+        <div class="pf-field" style="grid-column:1/-1">
+          <label class="pf-label" for="vaccine_name">Vaccine <span style="color:var(--danger)">*</span></label>
+          <select id="vaccine_name" name="vaccine_name" class="pf-input"
+                  onchange="toggleCustomVaccine(this.value)" required>
+            <option value="">— Select vaccine —</option>
+            {% for v in vaccine_options %}
+            <option value="{{ v }}">{{ v }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="pf-field" id="custom-vaccine-field" style="grid-column:1/-1;display:none">
+          <label class="pf-label" for="custom_vaccine">Custom Vaccine Name</label>
+          <input type="text" id="custom_vaccine" name="custom_vaccine" class="pf-input"
+                 placeholder="Enter vaccine name…">
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="vaccine_brand">Brand / Manufacturer</label>
+          <input type="text" id="vaccine_brand" name="vaccine_brand" class="pf-input"
+                 placeholder="e.g. Nobivac, Felocell">
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="batch_number">Batch / Lot Number</label>
+          <input type="text" id="batch_number" name="batch_number" class="pf-input"
+                 placeholder="e.g. B2024-001">
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="dose_number">Dose Number</label>
+          <input type="number" id="dose_number" name="dose_number" class="pf-input"
+                 value="1" min="1" max="10">
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="site">Injection Site</label>
+          <select id="site" name="site" class="pf-input">
+            <option value="Subcutaneous" selected>Subcutaneous</option>
+            <option value="Intramuscular">Intramuscular</option>
+            <option value="Intranasal">Intranasal</option>
+            <option value="Oral">Oral</option>
+          </select>
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="administered_at">Date Administered <span style="color:var(--danger)">*</span></label>
+          <input type="date" id="administered_at" name="administered_at" class="pf-input"
+                 value="{{ today }}" required>
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="next_due_at">Next Due Date</label>
+          <input type="date" id="next_due_at" name="next_due_at" class="pf-input">
+        </div>
+
+        <div class="pf-field" style="grid-column:1/-1">
+          <label class="pf-label" for="notes">Notes</label>
+          <textarea id="notes" name="notes" class="pf-input" rows="3"
+                    placeholder="Any reactions, observations, or special notes…"></textarea>
+        </div>
+
+      </div>
+
+      <div style="margin-top:1.5rem;display:flex;gap:0.75rem">
+        <button type="submit" class="pf-btn pf-btn-primary">💉 Record Vaccination</button>
+        <a href="{{ url_for('clinical.vaccinations') }}" class="pf-btn pf-btn-secondary">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleCustomVaccine(val) {
+  var field = document.getElementById('custom-vaccine-field');
+  if (field) {
+    field.style.display = val === 'Custom' ? 'block' : 'none';
+    var inp = document.getElementById('custom_vaccine');
+    if (inp) inp.required = (val === 'Custom');
+  }
+}
+
+// Auto-suggest next due date based on vaccine type
+document.getElementById('vaccine_name').addEventListener('change', function () {
+  var nextDue = document.getElementById('next_due_at');
+  var admin   = document.getElementById('administered_at');
+  if (!nextDue || !admin || !admin.value) return;
+  var base = new Date(admin.value);
+  var months = 0;
+  var val = this.value;
+  if (val.includes('Rabies'))      months = 12;
+  else if (val.includes('DHPP'))   months = 12;
+  else if (val.includes('FVRCP'))  months = 12;
+  else if (val.includes('Bordetella')) months = 6;
+  else if (val.includes('Lepto'))  months = 12;
+  else if (val.includes('FeLV'))   months = 12;
+  if (months > 0 && !nextDue.value) {
+    base.setMonth(base.getMonth() + months);
+    nextDue.value = base.toISOString().split('T')[0];
+  }
+});
+</script>
+{% endblock %}

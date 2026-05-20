@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Reports{% endblock %}
+{% block page_title %}Inventory Reports{% endblock %}
+{% block page_sub %}Stock value, low stock alerts, and expiry tracking{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('reports.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+<a href="{{ url_for('reports.financial') }}" class="pf-btn pf-btn-secondary">💰 Financial</a>
+<a href="{{ url_for('reports.inventory_export_xlsx') }}"
+   class="pf-btn" style="background:#16a34a;color:#fff">📊 Export Excel</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.inv-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+.inv-card { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+.inv-card.full { grid-column:1/-1; }
+.inv-title { font-size:15px; font-weight:700; color:var(--cl-primary); margin-bottom:16px; padding-bottom:10px; border-bottom:2px solid var(--cl-border); }
+.data-table { width:100%; border-collapse:collapse; font-size:13px; }
+.data-table th { text-align:left; padding:10px 14px; background:var(--cl-bg); font-weight:600; color:var(--cl-muted); font-size:12px; text-transform:uppercase; }
+.data-table td { padding:10px 14px; border-bottom:1px solid var(--cl-border); }
+.data-table tr:last-child td { border-bottom:none; }
+.data-table tr:hover td { background:rgba(0,0,0,.02); }
+.urgency-critical { background:#fee2e2; color:#991b1b; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:700; }
+.urgency-warning  { background:#fef3c7; color:#92400e; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:700; }
+.urgency-notice   { background:#dbeafe; color:#1d4ed8; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:700; }
+.stock-low { color:#dc2626; font-weight:700; }
+.stock-ok  { color:#166534; font-weight:600; }
+.empty-msg { text-align:center; padding:40px; color:var(--cl-muted); }
+.value-bar { height:8px; border-radius:4px; background:var(--cl-primary); opacity:.7; display:inline-block; vertical-align:middle; margin-left:8px; }
+@media(max-width:900px){ .inv-grid{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="inv-grid">
+
+  <!-- Stock Value by Category -->
+  <div class="inv-card">
+    <div class="inv-title">📊 Stock Value by Category</div>
+    {% if value_by_cat %}
+    {% set max_val = namespace(v=1) %}
+    {% for r in value_by_cat %}{% if r.stock_value > max_val.v %}{% set max_val.v = r.stock_value %}{% endif %}{% endfor %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Items</th>
+          <th>Value (EGP)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in value_by_cat %}
+        {% set bar_pct = (r.stock_value / max_val.v * 120) | round(0) | int %}
+        <tr>
+          <td style="font-weight:500;">{{ r.category or 'Uncategorized' }}</td>
+          <td style="color:var(--cl-muted);">{{ r.item_count }}</td>
+          <td>
+            <span style="font-weight:700;">{{ "{:,.0f}".format(r.stock_value) }}</span>
+            <span class="value-bar" style="width:{{ bar_pct }}px;"></span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-msg">No inventory data available</div>
+    {% endif %}
+  </div>
+
+  <!-- Low Stock Items -->
+  <div class="inv-card">
+    <div class="inv-title">⚠️ Low Stock Items ({{ low_stock|length }})</div>
+    {% if low_stock %}
+    <div style="overflow-y:auto;max-height:320px;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Category</th>
+            <th>Stock</th>
+            <th>Reorder</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in low_stock %}
+          <tr>
+            <td style="font-weight:500;">{{ r.name }}</td>
+            <td style="color:var(--cl-muted);">{{ r.category or '—' }}</td>
+            <td class="stock-low">{{ "{:.1f}".format(r.stock_qty) }} {{ r.unit }}</td>
+            <td style="color:var(--cl-muted);">≥ {{ r.reorder_level }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-msg">
+      <div style="font-size:32px;margin-bottom:8px;">✅</div>
+      All items are adequately stocked
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Expiry Alerts -->
+  <div class="inv-card full">
+    <div class="inv-title">⏳ Expiry Alerts — Items Expiring within 90 Days ({{ expiry_items|length }})</div>
+    {% if expiry_items %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Batch #</th>
+          <th>Qty</th>
+          <th>Expiry Date</th>
+          <th>Urgency</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in expiry_items %}
+        <tr>
+          <td style="font-weight:500;">{{ r.item_name }}</td>
+          <td style="color:var(--cl-muted);font-family:monospace;">{{ r.batch_number or '—' }}</td>
+          <td style="font-weight:600;">{{ "{:.1f}".format(r.quantity) }} {{ r.unit }}</td>
+          <td style="font-weight:600;
+            {% if r.urgency == 'critical' %}color:#dc2626;
+            {% elif r.urgency == 'warning' %}color:#d97706;
+            {% else %}color:#1d4ed8;{% endif %}">
+            {{ r.expiry_date or '—' }}
+          </td>
+          <td>
+            {% if r.urgency == 'critical' %}
+              <span class="urgency-critical">🔴 Critical (&lt;30d)</span>
+            {% elif r.urgency == 'warning' %}
+              <span class="urgency-warning">🟡 Warning (&lt;60d)</span>
+            {% else %}
+              <span class="urgency-notice">🔵 Notice (&lt;90d)</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-msg">
+      <div style="font-size:32px;margin-bottom:8px;">✅</div>
+      No items expiring within the next 90 days
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

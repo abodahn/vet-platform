@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ mod.name if mod else t('Module', 'وحدة') }} — {{ t('Coming Soon', 'قريباً') }}{% endblock %}
+{% block page_title %}{{ mod.name if mod else t('Module', 'وحدة') }}{% endblock %}
+{% block page_sub %}{{ mod.name_ar if mod else '' }}{% endblock %}
+
+{% block content %}
+<div class="pf-stub-wrap">
+
+  <div class="pf-stub-icon">{{ mod.icon if mod else '🔧' }}</div>
+
+  <div class="pf-stub-badge">
+    {% if mod and mod.status == 'beta' %}🔧 {{ t('Beta Preview', 'معاينة تجريبية') }}
+    {% elif mod and mod.status == 'planned' %}🔮 {{ t('Planned', 'مخطط') }}
+    {% else %}🗓 {{ t('Coming Soon', 'قريباً') }}{% endif %}
+  </div>
+
+  <div class="pf-stub-title">{{ mod.name if mod else t('Module Under Development', 'وحدة قيد التطوير') }}</div>
+
+  <div class="pf-stub-sub">
+    {% if mod %}
+      <strong>{{ t(mod.name, mod.name_ar) }}</strong>
+      {{ t('is part of the Premium Animal Hospital ERP platform and is scheduled for', 'جزء من منصة ERP لمستشفى بريميوم للحيوانات ومقرر لـ') }}
+      <strong>{{ mod.badge }}</strong>.
+      <br><br>
+      {{ mod.description }}
+    {% else %}
+      {{ t('This module is currently under development and will be available in a future platform release.', 'هذه الوحدة قيد التطوير حالياً وستكون متاحة في إصدار مستقبلي من المنصة.') }}
+    {% endif %}
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
+    <a href="{{ url_for('launcher.index') }}" class="pf-btn pf-btn-primary">
+      ← {{ t('Back to Launcher', 'العودة للوحة الوحدات') }}
+    </a>
+    <a href="/launcher/legacy/start" target="_blank" class="pf-btn pf-btn-outline">
+      🩺 {{ t('Open Examination Module', 'فتح وحدة الفحص') }}
+    </a>
+  </div>
+
+</div>
+{% endblock %}

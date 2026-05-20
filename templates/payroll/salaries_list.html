@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Salaries List{% endblock %}
+{% block content %}
+<div class="pf-page-header">
+  <div>
+    <h1 class="pf-page-title">💰 Salaries</h1>
+    <p class="pf-page-subtitle">{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month-1] }} {{ year }}</p>
+  </div>
+  <div class="pf-topbar-actions">
+    <a href="{{ url_for('payroll.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+    <a href="{{ url_for('payroll.salaries_export_xlsx', year=year, month=month) }}"
+       class="pf-btn" style="background:#16a34a;color:#fff">📊 Export Excel</a>
+    <a href="{{ url_for('payroll.salary_new') }}" class="pf-btn pf-btn-primary">+ New</a>
+  </div>
+</div>
+
+<div class="pf-card" style="margin-bottom:16px">
+  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;padding:16px">
+    {% set months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+    <select name="year" class="pf-input" style="width:90px">
+      {% for y in range(year-2, year+2) %}<option value="{{ y }}" {% if y==year %}selected{% endif %}>{{ y }}</option>{% endfor %}
+    </select>
+    <select name="month" class="pf-input" style="width:80px">
+      {% for m in range(1,13) %}<option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ months[m-1] }}</option>{% endfor %}
+    </select>
+    <select name="status" class="pf-input" style="width:120px">
+      <option value="">All status</option>
+      {% for s in ['Draft','Approved','Paid','Cancelled'] %}
+      <option value="{{ s }}" {% if status_f==s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="pf-btn pf-btn-secondary">Filter</button>
+  </form>
+</div>
+
+<div class="pf-card">
+  <div class="pf-table-wrapper">
+    <table class="pf-table">
+      <thead><tr>
+        <th>Staff</th><th>Role</th>
+        <th>Basic</th><th>OT</th><th>Allow.</th><th>Deduct.</th>
+        <th>Gross</th><th>Net</th><th>Status</th><th>Payment</th><th>Actions</th>
+      </tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td><strong>{{ r.full_name }}</strong></td>
+          <td><span class="pf-badge">{{ r.role }}</span></td>
+          <td>{{ '{:,.0f}'.format(r.basic_salary) }}</td>
+          <td>{{ '{:,.0f}'.format(r.overtime_hours * r.overtime_rate) }}</td>
+          <td>{{ '{:,.0f}'.format(r.allowances) }}</td>
+          <td class="text-danger">{{ '{:,.0f}'.format(r.deductions + r.absence_deduction + r.tax_deduction) }}</td>
+          <td>{{ '{:,.0f}'.format(r.gross) }}</td>
+          <td><strong>EGP {{ '{:,.0f}'.format(r.net) }}</strong></td>
+          <td>
+            <span class="pf-badge" style="background:{{ status_colors.get(r.status,'#6b7280') }}20;color:{{ status_colors.get(r.status,'#6b7280') }}">
+              {{ r.status }}
+            </span>
+          </td>
+          <td>{{ r.payment_method or '—' }}{% if r.payment_date %}<br><small>{{ r.payment_date }}</small>{% endif %}</td>
+          <td>
+            <a href="{{ url_for('payroll.salary_detail', sid=r.id) }}" class="pf-btn pf-btn-sm pf-btn-secondary">View</a>
+            {% if r.status != 'Paid' %}
+            <a href="{{ url_for('payroll.salary_edit', sid=r.id) }}" class="pf-btn pf-btn-sm pf-btn-secondary">Edit</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="11" style="text-align:center;padding:32px;color:#6b7280">No records found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}{{ staff.full_name or staff.username }} — Staff Detail{% endblock %}
+
+{% block page_title %}{{ staff.full_name or staff.username }}{% endblock %}
+{% block page_sub %}Staff profile and activity log{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('hr.staff_edit', user_id=staff.id) }}" class="pf-btn pf-btn-primary">✏️ Edit</a>
+<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">← Back</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.profile-grid { display:grid; grid-template-columns:320px 1fr; gap:24px; align-items:start; }
+.profile-card { background:var(--cl-surface); border-radius:14px; padding:28px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+.profile-avatar { width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:800; color:#fff; margin:0 auto 16px; }
+.profile-name { text-align:center; font-size:20px; font-weight:700; margin-bottom:4px; }
+.profile-role-badge { display:block; text-align:center; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; color:#fff; margin:0 auto 20px; width:fit-content; }
+.profile-info-row { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--cl-border); font-size:14px; }
+.profile-info-row:last-child { border-bottom:none; }
+.profile-info-label { color:var(--cl-muted); font-size:12px; font-weight:600; text-transform:uppercase; min-width:80px; }
+.reset-pw-form { background:var(--cl-bg); border-radius:10px; padding:16px; margin-top:20px; }
+.reset-pw-form h4 { font-size:14px; font-weight:600; margin-bottom:12px; color:var(--cl-danger); }
+.reset-pw-form input { width:100%; padding:9px 12px; border:1.5px solid var(--cl-border); border-radius:7px; background:var(--cl-surface); color:var(--cl-text); font-size:13px; margin-bottom:8px; box-sizing:border-box; }
+.reset-pw-form button { width:100%; padding:9px; background:var(--cl-danger); color:#fff; border:none; border-radius:7px; font-weight:600; cursor:pointer; font-size:13px; }
+.activity-card { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+.activity-title { font-size:16px; font-weight:700; color:var(--cl-primary); margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid var(--cl-border); }
+.audit-table { width:100%; border-collapse:collapse; font-size:13px; }
+.audit-table th { text-align:left; padding:10px 12px; background:var(--cl-bg); font-weight:600; color:var(--cl-muted); font-size:12px; text-transform:uppercase; }
+.audit-table td { padding:10px 12px; border-bottom:1px solid var(--cl-border); }
+.audit-table tr:last-child td { border-bottom:none; }
+.action-chip { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.action-login   { background:#dbeafe; color:#1d4ed8; }
+.action-logout  { background:#f3f4f6; color:#374151; }
+.action-create  { background:#dcfce7; color:#166534; }
+.action-update  { background:#fef3c7; color:#92400e; }
+.action-delete  { background:#fee2e2; color:#991b1b; }
+.action-default { background:#e0e7ff; color:#3730a3; }
+.empty-audit { text-align:center; padding:40px; color:var(--cl-muted); }
+@media(max-width:900px){ .profile-grid{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set color_map = {
+  'super_admin':'#dc2626','clinic_owner':'#7c3aed','branch_manager':'#1d4ed8',
+  'doctor':'#0891b2','nurse':'#0d9488','reception':'#ca8a04',
+  'inventory_mgr':'#b45309','pharmacist':'#7c3aed','finance':'#166534',
+  'groomer':'#be185d','boarding_staff':'#6b7280','support_admin':'#374151','auditor':'#6b7280'
+} %}
+{% set role_color = color_map.get(staff.role, '#6b7280') %}
+{% set initials = (staff.full_name or staff.username or 'U')[:2]|upper %}
+
+<div class="profile-grid">
+
+  <!-- Left: Profile Card -->
+  <div>
+    <div class="profile-card">
+      <div class="profile-avatar" style="background:{{ role_color }};">{{ initials }}</div>
+      <div class="profile-name">{{ staff.full_name or staff.username }}</div>
+      {% if staff.full_name_ar %}
+      <div style="text-align:center;color:var(--cl-muted);font-size:14px;margin-bottom:8px;direction:rtl;">{{ staff.full_name_ar }}</div>
+      {% endif %}
+      <span class="profile-role-badge" style="background:{{ role_color }};">
+        {{ staff.role.replace('_',' ').title() }}
+      </span>
+
+      <div class="profile-info-row">
+        <span class="profile-info-label">Username</span>
+        <code style="background:var(--cl-bg);padding:2px 8px;border-radius:4px;">{{ staff.username }}</code>
+      </div>
+      <div class="profile-info-row">
+        <span class="profile-info-label">Status</span>
+        {% if staff.is_active %}
+          <span style="color:#166534;font-weight:600;">● Active</span>
+        {% else %}
+          <span style="color:#991b1b;font-weight:600;">● Inactive</span>
+        {% endif %}
+      </div>
+      {% if staff.email %}
+      <div class="profile-info-row">
+        <span class="profile-info-label">Email</span>
+        <span>{{ staff.email }}</span>
+      </div>
+      {% endif %}
+      {% if staff.phone %}
+      <div class="profile-info-row">
+        <span class="profile-info-label">Phone</span>
+        <span>{{ staff.phone }}</span>
+      </div>
+      {% endif %}
+      <div class="profile-info-row">
+        <span class="profile-info-label">Branch</span>
+        <span>{{ staff.branch_name or '—' }}</span>
+      </div>
+      <div class="profile-info-row">
+        <span class="profile-info-label">Last Login</span>
+        <span style="color:var(--cl-muted);font-size:13px;">{{ staff.last_login_at[:16] if staff.last_login_at else 'Never' }}</span>
+      </div>
+      <div class="profile-info-row">
+        <span class="profile-info-label">Created</span>
+        <span style="color:var(--cl-muted);font-size:13px;">{{ staff.created_at[:10] if staff.created_at else '—' }}</span>
+      </div>
+
+      <!-- Reset Password -->
+      <div class="reset-pw-form">
+        <h4>🔑 Reset Password</h4>
+        <form method="post" action="{{ url_for('hr.staff_reset_password', user_id=staff.id) }}"
+              onsubmit="return confirm('Reset password for {{ staff.username }}?')">
+          <input type="password" name="new_password" placeholder="New password (min 6 chars)" required minlength="6">
+          <button type="submit">Reset Password</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Activity Log -->
+  <div>
+    <div class="activity-card">
+      <div class="activity-title">📋 Recent Activity (Last 50 Events)</div>
+      {% if audit %}
+      <div style="overflow-x:auto;">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Action</th>
+              <th>Module</th>
+              <th>Details</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in audit %}
+            {% set action_class = {
+              'login':'action-login','logout':'action-logout',
+              'create':'action-create','update':'action-update','delete':'action-delete'
+            }.get(log.action, 'action-default') %}
+            <tr>
+              <td style="white-space:nowrap;color:var(--cl-muted);">{{ log.timestamp[:16] if log.timestamp else '—' }}</td>
+              <td><span class="action-chip {{ action_class }}">{{ log.action or '—' }}</span></td>
+              <td style="color:var(--cl-muted);">{{ log.module or '—' }}</td>
+              <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ log.details or '' }}">
+                {{ log.details or '—' }}
+              </td>
+              <td style="color:var(--cl-muted);font-size:12px;">{{ log.ip or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-audit">
+        <div style="font-size:36px;">📭</div>
+        <div>No activity recorded yet for this user.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

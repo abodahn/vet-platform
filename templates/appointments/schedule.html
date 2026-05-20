@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule — {{ day_str }}{% endblock %}
+{% block page_title %}📅 Daily Schedule{% endblock %}
+{% block page_sub %}{{ day.strftime('%A, %d %B %Y') }}{% if day_str == today_str %} — Today{% endif %}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('appointments.appt_new', date=day_str) }}" class="pf-btn pf-btn-primary">
+    ➕ New Appointment
+  </a>
+  <a href="{{ url_for('appointments.calendar') }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">
+    📆 Week View
+  </a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* ── Day nav ─────────────────────────────── */
+  .day-nav {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--cl-surface);
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 22px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    flex-wrap: wrap;
+  }
+  .day-nav-btn {
+    padding: 8px 18px; border-radius: 8px;
+    border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg); color: var(--cl-text);
+    font-size: 0.9rem; font-weight: 600;
+    text-decoration: none; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .day-nav-btn:hover { border-color: var(--cl-primary); color: var(--cl-primary); }
+  .day-nav-date {
+    font-size: 1.15rem; font-weight: 800; color: var(--cl-primary);
+    flex: 1; text-align: center;
+  }
+  .today-badge {
+    padding: 3px 12px; border-radius: 20px;
+    background: var(--cl-success); color: #fff;
+    font-size: 0.78rem; font-weight: 700;
+  }
+  .today-input-wrap { display: flex; gap: 8px; align-items: center; }
+  .today-input-wrap input[type="date"] {
+    padding: 7px 12px; border-radius: 7px;
+    border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg); color: var(--cl-text);
+    font-size: 0.88rem; outline: none; cursor: pointer;
+  }
+  .today-input-wrap input:focus { border-color: var(--cl-primary); }
+
+  /* ── Stats row ───────────────────────────── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 14px; margin-bottom: 22px;
+  }
+  .stat-card {
+    background: var(--cl-surface);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    padding: 16px 14px; text-align: center;
+    border: 1.5px solid var(--cl-border);
+  }
+  .stat-icon { font-size: 1.4rem; margin-bottom: 6px; }
+  .stat-value { font-size: 1.6rem; font-weight: 800; color: var(--cl-primary); line-height: 1; margin-bottom: 4px; }
+  .stat-label { font-size: 0.75rem; color: var(--cl-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .stat-card.s-checkin .stat-value  { color: #7c3aed; }
+  .stat-card.s-complete .stat-value { color: var(--cl-success); }
+  .stat-card.s-pending .stat-value  { color: var(--cl-warning); }
+
+  /* ── Agenda ──────────────────────────────── */
+  .agenda-wrap {
+    background: var(--cl-surface);
+    border-radius: 14px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+    overflow: hidden;
+  }
+  .agenda-slot {
+    display: flex;
+    border-bottom: 1px solid var(--cl-border);
+    min-height: 56px;
+  }
+  .agenda-slot:last-child { border-bottom: none; }
+  .agenda-slot.has-appts { background: color-mix(in srgb, var(--cl-primary) 2%, var(--cl-surface)); }
+  .slot-time {
+    width: 80px; flex-shrink: 0;
+    padding: 14px 14px;
+    font-size: 0.82rem; font-weight: 700;
+    color: var(--cl-muted);
+    border-right: 2px solid var(--cl-border);
+    display: flex; align-items: flex-start;
+    background: color-mix(in srgb, var(--cl-primary) 3%, var(--cl-bg));
+  }
+  .slot-content {
+    flex: 1; padding: 10px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .slot-empty {
+    color: var(--cl-border); font-size: 0.8rem;
+    padding: 18px 16px;
+    font-style: italic;
+  }
+
+  /* ── Appointment blocks ───────────────────── */
+  .appt-block {
+    display: flex; gap: 10px; align-items: stretch;
+    border-radius: 9px; overflow: hidden;
+    text-decoration: none; color: var(--cl-text);
+    border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg);
+    transition: all 0.18s;
+  }
+  .appt-block:hover { transform: translateX(3px); box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
+  .appt-block-bar { width: 5px; flex-shrink: 0; }
+  .appt-block-body { flex: 1; padding: 9px 12px; }
+  .appt-block-top {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 3px;
+  }
+  .appt-time { font-size: 0.82rem; font-weight: 700; color: var(--cl-primary); }
+  .appt-type { font-size: 0.88rem; font-weight: 700; color: var(--cl-text); }
+  .appt-pet  { font-size: 0.8rem; color: var(--cl-muted); }
+  .appt-owner{ font-size: 0.78rem; color: var(--cl-muted); }
+
+  .status-badge {
+    font-size: 0.72rem; font-weight: 700; padding: 2px 9px;
+    border-radius: 20px; white-space: nowrap; margin-left: auto;
+  }
+  .st-blue    { background: color-mix(in srgb, #3b82f6 15%, transparent); color: #2563eb; border: 1px solid #93c5fd; }
+  .st-teal    { background: color-mix(in srgb, #0d9488 15%, transparent); color: #0f766e; border: 1px solid #5eead4; }
+  .st-purple  { background: color-mix(in srgb, #7c3aed 15%, transparent); color: #6d28d9; border: 1px solid #c4b5fd; }
+  .st-green   { background: color-mix(in srgb, #10b981 15%, transparent); color: #059669; border: 1px solid #6ee7b7; }
+  .st-red     { background: color-mix(in srgb, #ef4444 15%, transparent); color: #dc2626; border: 1px solid #fca5a5; text-decoration: line-through; }
+  .st-gray    { background: color-mix(in srgb, #6b7280 15%, transparent); color: #6b7280; border: 1px solid #d1d5db; }
+
+  .bar-blue   { background: #3b82f6; }
+  .bar-teal   { background: #0d9488; }
+  .bar-purple { background: #7c3aed; }
+  .bar-green  { background: #10b981; }
+  .bar-red    { background: #ef4444; }
+  .bar-gray   { background: #9ca3af; }
+
+  .priority-urgent    { color: var(--cl-warning); font-size: 0.78rem; font-weight: 700; }
+  .priority-emergency { color: var(--cl-danger);  font-size: 0.78rem; font-weight: 700; }
+
+  .appt-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+
+  .empty-day {
+    text-align: center; padding: 60px 20px;
+    color: var(--cl-muted); font-size: 0.95rem;
+  }
+  .empty-day .emoji { font-size: 2.5rem; display: block; margin-bottom: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Day navigation -->
+<div class="day-nav">
+  <a href="{{ url_for('appointments.schedule', date=prev_day) }}" class="day-nav-btn">← Prev</a>
+  <div class="day-nav-date">
+    {{ day.strftime('%A, %d %B %Y') }}
+    {% if day_str == today_str %}<span class="today-badge">Today</span>{% endif %}
+  </div>
+  <form method="get" action="{{ url_for('appointments.schedule') }}" class="today-input-wrap">
+    <input type="date" name="date" value="{{ day_str }}" onchange="this.form.submit()">
+  </form>
+  <a href="{{ url_for('appointments.schedule', date=next_day) }}" class="day-nav-btn">Next →</a>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-icon">📋</div>
+    <div class="stat-value">{{ total }}</div>
+    <div class="stat-label">Total</div>
+  </div>
+  <div class="stat-card s-pending">
+    <div class="stat-icon">🕐</div>
+    <div class="stat-value">{{ pending }}</div>
+    <div class="stat-label">Pending</div>
+  </div>
+  <div class="stat-card s-checkin">
+    <div class="stat-icon">🏥</div>
+    <div class="stat-value">{{ checked_in }}</div>
+    <div class="stat-label">Checked In</div>
+  </div>
+  <div class="stat-card s-complete">
+    <div class="stat-icon">✅</div>
+    <div class="stat-value">{{ completed }}</div>
+    <div class="stat-label">Completed</div>
+  </div>
+</div>
+
+<!-- Agenda -->
+{% if total > 0 %}
+<div class="agenda-wrap">
+  {% for slot in agenda %}
+  <div class="agenda-slot {% if slot.appointments %}has-appts{% endif %}">
+    <div class="slot-time">{{ slot.label }}</div>
+    {% if slot.appointments %}
+    <div class="slot-content">
+      {% for appt in slot.appointments %}
+      {% set sc = status_colors.get(appt.status, 'gray') %}
+      <a href="{{ url_for('appointments.appt_detail', appt_id=appt.id) }}" class="appt-block">
+        <div class="appt-block-bar bar-{{ sc }}"></div>
+        <div class="appt-block-body">
+          <div class="appt-block-top">
+            <span class="appt-time">{{ appt.appt_start[:5] }}{% if appt.appt_end %} – {{ appt.appt_end[:5] }}{% endif %}</span>
+            <span class="appt-type">{{ appt.appointment_type }}</span>
+            {% if appt.priority == 'Urgent' %}<span class="priority-urgent">⚡ Urgent</span>{% endif %}
+            {% if appt.priority == 'Emergency' %}<span class="priority-emergency">🚨 Emergency</span>{% endif %}
+            <span class="status-badge st-{{ sc }}">{{ appt.status }}</span>
+          </div>
+          <div class="appt-meta">
+            <span class="appt-pet">🐾 {{ appt.pet_name }}</span>
+            <span style="color:var(--cl-border);">·</span>
+            <span class="appt-owner">👤 {{ appt.owner_name }}</span>
+            {% if appt.doctor_name %}
+            <span style="color:var(--cl-border);">·</span>
+            <span class="appt-owner">🩺 {{ appt.doctor_name }}</span>
+            {% endif %}
+            {% if appt.reason %}
+            <span style="color:var(--cl-border);">·</span>
+            <span class="appt-owner" style="font-style:italic;">{{ appt.reason[:50] }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="slot-empty">No appointments</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="agenda-wrap">
+  <div class="empty-day">
+    <span class="emoji">📭</span>
+    <p>No appointments scheduled for {{ day.strftime('%d %B %Y') }}</p>
+    <a href="{{ url_for('appointments.appt_new', date=day_str) }}"
+       class="pf-btn pf-btn-primary" style="margin-top:14px;display:inline-block;">
+      ➕ Book Appointment
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

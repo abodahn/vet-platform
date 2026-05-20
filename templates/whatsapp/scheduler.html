@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp Scheduler{% endblock %}
+{% block page_title %}WhatsApp Reminder Scheduler{% endblock %}
+{% block page_sub %}Manual triggers, history & queue status{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">← Control Center</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.sch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+@media(max-width:700px){.sch-grid{grid-template-columns:1fr}}
+.sch-card{background:var(--cl-surface);border-radius:12px;padding:20px 22px;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.sch-card h3{font-size:13px;font-weight:700;text-transform:uppercase;color:var(--cl-muted);margin-bottom:10px}
+.sch-big{font-size:28px;font-weight:800;color:var(--cl-primary)}
+.sch-label{font-size:12px;color:var(--cl-muted);margin-top:2px}
+.sch-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;align-items:center}
+.job-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.job-appt_reminder{background:#dbeafe;color:#1d4ed8}
+.job-vaccine_reminder{background:#dcfce7;color:#15803d}
+.job-invoice_reminder{background:#fef3c7;color:#b45309}
+.status-sent{color:#15803d;font-weight:600}
+.status-failed{color:#dc2626}
+.status-pending{color:#d97706}
+</style>
+
+<!-- Queue overview -->
+<div class="sch-grid">
+  <div class="sch-card">
+    <h3>📅 Tomorrow's Appointments</h3>
+    <div class="sch-big">{{ upcoming_appts }}</div>
+    <div class="sch-label">owners with WhatsApp who have appointments tomorrow</div>
+  </div>
+  <div class="sch-card">
+    <h3>💉 Overdue Vaccines</h3>
+    <div class="sch-big" style="color:var(--pf-error,#dc2626)">{{ overdue_vaccines }}</div>
+    <div class="sch-label">pets with vaccine due or overdue (owner has WhatsApp)</div>
+  </div>
+  <div class="sch-card">
+    <h3>🧾 Unpaid Invoices</h3>
+    <div class="sch-big" style="color:#d97706">{{ overdue_invoices }}</div>
+    <div class="sch-label">owners with unpaid invoices and WhatsApp</div>
+  </div>
+</div>
+
+<!-- Manual trigger -->
+<div class="pf-card" style="margin-bottom:24px">
+  <div class="pf-card-header">
+    <h3 class="pf-card-title">⚡ Manual Trigger</h3>
+    <span style="font-size:.8rem;color:var(--cl-muted)">
+      Normally runs automatically at 09:00 daily. Use these buttons to trigger right now.
+    </span>
+  </div>
+  <div style="padding:1.25rem" class="sch-actions">
+    <form method="post" action="{{ url_for('whatsapp.scheduler_run') }}" style="display:inline">
+      <input type="hidden" name="type" value="all">
+      <button type="submit" class="pf-btn pf-btn-primary"
+              onclick="return confirm('Run ALL reminder jobs now? This will send real WhatsApp messages.')">
+        🚀 Run All Jobs Now
+      </button>
+    </form>
+    <form method="post" action="{{ url_for('whatsapp.scheduler_run') }}" style="display:inline">
+      <input type="hidden" name="type" value="appt">
+      <button type="submit" class="pf-btn pf-btn-secondary"
+              onclick="return confirm('Send appointment reminders now?')">
+        📅 Appointment Reminders
+      </button>
+    </form>
+    <form method="post" action="{{ url_for('whatsapp.scheduler_run') }}" style="display:inline">
+      <input type="hidden" name="type" value="vaccine">
+      <button type="submit" class="pf-btn pf-btn-secondary"
+              onclick="return confirm('Send vaccine reminders now?')">
+        💉 Vaccine Reminders
+      </button>
+    </form>
+    <form method="post" action="{{ url_for('whatsapp.scheduler_run') }}" style="display:inline">
+      <input type="hidden" name="type" value="invoice">
+      <button type="submit" class="pf-btn pf-btn-secondary"
+              onclick="return confirm('Send invoice reminders now?')">
+        🧾 Invoice Reminders
+      </button>
+    </form>
+    <form method="post" action="{{ url_for('whatsapp.scheduler_clear_history') }}" style="display:inline;margin-left:auto">
+      <button type="submit" class="pf-btn pf-btn-ghost" style="color:var(--pf-error)"
+              onclick="return confirm('Clear history older than 30 days?')">
+        🗑 Clear Old History
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Stats summary -->
+{% if stats %}
+<div class="sch-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:24px">
+  {% for type, count in stats.items() %}
+  <div class="sch-card" style="text-align:center">
+    <div style="margin-bottom:6px">
+      <span class="job-badge job-{{ type }}">{{ type.replace('_',' ').title() }}</span>
+    </div>
+    <div class="sch-big" style="font-size:22px">{{ count }}</div>
+    <div class="sch-label">total sent (all time)</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- History table -->
+<div class="pf-card">
+  <div class="pf-card-header">
+    <h3 class="pf-card-title">📋 Reminder History</h3>
+  </div>
+  <table class="pf-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Type</th>
+        <th>Entity</th>
+        <th>Status</th>
+        <th>Sent At</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for h in history %}
+      <tr>
+        <td style="color:var(--cl-muted)">{{ h.id }}</td>
+        <td><span class="job-badge job-{{ h.run_type }}">{{ (h.run_type or '').replace('_',' ').title() }}</span></td>
+        <td style="color:var(--cl-muted)">{{ h.entity_type }} #{{ h.entity_id }}</td>
+        <td class="status-{{ (h.status or 'sent').lower() }}">{{ h.status or 'sent' }}</td>
+        <td style="white-space:nowrap;color:var(--cl-muted)">{{ (h.run_at or '')[:16] }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--cl-muted)">
+        No reminder history yet. Reminders run automatically at 09:00 daily, or trigger manually above.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

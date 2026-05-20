@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Leave Request #{{ req.id }}{% endblock %}
+{% block page_title %}Leave Request{% endblock %}
+{% block page_sub %}#{{ req.id }} — {{ req.staff_name }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">← Leave Requests</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px">
+
+  <!-- Main Card -->
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div>
+        <div class="pf-card-title">
+          <span style="width:12px;height:12px;border-radius:50%;background:{{ req.color }};display:inline-block;margin-right:6px"></span>
+          {{ req.leave_type_name }} Leave
+        </div>
+        <div class="pf-card-sub">Submitted {{ req.created_at[:10] }}</div>
+      </div>
+      {% if req.status == 'Pending' %}<span class="pf-badge soon" style="font-size:13px">⏳ Pending</span>
+      {% elif req.status == 'Approved' %}<span class="pf-badge active" style="font-size:13px">✅ Approved</span>
+      {% else %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b;font-size:13px">❌ Rejected</span>{% endif %}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">
+      <div style="background:var(--cl-surface-2);border-radius:var(--cl-radius-sm);padding:16px;text-align:center">
+        <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:4px">Start Date</div>
+        <div style="font-weight:700;font-size:16px">{{ req.start_date }}</div>
+      </div>
+      <div style="background:var(--cl-surface-2);border-radius:var(--cl-radius-sm);padding:16px;text-align:center">
+        <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:4px">End Date</div>
+        <div style="font-weight:700;font-size:16px">{{ req.end_date }}</div>
+      </div>
+      <div style="background:{{ req.color }}18;border:1px solid {{ req.color }}44;border-radius:var(--cl-radius-sm);padding:16px;text-align:center">
+        <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:4px">Business Days</div>
+        <div style="font-weight:800;font-size:24px;color:{{ req.color }}">{{ req.days_requested }}</div>
+      </div>
+    </div>
+
+    <div class="pf-form-group">
+      <label class="pf-form-label">Reason</label>
+      <div style="background:var(--cl-surface-2);border-radius:var(--cl-radius-sm);padding:14px;font-size:14px;min-height:80px">
+        {{ req.reason or 'No reason provided.' }}
+      </div>
+    </div>
+
+    {% if req.status == 'Rejected' and req.rejection_reason %}
+    <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:var(--cl-radius-sm);padding:14px;margin-top:8px">
+      <div style="font-weight:600;color:#991b1b;margin-bottom:4px">Rejection Reason</div>
+      <div style="font-size:13px;color:#7f1d1d">{{ req.rejection_reason }}</div>
+    </div>
+    {% endif %}
+
+    {% if req.approved_by %}
+    <div style="font-size:12px;color:var(--cl-text-muted);margin-top:12px">
+      {{ req.status }} by <strong>{{ req.approved_by }}</strong> on {{ req.approved_at[:10] if req.approved_at else '' }}
+    </div>
+    {% endif %}
+
+    <!-- Manager Actions -->
+    {% if is_manager and req.status == 'Pending' %}
+    <div style="display:flex;gap:12px;margin-top:20px;padding-top:16px;border-top:1px solid var(--cl-border)">
+      <form method="POST" action="{{ url_for('attendance.leave_approve', req_id=req.id) }}" style="flex:1">
+        <button type="submit" class="pf-btn pf-btn-primary" style="width:100%">✅ Approve</button>
+      </form>
+      <button type="button" class="pf-btn pf-btn-sm" style="flex:1;background:#fee2e2;color:#991b1b;border:none"
+              onclick="document.getElementById('reject-panel').style.display='block';this.style.display='none'">
+        ❌ Reject
+      </button>
+    </div>
+    <div id="reject-panel" style="display:none;margin-top:12px">
+      <form method="POST" action="{{ url_for('attendance.leave_reject', req_id=req.id) }}">
+        <div class="pf-form-group">
+          <label class="pf-form-label">Rejection Reason</label>
+          <textarea name="rejection_reason" class="pf-form-control" rows="3" placeholder="Explain why this is rejected..." required></textarea>
+        </div>
+        <button type="submit" class="pf-btn" style="background:#ef4444;color:#fff">Confirm Rejection</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Sidebar Info -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+
+    <div class="pf-card">
+      <div class="pf-card-header"><div class="pf-card-title">👤 Staff</div></div>
+      <div style="padding:4px 0">
+        <div style="font-weight:700;font-size:15px">{{ req.staff_name }}</div>
+        <div style="font-size:12px;color:var(--cl-text-muted);margin-top:2px">{{ req.staff_role }}</div>
+        <div style="margin-top:8px">
+          {% if req.is_paid %}
+          <span class="pf-badge active">Paid Leave</span>
+          {% else %}
+          <span class="pf-badge">Unpaid Leave</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if bal %}
+    <div class="pf-card">
+      <div class="pf-card-header"><div class="pf-card-title">⚖️ Balance ({{ bal.year }})</div></div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
+        {% for label, val, color in [
+          ('Allocated', bal.allocated, '#6366f1'),
+          ('Used', bal.used, '#ef4444'),
+          ('Pending', bal.pending, '#f59e0b'),
+          ('Remaining', bal.remaining, '#10b981'),
+        ] %}
+        <div style="display:flex;justify-content:space-between;font-size:13px">
+          <span style="color:var(--cl-text-muted)">{{ label }}</span>
+          <span style="font-weight:700;color:{{ color }}">{{ '%.1f'|format(val or 0) }} days</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+</div>
+{% endblock %}

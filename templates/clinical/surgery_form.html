@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Record Surgery{% endblock %}
+{% block page_title %}Record Surgery{% endblock %}
+{% block page_sub %}Add a new surgical procedure record{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('clinical.surgeries') }}" class="pf-btn pf-btn-secondary">← Back to Surgeries</a>
+{% endblock %}
+
+{% block content %}
+
+{% if pet %}
+<div class="pf-card" style="margin-bottom:1rem;border-left:4px solid var(--primary)">
+  <div class="pf-card-body" style="display:flex;gap:2rem;align-items:center;padding:0.85rem 1.25rem">
+    <div>
+      <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin-bottom:0.2rem">Patient</div>
+      <div style="font-weight:700;font-size:1.05rem">{{ pet.pet_name }}</div>
+      <div style="font-size:0.82rem;color:var(--text-muted)">{{ pet.species }}{% if pet.breed %} · {{ pet.breed }}{% endif %}{% if pet.weight_kg %} · {{ pet.weight_kg }} kg{% endif %}</div>
+    </div>
+    <div>
+      <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin-bottom:0.2rem">Owner</div>
+      <div style="font-weight:600">{{ pet.owner_name }}</div>
+      <div style="font-size:0.82rem;color:var(--text-muted)">{{ pet.owner_phone or '' }}</div>
+    </div>
+    {% if pet.allergies %}
+    <div>
+      <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:#dc2626;margin-bottom:0.2rem">⚠ Allergies</div>
+      <div style="font-size:0.85rem;color:#dc2626">{{ pet.allergies }}</div>
+    </div>
+    {% endif %}
+    {% if pet.chronic_conditions %}
+    <div>
+      <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:#b45309;margin-bottom:0.2rem">Chronic Conditions</div>
+      <div style="font-size:0.85rem;color:#b45309">{{ pet.chronic_conditions }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <div class="pf-card-header">
+    <span>🔧 Surgery Details</span>
+  </div>
+  <div class="pf-card-body">
+    <form method="post" action="{{ url_for('clinical.surgery_new') }}">
+
+      {% if pet %}
+      <input type="hidden" name="pet_id" value="{{ pet.id }}">
+      {% else %}
+      <div class="pf-field" style="margin-bottom:1rem">
+        <label class="pf-label" for="pet_id">Pet ID <span style="color:var(--danger)">*</span></label>
+        <input type="number" id="pet_id" name="pet_id" class="pf-input" required
+               placeholder="Enter pet ID">
+      </div>
+      {% endif %}
+
+      <!-- Section: Basic Info -->
+      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.06em;margin-bottom:0.75rem;padding-bottom:0.4rem;border-bottom:1px solid var(--border)">
+        Procedure Information
+      </div>
+
+      <div class="pf-form-grid" style="margin-bottom:1.25rem">
+
+        <div class="pf-field" style="grid-column:1/-1">
+          <label class="pf-label" for="procedure_name">Procedure Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="procedure_name" name="procedure_name" class="pf-input"
+                 placeholder="e.g. Ovariohysterectomy, Fracture repair, Cystotomy…" required>
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="surgeon">Surgeon <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="surgeon" name="surgeon" class="pf-input"
+                 placeholder="Surgeon name" required>
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="anesthetist">Anesthetist</label>
+          <input type="text" id="anesthetist" name="anesthetist" class="pf-input"
+                 placeholder="Anesthetist name">
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="surgery_date">Surgery Date <span style="color:var(--danger)">*</span></label>
+          <input type="date" id="surgery_date" name="surgery_date" class="pf-input"
+                 value="{{ today }}" required>
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="duration_min">Duration (minutes)</label>
+          <input type="number" id="duration_min" name="duration_min" class="pf-input"
+                 placeholder="e.g. 45" min="1">
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="anesthesia_type">Anesthesia Type</label>
+          <select id="anesthesia_type" name="anesthesia_type" class="pf-input">
+            {% for a in anesthesia_types %}
+            <option value="{{ a }}">{{ a }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="outcome">Outcome</label>
+          <select id="outcome" name="outcome" class="pf-input">
+            <option value="Successful" selected>Successful</option>
+            <option value="Complicated">Complicated</option>
+            <option value="Unsuccessful">Unsuccessful</option>
+            <option value="Ongoing">Ongoing</option>
+          </select>
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="followup_date">Follow-up Date</label>
+          <input type="date" id="followup_date" name="followup_date" class="pf-input">
+        </div>
+
+      </div>
+
+      <!-- Section: Clinical Notes -->
+      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.06em;margin-bottom:0.75rem;padding-bottom:0.4rem;border-bottom:1px solid var(--border)">
+        Clinical Notes
+      </div>
+
+      <div class="pf-form-grid" style="margin-bottom:1.25rem">
+
+        <div class="pf-field" style="grid-column:1/-1">
+          <label class="pf-label" for="pre_op_notes">Pre-operative Notes</label>
+          <textarea id="pre_op_notes" name="pre_op_notes" class="pf-input" rows="3"
+                    placeholder="Patient preparation, pre-op medications, fasting status, physical exam findings…"></textarea>
+        </div>
+
+        <div class="pf-field" style="grid-column:1/-1">
+          <label class="pf-label" for="intra_op_notes">Intra-operative Notes</label>
+          <textarea id="intra_op_notes" name="intra_op_notes" class="pf-input" rows="4"
+                    placeholder="Surgical findings, complications encountered, techniques used…"></textarea>
+        </div>
+
+        <div class="pf-field" style="grid-column:1/-1">
+          <label class="pf-label" for="post_op_notes">Post-operative Notes</label>
+          <textarea id="post_op_notes" name="post_op_notes" class="pf-input" rows="3"
+                    placeholder="Recovery observations, discharge instructions, medications prescribed…"></textarea>
+        </div>
+
+      </div>
+
+      <!-- Consent -->
+      <div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1rem;background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1.5rem">
+        <input type="checkbox" id="consent_given" name="consent_given" value="1"
+               style="width:18px;height:18px;accent-color:var(--primary)">
+        <label for="consent_given" style="font-weight:600;cursor:pointer">
+          Owner consent has been obtained and documented
+        </label>
+      </div>
+
+      <div style="display:flex;gap:0.75rem">
+        <button type="submit" class="pf-btn pf-btn-primary">🔧 Save Surgery Record</button>
+        <a href="{{ url_for('clinical.surgeries') }}" class="pf-btn pf-btn-secondary">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}

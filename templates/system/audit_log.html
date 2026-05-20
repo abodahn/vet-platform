@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+{% block page_sub %}Complete platform activity trail with filters{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">🖥️ Monitor</a>
+<a href="{{ url_for('system.settings') }}" class="pf-btn pf-btn-secondary">⚙️ Settings</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.filter-bar { background:var(--cl-surface); border-radius:12px; padding:18px 22px; margin-bottom:22px; box-shadow:0 2px 8px rgba(0,0,0,.07); }
+.filter-bar form { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+.filter-group { display:flex; flex-direction:column; gap:5px; }
+.filter-group label { font-size:11px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.4px; }
+.filter-group select, .filter-group input {
+  padding:8px 12px; border:1.5px solid var(--cl-border); border-radius:8px;
+  background:var(--cl-bg); color:var(--cl-text); font-size:13px; min-width:140px;
+}
+.filter-group select:focus, .filter-group input:focus { outline:none; border-color:var(--cl-primary); }
+.filter-btn { padding:9px 20px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; align-self:flex-end; }
+.clear-link { font-size:12px; color:var(--cl-muted); text-decoration:none; align-self:flex-end; padding-bottom:8px; }
+.audit-table { width:100%; border-collapse:collapse; background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); font-size:13px; }
+.audit-table th { background:var(--cl-primary); color:#fff; padding:11px 14px; text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+.audit-table td { padding:10px 14px; border-bottom:1px solid var(--cl-border); vertical-align:middle; }
+.audit-table tr:last-child td { border-bottom:none; }
+.audit-table tr:hover td { background:var(--cl-bg); }
+.action-chip { display:inline-block; padding:2px 9px; border-radius:4px; font-size:11px; font-weight:700; }
+.ac-login        { background:#dbeafe; color:#1d4ed8; }
+.ac-login_failed { background:#fee2e2; color:#991b1b; }
+.ac-logout       { background:#f3f4f6; color:#374151; }
+.ac-create       { background:#dcfce7; color:#166534; }
+.ac-update       { background:#fef3c7; color:#92400e; }
+.ac-delete       { background:#fee2e2; color:#991b1b; }
+.ac-reset_password { background:#ede9fe; color:#5b21b6; }
+.ac-default      { background:#e0e7ff; color:#3730a3; }
+.module-tag { display:inline-block; background:var(--cl-bg); border:1px solid var(--cl-border); padding:2px 7px; border-radius:4px; font-size:11px; color:var(--cl-muted); font-family:monospace; }
+.result-info { color:var(--cl-muted); font-size:13px; margin-bottom:12px; }
+.empty-state { text-align:center; padding:60px; color:var(--cl-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <form method="get">
+    <div class="filter-group">
+      <label>User</label>
+      <select name="user">
+        <option value="">All Users</option>
+        {% for u in users %}
+        <option value="{{ u }}" {% if f_user == u %}selected{% endif %}>{{ u }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Action</label>
+      <input type="text" name="action" value="{{ f_action }}" placeholder="e.g. login, create…">
+    </div>
+    <div class="filter-group">
+      <label>Module</label>
+      <select name="module">
+        <option value="">All Modules</option>
+        {% for m in modules %}
+        <option value="{{ m }}" {% if f_module == m %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>From Date</label>
+      <input type="date" name="date_from" value="{{ f_from }}">
+    </div>
+    <div class="filter-group">
+      <label>To Date</label>
+      <input type="date" name="date_to" value="{{ f_to }}">
+    </div>
+    <button type="submit" class="filter-btn">🔍 Filter</button>
+    {% if f_user or f_action or f_module or f_from or f_to %}
+    <a href="{{ url_for('system.audit_log') }}" class="clear-link">✕ Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="result-info">Showing {{ logs|length }} log entries (max 200)</div>
+
+{% if logs %}
+<div style="overflow-x:auto;">
+  <table class="audit-table">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>User</th>
+        <th>Role</th>
+        <th>Action</th>
+        <th>Module</th>
+        <th>Entity</th>
+        <th>Details</th>
+        <th>IP</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      {% set ac = log.action or 'default' %}
+      {% set chip_class = 'ac-' ~ ac if 'ac-' ~ ac in ['ac-login','ac-login_failed','ac-logout','ac-create','ac-update','ac-delete','ac-reset_password'] else 'ac-default' %}
+      <tr>
+        <td style="white-space:nowrap;color:var(--cl-muted);font-size:12px;">
+          {{ log.timestamp[:16] if log.timestamp else '—' }}
+        </td>
+        <td style="font-weight:600;">{{ log.username or '—' }}</td>
+        <td style="color:var(--cl-muted);font-size:12px;">{{ (log.role or '—').replace('_',' ') }}</td>
+        <td>
+          <span class="action-chip {{ chip_class }}">{{ log.action or '—' }}</span>
+        </td>
+        <td>
+          {% if log.module %}
+          <span class="module-tag">{{ log.module }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td style="font-size:12px;color:var(--cl-muted);">
+          {% if log.entity_type %}{{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}{% else %}—{% endif %}
+        </td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;"
+            title="{{ log.details or '' }}">
+          {{ log.details or '—' }}
+        </td>
+        <td style="font-size:12px;color:var(--cl-muted);font-family:monospace;">{{ log.ip or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <div style="font-size:40px;margin-bottom:12px;">📭</div>
+  <div style="font-size:18px;font-weight:600;margin-bottom:6px;">No audit logs found</div>
+  <div>Try adjusting your filter criteria.</div>
+</div>
+{% endif %}
+{% endblock %}

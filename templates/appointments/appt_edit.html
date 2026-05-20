@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Reschedule Appointment #{{ appt.id }}{% endblock %}
+{% block page_title %}Reschedule Appointment{% endblock %}
+{% block page_sub %}#{{ appt.id }} — {{ appt.pet_name or 'Pet' }} / {{ appt.owner_name or 'Owner' }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('appointments.appt_detail', appt_id=appt.id) }}" class="pf-btn pf-btn-secondary">← Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="pf-card" style="max-width:760px;margin:0 auto">
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="pf-form-grid">
+
+      <!-- Date + Doctor -->
+      <div class="pf-form-group">
+        <label class="pf-label">Date *</label>
+        <input type="date" name="appt_date" id="apptDate" class="pf-input"
+               value="{{ appt.appt_date }}" required onchange="refreshSlots()">
+      </div>
+
+      <div class="pf-form-group">
+        <label class="pf-label">Doctor</label>
+        <select name="doctor_name" id="doctorSel" class="pf-input" onchange="refreshSlots()">
+          <option value="">— Any —</option>
+          {% for d in doctors %}
+          <option value="{{ d.full_name }}"
+            {% if d.full_name == appt.doctor_name %}selected{% endif %}>
+            {{ d.full_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Slot picker -->
+      <div class="pf-form-group" style="grid-column:1/-1">
+        <label class="pf-label">Time Slot *</label>
+        <input type="hidden" name="appt_start" id="apptStart" value="{{ appt.appt_start[:5] if appt.appt_start else '09:00' }}" required>
+        <div id="slotGrid" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+          {% for s in slots %}
+          <button type="button"
+            class="slot-btn {% if not s.available %}slot-taken{% endif %} {% if s.time == (appt.appt_start[:5] if appt.appt_start else '') %}slot-selected{% endif %}"
+            {% if not s.available %}disabled title="Already booked"{% endif %}
+            onclick="selectSlot('{{ s.time }}', this)">
+            {{ s.time }}
+          </button>
+          {% endfor %}
+        </div>
+        <p id="slotLoading" style="display:none;color:var(--pf-muted);font-size:.85rem">Loading slots…</p>
+      </div>
+
+      <!-- Duration -->
+      <div class="pf-form-group">
+        <label class="pf-label">Duration (min)</label>
+        <select name="duration_min" class="pf-input">
+          {% for d in [15,30,45,60,90,120] %}
+          <option value="{{ d }}" {% if d == (appt.duration_min or 30) %}selected{% endif %}>{{ d }} min</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Type / Priority / Channel -->
+      <div class="pf-form-group">
+        <label class="pf-label">Type</label>
+        <select name="appointment_type" class="pf-input">
+          {% for t in appt_types %}
+          <option {% if t == appt.appointment_type %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="pf-form-group">
+        <label class="pf-label">Priority</label>
+        <select name="priority" class="pf-input">
+          {% for p in priorities %}
+          <option {% if p == appt.priority %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="pf-form-group">
+        <label class="pf-label">Channel</label>
+        <select name="channel" class="pf-input">
+          {% for c in channels %}
+          <option {% if c == appt.channel %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="pf-form-group" style="grid-column:1/-1">
+        <label class="pf-label">Reason</label>
+        <input type="text" name="reason" class="pf-input" value="{{ appt.reason or '' }}">
+      </div>
+
+      <div class="pf-form-group" style="grid-column:1/-1">
+        <label class="pf-label">Notes</label>
+        <textarea name="notes" class="pf-input" rows="3">{{ appt.notes or '' }}</textarea>
+      </div>
+
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:24px">
+      <button type="submit" class="pf-btn pf-btn-primary">💾 Save Reschedule</button>
+      <a href="{{ url_for('appointments.appt_detail', appt_id=appt.id) }}" class="pf-btn pf-btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<style>
+.slot-btn {
+  padding:6px 14px; border-radius:8px; border:1px solid var(--border);
+  background:var(--surface-raised); cursor:pointer; font-size:.82rem;
+  transition:background .15s,border-color .15s;
+}
+.slot-btn:hover:not(:disabled) { background:var(--primary-soft); border-color:var(--primary); }
+.slot-btn.slot-selected { background:var(--primary); color:#fff; border-color:var(--primary); }
+.slot-btn.slot-taken { background:#fee2e2; color:#991b1b; border-color:#fca5a5; cursor:not-allowed; opacity:.7; }
+</style>
+
+<script>
+const APPT_ID = {{ appt.id }};
+
+function selectSlot(time, btn) {
+  document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('slot-selected'));
+  btn.classList.add('slot-selected');
+  document.getElementById('apptStart').value = time;
+}
+
+async function refreshSlots() {
+  const date   = document.getElementById('apptDate').value;
+  const doctor = document.getElementById('doctorSel').value;
+  const grid   = document.getElementById('slotGrid');
+  const loading= document.getElementById('slotLoading');
+  if (!date) return;
+
+  grid.style.display='none'; loading.style.display='block';
+  try {
+    const r = await fetch(`/appointments/api/slots?date=${date}&doctor=${encodeURIComponent(doctor)}&exclude_id=${APPT_ID}`);
+    const data = await r.json();
+    const current = document.getElementById('apptStart').value;
+    grid.innerHTML = data.slots.map(s => {
+      const isTaken    = !s.available;
+      const isSelected = s.time === current;
+      return `<button type="button"
+        class="slot-btn ${isTaken ? 'slot-taken' : ''} ${isSelected ? 'slot-selected' : ''}"
+        ${isTaken ? 'disabled title="Already booked"' : ''}
+        onclick="selectSlot('${s.time}', this)">${s.time}</button>`;
+    }).join('');
+  } catch(e) {}
+  grid.style.display='flex'; loading.style.display='none';
+}
+</script>
+{% endblock %}

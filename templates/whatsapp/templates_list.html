@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}WhatsApp Templates{% endblock %}
+{% block page_title %}WhatsApp Templates{% endblock %}
+{% block page_sub %}Manage message templates for WhatsApp communication{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.template_new') }}" class="pf-btn pf-btn-primary">➕ New Template</a>
+<a href="{{ url_for('whatsapp.message_log') }}" class="pf-btn pf-btn-secondary">📋 Message Log</a>
+<a href="{{ url_for('whatsapp.reminders') }}" class="pf-btn pf-btn-secondary">🔔 Reminders</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+/* Category tabs */
+.cat-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:24px; }
+.cat-tab {
+  display:flex; align-items:center; gap:8px;
+  padding:9px 20px; border-radius:30px; font-size:13px; font-weight:600;
+  cursor:pointer; border:2px solid transparent;
+  background:var(--cl-surface); color:var(--cl-muted);
+  transition:all .15s; user-select:none;
+}
+.cat-tab:hover { border-color:var(--cl-border); color:var(--cl-text); }
+.cat-tab.active { color:#fff; border-color:transparent; }
+.cat-tab .count { background:rgba(255,255,255,.25); border-radius:12px; padding:1px 8px; font-size:11px; }
+.cat-tab.active .count { background:rgba(255,255,255,.3); }
+.tab-all.active     { background:#374151; }
+.tab-appointment.active { background:#0891b2; }
+.tab-followup.active    { background:#0d9488; }
+.tab-vaccine.active     { background:#7c3aed; }
+.tab-campaign.active    { background:#d97706; }
+
+/* Search bar */
+.tmpl-search { position:relative; margin-bottom:20px; }
+.tmpl-search input {
+  width:100%; padding:10px 16px 10px 40px;
+  border:1.5px solid var(--cl-border); border-radius:10px;
+  background:var(--cl-surface); color:var(--cl-text); font-size:14px;
+  box-sizing:border-box;
+}
+.tmpl-search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--cl-muted); pointer-events:none; }
+
+/* Template grid */
+.templates-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:20px; }
+.tmpl-card {
+  background:var(--cl-surface); border-radius:14px; padding:22px;
+  box-shadow:0 2px 12px rgba(0,0,0,.08);
+  display:flex; flex-direction:column; gap:12px;
+  border-top:4px solid #25D366;
+  transition:box-shadow .15s;
+}
+.tmpl-card:hover { box-shadow:0 4px 20px rgba(0,0,0,.13); }
+.tmpl-card[data-scenario="appointment"] { border-top-color:#0891b2; }
+.tmpl-card[data-scenario="followup"]    { border-top-color:#0d9488; }
+.tmpl-card[data-scenario="vaccine"]     { border-top-color:#7c3aed; }
+.tmpl-card[data-scenario="campaign"],
+.tmpl-card[data-scenario="invoice"],
+.tmpl-card[data-scenario="custom"]      { border-top-color:#d97706; }
+.tmpl-card.hidden { display:none; }
+
+.tmpl-header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.tmpl-name { font-size:15px; font-weight:700; color:var(--cl-text); }
+.tmpl-name-code { font-size:11px; color:var(--cl-muted); font-family:monospace; margin-top:2px; }
+
+.cat-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; color:#fff; white-space:nowrap; }
+.cat-appointment { background:#0891b2; }
+.cat-followup    { background:#0d9488; }
+.cat-vaccine     { background:#7c3aed; }
+.cat-campaign, .cat-invoice, .cat-custom { background:#d97706; }
+.cat-default     { background:#6b7280; }
+
+.tmpl-preview { background:var(--cl-bg); border-radius:10px; padding:14px; font-size:13px; color:var(--cl-text); line-height:1.6; border-left:3px solid #25D366; }
+.tmpl-preview::before { content:'WhatsApp Preview'; display:block; font-size:10px; font-weight:700; color:#25D366; text-transform:uppercase; margin-bottom:6px; letter-spacing:.5px; }
+
+.tmpl-vars { display:flex; flex-wrap:wrap; gap:6px; }
+.var-chip { background:#e0e7ff; color:#3730a3; padding:2px 8px; border-radius:4px; font-size:11px; font-family:monospace; }
+
+.tmpl-footer { display:flex; align-items:center; justify-content:space-between; padding-top:8px; border-top:1px solid var(--cl-border); margin-top:auto; }
+.tmpl-lang { font-size:12px; color:var(--cl-muted); }
+.tmpl-actions { display:flex; gap:6px; }
+.btn-edit {
+  font-size:12px; font-weight:600; color:var(--cl-primary);
+  text-decoration:none; padding:5px 12px; border-radius:6px;
+  border:1.5px solid var(--cl-primary); background:transparent;
+  transition:all .15s; display:inline-flex; align-items:center; gap:4px;
+}
+.btn-edit:hover { background:var(--cl-primary); color:#fff; }
+.btn-del {
+  font-size:12px; font-weight:600; color:#dc2626;
+  text-decoration:none; padding:5px 10px; border-radius:6px;
+  border:1.5px solid #fca5a5; background:transparent; cursor:pointer;
+  transition:all .15s; display:inline-flex; align-items:center; gap:4px;
+}
+.btn-del:hover { background:#dc2626; color:#fff; border-color:#dc2626; }
+
+details summary { cursor:pointer; color:var(--cl-primary); font-size:12px; font-weight:600; list-style:none; }
+details summary::-webkit-details-marker { display:none; }
+details[open] summary { margin-bottom:8px; }
+
+.empty-state { text-align:center; padding:80px 20px; color:var(--cl-muted); }
+#no-results { display:none; text-align:center; padding:60px 20px; color:var(--cl-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if templates %}
+
+{# --- Build category counts --- #}
+{% set counts = {'all': templates|length, 'appointment': 0, 'followup': 0, 'vaccine': 0, 'campaign': 0} %}
+{% for t in templates %}
+  {% set sc = t.scenario or 'custom' %}
+  {% if sc == 'appointment' %}{% set _ = counts.update({'appointment': counts.appointment + 1}) %}
+  {% elif sc == 'followup' %}{% set _ = counts.update({'followup': counts.followup + 1}) %}
+  {% elif sc == 'vaccine' %}{% set _ = counts.update({'vaccine': counts.vaccine + 1}) %}
+  {% else %}{% set _ = counts.update({'campaign': counts.campaign + 1}) %}{% endif %}
+{% endfor %}
+
+{# --- Category tabs --- #}
+<div class="cat-tabs">
+  <div class="cat-tab tab-all active" onclick="filterCat('all', this)">
+    📋 All <span class="count">{{ counts.all }}</span>
+  </div>
+  <div class="cat-tab tab-appointment" onclick="filterCat('appointment', this)">
+    📅 Appointment <span class="count">{{ counts.appointment }}</span>
+  </div>
+  <div class="cat-tab tab-followup" onclick="filterCat('followup', this)">
+    🔄 Follow-up <span class="count">{{ counts.followup }}</span>
+  </div>
+  <div class="cat-tab tab-vaccine" onclick="filterCat('vaccine', this)">
+    💉 Vaccine <span class="count">{{ counts.vaccine }}</span>
+  </div>
+  <div class="cat-tab tab-campaign" onclick="filterCat('campaign', this)">
+    📢 Campaign &amp; Other <span class="count">{{ counts.campaign }}</span>
+  </div>
+</div>
+
+{# --- Search --- #}
+<div class="tmpl-search">
+  <span class="tmpl-search-icon">🔍</span>
+  <input type="text" id="tmpl-search" placeholder="Search templates by name or message…" oninput="filterSearch(this.value)">
+</div>
+
+<div style="color:var(--cl-muted);font-size:13px;margin-bottom:16px;" id="tmpl-count">
+  {{ templates|length }} template{{ 's' if templates|length != 1 }} available
+</div>
+
+{# --- Grid --- #}
+<div class="templates-grid" id="tmpl-grid">
+{% for t in templates %}
+{% set sc = t.scenario or 'custom' %}
+{% set cat_group = sc if sc in ('appointment','followup','vaccine') else 'campaign' %}
+{% set cat_cls = 'cat-' ~ sc %}
+
+<div class="tmpl-card"
+     data-scenario="{{ sc }}"
+     data-group="{{ cat_group }}"
+     data-search="{{ (t.name ~ ' ' ~ (t.template_text or ''))|lower }}">
+
+  <div class="tmpl-header">
+    <div>
+      <div class="tmpl-name">{{ t.name.replace('_',' ').title() }}</div>
+      <div class="tmpl-name-code">{{ t.name }}</div>
+    </div>
+    <span class="cat-badge {{ cat_cls }}">{{ sc.replace('_',' ').title() }}</span>
+  </div>
+
+  <details>
+    <summary>👁 Preview message</summary>
+    <div class="tmpl-preview" style="white-space:pre-wrap">{{ t.template_text or '(empty)' }}</div>
+  </details>
+
+  {% if t.variables_json and t.variables_json != '[]' %}
+  <div>
+    <div style="font-size:11px;font-weight:600;color:var(--cl-muted);text-transform:uppercase;margin-bottom:6px;">Variables</div>
+    <div class="tmpl-vars">
+      {% set vars = t.variables_json %}
+      {% if vars.startswith('[') %}
+        {% for v in vars[1:-1].replace('"','').replace("'",'').split(',') %}
+          {% if v.strip() %}
+          <span class="var-chip">{‌{ {{ v.strip() }} }}</span>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <span class="var-chip">{{ vars }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="tmpl-footer">
+    <div class="tmpl-lang">
+      🌐 {{ 'Arabic' if t.language == 'ar' else 'English' }}
+      &nbsp;·&nbsp;
+      {% if t.is_active %}<span style="color:#166534;">● Active</span>{% else %}<span style="color:#991b1b;">● Inactive</span>{% endif %}
+      {% if t.is_default %}&nbsp;·&nbsp;<span style="color:#d97706;">⭐ Default</span>{% endif %}
+    </div>
+    <div class="tmpl-actions">
+      <a href="{{ url_for('whatsapp.template_edit', tid=t.id) }}" class="btn-edit">✏️ Edit</a>
+      <form method="post" action="{{ url_for('whatsapp.template_delete', tid=t.id) }}"
+            onsubmit="return confirm('Delete template \'{{ t.name }}\'?')" style="margin:0">
+        <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
+        <button type="submit" class="btn-del">🗑</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+
+<div id="no-results">
+  <div style="font-size:40px;">🔍</div>
+  <div style="font-size:18px;font-weight:700;margin:12px 0 6px;">No templates found</div>
+  <div>Try a different search term or category.</div>
+</div>
+
+{% else %}
+<div class="empty-state">
+  <div style="font-size:56px;">💬</div>
+  <div style="font-size:20px;font-weight:700;margin:12px 0 8px;">No templates yet</div>
+  <div style="margin-bottom:20px;">Create your first WhatsApp message template to get started.</div>
+  <a href="{{ url_for('whatsapp.template_new') }}" class="pf-btn pf-btn-primary">➕ Create Template</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+let activeGroup = 'all';
+let searchTerm  = '';
+
+function filterCat(group, el) {
+  activeGroup = group;
+  document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  applyFilters();
+}
+
+function filterSearch(val) {
+  searchTerm = val.toLowerCase().trim();
+  applyFilters();
+}
+
+function applyFilters() {
+  const cards = document.querySelectorAll('#tmpl-grid .tmpl-card');
+  let visible = 0;
+  cards.forEach(card => {
+    const groupMatch = activeGroup === 'all' || card.dataset.group === activeGroup;
+    const searchMatch = !searchTerm || card.dataset.search.includes(searchTerm);
+    if (groupMatch && searchMatch) {
+      card.classList.remove('hidden');
+      visible++;
+    } else {
+      card.classList.add('hidden');
+    }
+  });
+  const countEl = document.getElementById('tmpl-count');
+  if (countEl) countEl.textContent = visible + ' template' + (visible !== 1 ? 's' : '') + ' shown';
+  document.getElementById('no-results').style.display = visible === 0 ? 'block' : 'none';
+}
+</script>
+{% endblock %}

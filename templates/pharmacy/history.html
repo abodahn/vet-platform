@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Dispensing History{% endblock %}
+{% block page_title %}Dispensing History{% endblock %}
+{% block page_sub %}Record of all dispensed medications{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('pharmacy.index') }}" class="pf-btn pf-btn-secondary">← Queue</a>
+{% endblock %}
+
+{% block content %}
+<!-- Date filter -->
+<div class="pf-card" style="margin-bottom:16px">
+  <form method="get" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+    <div class="pf-form-group" style="margin:0">
+      <label class="pf-label">From Date</label>
+      <input class="pf-input" type="date" name="date_from" value="{{ date_from }}">
+    </div>
+    <button class="pf-btn pf-btn-secondary" type="submit">Filter</button>
+  </form>
+</div>
+
+<div class="pf-card">
+  {% if records %}
+  <div style="overflow-x:auto">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Pet / Owner</th>
+          <th>Medication</th>
+          <th>Batch</th>
+          <th>Expiry</th>
+          <th style="text-align:right">Qty</th>
+          <th>Dispensed By</th>
+          <th>RX Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td style="font-size:12px;white-space:nowrap">{{ r.dispensed_at[:16] if r.dispensed_at else '—' }}</td>
+          <td>
+            <div style="font-weight:600">{{ r.pet_name }}</div>
+            <div style="font-size:12px;color:var(--cl-text-light)">{{ r.owner_name }}</div>
+          </td>
+          <td>
+            <div style="font-weight:600">{{ r.item_name }}</div>
+            <div style="font-size:12px;color:var(--cl-text-light)">{{ r.unit or '' }}</div>
+          </td>
+          <td><code style="font-size:11px">{{ r.batch_number or '—' }}</code></td>
+          <td style="font-size:12px">
+            {% if r.expiry_date %}
+              {% set exp = r.expiry_date %}
+              <span style="color:{{ 'var(--cl-danger)' if exp < now|default('9999') else 'inherit' }}">
+                {{ exp }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td style="text-align:right;font-weight:600">{{ r.quantity }}</td>
+          <td style="font-size:12px">{{ r.dispensed_by }}</td>
+          <td>
+            <span class="pf-badge {{ 'success' if r.status == 'Dispensed' else 'warning' }}">
+              {{ r.status }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="pf-empty" style="padding:48px;text-align:center">No dispensing records found for this period.</div>
+  {% endif %}
+</div>
+{% endblock %}

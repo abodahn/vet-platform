@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}New Lab Request{% endblock %}
+{% block page_title %}New Lab Request{% endblock %}
+{% block page_sub %}Create a new laboratory test request{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('clinical.lab_list') }}" class="pf-btn pf-btn-secondary">← Back to Lab Requests</a>
+{% endblock %}
+
+{% block content %}
+
+{% if visit and pet %}
+<!-- Context card -->
+<div class="pf-card" style="margin-bottom:1rem;border-left:4px solid var(--primary)">
+  <div class="pf-card-body" style="display:flex;gap:2rem;align-items:center;padding:0.85rem 1.25rem">
+    <div>
+      <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin-bottom:0.2rem">Patient</div>
+      <div style="font-weight:700;font-size:1.05rem">{{ pet.pet_name }}</div>
+      <div style="font-size:0.82rem;color:var(--text-muted)">{{ pet.species }}{% if pet.breed %} · {{ pet.breed }}{% endif %}</div>
+    </div>
+    <div>
+      <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin-bottom:0.2rem">Owner</div>
+      <div style="font-weight:600">{{ pet.owner_name }}</div>
+      <div style="font-size:0.82rem;color:var(--text-muted)">{{ pet.owner_phone or '' }}</div>
+    </div>
+    <div>
+      <div style="font-size:0.72rem;text-transform:uppercase;font-weight:700;color:var(--text-muted);margin-bottom:0.2rem">Visit</div>
+      <div style="font-weight:600">{{ visit.visit_date }}</div>
+      <div style="font-size:0.82rem;color:var(--text-muted)">{{ visit.visit_type }}</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <div class="pf-card-header">
+    <span>🧪 Lab Request Details</span>
+  </div>
+  <div class="pf-card-body">
+    <form method="post" action="{{ url_for('clinical.lab_new') }}">
+
+      {% if visit %}
+      <input type="hidden" name="visit_id" value="{{ visit.id }}">
+      <input type="hidden" name="pet_id" value="{{ visit.pet_id }}">
+      {% elif pet %}
+      <input type="hidden" name="pet_id" value="{{ pet.id }}">
+      {% endif %}
+
+      <div class="pf-form-grid">
+
+        <div class="pf-field" style="grid-column:1/-1">
+          <label class="pf-label" for="test_name">Test Name <span style="color:var(--danger)">*</span></label>
+          <select id="test_name" name="test_name" class="pf-input" onchange="toggleCustomTest(this.value)" required>
+            <option value="">— Select a test —</option>
+            {% for t in common_tests %}
+            <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+            <option value="Custom">Custom / Other</option>
+          </select>
+        </div>
+
+        <div class="pf-field" id="custom-test-field" style="grid-column:1/-1;display:none">
+          <label class="pf-label" for="custom_test">Custom Test Name</label>
+          <input type="text" id="custom_test" name="custom_test" class="pf-input"
+                 placeholder="Enter custom test name…">
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="test_code">Test Code</label>
+          <input type="text" id="test_code" name="test_code" class="pf-input"
+                 placeholder="e.g. CBC-001">
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="priority">Priority <span style="color:var(--danger)">*</span></label>
+          <select id="priority" name="priority" class="pf-input" required>
+            <option value="Routine" selected>Routine</option>
+            <option value="Urgent">Urgent</option>
+            <option value="STAT">STAT (Immediate)</option>
+          </select>
+        </div>
+
+        <div class="pf-field">
+          <label class="pf-label" for="sample_type">Sample Type</label>
+          <select id="sample_type" name="sample_type" class="pf-input">
+            <option value="">— Select —</option>
+            <option>Blood (EDTA)</option>
+            <option>Blood (Serum)</option>
+            <option>Urine</option>
+            <option>Feces</option>
+            <option>Swab</option>
+            <option>Tissue Biopsy</option>
+            <option>Fluid (Pleural)</option>
+            <option>Fluid (Abdominal)</option>
+            <option>Skin Scraping</option>
+            <option>Other</option>
+          </select>
+        </div>
+
+        <div class="pf-field" style="grid-column:1/-1">
+          <label class="pf-label" for="notes">Notes / Instructions</label>
+          <textarea id="notes" name="notes" class="pf-input" rows="3"
+                    placeholder="Special instructions for the lab team…"></textarea>
+        </div>
+
+      </div>
+
+      <div style="margin-top:1.5rem;display:flex;gap:0.75rem">
+        <button type="submit" class="pf-btn pf-btn-primary">Create Lab Request</button>
+        <a href="{{ url_for('clinical.lab_list') }}" class="pf-btn pf-btn-secondary">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleCustomTest(val) {
+  var field = document.getElementById('custom-test-field');
+  if (field) {
+    field.style.display = val === 'Custom' ? 'block' : 'none';
+    var input = document.getElementById('custom_test');
+    if (input) input.required = (val === 'Custom');
+  }
+}
+</script>
+{% endblock %}

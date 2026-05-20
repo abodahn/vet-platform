@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Monthly Budget', 'الميزانية الشهرية') }}{% endblock %}
+{% block page_title %}{{ t('Monthly Budget', 'الميزانية الشهرية') }}{% endblock %}
+{% block page_sub %}{{ month_label }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('accounting.dashboard') }}" class="pf-btn pf-btn-ghost">← {{ t('Dashboard', 'لوحة التحكم') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.budget-header { background:var(--cl-surface); border-radius:12px; padding:24px 28px;
+                 box-shadow:0 2px 8px rgba(0,0,0,.07); margin-bottom:24px;
+                 display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
+.budget-header-title { font-size:18px; font-weight:800; color:var(--cl-text); }
+.budget-header-sub { font-size:13px; color:var(--cl-muted); margin-top:4px; }
+
+.budget-totals { display:flex; gap:24px; }
+.bt-item { text-align:center; }
+.bt-label { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); }
+.bt-val { font-size:20px; font-weight:800; color:var(--cl-text); }
+
+.budget-card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); overflow:hidden; }
+.budget-table { width:100%; border-collapse:collapse; }
+.budget-table th { background:var(--cl-primary); color:#fff; padding:11px 18px; text-align:left;
+                   font-size:11px; font-weight:700; text-transform:uppercase; }
+.budget-table td { padding:14px 18px; border-bottom:1px solid var(--cl-border); vertical-align:middle; }
+.budget-table tr:last-child td { border-bottom:none; }
+.budget-table tfoot td { font-weight:800; border-top:2px solid var(--cl-border); font-size:14px; }
+
+.progress-track { height:12px; background:var(--cl-border); border-radius:99px; overflow:hidden; min-width:120px; }
+.progress-fill { height:100%; border-radius:99px; transition:.3s; }
+.pf-ok      { background:#22c55e; }
+.pf-warn    { background:#f59e0b; }
+.pf-over    { background:#ef4444; }
+
+.pct-badge { display:inline-block; padding:2px 9px; border-radius:10px; font-size:11px; font-weight:700; }
+.pct-ok   { background:#dcfce7; color:#15803d; }
+.pct-warn { background:#fef3c7; color:#d97706; }
+.pct-over { background:#fee2e2; color:#dc2626; }
+
+.var-pos { color:#15803d; font-weight:700; }
+.var-neg { color:#dc2626; font-weight:700; }
+
+.budget-note { margin-top:16px; background:var(--cl-surface); border-radius:10px; padding:14px 18px;
+               font-size:12px; color:var(--cl-muted); box-shadow:0 1px 4px rgba(0,0,0,.05);
+               border-left:4px solid var(--cl-info,#0ea5e9); }
+</style>
+
+<!-- Header summary -->
+<div class="budget-header">
+  <div>
+    <div class="budget-header-title">🎯 {{ t('Budget vs. Actuals', 'الميزانية مقابل الفعلي') }} — {{ month_label }}</div>
+    <div class="budget-header-sub">{{ t('Month-to-date spending against monthly targets', 'الإنفاق حتى اليوم مقابل الأهداف الشهرية') }}</div>
+  </div>
+  <div class="budget-totals">
+    <div class="bt-item">
+      <div class="bt-label">{{ t('Total Budget', 'إجمالي الميزانية') }}</div>
+      <div class="bt-val">{{ "{:,.0f}".format(total_budget) }} EGP</div>
+    </div>
+    <div class="bt-item">
+      <div class="bt-label">{{ t('Total Actual', 'الإجمالي الفعلي') }}</div>
+      <div class="bt-val" style="color:{% if total_actual > total_budget %}#dc2626{% else %}#15803d{% endif %};">
+        {{ "{:,.0f}".format(total_actual) }} EGP
+      </div>
+    </div>
+    <div class="bt-item">
+      <div class="bt-label">{{ t('Remaining', 'المتبقي') }}</div>
+      <div class="bt-val" style="color:{% if total_budget - total_actual < 0 %}#dc2626{% else %}#0ea5e9{% endif %};">
+        {{ "{:,.0f}".format(total_budget - total_actual) }} EGP
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Budget table -->
+<div class="budget-card">
+  <table class="budget-table">
+    <thead>
+      <tr>
+        <th>{{ t('Category', 'الفئة') }}</th>
+        <th style="text-align:right">{{ t('Budget (EGP)', 'الميزانية (جنيه)') }}</th>
+        <th style="text-align:right">{{ t('Actual (EGP)', 'الفعلي (جنيه)') }}</th>
+        <th style="text-align:right">{{ t('Variance (EGP)', 'الفرق (جنيه)') }}</th>
+        <th style="min-width:180px;">{{ t('% Used', 'نسبة الاستخدام') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in budget_targets %}
+      {% set pct = item.pct_used %}
+      {% set bar_class = 'pf-ok' if pct < 75 else ('pf-warn' if pct < 100 else 'pf-over') %}
+      {% set badge_class = 'pct-ok' if pct < 75 else ('pct-warn' if pct < 100 else 'pct-over') %}
+      <tr>
+        <td style="font-weight:600;">{{ item.category }}</td>
+        <td style="text-align:right;color:var(--cl-muted);">{{ "{:,.0f}".format(item.budget) }}</td>
+        <td style="text-align:right;font-weight:700;">{{ "{:,.0f}".format(item.actual) }}</td>
+        <td style="text-align:right;" class="{{ 'var-pos' if item.variance >= 0 else 'var-neg' }}">
+          {{ "{:+,.0f}".format(item.variance) }}
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="progress-track" style="flex:1;">
+              <div class="progress-fill {{ bar_class }}" style="width:{{ [pct,100]|min }}%;"></div>
+            </div>
+            <span class="pct-badge {{ badge_class }}" style="white-space:nowrap;">{{ pct }}%</span>
+          </div>
+        </td>
+        <td>
+          {% if pct >= 100 %}
+            <span class="pf-badge error">{{ t('Over Budget', 'تجاوز الميزانية') }}</span>
+          {% elif pct >= 75 %}
+            <span class="pf-badge warning">{{ t('Near Limit', 'قريب من الحد') }}</span>
+          {% else %}
+            <span class="pf-badge success">{{ t('On Track', 'في المسار') }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td>{{ t('TOTAL', 'الإجمالي') }}</td>
+        <td style="text-align:right;">{{ "{:,.0f}".format(total_budget) }}</td>
+        <td style="text-align:right;color:{% if total_actual > total_budget %}#dc2626{% else %}#15803d{% endif %};">
+          {{ "{:,.0f}".format(total_actual) }}
+        </td>
+        <td style="text-align:right;" class="{{ 'var-pos' if total_budget - total_actual >= 0 else 'var-neg' }}">
+          {{ "{:+,.0f}".format(total_budget - total_actual) }}
+        </td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<!-- ── Budget Editor ─────────────────────────────────────────── -->
+<div style="margin-top:28px">
+  <details id="budgetEditor">
+    <summary style="cursor:pointer;font-size:.9rem;font-weight:700;
+                    color:var(--cl-primary);list-style:none;
+                    padding:10px 0;border-top:1px solid var(--cl-border)">
+      ⚙️ Edit Budget Targets
+    </summary>
+    <div style="background:var(--cl-surface);border:1px solid var(--cl-border);
+                border-radius:12px;padding:20px;margin-top:12px">
+      <form method="post" action="{{ url_for('accounting.budget') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-bottom:16px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--cl-border)">
+              <th style="text-align:left;padding:.5rem .7rem;color:var(--cl-muted);font-weight:600">Category</th>
+              <th style="text-align:right;padding:.5rem .7rem;color:var(--cl-muted);font-weight:600">Monthly Budget (EGP)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in budget_targets %}
+            <tr style="border-bottom:1px solid var(--cl-border)">
+              <td style="padding:.5rem .7rem;font-weight:600">
+                {{ item.category }}
+                <input type="hidden" name="category[]" value="{{ item.category }}">
+              </td>
+              <td style="padding:.5rem .7rem;text-align:right">
+                <input type="number" name="monthly_egp[]" step="100"
+                       value="{{ item.budget|int }}"
+                       style="width:140px;padding:5px 10px;border:1px solid var(--cl-border);
+                              border-radius:6px;font-size:.88rem;text-align:right">
+              </td>
+            </tr>
+            {% endfor %}
+            <!-- Add new category row -->
+            <tr style="border-top:2px dashed var(--cl-border);background:var(--cl-bg)">
+              <td style="padding:.5rem .7rem">
+                <input type="text" name="new_category" placeholder="New category name (optional)"
+                       style="width:100%;padding:5px 10px;border:1px solid var(--cl-border);
+                              border-radius:6px;font-size:.85rem">
+              </td>
+              <td style="padding:.5rem .7rem;text-align:right">
+                <input type="number" name="new_amount" step="100" placeholder="0"
+                       style="width:140px;padding:5px 10px;border:1px solid var(--cl-border);
+                              border-radius:6px;font-size:.88rem;text-align:right">
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="display:flex;gap:10px;align-items:center">
+          <button type="submit" class="pf-btn pf-btn-primary">💾 Save Budget Targets</button>
+          <span style="font-size:.78rem;color:var(--cl-muted)">
+            Changes take effect immediately on the dashboard.
+          </span>
+        </div>
+      </form>
+    </div>
+  </details>
+</div>
+
+{% endblock %}

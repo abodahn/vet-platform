@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Supplier: {{ supplier['name'] if supplier else 'Not Found' }}{% endblock %}
+{% block page_title %}{{ supplier['name'] if supplier else 'Supplier' }}{% endblock %}
+{% block page_sub %}Supplier profile and purchase history{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('procurement.suppliers_list') }}" class="pf-btn pf-btn-ghost">← Suppliers</a>
+  {% if supplier %}
+  <a href="{{ url_for('procurement.supplier_edit', supplier_id=supplier['id']) }}" class="pf-btn pf-btn-secondary">✏️ Edit Supplier</a>
+  {% endif %}
+  <a href="{{ url_for('procurement.order_new_form') }}" class="pf-btn pf-btn-primary">+ New Order</a>
+{% endblock %}
+
+{% block content %}
+
+{% if supplier %}
+
+<!-- Supplier Info Card -->
+<div class="pf-card" style="margin-bottom:1.5rem;">
+  <div class="pf-card-header">
+    <div class="pf-card-title">Supplier Information</div>
+    {% if supplier['is_active'] %}
+      <span class="pf-badge success">Active</span>
+    {% else %}
+      <span class="pf-badge error">Inactive</span>
+    {% endif %}
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;padding:.5rem 0;">
+    <div>
+      <div class="pf-label">Contact Person</div>
+      <div style="font-weight:500;">{{ supplier['contact_person'] or '—' }}</div>
+    </div>
+    <div>
+      <div class="pf-label">Phone</div>
+      <div style="font-weight:500;">{{ supplier['phone'] or '—' }}</div>
+    </div>
+    <div>
+      <div class="pf-label">Email</div>
+      <div style="font-weight:500;">{{ supplier['email'] or '—' }}</div>
+    </div>
+    <div>
+      <div class="pf-label">Payment Terms</div>
+      <div style="font-weight:500;">{{ supplier['payment_terms'] or '—' }}</div>
+    </div>
+    <div>
+      <div class="pf-label">Address</div>
+      <div style="font-weight:500;">{{ supplier['address'] or '—' }}</div>
+    </div>
+    <div>
+      <div class="pf-label">Member Since</div>
+      <div style="font-weight:500;">{{ supplier['created_at'][:10] if supplier['created_at'] else '—' }}</div>
+    </div>
+  </div>
+
+  {% if supplier['notes'] %}
+  <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--pf-border);">
+    <div class="pf-label">Notes</div>
+    <div style="margin-top:.25rem;color:var(--pf-text-muted);">{{ supplier['notes'] }}</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Purchase Orders Table -->
+<div class="pf-card">
+  <div class="pf-card-header">
+    <div class="pf-card-title">Purchase Orders ({{ pos|length }})</div>
+    <a href="{{ url_for('procurement.order_new_form') }}" class="pf-btn pf-btn-primary" style="font-size:.85rem;">+ New Order</a>
+  </div>
+
+  {% if pos %}
+  <div style="overflow-x:auto;">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th>PO #</th>
+          <th>Order Date</th>
+          <th>Expected Date</th>
+          <th>Status</th>
+          <th>Total (EGP)</th>
+          <th>Notes</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for po in pos %}
+        <tr>
+          <td><strong>#{{ po['id'] }}</strong></td>
+          <td>{{ po['order_date'] or '—' }}</td>
+          <td>{{ po['expected_date'] or '—' }}</td>
+          <td>
+            {% if po['status'] == 'Received' %}
+              <span class="pf-badge success">Received</span>
+            {% elif po['status'] == 'Sent' %}
+              <span class="pf-badge warning">Sent</span>
+            {% elif po['status'] == 'Cancelled' %}
+              <span class="pf-badge error">Cancelled</span>
+            {% else %}
+              <span class="pf-badge">Draft</span>
+            {% endif %}
+          </td>
+          <td>{{ "%.2f"|format(po['total_amount'] or 0) }}</td>
+          <td style="color:var(--pf-text-muted);font-size:.85rem;">{{ po['notes'] or '—' }}</td>
+          <td>
+            <a href="{{ url_for('procurement.order_detail', order_id=po['id']) }}"
+               class="pf-btn pf-btn-ghost" style="font-size:.8rem;">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:2rem;text-align:center;color:var(--pf-text-muted);">
+    No purchase orders for this supplier yet.
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+<div class="pf-card" style="padding:2rem;text-align:center;">
+  <div style="color:var(--pf-text-muted);">Supplier not found.</div>
+  <a href="{{ url_for('procurement.suppliers_list') }}" class="pf-btn pf-btn-secondary" style="margin-top:1rem;">Back to Suppliers</a>
+</div>
+{% endif %}
+
+{% endblock %}

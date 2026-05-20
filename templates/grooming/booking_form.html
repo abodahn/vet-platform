@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}New Grooming Booking{% endblock %}
+{% block page_title %}New Grooming Booking{% endblock %}
+{% block page_sub %}Schedule a pet grooming appointment{% endblock %}
+
+{% block content %}
+<form method="post" action="{{ url_for('grooming.booking_new_submit') }}" style="max-width:700px">
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Patient</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Owner *</label>
+        <select name="owner_id" id="ownerSel" class="pf-input" required onchange="loadPets(this.value)">
+          <option value="">— Select Owner —</option>
+          {% for o in owners %}
+          <option value="{{ o.id }}">{{ o.full_name }} · {{ o.phone }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="pf-label">Pet *</label>
+        <select name="pet_id" id="petSel" class="pf-input" required>
+          <option value="">— Select owner first —</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Booking Details</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Service</label>
+        <select name="service_id" class="pf-input">
+          <option value="">— No specific service —</option>
+          {% for s in services %}
+          <option value="{{ s.id }}">{{ s.name }} ({{ s.species }}) · {{ s.duration_min }}min · {{ "%.0f"|format(s.price|float) }} EGP</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="pf-label">Groomer Name</label>
+        <input type="text" name="groomer_name" class="pf-input" placeholder="Groomer's name">
+      </div>
+      <div>
+        <label class="pf-label">Booking Date & Time *</label>
+        <input type="datetime-local" name="booking_date" class="pf-input" required>
+      </div>
+      <div>
+        <label class="pf-label">Status</label>
+        <select name="status" class="pf-input">
+          <option>Scheduled</option>
+          <option>In Progress</option>
+          <option>Completed</option>
+        </select>
+      </div>
+      <div style="grid-column:span 2">
+        <label class="pf-label">Notes</label>
+        <textarea name="notes" class="pf-input" rows="3" placeholder="Special instructions, coat condition, owner requests..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:1rem">
+    <button type="submit" class="pf-btn pf-btn-primary">Create Booking</button>
+    <a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost">Cancel</a>
+  </div>
+</form>
+
+<script>
+function loadPets(ownerId) {
+  var sel = document.getElementById('petSel');
+  sel.innerHTML = '<option value="">Loading...</option>';
+  if (!ownerId) { sel.innerHTML = '<option value="">— Select owner first —</option>'; return; }
+  fetch('/crm/owners/' + ownerId + '/pets-json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      sel.innerHTML = '<option value="">— Select Pet —</option>';
+      (data.pets || []).forEach(function(p){
+        sel.innerHTML += '<option value="' + p.id + '">' + p.pet_name + ' (' + p.species + ')</option>';
+      });
+    })
+    .catch(function(){ sel.innerHTML = '<option value="">Error loading</option>'; });
+}
+</script>
+{% endblock %}

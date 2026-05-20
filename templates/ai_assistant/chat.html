@@ -1,0 +1,507 @@
+{% extends "base.html" %}
+
+{% block title %}AI Assistant{% endblock %}
+
+{% block page_title %}AI Assistant{% endblock %}
+{% block page_sub %}Powered by <strong>freellmapi</strong> — multi-model router (Gemini · GPT · Claude){% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('ai_assistant.history') }}" class="pf-btn pf-btn-secondary" style="font-size:0.85rem;">
+  📋 History
+</a>
+{% if api_configured %}
+<form method="post" action="{{ url_for('ai_assistant.clear') }}" style="display:inline">
+  <button type="submit" class="pf-btn pf-btn-secondary" style="font-size:0.85rem;"
+          onclick="return confirm('Clear all conversation history?')">
+    🗑 Clear
+  </button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.ai-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 1.25rem;
+  height: calc(100vh - 160px);
+  min-height: 500px;
+}
+.ai-sidebar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ai-sidebar-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.ai-quick-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1.35;
+}
+.ai-quick-btn:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.ai-chat-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ai-disclaimer {
+  background: var(--warning-soft, #fef3c7);
+  border-bottom: 1px solid var(--border);
+  padding: 0.6rem 1rem;
+  font-size: 0.78rem;
+  color: var(--warning-text, #92400e);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.ai-msg {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 85%;
+}
+.ai-msg.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.ai-msg.assistant {
+  align-self: flex-start;
+}
+.ai-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.ai-msg.user .ai-msg-avatar {
+  background: var(--primary);
+  color: #fff;
+}
+.ai-msg.assistant .ai-msg-avatar {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+.ai-msg-bubble {
+  padding: 0.65rem 0.9rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ai-msg.user .ai-msg-bubble {
+  background: var(--primary);
+  color: #fff;
+  border-bottom-right-radius: 3px;
+}
+.ai-msg.assistant .ai-msg-bubble {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 3px;
+  color: var(--text);
+}
+.ai-msg-time {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  text-align: right;
+}
+.ai-msg.assistant .ai-msg-time { text-align: left; }
+.ai-input-bar {
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-end;
+  background: var(--surface);
+}
+#ai-input {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 44px;
+  max-height: 130px;
+  overflow-y: auto;
+  transition: border-color 0.15s;
+}
+#ai-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+#ai-send-btn {
+  padding: 0.6rem 1.1rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  height: 44px;
+}
+#ai-send-btn:hover { background: var(--primary-dark, #0e2a5c); }
+#ai-send-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ai-typing {
+  display: none;
+  align-self: flex-start;
+  padding: 0.6rem 1rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.ai-not-configured {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2rem;
+}
+.ai-not-configured h3 { color: var(--text); margin-bottom: 0.25rem; }
+.ai-not-configured code {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.65rem;
+  border-radius: 5px;
+  font-size: 0.85rem;
+  color: var(--primary);
+}
+@media (max-width: 768px) {
+  .ai-layout { grid-template-columns: 1fr; height: auto; }
+  .ai-sidebar { display: none; }
+  .ai-chat-container { height: calc(100vh - 200px); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ai-layout">
+
+  <!-- ── Quick-prompt sidebar ── -->
+  <aside class="ai-sidebar">
+    <div class="ai-sidebar-title">Quick Prompts</div>
+
+    {% if user_role in ('doctor', 'super_admin', 'clinic_owner') %}
+      <button class="ai-quick-btn" data-prompt="Calculate amoxicillin dosage for a 10 kg dog with a skin infection. Include dosage mg/kg, frequency, and duration.">
+        💊 Amoxicillin dosage (10 kg dog)
+      </button>
+      <button class="ai-quick-btn" data-prompt="What are the top differential diagnoses for acute vomiting in a 3-year-old dog with no history of dietary indiscretion?">
+        🔍 Differentials: vomiting in dogs
+      </button>
+      <button class="ai-quick-btn" data-prompt="Are there any known drug interactions between metronidazole and phenobarbital in dogs?">
+        ⚠️ Drug interaction: Metro + Phenobarb
+      </button>
+      <button class="ai-quick-btn" data-prompt="What is the standard pre-anesthetic protocol for a healthy 5 kg cat undergoing routine spay surgery?">
+        🔧 Pre-anesthetic protocol: cat spay
+      </button>
+      <button class="ai-quick-btn" data-prompt="List the common causes of polyuria and polydipsia (PU/PD) in senior dogs and recommended diagnostic workup.">
+        🩺 PU/PD workup: senior dog
+      </button>
+      <button class="ai-quick-btn" data-prompt="What are normal reference ranges for CBC in dogs? Include RBC, WBC, platelets, HCT.">
+        🧪 Normal CBC ranges: dogs
+      </button>
+    {% elif user_role == 'nurse' %}
+      <button class="ai-quick-btn" data-prompt="What are normal vital signs for a healthy adult dog (temperature, heart rate, respiratory rate)?">
+        🌡️ Normal vitals: adult dog
+      </button>
+      <button class="ai-quick-btn" data-prompt="How do I properly administer a subcutaneous injection to a cat?">
+        💉 SQ injection technique: cat
+      </button>
+      <button class="ai-quick-btn" data-prompt="What signs indicate a patient is in pain and how should I document them?">
+        😿 Pain assessment signs
+      </button>
+    {% elif user_role == 'reception' %}
+      <button class="ai-quick-btn" data-prompt="What information should I collect when scheduling a new patient's first appointment?">
+        📅 New appointment checklist
+      </button>
+      <button class="ai-quick-btn" data-prompt="How do I explain to an owner what to expect during their pet's annual wellness exam?">
+        ℹ️ Explaining wellness exams
+      </button>
+      <button class="ai-quick-btn" data-prompt="What are common reasons an owner might call to describe an emergency that requires same-day care?">
+        🚨 Emergency triage questions
+      </button>
+    {% elif user_role in ('inventory_mgr',) %}
+      <button class="ai-quick-btn" data-prompt="Explain FEFO (First Expiry First Out) inventory management and why it's important for veterinary medications.">
+        📦 FEFO explained
+      </button>
+      <button class="ai-quick-btn" data-prompt="What are best practices for storing veterinary vaccines and cold-chain medications?">
+        🌡️ Vaccine cold-chain storage
+      </button>
+      <button class="ai-quick-btn" data-prompt="How should I handle and dispose of expired veterinary medications safely?">
+        ♻️ Expired medication disposal
+      </button>
+    {% elif user_role == 'pharmacist' %}
+      <button class="ai-quick-btn" data-prompt="What are important counseling points for pet owners picking up metronidazole for their dog?">
+        💬 Patient counseling: Metronidazole
+      </button>
+      <button class="ai-quick-btn" data-prompt="List common compounding considerations for pediatric veterinary formulations.">
+        🧪 Compounding considerations
+      </button>
+      <button class="ai-quick-btn" data-prompt="What storage requirements apply to controlled veterinary substances in Egypt?">
+        🔒 Controlled substance storage
+      </button>
+    {% elif user_role == 'finance' %}
+      <button class="ai-quick-btn" data-prompt="What information is typically required on a veterinary invoice to comply with Egyptian tax regulations?">
+        🧾 Invoice compliance (Egypt)
+      </button>
+      <button class="ai-quick-btn" data-prompt="Explain common veterinary payment plan arrangements for expensive treatments.">
+        💳 Payment plan options
+      </button>
+    {% else %}
+      <button class="ai-quick-btn" data-prompt="What services does a full-service animal hospital typically offer?">
+        🏥 Typical hospital services
+      </button>
+      <button class="ai-quick-btn" data-prompt="How often should a healthy dog receive routine veterinary checkups?">
+        📅 Routine checkup frequency
+      </button>
+    {% endif %}
+  </aside>
+
+  <!-- ── Chat panel ── -->
+  <div class="ai-chat-container">
+
+    {% if not api_configured %}
+    <div class="ai-not-configured">
+      <div style="font-size:3rem">🤖</div>
+      <h3>AI Assistant Not Configured</h3>
+      <p>The <code>openai</code> Python package is required.</p>
+      <p>Run in your terminal:</p>
+      <code>pip install openai</code>
+      <p style="font-size:0.82rem">
+        Make sure the freellmapi router is running at
+        <strong>http://localhost:3001</strong>
+      </p>
+    </div>
+
+    {% else %}
+
+    <div class="ai-disclaimer">
+      ⚠️ <strong>Disclaimer:</strong> AI suggestions are for reference only. Always verify with clinical judgment and a licensed veterinarian.
+    </div>
+
+    <div class="ai-messages" id="ai-messages">
+
+      {% if not history %}
+      <div style="color:var(--text-muted);text-align:center;font-size:0.85rem;margin:auto;">
+        Start a conversation — ask a clinical question or use a quick prompt on the left.
+      </div>
+      {% endif %}
+
+      {% for msg in history %}
+      {% if msg.prompt %}
+      <div class="ai-msg user">
+        <div class="ai-msg-avatar">👤</div>
+        <div>
+          <div class="ai-msg-bubble">{{ msg.prompt }}</div>
+          <div class="ai-msg-time">{{ (msg.created_at or '')[:16] }}</div>
+        </div>
+      </div>
+      {% endif %}
+      {% if msg.response %}
+      <div class="ai-msg assistant">
+        <div class="ai-msg-avatar">🤖</div>
+        <div>
+          <div class="ai-msg-bubble">{{ msg.response }}</div>
+          <div class="ai-msg-time">
+            {{ (msg.created_at or '')[:16] }}
+            {% if msg.model_used and msg.model_used != 'none' %}
+            <span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;
+              font-size:0.68rem;background:var(--surface-raised);border:1px solid var(--border);
+              color:var(--text-muted);vertical-align:middle">⚡ {{ msg.model_used }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+
+      <div class="ai-typing" id="ai-typing">🤖 Thinking…</div>
+    </div>
+
+    <div class="ai-input-bar">
+      <textarea id="ai-input" placeholder="Ask a clinical or operational question… (Enter to send, Shift+Enter for newline)" rows="1"></textarea>
+      <button id="ai-send-btn">Send ➤</button>
+    </div>
+
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if api_configured %}
+<script>
+(function () {
+  const messagesEl = document.getElementById('ai-messages');
+  const inputEl    = document.getElementById('ai-input');
+  const sendBtn    = document.getElementById('ai-send-btn');
+  const typingEl   = document.getElementById('ai-typing');
+
+  function scrollBottom() {
+    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  scrollBottom();
+
+  function appendMessage(role, content, modelLabel) {
+    // Remove empty-state placeholder if present
+    const placeholder = messagesEl.querySelector('div[style*="color:var(--text-muted)"]');
+    if (placeholder) placeholder.remove();
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ai-msg ' + role;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'ai-msg-avatar';
+    avatar.textContent = role === 'assistant' ? '🤖' : '👤';
+
+    const inner = document.createElement('div');
+
+    const bubble = document.createElement('div');
+    bubble.className = 'ai-msg-bubble';
+    bubble.textContent = content;
+
+    const time = document.createElement('div');
+    time.className = 'ai-msg-time';
+    const now = new Date();
+    time.textContent = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
+    // Show which model handled this response
+    if (role === 'assistant' && modelLabel) {
+      const badge = document.createElement('span');
+      badge.style.cssText = 'display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;' +
+        'font-size:0.68rem;background:var(--surface-raised);border:1px solid var(--border);' +
+        'color:var(--text-muted);vertical-align:middle';
+      badge.textContent = '⚡ ' + modelLabel;
+      time.appendChild(badge);
+    }
+
+    inner.appendChild(bubble);
+    inner.appendChild(time);
+    wrap.appendChild(avatar);
+    wrap.appendChild(inner);
+
+    // Insert before typing indicator
+    messagesEl.insertBefore(wrap, typingEl);
+    scrollBottom();
+  }
+
+  async function sendMessage(text) {
+    if (!text) return;
+    appendMessage('user', text, '');
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    sendBtn.disabled = true;
+    typingEl.style.display = 'flex';
+    scrollBottom();
+
+    try {
+      const resp = await fetch('{{ url_for("ai_assistant.chat") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token }}'
+        },
+        body: JSON.stringify({message: text}),
+      });
+      const data = await resp.json();
+      typingEl.style.display = 'none';
+      const modelLabel = data.routed_via || data.model || '';
+      if (data.content) {
+        appendMessage('assistant', data.content, modelLabel);
+      } else if (data.error) {
+        appendMessage('assistant', '⚠️ ' + data.error, '');
+      }
+    } catch (err) {
+      typingEl.style.display = 'none';
+      appendMessage('assistant', '⚠️ Network error. Please try again.', '');
+    } finally {
+      sendBtn.disabled = false;
+      inputEl.focus();
+      scrollBottom();
+    }
+  }
+
+  sendBtn.addEventListener('click', function () {
+    sendMessage(inputEl.value.trim());
+  });
+
+  inputEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(inputEl.value.trim());
+    }
+  });
+
+  // Auto-grow textarea
+  inputEl.addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 130) + 'px';
+  });
+
+  // Quick prompt buttons
+  document.querySelectorAll('.ai-quick-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      inputEl.value = btn.dataset.prompt || '';
+      inputEl.dispatchEvent(new Event('input'));
+      inputEl.focus();
+    });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_sub %}{% if is_edit %}Update owner information{% else %}Register a new client{% endif %}{% endblock %}
+
+{% block topbar_actions %}
+  {% if is_edit %}
+  <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);">
+    ← Back to Profile
+  </a>
+  {% else %}
+  <a href="{{ url_for('crm.owners_list') }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);">
+    ← Owners List
+  </a>
+  {% endif %}
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  .form-card {
+    background: var(--cl-surface);
+    border-radius: 14px;
+    box-shadow: 0 2px 18px rgba(0,0,0,0.08);
+    margin-bottom: 22px;
+    overflow: hidden;
+  }
+  .form-card-header {
+    background: linear-gradient(135deg, var(--cl-primary) 0%, color-mix(in srgb, var(--cl-primary) 80%, var(--cl-accent)) 100%);
+    color: #fff;
+    padding: 16px 24px;
+    font-size: 1rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .form-card-body {
+    padding: 24px;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+  }
+  .form-grid-full { grid-column: 1 / -1; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--cl-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .form-label .req { color: var(--cl-danger); margin-left: 2px; }
+  .form-control {
+    padding: 10px 14px;
+    border: 1.5px solid var(--cl-border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: var(--cl-bg);
+    color: var(--cl-text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .form-control:focus {
+    border-color: var(--cl-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--cl-primary) 15%, transparent);
+  }
+  textarea.form-control { resize: vertical; min-height: 90px; }
+  select.form-control { cursor: pointer; }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border: 1.5px solid var(--cl-border);
+    border-radius: 8px;
+    background: var(--cl-bg);
+    cursor: pointer;
+  }
+  .checkbox-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--cl-primary);
+    cursor: pointer;
+  }
+  .checkbox-row label {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--cl-text);
+    cursor: pointer;
+    flex: 1;
+  }
+  .checkbox-row .badge-vip-check {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 20px 24px;
+    background: color-mix(in srgb, var(--cl-primary) 4%, var(--cl-surface));
+    border-top: 1px solid var(--cl-border);
+  }
+  .btn-save {
+    padding: 11px 28px;
+    background: linear-gradient(135deg, var(--cl-primary), color-mix(in srgb, var(--cl-primary) 80%, var(--cl-accent)));
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-size: 0.97rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-save:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-cancel {
+    padding: 11px 22px;
+    background: var(--cl-surface);
+    color: var(--cl-text);
+    border: 1.5px solid var(--cl-border);
+    border-radius: 9px;
+    font-size: 0.97rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .btn-cancel:hover { border-color: var(--cl-primary); }
+
+  .hint { font-size: 0.8rem; color: var(--cl-muted); margin-top: 3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" autocomplete="off">
+
+  <!-- ── Basic Info ──────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-card-header">👤 Basic Information</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Full Name (English) <span class="req">*</span></label>
+          <input type="text" name="full_name" class="form-control"
+                 value="{{ owner.get('full_name','') }}" required placeholder="e.g. Ahmed Hassan">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Full Name (Arabic)</label>
+          <input type="text" name="full_name_ar" class="form-control" dir="rtl"
+                 value="{{ owner.get('full_name_ar','') }}" placeholder="الاسم بالعربية">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Preferred Doctor</label>
+          <input type="text" name="preferred_doctor" class="form-control"
+                 value="{{ owner.get('preferred_doctor','') }}" placeholder="e.g. Dr. Hatem El Khateeb">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Contact ──────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-card-header">📞 Contact Details</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input type="tel" name="phone" class="form-control"
+                 value="{{ owner.get('phone','') }}" placeholder="+20 10X XXX XXXX">
+        </div>
+        <div class="form-group">
+          <label class="form-label">WhatsApp Number</label>
+          <input type="tel" name="whatsapp_phone" class="form-control"
+                 value="{{ owner.get('whatsapp_phone','') }}" placeholder="+20 10X XXX XXXX">
+          <span class="hint">Leave blank if same as phone</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-control"
+                 value="{{ owner.get('email','') }}" placeholder="owner@example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Preferred Contact Method</label>
+          <select name="preferred_contact" class="form-control">
+            {% for opt in ['WhatsApp', 'Phone', 'Email'] %}
+            <option value="{{ opt }}" {% if owner.get('preferred_contact','WhatsApp') == opt %}selected{% endif %}>
+              {{ opt }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group form-grid-full">
+          <label class="form-label">Address (English)</label>
+          <input type="text" name="address" class="form-control"
+                 value="{{ owner.get('address','') }}" placeholder="Street, Area, City">
+        </div>
+        <div class="form-group form-grid-full">
+          <label class="form-label">Address (Arabic)</label>
+          <input type="text" name="address_ar" class="form-control" dir="rtl"
+                 value="{{ owner.get('address_ar','') }}" placeholder="العنوان بالعربية">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Preferences ─────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-card-header">⚙️ Preferences & Notes</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">VIP Status</label>
+          <div class="checkbox-row">
+            <input type="checkbox" id="vip_flag" name="vip_flag" value="1"
+                   {% if owner.get('vip_flag') %}checked{% endif %}>
+            <label for="vip_flag">Mark as VIP Client <span class="badge-vip-check">⭐ VIP</span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Marketing Consent</label>
+          <div class="checkbox-row">
+            <input type="checkbox" id="marketing_consent" name="marketing_consent" value="1"
+                   {% if owner.get('marketing_consent', 1) %}checked{% endif %}>
+            <label for="marketing_consent">Consent to receive reminders & offers</label>
+          </div>
+        </div>
+        <div class="form-group form-grid-full">
+          <label class="form-label">Internal Notes</label>
+          <textarea name="notes" class="form-control"
+                    placeholder="Any special notes about this client…">{{ owner.get('notes','') }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Actions ─────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-actions">
+      <button type="submit" class="btn-save">
+        {% if is_edit %}💾 Save Changes{% else %}✅ Create Owner{% endif %}
+      </button>
+      {% if is_edit %}
+      <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn-cancel">Cancel</a>
+      {% else %}
+      <a href="{{ url_for('crm.owners_list') }}" class="btn-cancel">Cancel</a>
+      {% endif %}
+    </div>
+  </div>
+
+</form>
+{% endblock %}

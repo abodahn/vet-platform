@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Procurement Dashboard{% endblock %}
+{% block page_title %}Procurement & Suppliers{% endblock %}
+{% block page_sub %}Purchase orders, suppliers, and receiving{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('procurement.order_new_form') }}" class="pf-btn pf-btn-primary">+ New Order</a>
+  <a href="{{ url_for('procurement.suppliers_list') }}" class="pf-btn pf-btn-secondary">Suppliers</a>
+  <a href="{{ url_for('procurement.orders_list') }}" class="pf-btn pf-btn-ghost">All Orders</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stat Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem;">
+
+  <div class="pf-card" style="text-align:center;padding:1.5rem;">
+    <div style="font-size:2rem;font-weight:800;color:var(--pf-primary);">{{ supplier_count }}</div>
+    <div style="color:var(--pf-text-muted);margin-top:.25rem;">Suppliers</div>
+    <a href="{{ url_for('procurement.suppliers_list') }}" style="font-size:.8rem;color:var(--pf-primary);">Manage →</a>
+  </div>
+
+  <div class="pf-card" style="text-align:center;padding:1.5rem;">
+    <div style="font-size:2rem;font-weight:800;color:#f59e0b;">{{ open_po_count }}</div>
+    <div style="color:var(--pf-text-muted);margin-top:.25rem;">Open Orders</div>
+    <a href="{{ url_for('procurement.orders_list') }}?status=Draft" style="font-size:.8rem;color:#f59e0b;">View →</a>
+  </div>
+
+  <div class="pf-card" style="text-align:center;padding:1.5rem;">
+    <div style="font-size:2rem;font-weight:800;color:#10b981;">{{ received_this_month }}</div>
+    <div style="color:var(--pf-text-muted);margin-top:.25rem;">Items Received This Month</div>
+  </div>
+
+  <div class="pf-card" style="text-align:center;padding:1.5rem;">
+    <div style="font-size:2rem;font-weight:800;color:#6366f1;">{{ "%.2f"|format(total_spend) }}</div>
+    <div style="color:var(--pf-text-muted);margin-top:.25rem;">Total Spend EGP (Month)</div>
+  </div>
+
+</div>
+
+<!-- Recent Purchase Orders -->
+<div class="pf-card">
+  <div class="pf-card-header">
+    <div class="pf-card-title">Recent Purchase Orders</div>
+    <a href="{{ url_for('procurement.orders_list') }}" class="pf-btn pf-btn-ghost" style="font-size:.85rem;">View All</a>
+  </div>
+
+  {% if recent_pos %}
+  <div style="overflow-x:auto;">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th>PO #</th>
+          <th>Supplier</th>
+          <th>Date</th>
+          <th>Items</th>
+          <th>Total (EGP)</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for po in recent_pos %}
+        <tr>
+          <td><strong>#{{ po['id'] }}</strong></td>
+          <td>{{ po['supplier_name'] or '—' }}</td>
+          <td>{{ po['order_date'] or '—' }}</td>
+          <td>{{ po['item_count'] }}</td>
+          <td>{{ "%.2f"|format(po['total_amount'] or 0) }}</td>
+          <td>
+            {% if po['status'] == 'Received' %}
+              <span class="pf-badge success">Received</span>
+            {% elif po['status'] == 'Sent' %}
+              <span class="pf-badge warning">Sent</span>
+            {% elif po['status'] == 'Cancelled' %}
+              <span class="pf-badge error">Cancelled</span>
+            {% else %}
+              <span class="pf-badge">Draft</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('procurement.order_detail', order_id=po['id']) }}"
+               class="pf-btn pf-btn-ghost" style="font-size:.8rem;">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:2rem;text-align:center;color:var(--pf-text-muted);">
+    No purchase orders yet.
+    <a href="{{ url_for('procurement.order_new_form') }}">Create your first order →</a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

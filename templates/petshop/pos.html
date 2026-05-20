@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}Point of Sale{% endblock %}
+{% block page_title %}Point of Sale{% endblock %}
+{% block page_sub %}Search products, add to cart, and record payment{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('petshop.orders') }}" class="pf-btn pf-btn-secondary">🧾 Orders</a>
+<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.pos-layout { display:grid; grid-template-columns:1fr 380px; gap:20px; height:calc(100vh - 140px); min-height:500px; }
+.pos-left  { display:flex; flex-direction:column; gap:14px; overflow:hidden; }
+.pos-right { display:flex; flex-direction:column; gap:14px; }
+
+/* Search & filters */
+.pos-search { background:var(--cl-surface); border-radius:12px; padding:14px 16px; box-shadow:var(--cl-shadow-card); }
+.pos-search input { width:100%; padding:10px 14px; border:1.5px solid var(--cl-border); border-radius:9px;
+                    background:var(--cl-bg); color:var(--cl-text); font-size:14px; box-sizing:border-box; }
+.pos-search input:focus { outline:none; border-color:var(--cl-primary); }
+.cat-tabs  { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.cat-tab   { padding:5px 14px; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer;
+             border:1.5px solid var(--cl-border); background:var(--cl-bg); color:var(--cl-text-muted); }
+.cat-tab.active { background:var(--cl-primary); color:#fff; border-color:var(--cl-primary); }
+
+/* Product grid */
+.prod-scroll { flex:1; overflow-y:auto; }
+.prod-grid  { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; padding:2px; }
+.prod-tile  { background:var(--cl-surface); border-radius:10px; padding:12px 10px; text-align:center;
+              cursor:pointer; border:1.5px solid var(--cl-border); transition:.15s;
+              box-shadow:var(--cl-shadow-sm); }
+.prod-tile:hover { border-color:var(--cl-primary); background:var(--cl-primary-subtle); }
+.prod-tile.out  { opacity:.45; cursor:not-allowed; }
+.prod-emoji { font-size:26px; margin-bottom:6px; }
+.prod-tname { font-size:12px; font-weight:700; margin-bottom:4px; line-height:1.3; }
+.prod-tprice{ font-size:13px; font-weight:800; color:var(--cl-primary); }
+.prod-tstock{ font-size:10px; color:var(--cl-text-muted); margin-top:2px; }
+
+/* Cart */
+.cart-card  { background:var(--cl-surface); border-radius:12px; box-shadow:var(--cl-shadow-card); display:flex; flex-direction:column; flex:1; overflow:hidden; }
+.cart-head  { padding:14px 16px; font-size:14px; font-weight:800; color:var(--cl-primary); border-bottom:2px solid var(--cl-border); display:flex; justify-content:space-between; align-items:center; }
+.cart-items { flex:1; overflow-y:auto; padding:10px; }
+.cart-empty { text-align:center; padding:40px 20px; color:var(--cl-text-muted); }
+.cart-item  { display:flex; align-items:center; gap:8px; padding:8px 6px; border-bottom:1px solid var(--cl-border); }
+.ci-name    { flex:1; font-size:12px; font-weight:600; }
+.ci-qty     { display:flex; align-items:center; gap:4px; }
+.ci-qty button { width:24px; height:24px; border-radius:6px; border:1px solid var(--cl-border);
+                 background:var(--cl-bg); cursor:pointer; font-size:14px; font-weight:700; line-height:1; }
+.ci-qty span { width:28px; text-align:center; font-size:13px; font-weight:700; }
+.ci-price   { font-size:12px; font-weight:700; color:var(--cl-primary); white-space:nowrap; }
+.ci-del     { background:none; border:none; color:var(--cl-danger,#dc2626); cursor:pointer; font-size:16px; padding:0 2px; }
+
+/* Totals & payment */
+.cart-totals { padding:12px 14px; border-top:1px solid var(--cl-border); background:var(--cl-bg); }
+.tot-row   { display:flex; justify-content:space-between; font-size:13px; padding:4px 0; }
+.tot-grand { font-size:18px; font-weight:800; color:var(--cl-primary); border-top:2px solid var(--cl-primary); margin-top:6px; padding-top:8px; }
+.pay-section{ padding:12px 14px; border-top:1px solid var(--cl-border); }
+.pay-methods{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px; }
+.pay-btn    { padding:8px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg);
+              cursor:pointer; font-size:12px; font-weight:600; color:var(--cl-text); text-align:center; }
+.pay-btn.active { background:var(--cl-primary); color:#fff; border-color:var(--cl-primary); }
+.owner-search { position:relative; margin-bottom:10px; }
+.owner-search input { width:100%; padding:8px 12px; border:1.5px solid var(--cl-border); border-radius:8px;
+                      background:var(--cl-bg); color:var(--cl-text); font-size:12px; box-sizing:border-box; }
+.owner-dropdown { position:absolute; top:100%; left:0; right:0; background:var(--cl-surface);
+                  border:1px solid var(--cl-border); border-radius:8px; z-index:100; box-shadow:0 8px 24px rgba(0,0,0,.12); display:none; }
+.owner-opt { padding:8px 12px; cursor:pointer; font-size:12px; }
+.owner-opt:hover { background:var(--cl-bg); }
+.charge-btn { width:100%; padding:14px; background:var(--cl-primary); color:#fff; border:none;
+              border-radius:10px; font-size:15px; font-weight:800; cursor:pointer; margin-top:8px; }
+.charge-btn:disabled { opacity:.5; cursor:not-allowed; }
+.paid-input { width:100%; padding:9px 12px; border:1.5px solid var(--cl-border); border-radius:8px;
+              background:var(--cl-bg); color:var(--cl-text); font-size:14px; font-weight:700;
+              box-sizing:border-box; margin-bottom:8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pos-layout">
+
+  <!-- LEFT: Products -->
+  <div class="pos-left">
+    <div class="pos-search">
+      <input type="search" id="prod-search" placeholder="🔍  Search product by name, SKU, or barcode…" autocomplete="off">
+      <div class="cat-tabs">
+        <div class="cat-tab active" data-cat="">All</div>
+        {% for c in categories %}
+        <div class="cat-tab" data-cat="{{ c.id }}">{{ c.name }}</div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="prod-scroll">
+      <div class="prod-grid" id="prod-grid">
+        {% for p in products %}
+        <div class="prod-tile {% if p.stock_qty <= 0 %}out{% endif %}"
+             data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.sell_price }}"
+             data-tax="{{ p.tax_rate }}" data-stock="{{ p.stock_qty }}" data-unit="{{ p.unit }}"
+             data-cat="{{ p.category_id or '' }}"
+             onclick="addToCart(this)">
+          <div class="prod-emoji">
+            {% if 'food' in p.name|lower or 'كيب' in (p.name_ar or '') %}🥩
+            {% elif 'shampoo' in p.name|lower %}🧴
+            {% elif 'collar' in p.name|lower %}🦮
+            {% elif 'toy' in p.name|lower %}🧸
+            {% elif 'supplement' in p.name|lower or 'vitamin' in p.name|lower %}💊
+            {% else %}📦{% endif %}
+          </div>
+          <div class="prod-tname">{{ p.name }}</div>
+          <div class="prod-tprice">{{ "{:,.2f}".format(p.sell_price) }}</div>
+          <div class="prod-tstock">Stock: {{ p.stock_qty }} {{ p.unit }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Cart -->
+  <div class="pos-right">
+    <div class="cart-card">
+      <div class="cart-head">
+        🛒 Cart
+        <button onclick="clearCart()" style="background:none;border:none;color:var(--cl-danger,#dc2626);cursor:pointer;font-size:12px;font-weight:600">Clear</button>
+      </div>
+
+      <div class="cart-items" id="cart-items">
+        <div class="cart-empty" id="cart-empty">
+          <div style="font-size:40px;margin-bottom:8px">🛒</div>
+          Tap a product to add it
+        </div>
+      </div>
+
+      <div class="cart-totals">
+        <div class="tot-row"><span>Subtotal</span><span id="sub-total">0.00 EGP</span></div>
+        <div class="tot-row"><span>Discount</span>
+          <span><input type="number" id="discount-inp" min="0" step="0.5" value="0"
+                        style="width:70px;padding:3px 6px;border:1px solid var(--cl-border);border-radius:5px;background:var(--cl-bg);color:var(--cl-text);font-size:12px;text-align:right"
+                        oninput="recalc()"> EGP</span>
+        </div>
+        <div class="tot-row"><span>Tax</span><span id="tax-total">0.00 EGP</span></div>
+        <div class="tot-row tot-grand"><span>TOTAL</span><span id="grand-total">0.00 EGP</span></div>
+      </div>
+
+      <div class="pay-section">
+        <!-- Owner search -->
+        <div class="owner-search">
+          <input type="text" id="owner-inp" placeholder="👤 Search customer (optional)…" autocomplete="off" oninput="searchOwner(this.value)">
+          <input type="hidden" id="owner-id" value="">
+          <div class="owner-dropdown" id="owner-dropdown"></div>
+        </div>
+
+        <!-- Payment method -->
+        <div class="pay-methods">
+          {% for m in ['Cash','Card','Transfer','Instapay'] %}
+          <div class="pay-btn {% if loop.first %}active{% endif %}" data-method="{{ m }}" onclick="selectMethod(this)">{{ m }}</div>
+          {% endfor %}
+        </div>
+
+        <!-- Cash tendered -->
+        <input type="number" class="paid-input" id="paid-inp" placeholder="Amount tendered (EGP)" min="0" step="0.5" oninput="recalc()">
+        <div id="change-line" style="font-size:13px;font-weight:700;color:#15803d;text-align:right;min-height:18px"></div>
+
+        <button class="charge-btn" id="charge-btn" onclick="submitOrder()" disabled>
+          ✅ Charge — <span id="btn-total">0.00</span> EGP
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt modal -->
+<div id="receipt-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--cl-surface);border-radius:16px;padding:32px;max-width:420px;width:90%;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">✅</div>
+    <div style="font-size:20px;font-weight:800;color:var(--cl-primary);margin-bottom:6px">Sale Complete!</div>
+    <div id="receipt-info" style="font-size:14px;color:var(--cl-text-muted);margin-bottom:20px"></div>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <a id="receipt-link" href="#" target="_blank" class="pf-btn pf-btn-secondary" style="text-decoration:none">🖨️ Print Receipt</a>
+      <button onclick="newSale()" class="pf-btn pf-btn-primary">+ New Sale</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var cart = [];
+var selectedMethod = 'Cash';
+
+// ── Category filter ──────────────────────────────────────────
+document.querySelectorAll('.cat-tab').forEach(function(tab){
+  tab.addEventListener('click', function(){
+    document.querySelectorAll('.cat-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    filterProducts();
+  });
+});
+
+document.getElementById('prod-search').addEventListener('input', filterProducts);
+
+function filterProducts(){
+  var q   = document.getElementById('prod-search').value.toLowerCase();
+  var cat = document.querySelector('.cat-tab.active').dataset.cat;
+  document.querySelectorAll('.prod-tile').forEach(function(tile){
+    var name = tile.dataset.name.toLowerCase();
+    var tc   = tile.dataset.cat;
+    var matchQ   = !q || name.includes(q);
+    var matchCat = !cat || tc === cat;
+    tile.style.display = (matchQ && matchCat) ? '' : 'none';
+  });
+}
+
+// ── Cart ─────────────────────────────────────────────────────
+function addToCart(tile){
+  if(tile.classList.contains('out')) return;
+  var id    = parseInt(tile.dataset.id);
+  var name  = tile.dataset.name;
+  var price = parseFloat(tile.dataset.price);
+  var tax   = parseFloat(tile.dataset.tax)||0;
+  var stock = parseInt(tile.dataset.stock);
+  var unit  = tile.dataset.unit;
+
+  var existing = cart.find(i=>i.id===id);
+  if(existing){
+    if(existing.qty >= stock){ return; }
+    existing.qty++;
+  } else {
+    cart.push({id:id, name:name, price:price, tax:tax, qty:1, stock:stock, unit:unit});
+  }
+  renderCart();
+}
+
+function renderCart(){
+  var el = document.getElementById('cart-items');
+  var empty = document.getElementById('cart-empty');
+  if(cart.length===0){
+    el.innerHTML=''; el.appendChild(empty); empty.style.display='';
+    document.getElementById('charge-btn').disabled=true;
+    recalc(); return;
+  }
+  empty.style.display='none';
+  var html='';
+  cart.forEach(function(item,i){
+    html += '<div class="cart-item">' +
+      '<div class="ci-name">'+item.name+'</div>' +
+      '<div class="ci-qty">' +
+        '<button onclick="changeQty('+i+',-1)">−</button>' +
+        '<span>'+item.qty+'</span>' +
+        '<button onclick="changeQty('+i+',1)">+</button>' +
+      '</div>' +
+      '<div class="ci-price">'+((item.price*item.qty).toFixed(2))+' EGP</div>' +
+      '<button class="ci-del" onclick="removeItem('+i+')">×</button>' +
+    '</div>';
+  });
+  el.innerHTML=html;
+  document.getElementById('charge-btn').disabled=false;
+  recalc();
+}
+
+function changeQty(i,d){
+  cart[i].qty+=d;
+  if(cart[i].qty<=0) cart.splice(i,1);
+  else if(cart[i].qty>cart[i].stock) cart[i].qty=cart[i].stock;
+  renderCart();
+}
+
+function removeItem(i){ cart.splice(i,1); renderCart(); }
+function clearCart(){ cart=[]; renderCart(); }
+
+function recalc(){
+  var sub  = cart.reduce(function(s,i){return s+i.price*i.qty;},0);
+  var disc = parseFloat(document.getElementById('discount-inp').value)||0;
+  var tax  = cart.reduce(function(s,i){return s+i.price*i.qty*(i.tax/100);},0);
+  var grand = sub - disc + tax;
+  if(grand<0) grand=0;
+  var paid = parseFloat(document.getElementById('paid-inp').value)||0;
+  var change = paid - grand;
+
+  document.getElementById('sub-total').textContent   = sub.toFixed(2)+' EGP';
+  document.getElementById('tax-total').textContent   = tax.toFixed(2)+' EGP';
+  document.getElementById('grand-total').textContent = grand.toFixed(2)+' EGP';
+  document.getElementById('btn-total').textContent   = grand.toFixed(2);
+
+  var changeLine = document.getElementById('change-line');
+  if(selectedMethod==='Cash' && paid>0){
+    changeLine.textContent = change>=0 ? 'Change: '+change.toFixed(2)+' EGP' : '⚠️ Underpaid by '+Math.abs(change).toFixed(2)+' EGP';
+    changeLine.style.color = change>=0 ? '#15803d' : '#dc2626';
+  } else { changeLine.textContent=''; }
+}
+
+function selectMethod(btn){
+  document.querySelectorAll('.pay-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedMethod = btn.dataset.method;
+  recalc();
+}
+
+// ── Owner search ─────────────────────────────────────────────
+var ownerTimer;
+function searchOwner(q){
+  clearTimeout(ownerTimer);
+  if(!q){ document.getElementById('owner-dropdown').style.display='none'; return; }
+  ownerTimer=setTimeout(function(){
+    fetch('/petshop/api/owners/search?q='+encodeURIComponent(q))
+      .then(function(r){return r.json();})
+      .then(function(data){
+        var dd=document.getElementById('owner-dropdown');
+        if(!data.length){dd.style.display='none';return;}
+        dd.innerHTML=data.map(function(o){
+          return '<div class="owner-opt" onclick="selectOwner('+o.id+',\''+o.full_name+'\')">'+o.full_name+' — '+o.phone+'</div>';
+        }).join('');
+        dd.style.display='block';
+      });
+  },300);
+}
+
+function selectOwner(id,name){
+  document.getElementById('owner-id').value=id;
+  document.getElementById('owner-inp').value=name;
+  document.getElementById('owner-dropdown').style.display='none';
+}
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.owner-search')) document.getElementById('owner-dropdown').style.display='none';
+});
+
+// ── Submit ───────────────────────────────────────────────────
+function submitOrder(){
+  if(!cart.length) return;
+  var disc  = parseFloat(document.getElementById('discount-inp').value)||0;
+  var paid  = parseFloat(document.getElementById('paid-inp').value)||0;
+  var oid   = document.getElementById('owner-id').value||null;
+  var method= selectedMethod;
+  var sub   = cart.reduce(function(s,i){return s+i.price*i.qty;},0);
+  var tax   = cart.reduce(function(s,i){return s+i.price*i.qty*(i.tax/100);},0);
+  var grand = sub-disc+tax;
+
+  if(method==='Cash' && paid < grand){
+    alert('Amount tendered is less than total. Please enter the correct amount.');
+    return;
+  }
+
+  document.getElementById('charge-btn').disabled=true;
+  document.getElementById('charge-btn').textContent='Processing…';
+
+  fetch('/petshop/orders/create',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRF-Token':'{{ csrf_token }}'},
+    body:JSON.stringify({
+      items: cart.map(function(i){return {product_id:i.id,product_name:i.name,qty:i.qty,unit_price:i.price,tax_rate:i.tax,discount:0};}),
+      owner_id: oid ? parseInt(oid) : null,
+      source: 'in-clinic',
+      payment_method: method,
+      discount_amount: disc,
+      paid_amount: paid,
+    })
+  }).then(function(r){return r.json();})
+  .then(function(data){
+    if(data.error){ alert('Error: '+data.error); document.getElementById('charge-btn').disabled=false; document.getElementById('charge-btn').textContent='✅ Charge'; return; }
+    document.getElementById('receipt-info').innerHTML =
+      '<strong>Order: '+data.order_number+'</strong><br>Total: '+data.total.toFixed(2)+' EGP<br>Change: '+data.change.toFixed(2)+' EGP';
+    document.getElementById('receipt-link').href='/petshop/orders/'+data.order_id;
+    document.getElementById('receipt-modal').style.display='flex';
+  }).catch(function(e){ alert('Network error: '+e); document.getElementById('charge-btn').disabled=false; });
+}
+
+function newSale(){
+  document.getElementById('receipt-modal').style.display='none';
+  cart=[];
+  document.getElementById('discount-inp').value=0;
+  document.getElementById('paid-inp').value='';
+  document.getElementById('owner-id').value='';
+  document.getElementById('owner-inp').value='';
+  renderCart();
+}
+</script>
+{% endblock %}

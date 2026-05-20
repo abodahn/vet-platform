@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Leave Requests{% endblock %}
+{% block page_title %}Leave Requests{% endblock %}
+{% block page_sub %}{{ leaves|length }} requests{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('attendance.leave_new') }}" class="pf-btn pf-btn-primary pf-btn-sm">+ New Request</a>
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filters -->
+<div class="pf-card" style="margin-bottom:16px">
+  <form method="GET" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+    {% if is_manager %}
+    <div class="pf-form-group" style="margin:0;min-width:180px">
+      <label class="pf-form-label">Staff</label>
+      <select name="user_id" class="pf-form-control">
+        <option value="">All Staff</option>
+        {% for s in staff_list %}
+        <option value="{{ s.id }}" {% if user_filter == s.id|string %}selected{% endif %}>{{ s.full_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="pf-form-group" style="margin:0;min-width:140px">
+      <label class="pf-form-label">Status</label>
+      <select name="status" class="pf-form-control">
+        <option value="">All</option>
+        {% for st in ['Pending','Approved','Rejected'] %}
+        <option value="{{ st }}" {% if status_f == st %}selected{% endif %}>{{ st }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="pf-btn pf-btn-primary">Filter</button>
+    <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">Reset</a>
+  </form>
+</div>
+
+<!-- Stats row -->
+{% set pending_count = leaves | selectattr('status','eq','Pending') | list | length %}
+{% set approved_count = leaves | selectattr('status','eq','Approved') | list | length %}
+{% set rejected_count = leaves | selectattr('status','eq','Rejected') | list | length %}
+<div class="pf-stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+  <div class="pf-stat-card" style="--stat-color:#f59e0b">
+    <span class="pf-stat-icon">⏳</span>
+    <div class="pf-stat-label">Pending</div>
+    <div class="pf-stat-value">{{ pending_count }}</div>
+  </div>
+  <div class="pf-stat-card" style="--stat-color:#10b981">
+    <span class="pf-stat-icon">✅</span>
+    <div class="pf-stat-label">Approved</div>
+    <div class="pf-stat-value">{{ approved_count }}</div>
+  </div>
+  <div class="pf-stat-card" style="--stat-color:#ef4444">
+    <span class="pf-stat-icon">❌</span>
+    <div class="pf-stat-label">Rejected</div>
+    <div class="pf-stat-value">{{ rejected_count }}</div>
+  </div>
+</div>
+
+<div class="pf-card">
+  {% if leaves %}
+  <table class="pf-table">
+    <thead>
+      <tr>
+        {% if is_manager %}<th>Staff</th>{% endif %}
+        <th>Leave Type</th>
+        <th>From</th>
+        <th>To</th>
+        <th>Days</th>
+        <th>Reason</th>
+        <th>Status</th>
+        <th>Submitted</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lr in leaves %}
+      <tr>
+        {% if is_manager %}
+        <td style="font-weight:600">{{ lr.staff_name }}</td>
+        {% endif %}
+        <td>
+          <span style="display:inline-flex;align-items:center;gap:5px">
+            <span style="width:8px;height:8px;border-radius:50%;background:{{ lr.color }};display:inline-block"></span>
+            {{ lr.leave_type_name }}
+          </span>
+        </td>
+        <td>{{ lr.start_date }}</td>
+        <td>{{ lr.end_date }}</td>
+        <td style="font-weight:600">{{ lr.days_requested }}</td>
+        <td style="font-size:12px;max-width:180px;color:var(--cl-text-muted)">
+          {{ (lr.reason or '')[:60] }}{% if (lr.reason or '')|length > 60 %}…{% endif %}
+        </td>
+        <td>
+          {% if lr.status == 'Approved' %}<span class="pf-badge active">Approved</span>
+          {% elif lr.status == 'Pending' %}<span class="pf-badge soon">Pending</span>
+          {% else %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b">Rejected</span>{% endif %}
+        </td>
+        <td style="font-size:12px">{{ lr.created_at[:10] }}</td>
+        <td>
+          <a href="{{ url_for('attendance.leave_detail', req_id=lr.id) }}" class="pf-btn pf-btn-sm">View</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:48px;text-align:center;color:var(--cl-text-muted)">
+    No leave requests found.
+    <div style="margin-top:12px">
+      <a href="{{ url_for('attendance.leave_new') }}" class="pf-btn pf-btn-primary pf-btn-sm">Submit a Request</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

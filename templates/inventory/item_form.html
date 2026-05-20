@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_sub %}{% if item %}{{ t('Edit item details', 'تعديل تفاصيل الصنف') }}{% else %}{{ t('Add a new item to inventory', 'إضافة صنف جديد إلى المخزون') }}{% endif %}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('inventory.items_list') }}" class="pf-btn pf-btn-secondary">{{ t('← Back to Items', '← العودة إلى الأصناف') }}</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.pf-btn { padding:8px 18px; border-radius:8px; font-size:0.85rem; font-weight:600; cursor:pointer; border:none; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+.pf-btn-primary { background:var(--cl-primary); color:#fff; }
+.pf-btn-primary:hover { opacity:0.9; }
+.pf-btn-secondary { background:var(--cl-surface); color:var(--cl-text); border:1px solid var(--cl-border); }
+
+.form-card {
+  background:var(--cl-surface); border-radius:14px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.07);
+  margin-bottom:20px; overflow:hidden;
+}
+.form-card-header {
+  padding:14px 22px;
+  background:linear-gradient(135deg, var(--cl-primary) 0%, #1e40af 100%);
+  color:#fff; font-weight:700; font-size:0.95rem;
+  display:flex; align-items:center; gap:10px;
+}
+.form-card-body { padding:22px; }
+.form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+.form-group { display:flex; flex-direction:column; gap:6px; }
+.form-group label { font-size:0.78rem; font-weight:600; color:var(--cl-muted); text-transform:uppercase; }
+.form-group input, .form-group select, .form-group textarea {
+  padding:9px 13px; border:1px solid var(--cl-border); border-radius:9px;
+  font-size:0.88rem; background:var(--cl-bg); color:var(--cl-text);
+  transition:border-color 0.15s, box-shadow 0.15s;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  outline:none; border-color:var(--cl-primary); box-shadow:0 0 0 3px rgba(37,99,235,0.1);
+}
+.form-group textarea { resize:vertical; min-height:80px; }
+.form-group.full { grid-column:1/-1; }
+
+.checkbox-group { display:flex; flex-direction:column; gap:12px; }
+.checkbox-item { display:flex; align-items:flex-start; gap:10px; }
+.checkbox-item input[type=checkbox] { width:18px; height:18px; margin-top:2px; accent-color:var(--cl-primary); cursor:pointer; }
+.checkbox-item label { font-size:0.88rem; color:var(--cl-text); cursor:pointer; }
+.checkbox-item .chk-desc { font-size:0.76rem; color:var(--cl-muted); margin-top:2px; }
+
+.form-actions {
+  display:flex; gap:12px; justify-content:flex-end;
+  padding:18px 22px; border-top:1px solid var(--cl-border);
+  background:var(--cl-bg);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+
+  <!-- Basic Info -->
+  <div class="form-card">
+    <div class="form-card-header">📦 {{ t('Basic Information', 'المعلومات الأساسية') }}</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>{{ t('Item Name (English)', 'اسم الصنف (إنجليزي)') }} *</label>
+          <input type="text" name="name" value="{{ item.name if item else '' }}" required placeholder="{{ t('e.g. Amoxicillin 250mg Capsules', 'مثال: أموكسيسيلين 250 ملج كبسولات') }}">
+        </div>
+        <div class="form-group full">
+          <label>{{ t('Item Name (Arabic)', 'اسم الصنف (عربي)') }}</label>
+          <input type="text" name="name_ar" value="{{ item.name_ar if item else '' }}" placeholder="اسم المنتج بالعربية" dir="rtl">
+        </div>
+        <div class="form-group">
+          <label>{{ t('SKU / Item Code', 'رمز المنتج / كود الصنف') }}</label>
+          <input type="text" name="sku" value="{{ item.sku if item else '' }}" placeholder="{{ t('e.g. MED-001', 'مثال: MED-001') }}">
+        </div>
+        <div class="form-group">
+          <label>{{ t('Barcode', 'الباركود') }}</label>
+          <input type="text" name="barcode" value="{{ item.barcode if item else '' }}" placeholder="{{ t('Scan or enter barcode', 'امسح أو أدخل الباركود') }}">
+        </div>
+        <div class="form-group">
+          <label>{{ t('Category', 'الفئة') }}</label>
+          <select name="category_id">
+            <option value="">{{ t('— Select Category —', '— اختر الفئة —') }}</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}"
+              {% if item and item.category_id|string == cat.id|string %}selected{% endif %}>
+              {{ cat.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>{{ t('Unit of Measure', 'وحدة القياس') }} *</label>
+          <select name="unit">
+            {% for u in ['tablet','capsule','vial','bottle','ampoule','bag','box','tube','unit','ml','mg','g','kg','L','piece'] %}
+            <option value="{{ u }}" {% if item and item.unit == u %}selected{% elif not item and u == 'unit' %}selected{% endif %}>{{ u }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pricing -->
+  <div class="form-card">
+    <div class="form-card-header">💰 {{ t('Pricing', 'التسعير') }}</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>{{ t('Cost Price (EGP)', 'سعر التكلفة (جنيه)') }}</label>
+          <input type="number" name="cost_price" step="0.01" min="0"
+                 value="{{ '%.2f'|format(item.cost_price) if item else '0.00' }}"
+                 placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>{{ t('Sell Price (EGP)', 'سعر البيع (جنيه)') }}</label>
+          <input type="number" name="sell_price" step="0.01" min="0"
+                 value="{{ '%.2f'|format(item.sell_price) if item else '0.00' }}"
+                 placeholder="0.00">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stock Rules -->
+  <div class="form-card">
+    <div class="form-card-header">📊 {{ t('Stock Rules', 'قواعد المخزون') }}</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>{{ t('Reorder Level', 'مستوى إعادة الطلب') }}</label>
+          <input type="number" name="reorder_level" step="1" min="0"
+                 value="{{ item.reorder_level|int if item else '10' }}"
+                 placeholder="10">
+        </div>
+        <div class="form-group">
+          <label>{{ t('Maximum Stock', 'الحد الأقصى للمخزون') }}</label>
+          <input type="number" name="max_stock" step="1" min="0"
+                 value="{{ item.max_stock|int if item else '1000' }}"
+                 placeholder="1000">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flags -->
+  <div class="form-card">
+    <div class="form-card-header">🏷️ {{ t('Item Flags', 'خصائص الصنف') }}</div>
+    <div class="form-card-body">
+      <div class="checkbox-group">
+        <div class="checkbox-item">
+          <input type="checkbox" name="is_medication" id="is_medication"
+                 {% if item and item.is_medication %}checked{% endif %}>
+          <label for="is_medication">
+            <strong>💊 {{ t('Medication', 'دواء') }}</strong>
+            <div class="chk-desc">{{ t('This item is a veterinary medication or drug.', 'هذا الصنف دواء أو عقار بيطري.') }}</div>
+          </label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" name="is_controlled" id="is_controlled"
+                 {% if item and item.is_controlled %}checked{% endif %}>
+          <label for="is_controlled">
+            <strong>🔒 {{ t('Controlled Substance', 'مادة خاضعة للرقابة') }}</strong>
+            <div class="chk-desc">{{ t('Requires special handling and record-keeping under controlled substance regulations.', 'يتطلب معالجة خاصة وتسجيلاً وفق لوائح المواد الخاضعة للرقابة.') }}</div>
+          </label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" name="requires_rx" id="requires_rx"
+                 {% if item and item.requires_rx %}checked{% endif %}>
+          <label for="requires_rx">
+            <strong>📋 {{ t('Requires Prescription', 'يستلزم وصفة طبية') }}</strong>
+            <div class="chk-desc">{{ t('Cannot be dispensed without a valid prescription.', 'لا يمكن صرفه بدون وصفة طبية سارية.') }}</div>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Storage -->
+  <div class="form-card">
+    <div class="form-card-header">🌡️ {{ t('Storage Notes', 'ملاحظات التخزين') }}</div>
+    <div class="form-card-body">
+      <div class="form-group">
+        <label>{{ t('Storage Instructions', 'تعليمات التخزين') }}</label>
+        <textarea name="storage_notes" placeholder="{{ t('e.g. Store below 25°C, away from light. Refrigerate after opening.', 'مثال: يُحفظ في درجة حرارة أقل من 25 درجة مئوية، بعيداً عن الضوء. يُبرَّد بعد الفتح.') }}">{{ item.storage_notes if item else '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="{{ url_for('inventory.items_list') }}" class="pf-btn pf-btn-secondary">{{ t('Cancel', 'إلغاء') }}</a>
+    <button type="submit" class="pf-btn pf-btn-primary">
+      {% if item %}💾 {{ t('Save Changes', 'حفظ التغييرات') }}{% else %}✅ {{ t('Create Item', 'إنشاء الصنف') }}{% endif %}
+    </button>
+  </div>
+
+</form>
+{% endblock %}

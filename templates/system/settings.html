@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Clinic Settings{% endblock %}
+{% block page_title %}Clinic Settings{% endblock %}
+{% block page_sub %}Configure clinic information, preferences, and appearance{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">🖥️ Monitor</a>
+<a href="{{ url_for('system.diagnostics') }}" class="pf-btn pf-btn-secondary">🔬 Diagnostics</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.settings-form { max-width:860px; }
+.form-card { background:var(--cl-surface); border-radius:14px; padding:28px; margin-bottom:24px; box-shadow:0 2px 12px rgba(0,0,0,.07); }
+.form-card-title { font-size:16px; font-weight:700; color:var(--cl-primary); margin-bottom:20px; padding-bottom:12px; border-bottom:2px solid var(--cl-border); display:flex; align-items:center; gap:8px; }
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.form-group { display:flex; flex-direction:column; gap:6px; }
+.form-group.full { grid-column:1/-1; }
+.form-group label { font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.5px; }
+.form-group input, .form-group select, .form-group textarea {
+  padding:10px 14px; border:1.5px solid var(--cl-border); border-radius:8px;
+  background:var(--cl-bg); color:var(--cl-text); font-size:14px; transition:border-color .2s;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  outline:none; border-color:var(--cl-primary);
+}
+.form-group textarea { resize:vertical; min-height:80px; font-family:inherit; }
+.form-actions { display:flex; justify-content:flex-end; padding-top:4px; }
+.btn-save { padding:11px 28px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; }
+.btn-save:hover { opacity:.9; }
+.theme-preview { display:flex; gap:12px; margin-top:8px; }
+.theme-swatch { width:40px; height:40px; border-radius:8px; border:3px solid transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#fff; }
+.theme-swatch.selected { border-color:var(--cl-primary); }
+.hint { font-size:12px; color:var(--cl-muted); margin-top:3px; }
+@media(max-width:600px){ .form-grid{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="settings-form">
+
+  <!-- Clinic Info -->
+  <div class="form-card">
+    <div class="form-card-title">🏥 Clinic Information</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Clinic Name (English) *</label>
+        <input type="text" name="name" value="{{ clinic.get('name','') }}" required placeholder="Premium Animal Hospital">
+      </div>
+      <div class="form-group">
+        <label>Clinic Name (Arabic)</label>
+        <input type="text" name="name_ar" value="{{ clinic.get('name_ar','') }}" placeholder="مستشفى بريميوم للحيوانات" dir="rtl">
+      </div>
+      <div class="form-group">
+        <label>Lead Doctor / Owner</label>
+        <input type="text" name="doctor_name" value="{{ clinic.get('doctor_name','') }}" placeholder="Dr. Hatem El Khateeb">
+      </div>
+      <div class="form-group">
+        <label>Phone Number</label>
+        <input type="tel" name="phone" value="{{ clinic.get('phone','') }}" placeholder="+20 2 xxxx xxxx">
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" name="email" value="{{ clinic.get('email','') }}" placeholder="info@premiumvet.com">
+      </div>
+      <div class="form-group">
+        <label>Website</label>
+        <input type="url" name="website" value="{{ clinic.get('website','') }}" placeholder="https://premiumvet.com">
+      </div>
+      <div class="form-group full">
+        <label>Address</label>
+        <textarea name="address" placeholder="123 Nile Street, Cairo, Egypt">{{ clinic.get('address','') }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>License Number</label>
+        <input type="text" name="license_number" value="{{ clinic.get('license_number','') }}" placeholder="VET-EG-XXXXX">
+      </div>
+      <div class="form-group">
+        <label>Tax / VAT Number</label>
+        <input type="text" name="tax_number" value="{{ clinic.get('tax_number','') }}" placeholder="000-000-000">
+      </div>
+    </div>
+  </div>
+
+  <!-- Preferences -->
+  <div class="form-card">
+    <div class="form-card-title">🌍 Preferences</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Currency</label>
+        <select name="currency">
+          {% for cur in ['EGP','USD','EUR','GBP','SAR','AED'] %}
+          <option value="{{ cur }}" {% if clinic.get('currency','EGP') == cur %}selected{% endif %}>{{ cur }}</option>
+          {% endfor %}
+        </select>
+        <div class="hint">Used on invoices and financial reports</div>
+      </div>
+      <div class="form-group">
+        <label>Timezone</label>
+        <select name="timezone">
+          {% for tz in ['Africa/Cairo','UTC','Asia/Riyadh','Asia/Dubai','Europe/London','America/New_York'] %}
+          <option value="{{ tz }}" {% if clinic.get('timezone','Africa/Cairo') == tz %}selected{% endif %}>{{ tz }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Appearance -->
+  <div class="form-card">
+    <div class="form-card-title">🎨 Appearance</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Default Theme</label>
+        <select name="default_theme">
+          <option value="medical" {% if settings_rows.get('default_theme','medical') == 'medical' %}selected{% endif %}>
+            Medical (White / Navy / Gold)
+          </option>
+          <option value="logo" {% if settings_rows.get('default_theme') == 'logo' %}selected{% endif %}>
+            Logo (Navy / Yellow / Blue)
+          </option>
+        </select>
+        <div class="theme-preview">
+          <div class="theme-swatch {% if settings_rows.get('default_theme','medical') == 'medical' %}selected{% endif %}"
+               style="background:linear-gradient(135deg,#1a3a6b,#c9a84c);" title="Medical Theme">M</div>
+          <div class="theme-swatch {% if settings_rows.get('default_theme') == 'logo' %}selected{% endif %}"
+               style="background:linear-gradient(135deg,#0d1b4b,#f5c518);" title="Logo Theme">L</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Default Language</label>
+        <select name="default_language">
+          <option value="en" {% if settings_rows.get('default_language','en') == 'en' %}selected{% endif %}>English</option>
+          <option value="ar" {% if settings_rows.get('default_language') == 'ar' %}selected{% endif %}>Arabic (عربي)</option>
+        </select>
+        <div class="hint">Applied to new sessions by default</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn-save">💾 Save All Settings</button>
+  </div>
+</form>
+{% endblock %}

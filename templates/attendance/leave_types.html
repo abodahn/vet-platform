@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Leave Types{% endblock %}
+{% block page_title %}Leave Types{% endblock %}
+{% block page_sub %}{{ leave_types|length }} types configured{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('attendance.balances') }}" class="pf-btn pf-btn-sm">⚖️ Balances</a>
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px">
+
+  <!-- Table -->
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div class="pf-card-title">🏖 All Leave Types</div>
+    </div>
+    {% if leave_types %}
+    <table class="pf-table">
+      <thead>
+        <tr><th>Name</th><th>Arabic</th><th>Days/Year</th><th>Type</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for lt in leave_types %}
+        <tr>
+          <td>
+            <span style="display:inline-flex;align-items:center;gap:6px">
+              <span style="width:10px;height:10px;border-radius:50%;background:{{ lt.color }}"></span>
+              <strong>{{ lt.name }}</strong>
+            </span>
+          </td>
+          <td style="font-family:var(--cl-font-ar)">{{ lt.name_ar }}</td>
+          <td style="font-weight:600">{{ lt.days_per_year }}</td>
+          <td>
+            {% if lt.is_paid %}<span class="pf-badge active">Paid</span>
+            {% else %}<span class="pf-badge">Unpaid</span>{% endif %}
+          </td>
+          <td>
+            {% if lt.is_active %}<span class="pf-badge active">Active</span>
+            {% else %}<span class="pf-badge" style="background:#f3f4f6;color:#6b7280">Inactive</span>{% endif %}
+          </td>
+          <td>
+            <button class="pf-btn pf-btn-sm"
+              onclick="editLT({{ lt.id }},'{{ lt.name }}','{{ lt.name_ar }}',{{ lt.days_per_year }},{{ lt.is_paid }},'{{ lt.color }}',{{ lt.is_active }})">Edit</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:40px;text-align:center;color:var(--cl-text-muted)">No leave types defined yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Form -->
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div class="pf-card-title" id="form-title">➕ Add Leave Type</div>
+    </div>
+    <form method="POST" action="{{ url_for('attendance.leave_type_save') }}" id="lt-form">
+      <input type="hidden" name="lt_id" id="lt-id" value="">
+      <div class="pf-form-group">
+        <label class="pf-form-label">Name (English) <span style="color:#ef4444">*</span></label>
+        <input type="text" name="name" id="lt-name" class="pf-form-control" placeholder="e.g. Annual Leave" required>
+      </div>
+      <div class="pf-form-group">
+        <label class="pf-form-label">Name (Arabic)</label>
+        <input type="text" name="name_ar" id="lt-name-ar" class="pf-form-control" placeholder="e.g. إجازة سنوية" dir="rtl">
+      </div>
+      <div class="pf-form-group">
+        <label class="pf-form-label">Days Per Year</label>
+        <input type="number" name="days_per_year" id="lt-days" class="pf-form-control" value="21" min="0" max="365" step="0.5">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="pf-form-group">
+          <label class="pf-form-label">Color</label>
+          <input type="color" name="color" id="lt-color" class="pf-form-control" value="#6366f1" style="height:40px;padding:4px">
+        </div>
+        <div class="pf-form-group" style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" name="is_paid" id="lt-paid" value="1" checked> Paid Leave
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" name="is_active" id="lt-active" value="1" checked> Active
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="pf-btn pf-btn-primary" id="form-submit-btn">Add Type</button>
+        <button type="button" class="pf-btn pf-btn-sm" onclick="resetForm()">Reset</button>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editLT(id, name, nameAr, days, isPaid, color, isActive) {
+  document.getElementById('lt-id').value = id;
+  document.getElementById('lt-name').value = name;
+  document.getElementById('lt-name-ar').value = nameAr;
+  document.getElementById('lt-days').value = days;
+  document.getElementById('lt-paid').checked = isPaid == 1;
+  document.getElementById('lt-color').value = color;
+  document.getElementById('lt-active').checked = isActive == 1;
+  document.getElementById('form-title').textContent = '✏️ Edit Leave Type';
+  document.getElementById('form-submit-btn').textContent = 'Update Type';
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+function resetForm() {
+  document.getElementById('lt-id').value = '';
+  document.getElementById('lt-form').reset();
+  document.getElementById('form-title').textContent = '➕ Add Leave Type';
+  document.getElementById('form-submit-btn').textContent = 'Add Type';
+}
+</script>
+{% endblock %}

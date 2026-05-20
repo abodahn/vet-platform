@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if product else 'New' }} Product{% endblock %}
+{% block page_title %}{{ 'Edit' if product else 'New' }} Product{% endblock %}
+{% block page_sub %}{{ product.name if product else 'Add a new product to the pet shop catalog' }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('petshop.products') }}" class="pf-btn pf-btn-secondary">← Products</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.form-card { background:var(--cl-surface); border-radius:14px; padding:28px; box-shadow:var(--cl-shadow-card); max-width:780px; }
+.form-section { margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--cl-border); }
+.form-section:last-child { border-bottom:none; margin-bottom:0; }
+.form-section-title { font-size:13px; font-weight:800; color:var(--cl-primary); text-transform:uppercase; letter-spacing:.06em; margin-bottom:14px; }
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.form-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+.form-group { display:flex; flex-direction:column; gap:5px; }
+.form-label { font-size:12px; font-weight:700; color:var(--cl-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+.form-control { padding:10px 12px; border:1.5px solid var(--cl-border); border-radius:9px;
+                background:var(--cl-bg); color:var(--cl-text); font-size:13px; }
+.form-control:focus { outline:none; border-color:var(--cl-primary); }
+.form-hint { font-size:11px; color:var(--cl-text-muted); }
+.btn-save { padding:12px 32px; background:var(--cl-primary); color:#fff; border:none;
+            border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; }
+.btn-save:hover { background:var(--cl-primary-dark); }
+</style>
+
+<div class="form-card">
+  <form method="post">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+    <!-- Basic info -->
+    <div class="form-section">
+      <div class="form-section-title">📦 Basic Information</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Product Name (EN) *</label>
+          <input type="text" name="name" class="form-control" required
+                 value="{{ product.name if product else '' }}" placeholder="e.g. Royal Canin Adult Cat Food">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Product Name (AR)</label>
+          <input type="text" name="name_ar" class="form-control" dir="rtl"
+                 value="{{ product.name_ar if product else '' }}">
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:14px">
+        <div class="form-group">
+          <label class="form-label">SKU / Code</label>
+          <input type="text" name="sku" class="form-control"
+                 value="{{ product.sku if product else '' }}" placeholder="e.g. RC-CAT-ADULT-2KG">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Barcode</label>
+          <input type="text" name="barcode" class="form-control"
+                 value="{{ product.barcode if product else '' }}" placeholder="Optional">
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:14px">
+        <div class="form-group">
+          <label class="form-label">Brand</label>
+          <input type="text" name="brand" class="form-control"
+                 value="{{ product.brand if product else '' }}" placeholder="e.g. Royal Canin">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select name="category_id" class="form-control">
+            <option value="">— No Category —</option>
+            {% for c in categories %}
+            <option value="{{ c.id }}"
+              {% if product and product.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-control" rows="2"
+                  placeholder="Optional product description…">{{ product.description if product else '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Species & unit -->
+    <div class="form-section">
+      <div class="form-section-title">🐾 Species & Unit</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Species Applicability</label>
+          <select name="species" class="form-control">
+            {% for s in ['all','dog','cat','bird','rabbit','fish','exotic'] %}
+            <option value="{{ s }}" {% if product and product.species == s %}selected{% elif not product and s == 'all' %}selected{% endif %}>
+              {{ s|capitalize }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unit</label>
+          <select name="unit" class="form-control">
+            {% for u in ['unit','bag','bottle','box','pack','kg','gram','litre','ml','piece','pair','set'] %}
+            <option value="{{ u }}" {% if product and product.unit == u %}selected{% elif not product and u == 'unit' %}selected{% endif %}>
+              {{ u }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="form-section">
+      <div class="form-section-title">💰 Pricing</div>
+      <div class="form-grid-3">
+        <div class="form-group">
+          <label class="form-label">Cost Price (EGP)</label>
+          <input type="number" name="cost_price" class="form-control" step="0.01" min="0"
+                 value="{{ product.cost_price if product else '0' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sell Price (EGP) *</label>
+          <input type="number" name="sell_price" class="form-control" step="0.01" min="0" required
+                 value="{{ product.sell_price if product else '0' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tax Rate (%)</label>
+          <input type="number" name="tax_rate" class="form-control" step="0.1" min="0" max="100"
+                 value="{{ product.tax_rate if product else '0' }}">
+          <span class="form-hint">0 = tax-free</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stock -->
+    <div class="form-section">
+      <div class="form-section-title">📊 Stock</div>
+      <div class="form-grid">
+        {% if not product %}
+        <div class="form-group">
+          <label class="form-label">Opening Stock Qty</label>
+          <input type="number" name="stock_qty" class="form-control" min="0" value="0">
+          <span class="form-hint">Recorded as opening stock movement</span>
+        </div>
+        {% endif %}
+        <div class="form-group">
+          <label class="form-label">Reorder Level (alert when ≤)</label>
+          <input type="number" name="reorder_level" class="form-control" min="0"
+                 value="{{ product.reorder_level if product else '5' }}">
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;padding-top:8px">
+      <button type="submit" class="btn-save">
+        {{ '💾 Save Changes' if product else '➕ Create Product' }}
+      </button>
+      <a href="{{ url_for('petshop.products') }}"
+         style="padding:12px 20px;border-radius:10px;border:1.5px solid var(--cl-border);
+                background:var(--cl-surface);color:var(--cl-text);font-size:13px;font-weight:600;text-decoration:none">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Purchase Orders{% endblock %}
+{% block page_title %}Purchase Orders{% endblock %}
+{% block page_sub %}All procurement orders{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('procurement.order_new_form') }}" class="pf-btn pf-btn-primary">+ New Order</a>
+  <a href="{{ url_for('procurement.dashboard') }}" class="pf-btn pf-btn-ghost">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filter Bar -->
+<div class="pf-filter-bar" style="margin-bottom:1.5rem;">
+  <form method="GET" style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap;">
+    <div>
+      <label class="pf-label">Status</label>
+      <select name="status" class="pf-input" style="min-width:140px;">
+        <option value="All" {% if not status_filter or status_filter=='All' %}selected{% endif %}>All Statuses</option>
+        <option value="Draft"     {% if status_filter=='Draft'     %}selected{% endif %}>Draft</option>
+        <option value="Sent"      {% if status_filter=='Sent'      %}selected{% endif %}>Sent</option>
+        <option value="Received"  {% if status_filter=='Received'  %}selected{% endif %}>Received</option>
+        <option value="Cancelled" {% if status_filter=='Cancelled' %}selected{% endif %}>Cancelled</option>
+      </select>
+    </div>
+    <div>
+      <label class="pf-label">From Date</label>
+      <input type="date" name="date_from" class="pf-input" value="{{ date_from }}">
+    </div>
+    <div>
+      <label class="pf-label">To Date</label>
+      <input type="date" name="date_to" class="pf-input" value="{{ date_to }}">
+    </div>
+    <div style="display:flex;gap:.5rem;">
+      <button type="submit" class="pf-btn pf-btn-primary">Filter</button>
+      <a href="{{ url_for('procurement.orders_list') }}" class="pf-btn pf-btn-ghost">Clear</a>
+    </div>
+  </form>
+</div>
+
+<!-- Orders Table -->
+<div class="pf-card">
+  <div class="pf-card-header">
+    <div class="pf-card-title">
+      Purchase Orders
+      {% if status_filter and status_filter != 'All' %}— {{ status_filter }}{% endif %}
+      ({{ orders|length }})
+    </div>
+  </div>
+
+  {% if orders %}
+  <div style="overflow-x:auto;">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th>PO #</th>
+          <th>Date</th>
+          <th>Supplier</th>
+          <th>Expected Date</th>
+          <th>Items</th>
+          <th>Total (EGP)</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td><strong>#{{ o['id'] }}</strong></td>
+          <td>{{ o['order_date'] or '—' }}</td>
+          <td>{{ o['supplier_name'] or '—' }}</td>
+          <td>{{ o['expected_date'] or '—' }}</td>
+          <td>{{ o['item_count'] }}</td>
+          <td>{{ "%.2f"|format(o['total_amount'] or 0) }}</td>
+          <td>
+            {% if o['status'] == 'Received' %}
+              <span class="pf-badge success">Received</span>
+            {% elif o['status'] == 'Sent' %}
+              <span class="pf-badge warning">Sent</span>
+            {% elif o['status'] == 'Cancelled' %}
+              <span class="pf-badge error">Cancelled</span>
+            {% else %}
+              <span class="pf-badge">Draft</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('procurement.order_detail', order_id=o['id']) }}"
+               class="pf-btn pf-btn-ghost" style="font-size:.8rem;">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:2rem;text-align:center;color:var(--pf-text-muted);">
+    No purchase orders found.
+    <a href="{{ url_for('procurement.order_new_form') }}">Create your first order →</a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

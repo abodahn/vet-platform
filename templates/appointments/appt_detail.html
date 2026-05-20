@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Appointment #{{ appt.id }}{% endblock %}
+{% block page_title %}Appointment #{{ appt.id }}{% endblock %}
+{% block page_sub %}{{ appt.appt_date }} · {{ appt.appt_start }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('appointments.schedule', date=appt.appt_date) }}" class="pf-btn pf-btn-secondary">← Schedule</a>
+{% if appt.status not in ('Completed','Cancelled') %}
+<a href="{{ url_for('appointments.appt_edit', appt_id=appt.id) }}" class="pf-btn pf-btn-primary">✏️ Reschedule</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<style>
+.appt-grid { display:grid; grid-template-columns:2fr 1fr; gap:20px; }
+.card { background:var(--cl-surface); border-radius:12px; padding:24px; box-shadow:0 2px 8px rgba(0,0,0,.07); }
+.card-header { font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--cl-muted); margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--cl-border); }
+.info-row { display:flex; gap:8px; margin-bottom:10px; align-items:flex-start; }
+.info-label { font-size:12px; color:var(--cl-muted); min-width:110px; padding-top:2px; }
+.info-val { font-weight:500; }
+.badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-blue { background:#dbeafe; color:#1d4ed8; }
+.badge-teal { background:#ccfbf1; color:#0f766e; }
+.badge-purple { background:#ede9fe; color:#7c3aed; }
+.badge-green { background:#dcfce7; color:#15803d; }
+.badge-red { background:#fee2e2; color:#dc2626; }
+.badge-gray { background:#f1f5f9; color:#64748b; }
+.badge-amber { background:#fef9c3; color:#a16207; }
+.status-btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+.status-btns button { padding:8px 16px; border:2px solid var(--cl-border); background:var(--cl-bg); border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; transition:.2s; }
+.status-btns button:hover { border-color:var(--cl-primary); color:var(--cl-primary); }
+.priority-Normal { border-left:4px solid var(--cl-info); }
+.priority-Urgent { border-left:4px solid var(--cl-warning); }
+.priority-Emergency { border-left:4px solid var(--cl-danger); }
+@media(max-width:768px){ .appt-grid { grid-template-columns:1fr; } }
+</style>
+
+<div class="appt-grid">
+
+  <!-- Left: Appointment details -->
+  <div>
+    <div class="card priority-{{ appt.priority or 'Normal' }}" style="margin-bottom:20px">
+      <div class="card-header">Appointment Details</div>
+
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+        {% set sc = {'Scheduled':'badge-blue','Confirmed':'badge-teal','Checked-in':'badge-purple','CheckedIn':'badge-purple','Completed':'badge-green','Cancelled':'badge-red','No-Show':'badge-gray','NoShow':'badge-gray'} %}
+        <span class="badge {{ sc.get(appt.status, 'badge-gray') }}" style="font-size:14px; padding:6px 16px;">{{ appt.status }}</span>
+        {% if appt.priority and appt.priority != 'Normal' %}
+          <span class="badge badge-red">{{ appt.priority }}</span>
+        {% endif %}
+        {% if appt.appointment_type %}
+          <span class="badge badge-blue">{{ appt.appointment_type }}</span>
+        {% endif %}
+        <!-- No-Show Risk Badge -->
+        {% if appt.status in ('Scheduled','Confirmed') and appt.owner_id %}
+        <span id="riskBadge" style="display:none;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer"
+              onclick="toggleRiskDetail()" title="Click to see details">Loading risk...</span>
+        {% endif %}
+      </div>
+
+      <div class="info-row"><span class="info-label">Date</span><span class="info-val">{{ appt.appt_date }}</span></div>
+      <div class="info-row"><span class="info-label">Time</span><span class="info-val">{{ appt.appt_start }}{% if appt.appt_end %} – {{ appt.appt_end }}{% endif %} ({{ appt.duration_min or 30 }} min)</span></div>
+      <div class="info-row"><span class="info-label">Doctor</span><span class="info-val">{{ appt.doctor_name or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Channel</span><span class="info-val">{{ appt.channel or 'Walk-in' }}</span></div>
+      {% if appt.reason %}
+      <div class="info-row"><span class="info-label">Reason</span><span class="info-val">{{ appt.reason }}</span></div>
+      {% endif %}
+      {% if appt.symptoms %}
+      <div class="info-row"><span class="info-label">Symptoms</span><span class="info-val">{{ appt.symptoms }}</span></div>
+      {% endif %}
+      {% if appt.notes %}
+      <div class="info-row"><span class="info-label">Notes</span><span class="info-val">{{ appt.notes }}</span></div>
+      {% endif %}
+      {% if appt.checked_in_at %}
+      <div class="info-row"><span class="info-label">Checked In</span><span class="info-val">{{ appt.checked_in_at }}</span></div>
+      {% endif %}
+    </div>
+
+    <!-- Status Update -->
+    <div class="card">
+      <div class="card-header">Update Status</div>
+      <form method="post" action="{{ url_for('appointments.appt_status', appt_id=appt.id) }}">
+        <input type="hidden" name="next" value="{{ request.url }}">
+        <div class="status-btns">
+          {% for s in valid_statuses %}
+          <button type="submit" name="status" value="{{ s }}"
+                  {% if appt.status == s %}style="border-color:var(--cl-primary);background:var(--cl-primary);color:#fff;"{% endif %}>
+            {{ s }}
+          </button>
+          {% endfor %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right: Owner + Pet sidebar -->
+  <div>
+    {% if owner %}
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">Owner</div>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:var(--cl-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;">
+          {{ (owner.full_name or 'U')[:2]|upper }}
+        </div>
+        <div>
+          <div style="font-weight:700;">{{ owner.full_name }}</div>
+          <div style="font-size:13px;color:var(--cl-muted);">{{ owner.phone or '' }}</div>
+        </div>
+      </div>
+      <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn btn-secondary" style="width:100%;text-align:center;">View Profile</a>
+    </div>
+    {% endif %}
+
+    {% if pet %}
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">Patient</div>
+      <div style="font-size:28px; text-align:center; margin-bottom:8px;">
+        {% if pet.species == 'Dog' %}🐕{% elif pet.species == 'Cat' %}🐈{% elif pet.species == 'Bird' %}🐦{% elif pet.species == 'Rabbit' %}🐰{% else %}🐾{% endif %}
+      </div>
+      <div class="info-row"><span class="info-label">Name</span><span class="info-val">{{ pet.pet_name }}</span></div>
+      <div class="info-row"><span class="info-label">Species</span><span class="info-val">{{ pet.species or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Breed</span><span class="info-val">{{ pet.breed or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Sex</span><span class="info-val">{{ pet.sex or '—' }}</span></div>
+      <a href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}" class="btn btn-secondary" style="width:100%;text-align:center;margin-top:8px;">View Medical Record</a>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header">Quick Actions</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <a href="{{ url_for('appointments.appt_new') }}?owner_id={{ appt.owner_id }}&pet_id={{ appt.pet_id }}&date={{ appt.appt_date }}" class="btn btn-primary" style="text-align:center;">New Appointment</a>
+        <a href="{{ url_for('appointments.schedule', date=appt.appt_date) }}" class="btn btn-secondary" style="text-align:center;">Back to Schedule</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Risk detail tooltip -->
+<div id="riskDetail" style="display:none;position:fixed;bottom:24px;right:24px;
+     background:#0f172a;border:1px solid rgba(139,92,246,.4);border-radius:12px;
+     padding:16px 20px;max-width:320px;z-index:999;box-shadow:0 8px 30px rgba(0,0,0,.4)">
+  <div style="color:#e2e8f0;font-weight:700;font-size:.9rem;margin-bottom:8px">📊 No-Show Risk Factors</div>
+  <div id="riskReasons" style="font-size:.8rem;color:#94a3b8;line-height:1.7"></div>
+  <button onclick="document.getElementById('riskDetail').style.display='none'"
+          style="margin-top:10px;background:rgba(255,255,255,.08);border:none;color:#94a3b8;
+                 border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.75rem">Dismiss</button>
+</div>
+
+{% block scripts %}
+<script>
+{% if appt.owner_id and appt.status in ('Scheduled','Confirmed') %}
+(function() {
+  var ownerId  = {{ appt.owner_id }};
+  var apptTime = '{{ appt.appt_start or "" }}';
+  fetch('/appointments/api/risk-score/' + ownerId + '?time=' + encodeURIComponent(apptTime))
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      var badge = document.getElementById('riskBadge');
+      if (!badge) return;
+      badge.style.display = 'inline-block';
+      var score = d.score || 0;
+      var level = d.level || 'low';
+      if (level === 'high') {
+        badge.style.background = '#fee2e2'; badge.style.color = '#991b1b';
+        badge.textContent = '🔴 High No-Show Risk (' + score + '%)';
+      } else if (level === 'medium') {
+        badge.style.background = '#fef3c7'; badge.style.color = '#92400e';
+        badge.textContent = '🟡 Medium Risk (' + score + '%)';
+      } else {
+        badge.style.background = '#dcfce7'; badge.style.color = '#14532d';
+        badge.textContent = '🟢 Low Risk (' + score + '%)';
+      }
+      // Store reasons
+      badge.dataset.reasons = (d.reasons || []).join('\n• ');
+    })
+    .catch(function(){});
+})();
+
+var _riskOpen = false;
+function toggleRiskDetail() {
+  var detail  = document.getElementById('riskDetail');
+  var badge   = document.getElementById('riskBadge');
+  var reasons = badge ? badge.dataset.reasons : '';
+  _riskOpen = !_riskOpen;
+  detail.style.display = _riskOpen ? '' : 'none';
+  if (reasons) {
+    document.getElementById('riskReasons').innerHTML =
+      '• ' + reasons.replace(/\n/g,'<br>• ');
+  } else {
+    document.getElementById('riskReasons').textContent = 'No specific risk factors identified.';
+  }
+}
+{% endif %}
+</script>
+{% endblock %}
+{% endblock %}

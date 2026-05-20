@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+{% block page_sub %}Your in-app alerts and messages{% endblock %}
+
+{% block topbar_actions %}
+{% if notifications %}
+<form method="post" action="{{ url_for('notifications.mark_all_read') }}">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+  <button class="pf-btn pf-btn-secondary">Mark All Read</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="pf-card">
+  {% if notifications %}
+  <ul style="list-style:none;margin:0;padding:0">
+    {% for n in notifications %}
+    <li style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;
+               border-bottom:1px solid var(--cl-border);
+               background:{{ 'var(--cl-bg)' if n.is_read else 'var(--cl-surface)' }};
+               opacity:{{ '0.75' if n.is_read else '1' }}">
+      <span style="font-size:22px;flex-shrink:0;margin-top:2px">{{ n.icon or '🔔' }}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <span style="font-weight:{{ '500' if n.is_read else '700' }};font-size:14px">{{ n.title }}</span>
+          <span style="font-size:11px;color:var(--cl-text-light)">{{ n.created_at }}</span>
+          {% if not n.is_read %}
+          <span class="pf-badge success" style="font-size:10px">New</span>
+          {% endif %}
+        </div>
+        <div style="font-size:13px;color:var(--cl-text-light);margin-top:3px">{{ n.body }}</div>
+        {% if n.link %}
+        <a href="{{ n.link }}" style="font-size:12px;color:var(--cl-primary);margin-top:4px;display:inline-block">
+          View &rarr;
+        </a>
+        {% endif %}
+      </div>
+      {% if not n.is_read %}
+      <button class="pf-btn pf-btn-sm pf-btn-secondary"
+              onclick="markRead({{ n.id }}, this)"
+              style="flex-shrink:0">Read</button>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="pf-empty" style="padding:48px;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">🔔</div>
+    <div style="font-size:16px;font-weight:600">All caught up!</div>
+    <div style="color:var(--cl-text-light);margin-top:4px">No notifications to show.</div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function markRead(id, btn) {
+  fetch('/notifications/mark-read/' + id, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRF-Token': '{{ csrf_token }}'
+    }
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d.ok){
+      var li = btn.closest('li');
+      li.style.opacity = '0.75';
+      li.style.background = 'var(--cl-bg)';
+      btn.remove();
+      var badge = li.querySelector('.pf-badge');
+      if(badge) badge.remove();
+      // Update bell count
+      var bell = document.querySelector('a[href*="notifications"] span[style*="background"]');
+      if(bell){ var c=parseInt(bell.textContent)-1; if(c<=0) bell.remove(); else bell.textContent=c; }
+    }
+  });
+}
+</script>
+{% endblock %}

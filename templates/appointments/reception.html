@@ -1,0 +1,516 @@
+{% extends "base.html" %}
+
+{% block title %}Reception Workspace — {{ today_str }}{% endblock %}
+{% block page_title %}🖥️ Reception Workspace{% endblock %}
+{% block page_sub %}Today · {{ today_str }} · Quick check-in &amp; appointment management{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('appointments.appt_new', date=today_str) }}" class="pf-btn pf-btn-primary">
+    ➕ New Appointment
+  </a>
+  <a href="{{ url_for('appointments.schedule', date=today_str) }}"
+     class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">
+    📅 Day Schedule
+  </a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* ── Layout ──────────────────────────────────────────────── */
+  .rec-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 22px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .rec-layout { grid-template-columns: 1fr; }
+  }
+
+  /* ── Stats bar ───────────────────────────────────────────── */
+  .rec-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  @media (max-width: 700px) {
+    .rec-stats { grid-template-columns: repeat(2, 1fr); }
+  }
+  .rec-stat {
+    background: var(--cl-surface);
+    border: 1.5px solid var(--cl-border);
+    border-radius: 12px;
+    padding: 16px 14px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .rec-stat-icon  { font-size: 1.4rem; margin-bottom: 6px; }
+  .rec-stat-value { font-size: 1.8rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+  .rec-stat-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--cl-text-muted); }
+  .rec-stat.s-checkin .rec-stat-value  { color: #7c3aed; }
+  .rec-stat.s-waiting .rec-stat-value  { color: var(--cl-warning, #f59e0b); }
+  .rec-stat.s-complete .rec-stat-value { color: var(--cl-success, #10b981); }
+  .rec-stat.s-total .rec-stat-value    { color: var(--cl-primary); }
+
+  /* ── Panel headings ──────────────────────────────────────── */
+  .rec-panel {
+    background: var(--cl-surface);
+    border: 1.5px solid var(--cl-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .rec-panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    background: color-mix(in srgb, var(--cl-primary) 5%, var(--cl-surface));
+    border-bottom: 1.5px solid var(--cl-border);
+  }
+  .rec-panel-title {
+    font-size: 0.95rem; font-weight: 800; color: var(--cl-text);
+  }
+  .rec-panel-sub {
+    font-size: 0.78rem; color: var(--cl-text-muted); margin-top: 2px;
+  }
+
+  /* ── Agenda ──────────────────────────────────────────────── */
+  .agenda-slot {
+    display: flex;
+    border-bottom: 1px solid var(--cl-border);
+    min-height: 52px;
+  }
+  .agenda-slot:last-child { border-bottom: none; }
+  .agenda-slot.has-appts {
+    background: color-mix(in srgb, var(--cl-primary) 2%, var(--cl-surface));
+  }
+  .slot-time {
+    width: 72px; flex-shrink: 0;
+    padding: 12px 10px;
+    font-size: 0.78rem; font-weight: 700; color: var(--cl-text-muted);
+    border-right: 2px solid var(--cl-border);
+    display: flex; align-items: flex-start;
+    background: color-mix(in srgb, var(--cl-primary) 3%, var(--cl-bg));
+  }
+  .slot-content {
+    flex: 1; padding: 8px 14px;
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .slot-empty {
+    color: var(--cl-border); font-size: 0.78rem;
+    padding: 16px 14px; font-style: italic;
+  }
+
+  /* ── Appointment blocks ───────────────────────────────────── */
+  .appt-block {
+    display: flex; gap: 0; align-items: stretch;
+    border-radius: 8px; overflow: hidden;
+    text-decoration: none; color: var(--cl-text);
+    border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg);
+    transition: all 0.15s;
+  }
+  .appt-block:hover { transform: translateX(3px); box-shadow: 0 3px 10px rgba(0,0,0,0.09); }
+  .appt-bar { width: 5px; flex-shrink: 0; }
+  .appt-body { flex: 1; padding: 8px 12px; }
+  .appt-row-top {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 3px;
+  }
+  .appt-time  { font-size: 0.8rem; font-weight: 700; color: var(--cl-primary); }
+  .appt-type  { font-size: 0.85rem; font-weight: 700; }
+  .appt-meta  { font-size: 0.78rem; color: var(--cl-text-muted); display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* status badge */
+  .st-badge {
+    font-size: 0.7rem; font-weight: 700; padding: 2px 8px;
+    border-radius: 20px; white-space: nowrap; margin-left: auto;
+  }
+  .st-blue   { background: color-mix(in srgb, #3b82f6 14%, transparent); color: #2563eb; border: 1px solid #93c5fd; }
+  .st-teal   { background: color-mix(in srgb, #0d9488 14%, transparent); color: #0f766e; border: 1px solid #5eead4; }
+  .st-purple { background: color-mix(in srgb, #7c3aed 14%, transparent); color: #6d28d9; border: 1px solid #c4b5fd; }
+  .st-green  { background: color-mix(in srgb, #10b981 14%, transparent); color: #059669; border: 1px solid #6ee7b7; }
+  .st-red    { background: color-mix(in srgb, #ef4444 14%, transparent); color: #dc2626; border: 1px solid #fca5a5; }
+  .st-gray   { background: color-mix(in srgb, #6b7280 14%, transparent); color: #6b7280; border: 1px solid #d1d5db; }
+  .bar-blue   { background: #3b82f6; }
+  .bar-teal   { background: #0d9488; }
+  .bar-purple { background: #7c3aed; }
+  .bar-green  { background: #10b981; }
+  .bar-red    { background: #ef4444; }
+  .bar-gray   { background: #9ca3af; }
+
+  /* priority */
+  .pri-urgent    { color: var(--cl-warning, #f59e0b); font-size: 0.75rem; font-weight: 700; }
+  .pri-emergency { color: var(--cl-danger, #ef4444);  font-size: 0.75rem; font-weight: 700; }
+
+  /* ── Quick check-in panel (right column) ─────────────────── */
+  .checkin-panel {
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  /* owner search */
+  .owner-search-wrap {
+    padding: 16px 18px;
+  }
+  .owner-search-input {
+    width: 100%; padding: 10px 14px;
+    border-radius: 9px;
+    border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg); color: var(--cl-text);
+    font-size: 0.9rem; outline: none;
+    transition: border-color 0.15s;
+  }
+  .owner-search-input:focus { border-color: var(--cl-primary); }
+  .owner-search-hint { font-size: 0.75rem; color: var(--cl-text-muted); margin-top: 6px; }
+
+  /* owner result list */
+  .owner-results {
+    max-height: 280px; overflow-y: auto;
+    border-top: 1px solid var(--cl-border);
+  }
+  .owner-result-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 18px;
+    cursor: pointer; border-bottom: 1px solid var(--cl-border);
+    transition: background 0.12s;
+  }
+  .owner-result-row:last-child { border-bottom: none; }
+  .owner-result-row:hover { background: color-mix(in srgb, var(--cl-primary) 6%, var(--cl-surface)); }
+  .owner-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: color-mix(in srgb, var(--cl-primary) 14%, var(--cl-surface));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; flex-shrink: 0;
+  }
+  .owner-name  { font-size: 0.88rem; font-weight: 700; color: var(--cl-text); }
+  .owner-phone { font-size: 0.75rem; color: var(--cl-text-muted); }
+  .owner-pets-count { margin-left: auto; font-size: 0.72rem; color: var(--cl-primary); font-weight: 700; }
+
+  /* pet list for selected owner */
+  .selected-owner-panel {
+    border-top: 1px solid var(--cl-border);
+    padding: 14px 18px;
+    display: none;
+  }
+  .selected-owner-panel.active { display: block; }
+  .sel-owner-name { font-size: 0.95rem; font-weight: 800; color: var(--cl-text); margin-bottom: 10px; }
+  .pet-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px;
+    background: color-mix(in srgb, var(--cl-primary) 10%, var(--cl-surface));
+    border: 1.5px solid var(--cl-border);
+    font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    transition: all 0.12s; text-decoration: none; color: var(--cl-text);
+    margin: 0 4px 6px 0;
+  }
+  .pet-chip:hover {
+    background: var(--cl-primary); color: #fff; border-color: var(--cl-primary);
+  }
+  .quick-book-btn {
+    display: block; width: 100%;
+    margin-top: 12px; padding: 10px;
+    border-radius: 9px; border: none;
+    background: var(--cl-primary); color: #fff;
+    font-size: 0.88rem; font-weight: 700;
+    cursor: pointer; text-align: center;
+    text-decoration: none; transition: opacity 0.15s;
+  }
+  .quick-book-btn:hover { opacity: 0.88; color: #fff; }
+
+  /* empty state */
+  .empty-agenda {
+    text-align: center; padding: 50px 20px;
+    color: var(--cl-text-muted); font-size: 0.9rem;
+  }
+  .empty-agenda .ei { font-size: 2.5rem; display: block; margin-bottom: 10px; }
+
+  /* scrollable agenda */
+  .agenda-scroll { max-height: 680px; overflow-y: auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Stats bar ──────────────────────────────────────────── -->
+<div class="rec-stats">
+  <div class="rec-stat s-total">
+    <div class="rec-stat-icon">📋</div>
+    <div class="rec-stat-value">{{ total }}</div>
+    <div class="rec-stat-label">Total Today</div>
+  </div>
+  <div class="rec-stat s-checkin">
+    <div class="rec-stat-icon">🏥</div>
+    <div class="rec-stat-value">{{ checked_in }}</div>
+    <div class="rec-stat-label">Checked In</div>
+  </div>
+  <div class="rec-stat s-waiting">
+    <div class="rec-stat-icon">🕐</div>
+    <div class="rec-stat-value">{{ waiting }}</div>
+    <div class="rec-stat-label">Waiting</div>
+  </div>
+  <div class="rec-stat s-complete">
+    <div class="rec-stat-icon">✅</div>
+    <div class="rec-stat-value">{{ completed }}</div>
+    <div class="rec-stat-label">Completed</div>
+  </div>
+</div>
+
+<!-- ── Two-column layout ──────────────────────────────────── -->
+<div class="rec-layout">
+
+  <!-- LEFT: Today's agenda -->
+  <div class="rec-panel">
+    <div class="rec-panel-head">
+      <div>
+        <div class="rec-panel-title">📅 Today's Appointments</div>
+        <div class="rec-panel-sub">{{ today_str }} · {{ total }} appointment{{ 's' if total != 1 }}</div>
+      </div>
+      <a href="{{ url_for('appointments.appt_new', date=today_str) }}"
+         class="pf-btn pf-btn-primary pf-btn-sm">➕ Book</a>
+    </div>
+
+    {% if total > 0 %}
+    <div class="agenda-scroll">
+      {% for slot in agenda %}
+      <div class="agenda-slot {% if slot.appointments %}has-appts{% endif %}">
+        <div class="slot-time">{{ slot.label }}</div>
+        {% if slot.appointments %}
+        <div class="slot-content">
+          {% for appt in slot.appointments %}
+          {% set sc = status_colors.get(appt.status, 'gray') %}
+          <a href="{{ url_for('appointments.appt_detail', appt_id=appt.id) }}" class="appt-block">
+            <div class="appt-bar bar-{{ sc }}"></div>
+            <div class="appt-body">
+              <div class="appt-row-top">
+                <span class="appt-time">{{ appt.appt_start[:5] }}{% if appt.appt_end %}&ndash;{{ appt.appt_end[:5] }}{% endif %}</span>
+                <span class="appt-type">{{ appt.appointment_type }}</span>
+                {% if appt.priority == 'Urgent' %}<span class="pri-urgent">⚡</span>{% endif %}
+                {% if appt.priority == 'Emergency' %}<span class="pri-emergency">🚨</span>{% endif %}
+                <span class="st-badge st-{{ sc }}">{{ appt.status }}</span>
+              </div>
+              <div class="appt-meta">
+                <span>🐾 {{ appt.pet_name }}</span>
+                <span>·</span>
+                <span>👤 {{ appt.owner_name }}</span>
+                {% if appt.doctor_name %}<span>·</span><span>🩺 {{ appt.doctor_name }}</span>{% endif %}
+                {% if appt.reason %}<span>·</span><span style="font-style:italic">{{ appt.reason[:45] }}</span>{% endif %}
+              </div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="slot-empty">—</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="empty-agenda">
+      <span class="ei">📭</span>
+      No appointments scheduled for today.
+      <br>
+      <a href="{{ url_for('appointments.appt_new', date=today_str) }}"
+         class="pf-btn pf-btn-primary" style="margin-top:14px;display:inline-block;">
+        ➕ Book First Appointment
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- RIGHT: Quick check-in panel -->
+  <div class="checkin-panel">
+
+    <!-- Owner search -->
+    <div class="rec-panel">
+      <div class="rec-panel-head">
+        <div>
+          <div class="rec-panel-title">🔍 Owner Lookup</div>
+          <div class="rec-panel-sub">Search by name or phone to check in</div>
+        </div>
+      </div>
+      <div class="owner-search-wrap">
+        <input type="text" id="ownerSearchInput"
+               class="owner-search-input"
+               placeholder="Type owner name or phone…"
+               autocomplete="off">
+        <div class="owner-search-hint">{{ owners|length }} owners registered</div>
+      </div>
+
+      <!-- Results list (filtered by JS) -->
+      <div class="owner-results" id="ownerResults">
+        {% for owner in owners %}
+        <div class="owner-result-row"
+             data-name="{{ (owner.full_name or '')|lower }}"
+             data-phone="{{ (owner.phone or '')|lower }}"
+             data-owner-id="{{ owner.id }}"
+             data-owner-name="{{ owner.full_name }}"
+             data-owner-phone="{{ owner.phone or '' }}"
+             onclick="selectOwner(this)">
+          <div class="owner-avatar">👤</div>
+          <div>
+            <div class="owner-name">{{ owner.full_name }}</div>
+            <div class="owner-phone">{{ owner.phone or 'No phone' }}</div>
+          </div>
+          {% if owner.pet_count is defined %}
+          <div class="owner-pets-count">{{ owner.pet_count }} pet{{ 's' if owner.pet_count != 1 }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Selected owner + pets -->
+      <div class="selected-owner-panel" id="selectedOwnerPanel">
+        <div class="sel-owner-name" id="selectedOwnerName">—</div>
+        <div id="petChipsWrap" style="margin-bottom:4px"></div>
+        <a href="#" id="quickBookLink" class="quick-book-btn">
+          📅 Book Appointment for this Owner
+        </a>
+      </div>
+    </div>
+
+    <!-- Checked-in queue -->
+    <div class="rec-panel">
+      <div class="rec-panel-head">
+        <div>
+          <div class="rec-panel-title">🏥 Checked-In Queue</div>
+          <div class="rec-panel-sub">{{ checked_in }} currently checked in</div>
+        </div>
+      </div>
+      {% set checkin_appts = appointments | selectattr('status', 'in', ['Checked-in', 'CheckedIn']) | list %}
+      {% if checkin_appts %}
+      {% for appt in checkin_appts %}
+      {% set sc = status_colors.get(appt.status, 'purple') %}
+      <div style="padding: 10px 16px; border-bottom: 1px solid var(--cl-border);">
+        <a href="{{ url_for('appointments.appt_detail', appt_id=appt.id) }}"
+           style="text-decoration:none;color:var(--cl-text);">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:0.82rem;font-weight:700;color:#7c3aed;">{{ appt.appt_start[:5] }}</span>
+            <span style="font-size:0.88rem;font-weight:700;">{{ appt.pet_name }}</span>
+            <span class="st-badge st-purple" style="margin-left:auto">Checked In</span>
+          </div>
+          <div style="font-size:0.78rem;color:var(--cl-text-muted);margin-top:3px;">
+            👤 {{ appt.owner_name }}
+            {% if appt.doctor_name %} · 🩺 {{ appt.doctor_name }}{% endif %}
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="padding:24px;text-align:center;color:var(--cl-text-muted);font-size:0.85rem;">
+        No patients currently checked in
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Waiting queue -->
+    <div class="rec-panel">
+      <div class="rec-panel-head">
+        <div>
+          <div class="rec-panel-title">🕐 Waiting / Scheduled</div>
+          <div class="rec-panel-sub">{{ waiting }} appointment{{ 's' if waiting != 1 }} pending</div>
+        </div>
+      </div>
+      {% set waiting_appts = appointments | selectattr('status', 'in', ['Scheduled', 'Confirmed']) | list %}
+      {% if waiting_appts %}
+      {% for appt in waiting_appts[:8] %}
+      <div style="padding:10px 16px;border-bottom:1px solid var(--cl-border);display:flex;align-items:center;gap:10px;">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:0.8rem;font-weight:700;color:var(--cl-primary)">{{ appt.appt_start[:5] }}</span>
+            <span style="font-size:0.85rem;font-weight:700">{{ appt.pet_name }}</span>
+            <span class="st-badge st-{% if appt.status == 'Confirmed' %}teal{% else %}blue{% endif %}"
+                  style="margin-left:auto">{{ appt.status }}</span>
+          </div>
+          <div style="font-size:0.75rem;color:var(--cl-text-muted);margin-top:2px;">
+            👤 {{ appt.owner_name }} · {{ appt.appointment_type }}
+          </div>
+        </div>
+        <!-- Quick check-in button -->
+        <form method="post" action="{{ url_for('appointments.appt_status', appt_id=appt.id) }}" style="flex-shrink:0">
+          <input type="hidden" name="status" value="Checked-in">
+          <input type="hidden" name="next" value="{{ url_for('appointments.reception') }}">
+          <button type="submit"
+                  class="pf-btn pf-btn-sm"
+                  style="background:color-mix(in srgb,#7c3aed 12%,transparent);color:#6d28d9;border:1.5px solid #c4b5fd;font-size:0.75rem;padding:5px 10px;">
+            Check In
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+      {% if waiting_appts|length > 8 %}
+      <div style="padding:10px 16px;text-align:center;font-size:0.78rem;color:var(--cl-text-muted)">
+        +{{ waiting_appts|length - 8 }} more —
+        <a href="{{ url_for('appointments.schedule', date=today_str) }}" style="color:var(--cl-primary)">view all</a>
+      </div>
+      {% endif %}
+      {% else %}
+      <div style="padding:24px;text-align:center;color:var(--cl-text-muted);font-size:0.85rem;">
+        No appointments waiting
+      </div>
+      {% endif %}
+    </div>
+
+  </div><!-- end right column -->
+</div><!-- end rec-layout -->
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+/* ── Owner search filter ─────────────────────────────────── */
+const searchInput  = document.getElementById('ownerSearchInput');
+const ownerResults = document.getElementById('ownerResults');
+const allRows      = Array.from(ownerResults.querySelectorAll('.owner-result-row'));
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim().toLowerCase();
+  allRows.forEach(row => {
+    const match = !q || row.dataset.name.includes(q) || row.dataset.phone.includes(q);
+    row.style.display = match ? '' : 'none';
+  });
+});
+
+/* ── Owner selection → show pets ────────────────────────── */
+async function selectOwner(row) {
+  const ownerId   = row.dataset.ownerId;
+  const ownerName = row.dataset.ownerName;
+  const ownerPhone = row.dataset.ownerPhone;
+
+  // Highlight selected row
+  allRows.forEach(r => r.style.background = '');
+  row.style.background = 'color-mix(in srgb, var(--cl-primary) 8%, var(--cl-surface))';
+
+  // Show panel
+  const panel = document.getElementById('selectedOwnerPanel');
+  panel.classList.add('active');
+  document.getElementById('selectedOwnerName').textContent = ownerName + (ownerPhone ? ' · ' + ownerPhone : '');
+
+  // Set quick-book link
+  document.getElementById('quickBookLink').href =
+    '{{ url_for("appointments.appt_new") }}?owner_id=' + ownerId +
+    '&date={{ today_str }}';
+
+  // Fetch pets
+  const petsWrap = document.getElementById('petChipsWrap');
+  petsWrap.innerHTML = '<span style="font-size:0.78rem;color:var(--cl-text-muted)">Loading pets…</span>';
+  try {
+    const resp = await fetch('/appointments/api/pets?owner_id=' + ownerId);
+    const pets = await resp.json();
+    if (pets.length === 0) {
+      petsWrap.innerHTML = '<span style="font-size:0.78rem;color:var(--cl-text-muted)">No pets registered</span>';
+    } else {
+      petsWrap.innerHTML = pets.map(p =>
+        `<a class="pet-chip"
+            href="/appointments/new?owner_id=${ownerId}&pet_id=${p.id}&date={{ today_str }}">
+           🐾 ${p.pet_name}${p.species ? ' <span style="opacity:.7;font-size:.72rem">(${p.species})</span>' : ''}
+         </a>`
+      ).join('');
+    }
+  } catch(e) {
+    petsWrap.innerHTML = '<span style="font-size:0.78rem;color:var(--cl-danger)">Could not load pets</span>';
+  }
+}
+</script>
+{% endblock %}

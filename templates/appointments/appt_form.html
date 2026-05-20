@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+
+{% block title %}New Appointment{% endblock %}
+{% block page_title %}New Appointment{% endblock %}
+{% block page_sub %}Book a visit for a patient{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('appointments.schedule') }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);">
+    ← Schedule
+  </a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  .form-card {
+    background: var(--cl-surface);
+    border-radius: 14px;
+    box-shadow: 0 2px 18px rgba(0,0,0,0.08);
+    margin-bottom: 22px;
+    overflow: hidden;
+  }
+  .form-card-header {
+    background: linear-gradient(135deg, var(--cl-primary) 0%, color-mix(in srgb, var(--cl-primary) 80%, var(--cl-accent)) 100%);
+    color: #fff; padding: 16px 24px;
+    font-size: 1rem; font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .form-card-body { padding: 24px; }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 18px;
+  }
+  .form-grid-full { grid-column: 1 / -1; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label {
+    font-size: 0.85rem; font-weight: 600;
+    color: var(--cl-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .form-label .req { color: var(--cl-danger); margin-left: 2px; }
+  .form-control {
+    padding: 10px 14px;
+    border: 1.5px solid var(--cl-border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: var(--cl-bg);
+    color: var(--cl-text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%; box-sizing: border-box;
+  }
+  .form-control:focus {
+    border-color: var(--cl-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--cl-primary) 15%, transparent);
+  }
+  select.form-control { cursor: pointer; }
+  textarea.form-control { resize: vertical; min-height: 85px; }
+
+  /* Type selector pills */
+  .type-grid {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .type-opt { display: none; }
+  .type-label {
+    padding: 8px 16px; border-radius: 8px;
+    border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg); color: var(--cl-text);
+    font-size: 0.88rem; font-weight: 600;
+    cursor: pointer; transition: all 0.18s;
+  }
+  .type-label:hover { border-color: var(--cl-primary); color: var(--cl-primary); }
+  .type-opt:checked + .type-label {
+    background: var(--cl-primary); color: #fff;
+    border-color: var(--cl-primary);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--cl-primary) 30%, transparent);
+  }
+
+  /* Priority selector */
+  .priority-grid { display: flex; gap: 8px; }
+  .prio-opt { display: none; }
+  .prio-label {
+    flex: 1; text-align: center;
+    padding: 9px 12px; border-radius: 8px;
+    border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg); color: var(--cl-text);
+    font-size: 0.88rem; font-weight: 700; cursor: pointer;
+    transition: all 0.18s;
+  }
+  .prio-opt:checked + .prio-label.normal   { background: var(--cl-success); color: #fff; border-color: var(--cl-success); }
+  .prio-opt:checked + .prio-label.urgent   { background: var(--cl-warning); color: #fff; border-color: var(--cl-warning); }
+  .prio-opt:checked + .prio-label.emergency{ background: var(--cl-danger);  color: #fff; border-color: var(--cl-danger); }
+
+  /* Slot picker */
+  .slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 7px;
+  }
+  .slot-opt { display: none; }
+  .slot-label {
+    display: block; text-align: center;
+    padding: 8px 6px; border-radius: 7px;
+    border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg); color: var(--cl-text);
+    font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .slot-label:hover { border-color: var(--cl-primary); color: var(--cl-primary); }
+  .slot-opt:checked + .slot-label {
+    background: var(--cl-primary); color: #fff; border-color: var(--cl-primary);
+  }
+  .slot-label.unavailable {
+    opacity: 0.35; cursor: not-allowed;
+    text-decoration: line-through;
+    pointer-events: none;
+  }
+
+  .pet-hint {
+    font-size: 0.82rem; color: var(--cl-muted);
+    padding: 8px 12px; border-radius: 7px;
+    background: color-mix(in srgb, var(--cl-info) 8%, var(--cl-bg));
+    border: 1px solid color-mix(in srgb, var(--cl-info) 20%, var(--cl-border));
+  }
+
+  .form-actions {
+    display: flex; gap: 12px; align-items: center;
+    padding: 20px 24px;
+    background: color-mix(in srgb, var(--cl-primary) 4%, var(--cl-surface));
+    border-top: 1px solid var(--cl-border);
+  }
+  .btn-save {
+    padding: 11px 28px;
+    background: linear-gradient(135deg, var(--cl-primary), color-mix(in srgb, var(--cl-primary) 80%, var(--cl-accent)));
+    color: #fff; border: none; border-radius: 9px;
+    font-size: 0.97rem; font-weight: 700;
+    cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-save:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-cancel {
+    padding: 11px 22px;
+    background: var(--cl-surface); color: var(--cl-text);
+    border: 1.5px solid var(--cl-border); border-radius: 9px;
+    font-size: 0.97rem; font-weight: 600; text-decoration: none;
+    cursor: pointer; transition: border-color 0.2s;
+  }
+  .btn-cancel:hover { border-color: var(--cl-primary); }
+  .hint { font-size: 0.8rem; color: var(--cl-muted); margin-top: 3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="appt-form" autocomplete="off">
+
+  <!-- ── Patient Section ─────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-card-header">🐾 Patient</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+
+        <div class="form-group">
+          <label class="form-label">Owner <span class="req">*</span></label>
+          <select name="owner_id" id="owner-select" class="form-control" required>
+            <option value="">— Select Owner —</option>
+            {% for owner in owners %}
+            <option value="{{ owner.id }}"
+              {% if owner.id | string == prefill_owner_id %}selected{% endif %}>
+              {{ owner.full_name }}{% if owner.phone %} · {{ owner.phone }}{% endif %}{% if owner.vip_flag %} ⭐{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <span class="hint">Start typing to filter, then select</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Pet <span class="req">*</span></label>
+          <select name="pet_id" id="pet-select" class="form-control" required>
+            <option value="">— Select Pet —</option>
+            {% for pet in pets %}
+            <option value="{{ pet.id }}"
+              {% if pet.id | string == prefill_pet_id %}selected{% endif %}>
+              {{ pet.pet_name }}{% if pet.species %} ({{ pet.species }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          {% if not pets and prefill_owner_id %}
+          <span class="pet-hint">ℹ️ No pets found for this owner. <a href="{{ url_for('crm.pet_new', owner_id=prefill_owner_id) }}">Add a pet first →</a></span>
+          {% elif not prefill_owner_id %}
+          <span class="hint">Select an owner first — pet list will reload</span>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Doctor / Vet</label>
+          <select name="doctor_name" id="doctor-select" class="form-control">
+            <option value="">— Assign Doctor —</option>
+            {% for doc in doctors %}
+            <option value="{{ doc.full_name }}">{{ doc.full_name }}</option>
+            {% endfor %}
+            <option value="Dr. Hatem El Khateeb">Dr. Hatem El Khateeb</option>
+          </select>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Appointment Details ─────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-card-header">📋 Appointment Details</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+
+        <div class="form-group form-grid-full">
+          <label class="form-label">Type <span class="req">*</span></label>
+          <div class="type-grid">
+            {% set type_icons = {'Consultation':'🩺','Vaccination':'💉','Surgery':'🔧','Grooming':'✂️','Lab':'🔬','Follow-up':'📋','Emergency':'🚨'} %}
+            {% for t in appt_types %}
+            <span>
+              <input type="radio" name="appointment_type" id="type_{{ t }}" value="{{ t }}"
+                     class="type-opt" {% if t == 'Consultation' %}checked{% endif %}>
+              <label for="type_{{ t }}" class="type-label">{{ type_icons.get(t,'') }} {{ t }}</label>
+            </span>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="form-group form-grid-full">
+          <label class="form-label">Priority</label>
+          <div class="priority-grid">
+            <span>
+              <input type="radio" name="priority" id="prio_Normal" value="Normal" class="prio-opt" checked>
+              <label for="prio_Normal" class="prio-label normal">✅ Normal</label>
+            </span>
+            <span>
+              <input type="radio" name="priority" id="prio_Urgent" value="Urgent" class="prio-opt">
+              <label for="prio_Urgent" class="prio-label urgent">⚡ Urgent</label>
+            </span>
+            <span>
+              <input type="radio" name="priority" id="prio_Emergency" value="Emergency" class="prio-opt">
+              <label for="prio_Emergency" class="prio-label emergency">🚨 Emergency</label>
+            </span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Date <span class="req">*</span></label>
+          <input type="date" name="appt_date" id="appt-date" class="form-control"
+                 value="{{ prefill_date }}" required min="{{ today_str if today_str else '' }}">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Duration</label>
+          <select name="duration_min" class="form-control">
+            {% for mins, label in [(15,'15 min'),(30,'30 min'),(45,'45 min'),(60,'1 hour'),(90,'1.5 hours'),(120,'2 hours')] %}
+            <option value="{{ mins }}" {% if mins == 30 %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Channel</label>
+          <select name="channel" class="form-control">
+            {% set ch_icons = {'Walk-in':'🚶','WhatsApp':'💬','Phone':'📞','Online':'🌐'} %}
+            {% for ch in channels %}
+            <option value="{{ ch }}">{{ ch_icons.get(ch,'') }} {{ ch }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+      </div>
+
+      <!-- Time slot picker -->
+      <div class="form-group" style="margin-top: 20px;">
+        <label class="form-label">Start Time <span class="req">*</span></label>
+        <div class="slots-grid" id="slots-grid">
+          {% for hour in range(8, 20) %}
+            {% for minute in [0, 30] %}
+            {% set t = "%02d:%02d" | format(hour, minute) %}
+            <span>
+              <input type="radio" name="appt_start" id="slot_{{ t }}" value="{{ t }}" class="slot-opt"
+                     {% if t == '09:00' %}checked{% endif %}>
+              <label for="slot_{{ t }}" class="slot-label">{{ t }}</label>
+            </span>
+            {% endfor %}
+          {% endfor %}
+        </div>
+        <span class="hint" style="margin-top:8px;">Grey slots are unavailable for the selected date/doctor</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Notes ──────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-card-header">📝 Reason & Notes</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+        <div class="form-group form-grid-full">
+          <label class="form-label">Reason for Visit</label>
+          <input type="text" name="reason" class="form-control"
+                 placeholder="e.g. Annual checkup, limping, vaccination due…">
+        </div>
+        <div class="form-group form-grid-full">
+          <label class="form-label">Symptoms (if any)</label>
+          <textarea name="symptoms" class="form-control"
+                    placeholder="Describe observed symptoms…"></textarea>
+        </div>
+        <div class="form-group form-grid-full">
+          <label class="form-label">Internal Notes</label>
+          <textarea name="notes" class="form-control"
+                    placeholder="Notes for the clinical team…"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Actions ────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-actions">
+      <button type="submit" class="btn-save">✅ Book Appointment</button>
+      <a href="{{ url_for('appointments.schedule') }}" class="btn-cancel">Cancel</a>
+    </div>
+  </div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var ownerSel  = document.getElementById('owner-select');
+  var petSel    = document.getElementById('pet-select');
+  var datePick  = document.getElementById('appt-date');
+  var doctorSel = document.getElementById('doctor-select');
+  var slotsGrid = document.getElementById('slots-grid');
+
+  // ── Pet dropdown reload when owner changes ──────────────
+  ownerSel.addEventListener('change', function () {
+    var ownerId = this.value;
+    if (!ownerId) {
+      petSel.innerHTML = '<option value="">— Select Pet —</option>';
+      return;
+    }
+    fetch('/appointments/api/pets?owner_id=' + ownerId)
+      .then(function (r) { return r.json(); })
+      .then(function (pets) {
+        petSel.innerHTML = '<option value="">— Select Pet —</option>';
+        pets.forEach(function (p) {
+          var opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.pet_name + (p.species ? ' (' + p.species + ')' : '');
+          petSel.appendChild(opt);
+        });
+        if (pets.length === 1) petSel.value = pets[0].id;
+      })
+      .catch(function () {});
+  });
+
+  // ── Slot availability refresh ───────────────────────────
+  function refreshSlots() {
+    var d = datePick ? datePick.value : '';
+    var doc = doctorSel ? doctorSel.value : '';
+    if (!d) return;
+    fetch('/appointments/api/slots?date=' + d + '&doctor=' + encodeURIComponent(doc))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var slots = data.slots || [];
+        slots.forEach(function (slot) {
+          var lbl = document.querySelector('label[for="slot_' + slot.time.replace(':', '_') + '"]');
+          // also try with colons
+          if (!lbl) {
+            lbl = document.querySelector('label[for="slot_' + slot.time + '"]');
+          }
+          if (lbl) {
+            if (!slot.available) {
+              lbl.classList.add('unavailable');
+            } else {
+              lbl.classList.remove('unavailable');
+            }
+          }
+        });
+      })
+      .catch(function () {});
+  }
+
+  if (datePick)  datePick.addEventListener('change', refreshSlots);
+  if (doctorSel) doctorSel.addEventListener('change', refreshSlots);
+
+  // Run on load
+  refreshSlots();
+})();
+</script>
+{% endblock %}

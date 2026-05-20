@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% block title %}Custom Report Builder{% endblock %}
+{% block page_title %}Custom Report Builder{% endblock %}
+{% block page_sub %}Build any report — choose source, columns, filters, and export format{% endblock %}
+
+{% block content %}
+<style>
+.rb-grid{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start}
+@media(max-width:900px){.rb-grid{grid-template-columns:1fr}}
+.rb-col-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.rb-col-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1.5px solid var(--cl-border);border-radius:6px;cursor:pointer;transition:all .15s;font-size:.85rem}
+.rb-col-item:hover{border-color:var(--cl-primary);background:rgba(var(--cl-primary-rgb),.05)}
+.rb-col-item.checked{border-color:var(--cl-primary);background:rgba(var(--cl-primary-rgb),.1);font-weight:600}
+.rb-col-item input{accent-color:var(--cl-primary);cursor:pointer}
+.source-card{border:2px solid var(--cl-border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px;margin-bottom:8px;font-weight:600}
+.source-card:hover{border-color:var(--cl-primary)}
+.source-card.active{border-color:var(--cl-primary);background:rgba(var(--cl-primary-rgb),.07)}
+.source-card input{accent-color:var(--cl-primary)}
+.saved-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--cl-border)}
+.saved-row:last-child{border-bottom:none}
+.pf-badge.builder{background:#dbeafe;color:#1d4ed8;border-radius:6px;padding:2px 8px;font-size:.78rem}
+</style>
+
+<!-- AI Natural Language Query Bar -->
+<div style="background:linear-gradient(135deg,#0f172a,#1e1b4b);border:1px solid rgba(139,92,246,.4);
+            border-radius:14px;padding:18px 22px;margin-bottom:22px;position:relative;overflow:hidden">
+  <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;
+              background:radial-gradient(circle,rgba(139,92,246,.15) 0%,transparent 70%);
+              border-radius:50%;pointer-events:none"></div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <span style="background:linear-gradient(135deg,#8b5cf6,#3b82f6);border-radius:8px;
+                 padding:5px 9px;font-size:1rem">✨</span>
+    <div style="color:#e2e8f0;font-weight:700;font-size:.95rem">AI Report Builder</div>
+    <div style="color:rgba(148,163,184,.7);font-size:.78rem;margin-left:4px">Describe what you want in plain English</div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <input type="text" id="nlQuery" placeholder="e.g. unpaid invoices from last month · dogs treated for vomiting this week · inventory below reorder level"
+           style="flex:1;padding:10px 14px;background:rgba(255,255,255,.08);border:1px solid rgba(139,92,246,.4);
+                  border-radius:8px;color:#e2e8f0;font-size:.88rem;outline:none"
+           onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='rgba(139,92,246,.4)'"
+           onkeydown="if(event.key==='Enter')runNlQuery()">
+    <button onclick="runNlQuery()" id="nlBtn"
+            style="padding:10px 18px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;
+                   border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:.88rem;
+                   white-space:nowrap;transition:opacity .2s">
+      🤖 Build Report
+    </button>
+  </div>
+  <div id="nlResult" style="display:none;margin-top:12px;padding:8px 12px;background:rgba(16,185,129,.1);
+       border:1px solid rgba(16,185,129,.3);border-radius:8px;color:#6ee7b7;font-size:.82rem"></div>
+</div>
+
+<script>
+function runNlQuery() {
+  var q = document.getElementById('nlQuery').value.trim();
+  if (!q) return;
+  var btn = document.getElementById('nlBtn');
+  btn.disabled = true; btn.textContent = '...';
+  var result = document.getElementById('nlResult');
+
+  var _csrf = (document.querySelector('meta[name=csrf-token]')||{}).content || '';
+  fetch('/ai/nl-report', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRF-Token':_csrf},
+    body: JSON.stringify({query: q})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    // Apply to form
+    if (d.source) {
+      var radio = document.querySelector('input[name=source][value="' + d.source + '"]');
+      if (radio) { radio.checked = true; selectSource(d.source); }
+    }
+    if (d.date_from) document.getElementById('f_date_from').value = d.date_from;
+    if (d.date_to)   document.getElementById('f_date_to').value   = d.date_to;
+    if (d.status)    document.getElementById('f_status').value    = d.status;
+    result.style.display = '';
+    result.textContent = '✅ ' + (d.suggestion || 'Report configured. Review and click Run.');
+  })
+  .catch(function() {
+    result.style.display = '';
+    result.style.background = 'rgba(239,68,68,.1)';
+    result.style.color = '#fca5a5';
+    result.style.borderColor = 'rgba(239,68,68,.3)';
+    result.textContent = '⚠️ AI unavailable. Please configure manually.';
+  })
+  .finally(function() { btn.disabled = false; btn.textContent = '🤖 Build Report'; });
+}
+</script>
+
+<form method="post" action="{{ url_for('reports.builder_run') }}" id="builderForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  <div class="rb-grid">
+
+    <!-- LEFT PANEL — Source + Columns -->
+    <div>
+      <div class="pf-card" style="margin-bottom:16px">
+        <div class="pf-card-header"><h3 class="pf-card-title">1. Data Source</h3></div>
+        <div style="padding:1rem">
+          {% for key, src in sources.items() %}
+          <label class="source-card" id="src-card-{{ key }}">
+            <input type="radio" name="source" value="{{ key }}"
+                   onchange="selectSource('{{ key }}')"
+                   {% if loop.first %}checked{% endif %}>
+            <span style="font-size:1.2rem">
+              {% if key=='invoices' %}🧾{% elif key=='appointments' %}📅{% elif key=='visits' %}🏥
+              {% elif key=='payments' %}💳{% elif key=='owners' %}👤{% elif key=='pets' %}🐾
+              {% elif key=='expenses' %}💸{% elif key=='inventory' %}📦{% else %}📋{% endif %}
+            </span>
+            <span>{{ src.label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Columns panel — updated via JS -->
+      <div class="pf-card" style="margin-bottom:16px">
+        <div class="pf-card-header" style="display:flex;align-items:center;justify-content:space-between">
+          <h3 class="pf-card-title">2. Columns</h3>
+          <div style="display:flex;gap:6px">
+            <button type="button" onclick="toggleAll(true)" class="pf-btn pf-btn-sm pf-btn-ghost">All</button>
+            <button type="button" onclick="toggleAll(false)" class="pf-btn pf-btn-sm pf-btn-ghost">None</button>
+          </div>
+        </div>
+        <div style="padding:1rem" id="colsPanel">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL — Filters + Options + Run -->
+    <div>
+      <div class="pf-card" style="margin-bottom:16px">
+        <div class="pf-card-header"><h3 class="pf-card-title">3. Filters</h3></div>
+        <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div>
+            <label class="pf-label">Date From</label>
+            <input type="date" name="date_from" class="pf-input" id="f_date_from">
+          </div>
+          <div>
+            <label class="pf-label">Date To</label>
+            <input type="date" name="date_to" class="pf-input" id="f_date_to">
+          </div>
+          <div id="statusWrap" style="display:none;grid-column:span 2">
+            <label class="pf-label">Status Filter</label>
+            <select name="status_filter" class="pf-input" id="f_status">
+              <option value="">— All Statuses —</option>
+            </select>
+          </div>
+          <div>
+            <label class="pf-label">Row Limit</label>
+            <select name="limit" class="pf-input">
+              <option value="100">100 rows</option>
+              <option value="250">250 rows</option>
+              <option value="500" selected>500 rows</option>
+              <option value="1000">1000 rows</option>
+              <option value="2000">2000 rows (max)</option>
+            </select>
+          </div>
+          <div>
+            <label class="pf-label">Output Format</label>
+            <select name="format" class="pf-input" id="f_format">
+              <option value="html">View in Browser</option>
+              <option value="csv">Download CSV</option>
+              <option value="xlsx">Download Excel (.xlsx)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="pf-card" style="margin-bottom:16px">
+        <div class="pf-card-header"><h3 class="pf-card-title">4. Run Report</h3></div>
+        <div style="padding:1.25rem">
+          <button type="submit" class="pf-btn pf-btn-primary" style="font-size:1rem;padding:10px 28px">
+            ▶ Run Report
+          </button>
+          <span style="color:var(--cl-muted);font-size:.85rem;margin-left:12px">
+            Results open in a new page
+          </span>
+        </div>
+      </div>
+
+      <!-- Save Report -->
+      <div class="pf-card" style="margin-bottom:16px">
+        <div class="pf-card-header"><h3 class="pf-card-title">💾 Save Report Config</h3></div>
+        <div style="padding:1.25rem;display:flex;gap:8px">
+          <input type="text" name="report_name" id="reportName" class="pf-input" placeholder="Report name (e.g. Monthly Invoices)">
+          <button type="button" onclick="saveReport()" class="pf-btn pf-btn-secondary" style="white-space:nowrap">Save</button>
+        </div>
+      </div>
+
+      <!-- Saved Reports -->
+      {% if saved %}
+      <div class="pf-card">
+        <div class="pf-card-header"><h3 class="pf-card-title">📁 Saved Reports</h3></div>
+        <div style="padding:.75rem 1.25rem">
+          {% for r in saved %}
+          <div class="saved-row">
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:.9rem">{{ r.name }}</div>
+              <div style="font-size:.78rem;color:var(--cl-muted)">
+                <span class="pf-badge builder">{{ r.source }}</span>
+                &nbsp;{{ (r.created_at or '')[:16] }}
+                {% if r.created_by %}&nbsp;by {{ r.created_by }}{% endif %}
+              </div>
+            </div>
+            <a href="{{ url_for('reports.builder_saved', rid=r.id) }}"
+               class="pf-btn pf-btn-sm pf-btn-secondary">▶ Run</a>
+            <form method="post" action="{{ url_for('reports.builder_delete', rid=r.id) }}"
+                  style="display:inline" onsubmit="return confirm('Delete saved report?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="pf-btn pf-btn-sm pf-btn-ghost" style="color:var(--pf-error)">🗑</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</form>
+
+<!-- Hidden save form (POST to builder_save) -->
+<form method="post" action="{{ url_for('reports.builder_save') }}" id="saveForm" style="display:none">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="name" id="sf_name">
+  <input type="hidden" name="source" id="sf_source">
+  <input type="hidden" name="date_from" id="sf_date_from">
+  <input type="hidden" name="date_to" id="sf_date_to">
+  <input type="hidden" name="status_filter" id="sf_status">
+  <input type="hidden" name="limit" id="sf_limit">
+  <div id="sf_cols"></div>
+</form>
+
+<script>
+// Source → columns/status metadata (built from server-side SOURCES dict)
+var SOURCES = {{ sources | tojson }};
+
+var currentSource = "{{ sources.keys() | list | first }}";
+
+function selectSource(key) {
+  currentSource = key;
+  // Update card styles
+  document.querySelectorAll('.source-card').forEach(function(el) {
+    el.classList.remove('active');
+  });
+  var card = document.getElementById('src-card-' + key);
+  if (card) card.classList.add('active');
+  renderCols(key);
+  renderStatus(key);
+}
+
+function renderCols(key) {
+  var src = SOURCES[key];
+  if (!src) return;
+  var html = '<div class="rb-col-grid">';
+  var cols = src.cols;
+  var i = 0;
+  for (var col in cols) {
+    var lbl = cols[col];
+    var checked = (i < 6) ? 'checked' : '';  // pre-check first 6
+    html += '<label class="rb-col-item' + (i<6?' checked':'') + '" id="lbl-' + col.replace(/\./g,'_') + '">' +
+      '<input type="checkbox" name="cols" value="' + col + '" ' + checked +
+      ' onchange="updateColStyle(this)">' + lbl + '</label>';
+    i++;
+  }
+  html += '</div>';
+  document.getElementById('colsPanel').innerHTML = html;
+}
+
+function updateColStyle(cb) {
+  var lbl = cb.closest('label');
+  if (cb.checked) lbl.classList.add('checked');
+  else lbl.classList.remove('checked');
+}
+
+function toggleAll(state) {
+  document.querySelectorAll('#colsPanel input[type=checkbox]').forEach(function(cb) {
+    cb.checked = state;
+    updateColStyle(cb);
+  });
+}
+
+function renderStatus(key) {
+  var src = SOURCES[key];
+  var wrap = document.getElementById('statusWrap');
+  var sel = document.getElementById('f_status');
+  if (!src || !src.status_col) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+  sel.innerHTML = '<option value="">— All Statuses —</option>';
+  (src.status_vals || []).forEach(function(v) {
+    sel.innerHTML += '<option value="' + v + '">' + v + '</option>';
+  });
+}
+
+function saveReport() {
+  var name = document.getElementById('reportName').value.trim();
+  if (!name) { alert('Please enter a report name.'); return; }
+  // Collect checked cols
+  var sf = document.getElementById('saveForm');
+  var colContainer = document.getElementById('sf_cols');
+  colContainer.innerHTML = '';
+  document.querySelectorAll('#colsPanel input[type=checkbox]:checked').forEach(function(cb) {
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'cols'; inp.value = cb.value;
+    colContainer.appendChild(inp);
+  });
+  document.getElementById('sf_name').value = name;
+  document.getElementById('sf_source').value = currentSource;
+  document.getElementById('sf_date_from').value = document.getElementById('f_date_from').value;
+  document.getElementById('sf_date_to').value = document.getElementById('f_date_to').value;
+  document.getElementById('sf_status').value = document.getElementById('f_status').value;
+  var limitSel = document.querySelector('[name=limit]');
+  document.getElementById('sf_limit').value = limitSel ? limitSel.value : '500';
+  sf.submit();
+}
+
+// Init on load
+document.addEventListener('DOMContentLoaded', function() {
+  selectSource(currentSource);
+});
+</script>
+{% endblock %}

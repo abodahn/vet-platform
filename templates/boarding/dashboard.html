@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Boarding{% endblock %}
+{% block page_title %}Boarding{% endblock %}
+{% block page_sub %}Pet hotel rooms & stay management{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('boarding.booking_new_form') }}" class="pf-btn pf-btn-primary">+ New Booking</a>
+<a href="{{ url_for('boarding.rooms_list') }}" class="pf-btn pf-btn-secondary">Manage Rooms</a>
+{% endblock %}
+
+{% block content %}
+<!-- Stat cards -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;margin-bottom:1.5rem">
+  <div class="pf-card" style="text-align:center;padding:1.25rem">
+    <div style="font-size:2rem;font-weight:800;color:var(--pf-primary)">{{ total_rooms }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Total Rooms</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1.25rem">
+    <div style="font-size:2rem;font-weight:800;color:#ef4444">{{ occupied }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Occupied</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1.25rem">
+    <div style="font-size:2rem;font-weight:800;color:#10b981">{{ available }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Available</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1.25rem">
+    <div style="font-size:2rem;font-weight:800;color:#f59e0b">{{ checkout_today }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Checkout Today</div>
+  </div>
+</div>
+
+<!-- Room grid -->
+<div class="pf-card" style="margin-bottom:1.5rem">
+  <div class="pf-card-header" style="display:flex;justify-content:space-between;align-items:center">
+    <h3 class="pf-card-title">🏠 Room Status</h3>
+    <a href="{{ url_for('boarding.bookings_list') }}" class="pf-btn pf-btn-ghost" style="font-size:.85rem">All Bookings →</a>
+  </div>
+  <div style="padding:1.25rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem">
+    {% for r in rooms %}
+    {% set is_occupied = r.active_bookings and r.active_bookings > 0 %}
+    <div style="border:2px solid {% if is_occupied %}#f59e0b{% else %}#10b981{% endif %};
+                border-radius:10px;padding:1rem;
+                background:{% if is_occupied %}#fffbeb{% else %}#f0fdf4{% endif %}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+        <div style="font-size:1.1rem;font-weight:800;color:{% if is_occupied %}#92400e{% else %}#065f46{% endif %}">
+          Room {{ r.room_number }}
+        </div>
+        <span style="font-size:.75rem;font-weight:600;color:{% if is_occupied %}#92400e{% else %}#065f46{% endif %}">
+          {% if is_occupied %}OCCUPIED{% else %}FREE{% endif %}
+        </span>
+      </div>
+      <div style="font-size:.8rem;color:var(--pf-muted);margin-bottom:.5rem">
+        {{ r.room_type or 'Standard' }} · {{ r.daily_rate or 0 }} EGP/day
+      </div>
+      {% if is_occupied and r.pet_name %}
+      <div style="border-top:1px solid {% if is_occupied %}#fcd34d{% else %}#86efac{% endif %};padding-top:.5rem;margin-top:.5rem;font-size:.83rem">
+        <div style="font-weight:600">🐾 {{ r.pet_name }}</div>
+        <div style="color:var(--pf-muted)">{{ r.owner_name }}</div>
+        <div style="color:var(--pf-muted);font-size:.78rem;margin-top:.2rem">
+          In: {{ (r.checkin_date or '')[:10] }}<br>
+          Out: {{ (r.expected_checkout or '')[:10] }}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div style="grid-column:span 4;text-align:center;color:var(--pf-muted);padding:2rem">
+      No rooms configured yet. <a href="{{ url_for('boarding.rooms_list') }}">Add rooms →</a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

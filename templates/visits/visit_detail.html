@@ -1,0 +1,1097 @@
+{% extends "base.html" %}
+
+{% block title %}Visit #{{ visit.id }} — {{ visit.pet_name }}{% endblock %}
+
+{% block page_title %}Visit #{{ visit.id }} — {{ visit.pet_name }}{% endblock %}
+{% block page_sub %}{{ visit.visit_date[:16] if visit.visit_date else '' }} · {{ visit.visit_type }} · Dr. {{ visit.doctor_name }}</{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('visits.visits_list') }}" class="pf-btn">← Visits</a>
+  <a href="{{ url_for('visits.visit_print', visit_id=visit.id) }}" target="_blank" class="pf-btn">
+    🖨 Print
+  </a>
+  {# ── Invoice link ──────────────────────────────────── #}
+  {% if invoice %}
+    <a href="{{ url_for('finance.invoice_detail', inv_id=invoice.id) }}"
+       class="pf-btn" style="background:var(--cl-accent);color:#fff">
+      🧾 Invoice {{ invoice.invoice_number }}
+    </a>
+  {% elif visit.status == 'Completed' %}
+    <a href="{{ url_for('visits.visit_invoice', visit_id=visit.id) }}"
+       class="pf-btn pf-btn-secondary">🧾 Create Invoice</a>
+  {% endif %}
+  {# ── Pharmacy dispense link ───────────────────────── #}
+  {% if prescriptions %}
+    <a href="{{ url_for('pharmacy.index') }}" class="pf-btn"
+       style="background:#7c3aed;color:#fff">💊 Pharmacy</a>
+  {% endif %}
+  {% if visit.status == 'Open' %}
+    {% if diagnoses %}
+    <button onclick="loadDischargeInstructions({{ visit.id }})"
+            style="background:linear-gradient(135deg,#16a34a,#10b981);color:#fff;border:none;
+                   border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:600;font-size:.85rem">
+      📋 Discharge Instructions
+    </button>
+    <form method="post" action="{{ url_for('visits.complete_visit', visit_id=visit.id) }}" style="display:inline">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="pf-btn pf-btn-primary"
+              onclick="return confirm('Mark this visit as Completed? An invoice will be auto-generated.')">
+        ✔ Complete Visit
+      </button>
+    </form>
+    {% else %}
+    <button class="pf-btn" disabled title="Add a diagnosis first"
+            style="opacity:.5;cursor:not-allowed">✔ Complete Visit</button>
+    {% endif %}
+  {% else %}
+    <span class="pf-badge" style="background:var(--cl-success);color:#fff;padding:.4rem .8rem;border-radius:8px">
+      ✔ Completed
+    </span>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if visit.status == 'Open' and not diagnoses %}
+<div style="background:var(--cl-warning);color:#7a5200;border-radius:10px;padding:.8rem 1.2rem;
+            margin-bottom:1rem;display:flex;align-items:center;gap:.6rem;font-weight:500">
+  ⚠️ Add at least one diagnosis before completing this visit.
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:300px 1fr;gap:1.5rem;align-items:start">
+
+  <!-- ══════════════════════════════
+       LEFT PANEL
+  ═══════════════════════════════ -->
+  <div style="display:flex;flex-direction:column;gap:1rem">
+
+    <!-- Patient Card -->
+    <div class="pf-card">
+      <div style="text-align:center;padding:.5rem 0 1rem">
+        <div style="font-size:2.5rem">
+          {% if visit.species == 'Dog' %}🐶
+          {% elif visit.species == 'Cat' %}🐱
+          {% elif visit.species == 'Bird' %}🦜
+          {% elif visit.species == 'Rabbit' %}🐰
+          {% else %}🐾{% endif %}
+        </div>
+        <div style="font-size:1.2rem;font-weight:700;margin-top:.3rem">{{ visit.pet_name }}</div>
+        <div style="color:var(--cl-muted);font-size:.88rem">{{ visit.species }}{% if visit.breed %} · {{ visit.breed }}{% endif %}</div>
+      </div>
+      <div style="border-top:1px solid var(--cl-border);padding-top:.8rem;display:grid;gap:.5rem">
+        <div style="display:flex;justify-content:space-between;font-size:.88rem">
+          <span style="color:var(--cl-muted)">Sex</span>
+          <span style="font-weight:500">{{ visit.sex or '—' }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.88rem">
+          <span style="color:var(--cl-muted)">Record Weight</span>
+          <span style="font-weight:500">{{ visit.pet_weight or '—' }} kg</span>
+        </div>
+        {% if visit.pet_dob %}
+        <div style="display:flex;justify-content:space-between;font-size:.88rem">
+          <span style="color:var(--cl-muted)">DOB</span>
+          <span style="font-weight:500">{{ visit.pet_dob }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Allergies Warning -->
+    {% if visit.allergies %}
+    <div style="background:#fff0f0;border:1.5px solid var(--cl-danger);border-radius:10px;
+                padding:.8rem 1rem">
+      <div style="font-weight:700;color:var(--cl-danger);margin-bottom:.3rem">⚠️ Allergies</div>
+      <div style="font-size:.9rem;color:var(--cl-danger)">{{ visit.allergies }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Owner Card -->
+    <div class="pf-card">
+      <div style="font-weight:700;margin-bottom:.7rem;color:var(--cl-muted);font-size:.8rem;
+                  text-transform:uppercase;letter-spacing:.06em">Owner</div>
+      <div style="font-weight:600;font-size:1rem;margin-bottom:.3rem">{{ visit.owner_name }}</div>
+      <div style="font-size:.88rem;color:var(--cl-muted);margin-bottom:.5rem">{{ visit.owner_phone }}</div>
+      {% if visit.owner_phone %}
+      <a href="https://wa.me/{{ visit.owner_phone | replace('+','') | replace(' ','') | replace('-','') }}"
+         target="_blank"
+         style="display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;
+                color:#25d366;text-decoration:none;font-weight:600">
+        💬 WhatsApp
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Vitals Card -->
+    <div class="pf-card">
+      <div style="font-weight:700;margin-bottom:.7rem;color:var(--cl-muted);font-size:.8rem;
+                  text-transform:uppercase;letter-spacing:.06em">Visit Vitals</div>
+      <div style="display:grid;gap:.5rem">
+        <div style="display:flex;justify-content:space-between;font-size:.88rem">
+          <span style="color:var(--cl-muted)">Weight</span>
+          <span style="font-weight:600">{{ visit.weight_kg or '—' }} {% if visit.weight_kg %}kg{% endif %}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.88rem">
+          <span style="color:var(--cl-muted)">Temperature</span>
+          <span style="font-weight:600">{{ visit.temp_c or '—' }} {% if visit.temp_c %}°C{% endif %}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.88rem">
+          <span style="color:var(--cl-muted)">Heart Rate</span>
+          <span style="font-weight:600">{{ visit.heart_rate or '—' }} {% if visit.heart_rate %}bpm{% endif %}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visit Meta -->
+    <div class="pf-card">
+      <div style="font-weight:700;margin-bottom:.7rem;color:var(--cl-muted);font-size:.8rem;
+                  text-transform:uppercase;letter-spacing:.06em">Visit Info</div>
+      <div style="display:grid;gap:.5rem">
+        <div style="display:flex;justify-content:space-between;font-size:.88rem">
+          <span style="color:var(--cl-muted)">Date</span>
+          <span style="font-weight:500">{{ visit.visit_date[:10] if visit.visit_date else '—' }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.88rem">
+          <span style="color:var(--cl-muted)">Type</span>
+          <span style="font-weight:500">{{ visit.visit_type or '—' }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.88rem">
+          <span style="color:var(--cl-muted)">Doctor</span>
+          <span style="font-weight:500">{{ visit.doctor_name or '—' }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.88rem">
+          <span style="color:var(--cl-muted)">Status</span>
+          <span>
+            {% if visit.status == 'Open' %}
+              <span class="pf-badge" style="background:var(--cl-info);color:#fff">Open</span>
+            {% elif visit.status == 'Completed' %}
+              <span class="pf-badge" style="background:var(--cl-success);color:#fff">Completed</span>
+            {% else %}
+              <span class="pf-badge" style="background:var(--cl-muted);color:#fff">{{ visit.status }}</span>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <!-- end left panel -->
+
+  <!-- ══════════════════════════════
+       RIGHT PANEL
+  ═══════════════════════════════ -->
+  <div style="display:flex;flex-direction:column;gap:1.5rem">
+
+    <!-- Chief Complaint -->
+    {% if visit.chief_complaint %}
+    <div class="pf-card" style="border-left:4px solid var(--cl-primary)">
+      <div style="font-weight:700;margin-bottom:.5rem">Chief Complaint</div>
+      <div style="font-size:.95rem">{{ visit.chief_complaint }}</div>
+      {% if visit.symptoms %}
+      <div style="margin-top:.7rem;font-size:.88rem;color:var(--cl-muted)">
+        <strong>Symptoms:</strong> {{ visit.symptoms }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ─── SOAP NOTES ─── -->
+    <div class="pf-card" id="soap">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div class="pf-card-title">📝 SOAP Clinical Notes</div>
+        {% if visit.soap_subjective or visit.soap_objective or visit.soap_assessment or visit.soap_plan %}
+        <span class="pf-badge success" style="font-size:11px">Recorded</span>
+        {% endif %}
+      </div>
+
+      {% if visit.soap_subjective or visit.soap_objective or visit.soap_assessment or visit.soap_plan %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        {% for label, icon, field in [
+          ('Subjective','👤','soap_subjective'),
+          ('Objective','🔍','soap_objective'),
+          ('Assessment','🧠','soap_assessment'),
+          ('Plan','💊','soap_plan')
+        ] %}
+        <div style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;padding:12px">
+          <div style="font-size:11px;font-weight:700;color:var(--cl-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
+            {{ icon }} {{ label }}
+          </div>
+          <div style="font-size:13px;white-space:pre-wrap">{{ visit[field] or '—' }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if visit.status == 'Open' %}
+      <details {% if not (visit.soap_subjective or visit.soap_objective) %}open{% endif %}>
+        <summary style="cursor:pointer;font-weight:600;font-size:.9rem;color:var(--cl-primary);
+                         margin-bottom:.8rem;list-style:none">
+          {% if visit.soap_subjective or visit.soap_objective %}✏️ Update SOAP Notes{% else %}＋ Record SOAP Notes{% endif %}
+        </summary>
+        <form method="post" action="{{ url_for('visits.save_soap', visit_id=visit.id) }}"
+              style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
+                     padding:1rem;display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <div>
+            <label class="pf-label">👤 Subjective <span style="font-weight:400;color:var(--cl-muted)">(owner reports)</span></label>
+            <textarea name="soap_subjective" class="pf-input" rows="3"
+                      placeholder="What the owner reports: symptoms, history, concerns…">{{ visit.soap_subjective or '' }}</textarea>
+          </div>
+          <div>
+            <label class="pf-label">🔍 Objective <span style="font-weight:400;color:var(--cl-muted)">(doctor observes)</span></label>
+            <textarea name="soap_objective" class="pf-input" rows="3"
+                      placeholder="Physical exam findings, vitals, lab results…">{{ visit.soap_objective or '' }}</textarea>
+          </div>
+          <div>
+            <label class="pf-label">🧠 Assessment <span style="font-weight:400;color:var(--cl-muted)">(diagnosis / evaluation)</span></label>
+            <textarea name="soap_assessment" class="pf-input" rows="3"
+                      placeholder="Clinical interpretation, differential diagnosis…">{{ visit.soap_assessment or '' }}</textarea>
+          </div>
+          <div>
+            <label class="pf-label">💊 Plan <span style="font-weight:400;color:var(--cl-muted)">(treatment plan)</span></label>
+            <textarea name="soap_plan" class="pf-input" rows="3"
+                      placeholder="Medications, follow-up, client education…">{{ visit.soap_plan or '' }}</textarea>
+          </div>
+          <div style="grid-column:span 2;text-align:right">
+            <button type="submit" class="pf-btn pf-btn-primary">Save SOAP Notes</button>
+          </div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    <!-- ─── DIAGNOSIS SECTION ─── -->
+    <div class="pf-card" id="diagnosis">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div class="pf-card-title">🔍 Diagnosis</div>
+        <span style="font-size:.82rem;color:var(--cl-muted)">{{ diagnoses|length }} record(s)</span>
+      </div>
+
+      {% if diagnoses %}
+      <div style="display:flex;flex-direction:column;gap:.6rem;margin-bottom:1.2rem">
+        {% for d in diagnoses %}
+        <div style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
+                    padding:.7rem 1rem;display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-weight:600">{{ d.diagnosis_text }}</div>
+            {% if d.notes %}
+            <div style="font-size:.85rem;color:var(--cl-muted);margin-top:.2rem">{{ d.notes }}</div>
+            {% endif %}
+            <div style="font-size:.78rem;color:var(--cl-muted);margin-top:.3rem">{{ d.created_at[:16] if d.created_at else '' }}</div>
+          </div>
+          <span style="white-space:nowrap;margin-left:.8rem">
+            {% if d.severity == 'Mild' %}
+              <span class="pf-badge" style="background:var(--cl-success);color:#fff">Mild</span>
+            {% elif d.severity == 'Moderate' %}
+              <span class="pf-badge" style="background:var(--cl-warning);color:#7a5200">Moderate</span>
+            {% elif d.severity == 'Severe' %}
+              <span class="pf-badge" style="background:var(--cl-danger);color:#fff">Severe</span>
+            {% elif d.severity == 'Critical' %}
+              <span class="pf-badge" style="background:#7b0000;color:#fff">Critical</span>
+            {% endif %}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="color:var(--cl-muted);font-size:.9rem;margin-bottom:1rem">No diagnoses recorded yet.</div>
+      {% endif %}
+
+      {% if visit.status == 'Open' %}
+      <details {% if not diagnoses %}open{% endif %}>
+        <summary style="cursor:pointer;font-weight:600;font-size:.9rem;color:var(--cl-primary);
+                         margin-bottom:.8rem;list-style:none">
+          ＋ Add Diagnosis
+        </summary>
+        <form method="post" action="{{ url_for('visits.add_diagnosis', visit_id=visit.id) }}"
+              style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
+                     padding:1rem;display:grid;gap:.8rem">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <div>
+            <label class="pf-label">Diagnosis <span style="color:var(--cl-danger)">*</span></label>
+            <input type="text" name="diagnosis_text" class="pf-input" required
+                   placeholder="e.g. Acute gastroenteritis">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+            <div>
+              <label class="pf-label">Severity</label>
+              <select name="severity" class="pf-input">
+                <option value="Mild">Mild</option>
+                <option value="Moderate">Moderate</option>
+                <option value="Severe">Severe</option>
+                <option value="Critical">Critical</option>
+              </select>
+            </div>
+            <div>
+              <label class="pf-label">Notes</label>
+              <input type="text" name="diagnosis_notes" class="pf-input"
+                     placeholder="Additional notes…">
+            </div>
+          </div>
+          <div style="text-align:right">
+            <button type="submit" class="pf-btn pf-btn-primary">Add Diagnosis</button>
+          </div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    <!-- ─── TREATMENT PLAN ─── -->
+    <div class="pf-card" id="treatment">
+      <div class="pf-card-title" style="margin-bottom:1rem">💊 Treatment Plan</div>
+
+      {% if treatment %}
+      <div style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
+                  padding:1rem;margin-bottom:1rem">
+        <div style="margin-bottom:.5rem"><strong>Plan:</strong> {{ treatment.plan_text or '—' }}</div>
+        {% if treatment.goals %}
+        <div style="margin-bottom:.5rem"><strong>Goals:</strong> {{ treatment.goals }}</div>
+        {% endif %}
+        {% if treatment.duration %}
+        <div style="margin-bottom:.5rem"><strong>Duration:</strong> {{ treatment.duration }}</div>
+        {% endif %}
+        {% if treatment.followup_in %}
+        <div><strong>Follow-up:</strong> in {{ treatment.followup_in }} {{ treatment.followup_unit or 'days' }}</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if visit.status == 'Open' %}
+      <details {% if not treatment %}open{% endif %}>
+        <summary style="cursor:pointer;font-weight:600;font-size:.9rem;color:var(--cl-primary);
+                         margin-bottom:.8rem;list-style:none">
+          {% if treatment %}✏️ Update Plan{% else %}＋ Add Treatment Plan{% endif %}
+        </summary>
+        <form method="post" action="{{ url_for('visits.save_treatment', visit_id=visit.id) }}"
+              style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
+                     padding:1rem;display:grid;gap:.8rem">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <div>
+            <label class="pf-label">Treatment Plan</label>
+            <textarea name="plan_text" class="pf-input" rows="3"
+                      placeholder="Describe the treatment approach…">{{ treatment.plan_text if treatment else '' }}</textarea>
+          </div>
+          <div>
+            <label class="pf-label">Goals</label>
+            <textarea name="goals" class="pf-input" rows="2"
+                      placeholder="Expected outcomes…">{{ treatment.goals if treatment else '' }}</textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem">
+            <div>
+              <label class="pf-label">Duration</label>
+              <input type="text" name="duration" class="pf-input"
+                     value="{{ treatment.duration if treatment else '' }}"
+                     placeholder="e.g. 7 days">
+            </div>
+            <div>
+              <label class="pf-label">Follow-up in</label>
+              <input type="number" name="followup_in" class="pf-input" min="1"
+                     value="{{ treatment.followup_in if treatment else '' }}"
+                     placeholder="e.g. 2">
+            </div>
+            <div>
+              <label class="pf-label">Unit</label>
+              <select name="followup_unit" class="pf-input">
+                <option value="days" {% if treatment and treatment.followup_unit=='days' %}selected{% endif %}>Days</option>
+                <option value="weeks" {% if treatment and treatment.followup_unit=='weeks' %}selected{% endif %}>Weeks</option>
+                <option value="months" {% if treatment and treatment.followup_unit=='months' %}selected{% endif %}>Months</option>
+              </select>
+            </div>
+          </div>
+          <div style="text-align:right">
+            <button type="submit" class="pf-btn pf-btn-primary">Save Treatment Plan</button>
+          </div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    <!-- ─── PRESCRIPTIONS ─── -->
+    <div class="pf-card" id="prescriptions">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div class="pf-card-title">💉 Prescriptions</div>
+        <span style="font-size:.82rem;color:var(--cl-muted)">{{ prescriptions|length }} Rx</span>
+      </div>
+
+      {% for rx in prescriptions %}
+      <div style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
+                  padding:1rem;margin-bottom:.8rem">
+        <div style="font-weight:600;font-size:.88rem;color:var(--cl-muted);margin-bottom:.6rem">
+          Rx #{{ loop.index }} — {{ rx.created_at[:10] if rx.created_at else '' }}
+        </div>
+        {% if rx_items.get(rx.id) %}
+        <table style="width:100%;font-size:.85rem;border-collapse:collapse">
+          <thead>
+            <tr style="border-bottom:1px solid var(--cl-border)">
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Medication</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Dosage</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Frequency</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Duration</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Route</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in rx_items[rx.id] %}
+            <tr style="border-bottom:1px solid var(--cl-border)">
+              <td style="padding:.4rem .5rem;font-weight:600">{{ item.medication_name }}</td>
+              <td style="padding:.4rem .5rem">{{ item.dosage or '—' }}</td>
+              <td style="padding:.4rem .5rem">{{ item.frequency or '—' }}</td>
+              <td style="padding:.4rem .5rem">{{ item.duration or '—' }}</td>
+              <td style="padding:.4rem .5rem">{{ item.route or '—' }}</td>
+              <td style="padding:.4rem .5rem">{{ item.quantity or '—' }} {{ item.unit or '' }}</td>
+            </tr>
+            {% if item.instructions %}
+            <tr>
+              <td colspan="6" style="padding:.2rem .5rem .5rem;font-size:.82rem;color:var(--cl-muted)">
+                ℹ️ {{ item.instructions }}
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div style="font-size:.88rem;color:var(--cl-muted)">No items in this prescription.</div>
+        {% endif %}
+        {% if rx.notes %}
+        <div style="margin-top:.5rem;font-size:.85rem;color:var(--cl-muted)">Notes: {{ rx.notes }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      {% if not prescriptions %}
+      <div style="color:var(--cl-muted);font-size:.9rem;margin-bottom:1rem">No prescriptions yet.</div>
+      {% endif %}
+
+      {% if visit.status == 'Open' %}
+      <details>
+        <summary style="cursor:pointer;font-weight:600;font-size:.9rem;color:var(--cl-primary);
+                         margin-bottom:.8rem;list-style:none">
+          ＋ Add Prescription
+        </summary>
+        <form method="post" action="{{ url_for('visits.add_prescription', visit_id=visit.id) }}"
+              id="rxForm"
+              style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;padding:1rem">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <div id="rxLines" style="display:flex;flex-direction:column;gap:.8rem;margin-bottom:.8rem">
+            <!-- Line 1 -->
+            <div class="rx-line" style="background:#fff;border:1px solid var(--cl-border);
+                                        border-radius:6px;padding:.8rem;display:grid;
+                                        grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;gap:.5rem">
+              <div>
+                <label class="pf-label" style="font-size:.78rem">Medication *</label>
+                <input type="text" name="medication_name_1" class="pf-input" style="font-size:.85rem" required
+                       placeholder="Drug name">
+              </div>
+              <div>
+                <label class="pf-label" style="font-size:.78rem">Dosage</label>
+                <input type="text" name="dosage_1" class="pf-input" style="font-size:.85rem" placeholder="e.g. 5mg">
+              </div>
+              <div>
+                <label class="pf-label" style="font-size:.78rem">Frequency</label>
+                <input type="text" name="frequency_1" class="pf-input" style="font-size:.85rem" placeholder="e.g. BID">
+              </div>
+              <div>
+                <label class="pf-label" style="font-size:.78rem">Duration</label>
+                <input type="text" name="duration_1" class="pf-input" style="font-size:.85rem" placeholder="e.g. 7d">
+              </div>
+              <div>
+                <label class="pf-label" style="font-size:.78rem">Route</label>
+                <select name="route_1" class="pf-input" style="font-size:.85rem">
+                  <option value="">—</option>
+                  <option value="Oral">Oral</option>
+                  <option value="IV">IV</option>
+                  <option value="IM">IM</option>
+                  <option value="SC">SC</option>
+                  <option value="Topical">Topical</option>
+                  <option value="Ophthalmic">Ophthalmic</option>
+                  <option value="Otic">Otic</option>
+                </select>
+              </div>
+              <div>
+                <label class="pf-label" style="font-size:.78rem">Qty</label>
+                <input type="number" name="quantity_1" class="pf-input" style="font-size:.85rem" placeholder="—">
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:.8rem">
+            <button type="button" onclick="addRxLine()" class="pf-btn"
+                    style="font-size:.85rem;padding:.3rem .8rem">
+              ＋ Add Line
+            </button>
+          </div>
+
+          <div>
+            <label class="pf-label">Prescription Notes</label>
+            <input type="text" name="rx_notes" class="pf-input" placeholder="General notes…">
+          </div>
+
+          <!-- Drug Interaction Checker -->
+          <div id="drugInteractionBanner" style="display:none;margin-top:.8rem;padding:10px 14px;
+               border-radius:8px;font-size:.82rem;line-height:1.5"></div>
+
+          <div style="display:flex;align-items:center;gap:8px;margin-top:.8rem">
+            <button type="button" onclick="checkDrugInteractions()"
+                    style="background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;border:none;
+                           border-radius:6px;padding:5px 12px;cursor:pointer;font-size:.78rem;font-weight:600">
+              💊 Check Interactions
+            </button>
+            <span style="font-size:.72rem;color:var(--cl-muted)">AI checks against current medications</span>
+            <button type="submit" class="pf-btn pf-btn-primary" style="margin-left:auto">Save Prescription</button>
+          </div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    <!-- ─── LAB REQUESTS ─── -->
+    <div class="pf-card" id="lab">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div class="pf-card-title">🔬 Lab Requests</div>
+        <a href="{{ url_for('clinical.lab_list') }}" style="font-size:.82rem;color:var(--cl-primary)">
+          View Lab Module →
+        </a>
+      </div>
+
+      {% if lab_requests %}
+      <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem">
+        {% for lr in lab_requests %}
+        <div style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
+                    padding:.7rem 1rem;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:600">{{ lr.test_name }}</div>
+            {% if lr.sample_type %}
+            <div style="font-size:.82rem;color:var(--cl-muted)">Sample: {{ lr.sample_type }}</div>
+            {% endif %}
+            {% if lr.notes %}
+            <div style="font-size:.82rem;color:var(--cl-muted)">{{ lr.notes }}</div>
+            {% endif %}
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem">
+            {% if lr.priority == 'Urgent' or lr.priority == 'STAT' %}
+              <span class="pf-badge" style="background:var(--cl-danger);color:#fff">{{ lr.priority }}</span>
+            {% else %}
+              <span class="pf-badge" style="background:var(--cl-info);color:#fff">{{ lr.priority or 'Routine' }}</span>
+            {% endif %}
+            <span style="font-size:.78rem;color:var(--cl-muted)">{{ lr.created_at[:10] if lr.created_at else '' }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="color:var(--cl-muted);font-size:.9rem;margin-bottom:1rem">No lab requests for this visit.</div>
+      {% endif %}
+
+      {% if visit.status == 'Open' %}
+      <details>
+        <summary style="cursor:pointer;font-weight:600;font-size:.9rem;color:var(--cl-primary);
+                         margin-bottom:.8rem;list-style:none">
+          ＋ Request Lab Test
+        </summary>
+        <form method="post" action="{{ url_for('clinical.lab_request_from_visit') if false else '#' }}"
+              style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
+                     padding:1rem;display:grid;gap:.8rem"
+              onsubmit="submitLabRequest(event, {{ visit.id }})">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+            <div>
+              <label class="pf-label">Test Name <span style="color:var(--cl-danger)">*</span></label>
+              <input type="text" name="test_name" id="labTestName" class="pf-input"
+                     list="commonTests" required placeholder="e.g. CBC, Biochemistry">
+              <datalist id="commonTests">
+                <option value="Complete Blood Count (CBC)">
+                <option value="Biochemistry Panel">
+                <option value="Urinalysis">
+                <option value="Fecal Exam">
+                <option value="Thyroid (T4)">
+                <option value="Heartworm Test">
+                <option value="FeLV/FIV Test">
+                <option value="Skin Scraping">
+                <option value="Culture & Sensitivity">
+                <option value="X-Ray">
+                <option value="Ultrasound">
+              </datalist>
+            </div>
+            <div>
+              <label class="pf-label">Priority</label>
+              <select name="priority" id="labPriority" class="pf-input">
+                <option value="Routine">Routine</option>
+                <option value="Urgent">Urgent</option>
+                <option value="STAT">STAT</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+            <div>
+              <label class="pf-label">Sample Type</label>
+              <input type="text" name="sample_type" id="labSampleType" class="pf-input"
+                     placeholder="e.g. Blood, Urine">
+            </div>
+            <div>
+              <label class="pf-label">Notes</label>
+              <input type="text" name="lab_notes" id="labNotes" class="pf-input"
+                     placeholder="Special instructions…">
+            </div>
+          </div>
+          <div style="text-align:right">
+            <button type="submit" class="pf-btn pf-btn-primary">Request Test</button>
+          </div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    <!-- Visit Notes (if any) -->
+    {% if visit.notes %}
+    <div class="pf-card">
+      <div class="pf-card-title" style="margin-bottom:.7rem">📝 Notes</div>
+      <div style="font-size:.92rem;white-space:pre-wrap">{{ visit.notes }}</div>
+    </div>
+    {% endif %}
+
+  </div>
+  <!-- end right panel -->
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     AI ASSISTANT — floating button + slide-in panel
+     The panel sends visit_id with every message so the AI knows the patient.
+═══════════════════════════════════════════════════════════════════ -->
+
+<!-- Floating trigger button -->
+<button id="aiFloatBtn" onclick="toggleAiPanel()"
+  title="Ask AI about this patient"
+  style="position:fixed;bottom:28px;right:28px;z-index:1100;
+         width:56px;height:56px;border-radius:50%;border:none;
+         background:var(--cl-primary);color:#fff;font-size:1.5rem;
+         box-shadow:0 4px 18px rgba(0,0,0,.25);cursor:pointer;
+         display:flex;align-items:center;justify-content:center;
+         transition:transform .2s">
+  🤖
+</button>
+
+<!-- Slide-in panel -->
+<div id="aiPanel"
+  style="position:fixed;top:0;right:-420px;width:400px;height:100vh;
+         background:var(--cl-surface);border-left:1px solid var(--cl-border);
+         box-shadow:-4px 0 20px rgba(0,0,0,.12);z-index:1200;
+         display:flex;flex-direction:column;transition:right .3s ease;overflow:hidden">
+
+  <!-- Panel header -->
+  <div style="padding:14px 16px;border-bottom:1px solid var(--cl-border);
+              display:flex;align-items:center;gap:10px;background:var(--cl-primary);color:#fff">
+    <span style="font-size:1.2rem">🤖</span>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:.95rem">AI Clinical Assistant</div>
+      <div style="font-size:.75rem;opacity:.85" id="aiPatientLabel">
+        {{ visit.pet_name }} — {{ visit.species }}
+      </div>
+    </div>
+    <button onclick="toggleAiPanel()" style="background:none;border:none;color:#fff;
+            font-size:1.2rem;cursor:pointer;padding:0 4px;line-height:1">&times;</button>
+  </div>
+
+  <!-- Context badge -->
+  <div id="aiCtxBadge"
+    style="background:#eff6ff;border-bottom:1px solid #bfdbfe;padding:8px 14px;
+           font-size:.78rem;color:#1d4ed8;display:none">
+    📋 Patient context loaded — AI knows {{ visit.pet_name }}'s history
+  </div>
+
+  <!-- Messages -->
+  <div id="aiMsgs"
+    style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px">
+    <div style="text-align:center;color:var(--cl-muted);font-size:.82rem;margin-top:20px">
+      Ask me anything about <strong>{{ visit.pet_name }}</strong>.<br>
+      I already know the patient's history, medications, and allergies.
+    </div>
+  </div>
+
+  <!-- Photo upload row -->
+  <div style="padding:6px 12px;border-top:1px solid var(--cl-border);
+              display:flex;align-items:center;gap:6px;background:rgba(139,92,246,.04)">
+    <input type="file" id="photoInput" accept="image/*" style="display:none"
+           onchange="handlePhotoUpload(this)">
+    <button onclick="document.getElementById('photoInput').click()"
+            style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;
+                   border-radius:6px;padding:5px 10px;cursor:pointer;font-size:.75rem;font-weight:600;
+                   white-space:nowrap">
+      📸 Analyze Photo
+    </button>
+    <span style="font-size:.72rem;color:var(--cl-muted)">Upload wound/eye/skin photo for AI diagnosis</span>
+  </div>
+
+  <!-- Input row -->
+  <div style="padding:12px;border-top:1px solid var(--cl-border);display:flex;gap:8px">
+    <input id="aiInput" type="text" placeholder="Ask about this patient…"
+      style="flex:1;padding:8px 12px;border:1px solid var(--cl-border);
+             border-radius:8px;font-size:.88rem;outline:none"
+      onkeydown="if(event.key==='Enter')sendAiMsg()">
+    <button onclick="sendAiMsg()"
+      style="padding:8px 14px;background:var(--cl-primary);color:#fff;border:none;
+             border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600">
+      Send
+    </button>
+  </div>
+</div>
+
+<!-- Dark overlay -->
+<div id="aiOverlay" onclick="toggleAiPanel()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1199"></div>
+
+<!-- Discharge Instructions Modal -->
+<div id="dischargeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+     z-index:9999;align-items:flex-start;justify-content:center;padding-top:50px">
+  <div style="background:var(--cl-surface);border-radius:14px;padding:28px;width:700px;
+              max-width:95vw;max-height:85vh;overflow-y:auto;
+              box-shadow:0 8px 40px rgba(0,0,0,.3);border:1px solid rgba(16,185,129,.3)">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <span style="background:linear-gradient(135deg,#16a34a,#10b981);border-radius:10px;
+                   padding:7px 11px;font-size:1.1rem">📋</span>
+      <div>
+        <div style="font-weight:700;font-size:1.05rem">AI Discharge Instructions</div>
+        <div style="font-size:.78rem;color:var(--cl-muted)">Bilingual — English & Arabic</div>
+      </div>
+      <button onclick="document.getElementById('dischargeModal').style.display='none'"
+              style="margin-left:auto;background:none;border:none;font-size:1.3rem;
+                     cursor:pointer;color:var(--cl-muted)">×</button>
+    </div>
+    <div id="dischargeContent" style="white-space:pre-wrap;font-size:.88rem;line-height:1.8;
+         color:var(--cl-text);min-height:80px">
+      <div style="color:var(--cl-muted);display:flex;align-items:center;gap:8px">
+        <span style="animation:spin 1s linear infinite;display:inline-block">⏳</span>
+        Generating bilingual discharge instructions...
+      </div>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="printDischarge()"
+              style="background:#16a34a;color:#fff;border:none;border-radius:8px;
+                     padding:8px 18px;cursor:pointer;font-weight:600">🖨 Print</button>
+      <button onclick="whatsappDischarge()"
+              style="background:#25d366;color:#fff;border:none;border-radius:8px;
+                     padding:8px 18px;cursor:pointer;font-weight:600">📱 WhatsApp</button>
+      <button onclick="document.getElementById('dischargeModal').style.display='none'"
+              style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
+                     padding:8px 18px;cursor:pointer">Close</button>
+    </div>
+  </div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ── AI Visit Panel ── */
+const AI_VISIT_ID = {{ visit.id }};
+let _aiPanelOpen  = false;
+let _ctxLoaded    = false;
+
+async function toggleAiPanel() {
+  _aiPanelOpen = !_aiPanelOpen;
+  document.getElementById('aiPanel').style.right   = _aiPanelOpen ? '0' : '-420px';
+  document.getElementById('aiOverlay').style.display = _aiPanelOpen ? 'block' : 'none';
+  document.getElementById('aiFloatBtn').style.transform = _aiPanelOpen ? 'scale(0)' : 'scale(1)';
+  if (_aiPanelOpen && !_ctxLoaded) {
+    // Verify context is available (fire & forget — the /chat route handles it)
+    try {
+      const r = await fetch(`/ai/context/visit/${AI_VISIT_ID}`);
+      if (r.ok) {
+        _ctxLoaded = true;
+        document.getElementById('aiCtxBadge').style.display = 'block';
+      }
+    } catch(e) {}
+    document.getElementById('aiInput').focus();
+  }
+}
+
+function aiAddMsg(role, text, model) {
+  const wrap = document.getElementById('aiMsgs');
+  const isUser = role === 'user';
+  const div = document.createElement('div');
+  div.style.cssText = `display:flex;flex-direction:column;align-items:${isUser?'flex-end':'flex-start'}`;
+  const bubble = document.createElement('div');
+  bubble.style.cssText = `
+    max-width:88%;padding:9px 13px;border-radius:12px;font-size:.85rem;line-height:1.5;
+    white-space:pre-wrap;word-break:break-word;
+    background:${isUser?'var(--cl-primary)':'var(--cl-bg)'};
+    color:${isUser?'#fff':'var(--cl-text)'};
+    border:${isUser?'none':'1px solid var(--cl-border)'};
+  `;
+  bubble.textContent = text;
+  div.appendChild(bubble);
+  if (model && !isUser) {
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:.7rem;color:var(--cl-muted);margin-top:3px;padding:0 4px';
+    lbl.textContent = '⚡ ' + model;
+    div.appendChild(lbl);
+  }
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function sendAiMsg() {
+  const inp = document.getElementById('aiInput');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = '';
+  inp.disabled = true;
+  aiAddMsg('user', msg);
+
+  // Thinking indicator
+  const thinkId = 'ai-think-' + Date.now();
+  const thinkDiv = document.createElement('div');
+  thinkDiv.id = thinkId;
+  thinkDiv.style.cssText = 'color:var(--cl-muted);font-size:.82rem;padding:4px 8px';
+  thinkDiv.textContent = '…';
+  document.getElementById('aiMsgs').appendChild(thinkDiv);
+  document.getElementById('aiMsgs').scrollTop = 9999;
+
+  try {
+    const r = await fetch('/ai/chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ message: msg, visit_id: AI_VISIT_ID }),
+    });
+    const data = await r.json();
+    document.getElementById(thinkId)?.remove();
+    if (data.error) {
+      aiAddMsg('assistant', 'Error: ' + data.error);
+    } else {
+      aiAddMsg('assistant', data.content, data.routed_via || data.model);
+    }
+  } catch(e) {
+    document.getElementById(thinkId)?.remove();
+    aiAddMsg('assistant', 'Connection error — is the AI service running?');
+  }
+  inp.disabled = false;
+  inp.focus();
+}
+
+var rxLineCount = 1;
+
+function addRxLine() {
+  rxLineCount++;
+  var n = rxLineCount;
+  var div = document.createElement('div');
+  div.className = 'rx-line';
+  div.style.cssText = 'background:#fff;border:1px solid var(--cl-border);border-radius:6px;padding:.8rem;display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;gap:.5rem';
+  div.innerHTML = `
+    <div>
+      <label class="pf-label" style="font-size:.78rem">Medication *</label>
+      <input type="text" name="medication_name_${n}" class="pf-input" style="font-size:.85rem" required placeholder="Drug name">
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:.78rem">Dosage</label>
+      <input type="text" name="dosage_${n}" class="pf-input" style="font-size:.85rem" placeholder="e.g. 5mg">
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:.78rem">Frequency</label>
+      <input type="text" name="frequency_${n}" class="pf-input" style="font-size:.85rem" placeholder="e.g. BID">
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:.78rem">Duration</label>
+      <input type="text" name="duration_${n}" class="pf-input" style="font-size:.85rem" placeholder="e.g. 7d">
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:.78rem">Route</label>
+      <select name="route_${n}" class="pf-input" style="font-size:.85rem">
+        <option value="">—</option>
+        <option value="Oral">Oral</option>
+        <option value="IV">IV</option>
+        <option value="IM">IM</option>
+        <option value="SC">SC</option>
+        <option value="Topical">Topical</option>
+        <option value="Ophthalmic">Ophthalmic</option>
+        <option value="Otic">Otic</option>
+      </select>
+    </div>
+    <div>
+      <label class="pf-label" style="font-size:.78rem">Qty</label>
+      <input type="number" name="quantity_${n}" class="pf-input" style="font-size:.85rem" placeholder="—">
+    </div>
+  `;
+  document.getElementById('rxLines').appendChild(div);
+}
+
+function submitLabRequest(e, visitId) {
+  e.preventDefault();
+  var form = e.target;
+  var data = new FormData();
+  data.append('visit_id', visitId);
+  data.append('test_name', form.querySelector('[name=test_name]').value);
+  data.append('priority', form.querySelector('[name=priority]').value);
+  data.append('sample_type', form.querySelector('[name=sample_type]').value);
+  data.append('notes', form.querySelector('[name=lab_notes]').value);
+  data.append('pet_id', '{{ visit.pet_id }}');
+  data.append('owner_id', '{{ visit.owner_id }}');
+
+  fetch('/clinical/lab/request', { method: 'POST', body: data })
+    .then(function(r) {
+      if (r.ok || r.redirected) {
+        window.location.href = window.location.pathname + '#lab';
+        window.location.reload();
+      } else {
+        alert('Error submitting lab request. Please try from the Lab module.');
+      }
+    })
+    .catch(function() {
+      window.location.href = '/clinical/lab';
+    });
+}
+
+/* ── Discharge Instructions ── */
+var _dischargeText = '';
+function loadDischargeInstructions(visitId) {
+  var modal   = document.getElementById('dischargeModal');
+  var content = document.getElementById('dischargeContent');
+  modal.style.display = 'flex';
+  _dischargeText = '';
+  content.innerHTML = '<div style="color:var(--cl-muted);display:flex;align-items:center;gap:8px"><span style="animation:spin 1s linear infinite;display:inline-block">⏳</span> Generating bilingual discharge instructions...</div>';
+
+  var csrf = (document.querySelector('meta[name=csrf-token]')||{}).content || '';
+  fetch('/ai/discharge-instructions/' + visitId, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.error) {
+      content.innerHTML = '<div style="color:var(--cl-danger)">⚠️ ' + d.error + '</div>';
+      return;
+    }
+    _dischargeText = d.instructions;
+    content.textContent = d.instructions;
+  })
+  .catch(function() {
+    content.innerHTML = '<div style="color:var(--cl-danger)">⚠️ Could not generate instructions. Is the AI service running?</div>';
+  });
+}
+
+function printDischarge() {
+  if (!_dischargeText) return;
+  var w = window.open('', '_blank');
+  w.document.write(
+    '<html><head><title>Discharge Instructions</title><style>' +
+    'body{font-family:serif;font-size:12pt;padding:40px;max-width:700px;margin:auto;line-height:1.8}' +
+    'h2{color:#1a5c38;border-bottom:2px solid #1a5c38;padding-bottom:8px}' +
+    '</style></head><body><h2>📋 Discharge Instructions</h2>' +
+    '<pre style="white-space:pre-wrap;font-family:inherit">' + _dischargeText + '</pre>' +
+    '<p style="margin-top:30px;color:#666;font-size:10pt">Premium Animal Hospital — Dr. Hatem El Khateeb</p>' +
+    '</body></html>'
+  );
+  w.print();
+}
+
+function whatsappDischarge() {
+  if (!_dischargeText) return;
+  var phone = '{{ visit.owner_phone or "" }}';
+  if (!phone) { alert('No phone number on file for this owner.'); return; }
+  var encoded = encodeURIComponent(_dischargeText.slice(0, 1000));
+  window.open('https://wa.me/' + phone.replace(/\D/g,'') + '?text=' + encoded, '_blank');
+}
+
+/* ── AI Photo Diagnosis ── */
+function handlePhotoUpload(input) {
+  if (!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var b64  = e.target.result.split(',')[1];
+    var mime = file.type || 'image/jpeg';
+    // Show thinking in AI panel
+    if (!_aiPanelOpen) toggleAiPanel();
+    aiAddMsg('user', '📸 Analyzing uploaded photo: ' + file.name);
+    var thinkId = 'photo-think-' + Date.now();
+    var thinkDiv = document.createElement('div');
+    thinkDiv.id = thinkId;
+    thinkDiv.style.cssText = 'color:var(--cl-muted);font-size:.82rem;padding:4px 8px';
+    thinkDiv.textContent = '🔬 Analyzing image with AI vision…';
+    document.getElementById('aiMsgs').appendChild(thinkDiv);
+    document.getElementById('aiMsgs').scrollTop = 9999;
+
+    var csrf = (document.querySelector('meta[name=csrf-token]')||{}).content || '';
+    fetch('/ai/analyze-photo', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+      body: JSON.stringify({
+        image_b64: b64,
+        mime: mime,
+        visit_id: AI_VISIT_ID,
+        context: '{{ visit.species }} · {{ visit.chief_complaint or "" }}'
+      })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      document.getElementById(thinkId)?.remove();
+      if (d.error) aiAddMsg('assistant', '⚠️ Photo analysis error: ' + d.error);
+      else         aiAddMsg('assistant', '🔬 PHOTO ANALYSIS:\n\n' + d.analysis);
+    })
+    .catch(function() {
+      document.getElementById(thinkId)?.remove();
+      aiAddMsg('assistant', '⚠️ Could not analyze photo — AI service unavailable.');
+    });
+  };
+  reader.readAsDataURL(file);
+  input.value = ''; // reset so same file can be re-uploaded
+}
+
+/* ── Drug Interaction Checker ── */
+function checkDrugInteractions() {
+  // Collect all medication names from the form
+  var meds = [];
+  document.querySelectorAll('[name^="medication_name_"]').forEach(function(inp) {
+    if (inp.value.trim()) meds.push(inp.value.trim());
+  });
+  if (!meds.length) { alert('Enter at least one medication name first.'); return; }
+
+  // Existing active prescriptions
+  var existing = [{% for rx in prescriptions %}{% for item in rx.items if rx.items is defined %}'{{ item.medication_name }}',{% endfor %}{% endfor %}];
+  var newDrug  = meds[0];
+  var current  = existing.concat(meds.slice(1));
+
+  var banner = document.getElementById('drugInteractionBanner');
+  banner.style.display = '';
+  banner.style.background = '#f1f5f9';
+  banner.style.border = '1px solid #e2e8f0';
+  banner.style.color  = '#64748b';
+  banner.textContent  = '💊 Checking interactions…';
+
+  var csrf = (document.querySelector('meta[name=csrf-token]')||{}).content || '';
+  fetch('/ai/drug-interactions', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+    body: JSON.stringify({
+      new_drug: newDrug,
+      current_medications: current,
+      species: '{{ visit.species }}'
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    var sev = (d.severity || 'none').toLowerCase();
+    if (sev === 'severe') {
+      banner.style.background = '#fee2e2'; banner.style.border = '1.5px solid #fca5a5'; banner.style.color = '#991b1b';
+      banner.innerHTML = '🚨 <strong>SEVERE INTERACTION</strong>: ' + (d.recommendation || '') +
+        (d.interactions||[]).map(function(i){ return '<br>• ' + i.drugs + ': ' + i.effect; }).join('');
+    } else if (sev === 'moderate') {
+      banner.style.background = '#fef3c7'; banner.style.border = '1.5px solid #fcd34d'; banner.style.color = '#92400e';
+      banner.innerHTML = '⚠️ <strong>Moderate interaction</strong>: ' + (d.recommendation || '') +
+        (d.interactions||[]).map(function(i){ return '<br>• ' + i.drugs + ': ' + i.effect; }).join('');
+    } else if (sev === 'mild') {
+      banner.style.background = '#fef9c3'; banner.style.border = '1px solid #fde68a'; banner.style.color = '#713f12';
+      banner.innerHTML = '💛 <strong>Mild interaction noted</strong>: ' + (d.recommendation || '');
+    } else {
+      banner.style.background = '#dcfce7'; banner.style.border = '1px solid #86efac'; banner.style.color = '#14532d';
+      banner.innerHTML = '✅ <strong>No significant interactions found</strong>. ' + (d.recommendation || 'Safe to prescribe.');
+    }
+  })
+  .catch(function() {
+    banner.style.background = '#f1f5f9'; banner.style.color = '#64748b';
+    banner.textContent = '⚠️ Interaction check unavailable — AI service offline.';
+  });
+}
+</script>
+{% endblock %}

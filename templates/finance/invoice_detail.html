@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}{{ invoice.invoice_number }}{% endblock %}
+{% block page_title %}{{ invoice.invoice_number }}{% endblock %}
+{% block page_sub %}{{ invoice.issue_date }} · {{ invoice.status }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('finance.invoices_list') }}" class="btn btn-secondary no-print">← {{ t('Invoices', 'الفواتير') }}</a>
+<a href="{{ url_for('finance.invoice_print', inv_id=invoice.id) }}" target="_blank" class="btn btn-primary no-print">🖨 {{ t('Print / PDF', 'طباعة / PDF') }}</a>
+{% if invoice.status not in ('Paid','Cancelled') %}
+<a href="{{ url_for('finance.invoice_edit', inv_id=invoice.id) }}" class="btn btn-secondary no-print">✏️ {{ t('Edit', 'تعديل') }}</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<style>
+@media print {
+  .no-print, .pf-sidebar, .pf-topbar, .pf-sidebar-footer { display:none !important; }
+  .pf-main { margin:0 !important; padding:0 !important; }
+  .pf-content { padding:0 !important; }
+  .invoice-wrap { box-shadow:none !important; }
+}
+.inv-grid { display:grid; grid-template-columns:2fr 1fr; gap:20px; align-items:start; }
+.invoice-wrap { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.1); overflow:hidden; }
+.inv-header { background:linear-gradient(135deg, var(--cl-primary), color-mix(in srgb, var(--cl-primary) 80%, #000)); color:#fff; padding:32px 36px; display:flex; justify-content:space-between; align-items:flex-start; }
+.inv-logo { font-size:28px; font-weight:900; letter-spacing:-.5px; }
+.inv-logo-sub { font-size:13px; opacity:.8; }
+.inv-meta { text-align:right; }
+.inv-meta .inv-num { font-size:22px; font-weight:800; }
+.inv-meta .inv-date { font-size:13px; opacity:.8; margin-top:4px; }
+.inv-body { padding:28px 36px; }
+.inv-parties { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:28px; }
+.party-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--cl-muted); margin-bottom:6px; }
+.party-name { font-size:16px; font-weight:700; }
+.party-info { font-size:13px; color:var(--cl-muted); margin-top:3px; }
+.lines-table { width:100%; border-collapse:collapse; margin-bottom:0; }
+.lines-table th { background:var(--cl-bg); padding:10px 14px; border-bottom:2px solid var(--cl-primary); font-size:12px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); }
+.lines-table td { padding:11px 14px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.totals-section { padding:20px 36px; background:var(--cl-bg); border-top:1px solid var(--cl-border); }
+.total-row { display:flex; justify-content:space-between; padding:7px 0; font-size:14px; }
+.total-row.grand { border-top:2px solid var(--cl-primary); margin-top:8px; padding-top:12px; font-size:18px; font-weight:800; color:var(--cl-primary); }
+.badge { display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:700; }
+.badge-Paid { background:#dcfce7; color:#15803d; }
+.badge-Unpaid { background:#fee2e2; color:#dc2626; }
+.badge-Partial { background:#fef3c7; color:#d97706; }
+.badge-Cancelled { background:#f1f5f9; color:#64748b; }
+/* Side panel */
+.side-card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); overflow:hidden; margin-bottom:16px; }
+.side-card-header { background:var(--cl-primary); color:#fff; padding:14px 20px; font-weight:700; font-size:14px; }
+.side-card-body { padding:20px; }
+.pay-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.pay-row:last-child { border-bottom:none; }
+.form-group { margin-bottom:14px; }
+.form-label { display:block; font-size:12px; font-weight:600; margin-bottom:5px; }
+.form-control { width:100%; padding:9px 12px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; box-sizing:border-box; }
+.form-control:focus { outline:none; border-color:var(--cl-primary); }
+.pay-btn { width:100%; padding:12px; background:var(--cl-success); color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:14px; }
+@media(max-width:900px){ .inv-grid { grid-template-columns:1fr; } }
+</style>
+
+<div class="inv-grid">
+
+  <!-- Invoice document -->
+  <div>
+    <div class="invoice-wrap">
+      <!-- Header -->
+      <div class="inv-header">
+        <div>
+          <div class="inv-logo">🐾 {{ clinic.name if clinic else 'Premium Animal Hospital' }}</div>
+          <div class="inv-logo-sub">{{ clinic.doctor_name if clinic else 'Dr. Hatem El Khateeb' }}</div>
+          {% if clinic and clinic.phone %}<div class="inv-logo-sub">{{ clinic.phone }}</div>{% endif %}
+        </div>
+        <div class="inv-meta">
+          <div class="inv-num">{{ invoice.invoice_number }}</div>
+          <div class="inv-date">{{ t('Issued', 'تاريخ الإصدار') }}: {{ invoice.issue_date }}</div>
+          {% if invoice.due_date %}<div class="inv-date">{{ t('Due', 'تاريخ الاستحقاق') }}: {{ invoice.due_date }}</div>{% endif %}
+          <div style="margin-top:8px">
+            <span class="badge badge-{{ invoice.status }}">{{ invoice.status }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parties -->
+      <div class="inv-body">
+        <div class="inv-parties">
+          <div>
+            <div class="party-label">{{ t('Bill To', 'فاتورة إلى') }}</div>
+            <div class="party-name">{{ invoice.owner_name or '—' }}</div>
+            {% if invoice.owner_phone %}<div class="party-info">{{ invoice.owner_phone }}</div>{% endif %}
+          </div>
+          <div>
+            <div class="party-label">{{ t('Patient', 'المريض') }}</div>
+            <div class="party-name">{{ invoice.pet_name or '—' }}</div>
+            {% if invoice.doctor_name %}<div class="party-info">Dr. {{ invoice.doctor_name }}</div>{% endif %}
+          </div>
+        </div>
+
+        <!-- Lines -->
+        <table class="lines-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">{{ t('Description', 'الوصف') }}</th>
+              <th>{{ t('Type', 'النوع') }}</th>
+              <th style="text-align:right">{{ t('Qty', 'الكمية') }}</th>
+              <th style="text-align:right">{{ t('Unit Price', 'سعر الوحدة') }}</th>
+              <th style="text-align:right">{{ t('Disc %', 'خصم %') }}</th>
+              <th style="text-align:right">{{ t('Total', 'الإجمالي') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in invoice.lines %}
+            <tr>
+              <td>{{ line.description }}</td>
+              <td style="color:var(--cl-muted); font-size:12px; text-align:center;">{{ line.line_type }}</td>
+              <td style="text-align:right;">{{ line.quantity }}</td>
+              <td style="text-align:right;">{{ "{:,.2f}".format(line.unit_price or 0) }}</td>
+              <td style="text-align:right; color:var(--cl-muted);">{% if line.discount %}{{ line.discount }}%{% else %}—{% endif %}</td>
+              <td style="text-align:right; font-weight:600;">{{ "{:,.2f}".format(line.total or 0) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center; padding:20px; color:var(--cl-muted);">{{ t('No line items', 'لا توجد بنود') }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Totals -->
+      <div class="totals-section">
+        <div class="total-row"><span>{{ t('Subtotal', 'المجموع الفرعي') }}</span><span>{{ "{:,.2f}".format(invoice.subtotal or 0) }} EGP</span></div>
+        {% if invoice.discount_amount %}
+        <div class="total-row" style="color:var(--cl-success)"><span>{{ t('Discount', 'خصم') }}</span><span>− {{ "{:,.2f}".format(invoice.discount_amount or 0) }} EGP</span></div>
+        {% endif %}
+        {% if invoice.tax_amount %}
+        <div class="total-row"><span>{{ t('Tax', 'الضريبة') }} ({{ invoice.tax_rate or 0 }}%)</span><span>+ {{ "{:,.2f}".format(invoice.tax_amount or 0) }} EGP</span></div>
+        {% endif %}
+        <div class="total-row grand"><span>{{ t('TOTAL', 'الإجمالي') }}</span><span>{{ "{:,.2f}".format(invoice.total or 0) }} EGP</span></div>
+        <div class="total-row" style="color:var(--cl-success)"><span>{{ t('Paid', 'مدفوع') }}</span><span>{{ "{:,.2f}".format(invoice.paid_amount or 0) }} EGP</span></div>
+        <div class="total-row" style="font-weight:700; color:{% if (invoice.due_amount or 0) > 0 %}var(--cl-warning){% else %}var(--cl-success){% endif %}">
+          <span>{{ t('Balance Due', 'الرصيد المستحق') }}</span><span>{{ "{:,.2f}".format(invoice.due_amount or 0) }} EGP</span>
+        </div>
+        {% if invoice.notes %}
+        <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--cl-border); font-size:13px; color:var(--cl-muted);">
+          <strong>{{ t('Notes', 'ملاحظات') }}:</strong> {{ invoice.notes }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right sidebar -->
+  <div class="no-print">
+
+    <!-- Payment history -->
+    <div class="side-card">
+      <div class="side-card-header">💳 {{ t('Payments', 'المدفوعات') }}</div>
+      <div class="side-card-body">
+        {% for pay in invoice.payments %}
+        <div class="pay-row">
+          <div>
+            <div style="font-weight:600;">{{ "{:,.2f}".format(pay.amount) }} EGP</div>
+            <div style="font-size:11px; color:var(--cl-muted);">{{ pay.method }} · {{ pay.received_at[:10] if pay.received_at else '' }}</div>
+          </div>
+          <div style="font-size:12px; color:var(--cl-muted);">{{ pay.received_by or '' }}</div>
+        </div>
+        {% else %}
+        <div style="color:var(--cl-muted); font-size:13px; text-align:center; padding:12px 0;">{{ t('No payments yet', 'لا توجد مدفوعات بعد') }}</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Record payment -->
+    {% if invoice.status not in ('Paid','Cancelled') %}
+    <div class="side-card">
+      <div class="side-card-header">+ {{ t('Record Payment', 'تسجيل دفع') }}</div>
+      <div class="side-card-body">
+        <form method="post" action="{{ url_for('finance.invoice_pay', inv_id=invoice.id) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <div class="form-group">
+            <label class="form-label">{{ t('Amount (EGP)', 'المبلغ (جنيه)') }} *</label>
+            <input type="number" name="amount" class="form-control" step="0.01" min="0.01"
+                   placeholder="{{ '{:,.2f}'.format(invoice.due_amount or 0) }}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Method', 'طريقة الدفع') }}</label>
+            <select name="method" class="form-control">
+              <option value="Cash">{{ t('Cash', 'نقداً') }}</option>
+              <option value="Card">{{ t('Card / Visa', 'بطاقة / فيزا') }}</option>
+              <option value="Transfer">{{ t('Bank Transfer', 'تحويل بنكي') }}</option>
+              <option value="Instapay">{{ t('Instapay', 'إنستاباي') }}</option>
+              <option value="Insurance">{{ t('Insurance', 'تأمين') }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Reference / Receipt #', 'المرجع / رقم الإيصال') }}</label>
+            <input type="text" name="reference" class="form-control" placeholder="{{ t('Optional', 'اختياري') }}">
+          </div>
+          <button type="submit" class="pay-btn">✅ {{ t('Record Payment', 'تسجيل الدفع') }}</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- WhatsApp Send -->
+    <div class="side-card no-print">
+      <div class="side-card-header">📱 {{ t('Send via WhatsApp', 'إرسال واتساب') }}</div>
+      <div class="side-card-body">
+        <form method="post" action="{{ url_for('finance.invoice_whatsapp', inv_id=invoice.id) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <p style="font-size:12px;color:var(--cl-muted);margin-bottom:12px;">{{ t('Send invoice summary to owner via WhatsApp','إرسال ملخص الفاتورة عبر واتساب') }}</p>
+          <button type="submit" class="pay-btn" style="background:#25D366;">📱 {{ t('Send WhatsApp','إرسال') }}</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Credit Note -->
+    {% if invoice.status not in ('Cancelled',) %}
+    <div class="side-card no-print">
+      <div class="side-card-header">↩️ {{ t('Credit Note / Refund','إشعار دائن') }}</div>
+      <div class="side-card-body">
+        <form method="post" action="{{ url_for('finance.invoice_credit_note', inv_id=invoice.id) }}"
+              onsubmit="return confirm('Issue a credit note for this invoice?')">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <div class="form-group">
+            <label class="form-label">{{ t('Amount (EGP)','المبلغ') }}</label>
+            <input type="number" name="amount" class="form-control" step="0.01" min="0.01"
+                   value="{{ invoice.total or 0 }}" placeholder="{{ invoice.total or 0 }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Reason','السبب') }}</label>
+            <input type="text" name="reason" class="form-control" placeholder="Refund / cancellation reason">
+          </div>
+          <button type="submit" class="pay-btn" style="background:#dc2626;margin-top:4px;">↩️ {{ t('Issue Credit Note','إصدار إشعار دائن') }}</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Receive Stock{% endblock %}
+{% block page_title %}Receive Stock{% endblock %}
+{% block page_sub %}{% if item %}{{ item.name }}{% else %}Select an item{% endif %}{% endblock %}
+
+{% block topbar_actions %}
+{% if item %}
+<a href="{{ url_for('inventory.item_detail', item_id=item.id) }}" class="btn btn-secondary">← Item Detail</a>
+{% else %}
+<a href="{{ url_for('inventory.items_list') }}" class="btn btn-secondary">← Items</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<style>
+.form-card { background:var(--cl-surface); border-radius:12px; padding:28px; box-shadow:0 2px 8px rgba(0,0,0,.07); max-width:680px; }
+.form-section-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--cl-muted); margin:24px 0 16px; padding-bottom:8px; border-bottom:1px solid var(--cl-border); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.form-group { margin-bottom:16px; }
+.form-label { display:block; font-size:13px; font-weight:600; color:var(--cl-text); margin-bottom:6px; }
+.form-control { width:100%; padding:10px 14px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:14px; box-sizing:border-box; transition:border .2s; }
+.form-control:focus { outline:none; border-color:var(--cl-primary); }
+.item-context { background:linear-gradient(135deg, var(--cl-primary) 0%, color-mix(in srgb, var(--cl-primary) 80%, #000) 100%); color:#fff; border-radius:12px; padding:20px 24px; margin-bottom:24px; display:flex; align-items:center; gap:16px; }
+.item-context-icon { font-size:32px; }
+.btn-primary { background:var(--cl-primary); color:#fff; padding:12px 28px; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-size:14px; }
+</style>
+
+{% if item %}
+<div class="item-context">
+  <div class="item-context-icon">📦</div>
+  <div>
+    <div style="font-size:18px; font-weight:700;">{{ item.name }}</div>
+    {% if item.sku %}<div style="opacity:.8; font-size:13px;">SKU: {{ item.sku }}</div>{% endif %}
+    <div style="opacity:.8; font-size:13px;">Unit: {{ item.unit or 'unit' }}</div>
+  </div>
+</div>
+{% endif %}
+
+<div class="form-card">
+  <form method="post" action="{{ url_for('inventory.batch_new') }}">
+    <input type="hidden" name="item_id" value="{{ item_id or '' }}">
+
+    {% if not item %}
+    <div class="form-group">
+      <label class="form-label">Item *</label>
+      <input class="form-control" name="item_id" type="number" placeholder="Item ID" required>
+    </div>
+    {% endif %}
+
+    <div class="form-section-title">Batch Information</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Batch Number</label>
+        <input class="form-control" name="batch_number" type="text" placeholder="e.g. BATCH-2024-001">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Lot Number</label>
+        <input class="form-control" name="lot_number" type="text" placeholder="Manufacturer lot">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Manufacture Date</label>
+        <input class="form-control" name="manufacture_date" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expiry Date</label>
+        <input class="form-control" name="expiry_date" type="date">
+      </div>
+    </div>
+
+    <div class="form-section-title">Stock Details</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Quantity Received *</label>
+        <input class="form-control" name="quantity" type="number" step="0.01" min="0.01" placeholder="0.00" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Unit Cost (EGP)</label>
+        <input class="form-control" name="unit_cost" type="number" step="0.01" min="0" placeholder="0.00">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Warehouse</label>
+      <select class="form-control" name="warehouse_id">
+        {% for wh in warehouses %}
+        <option value="{{ wh.id }}">{{ wh.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea class="form-control" name="notes" rows="3" placeholder="Supplier info, delivery notes…"></textarea>
+    </div>
+
+    <div style="margin-top:24px; display:flex; gap:12px;">
+      <button type="submit" class="btn-primary">💾 Receive Stock</button>
+      {% if item %}
+      <a href="{{ url_for('inventory.item_detail', item_id=item.id) }}" style="padding:12px 20px; border:1.5px solid var(--cl-border); border-radius:8px; text-decoration:none; color:var(--cl-text); font-weight:600;">Cancel</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

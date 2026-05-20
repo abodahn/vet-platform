@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}{{ t('P&L Report', 'تقرير الأرباح والخسائر') }}{% endblock %}
+{% block page_title %}{{ t('Profit & Loss Report', 'تقرير الأرباح والخسائر') }}{% endblock %}
+{% block page_sub %}{{ date_from }} to {{ date_to }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('accounting.dashboard') }}" class="pf-btn pf-btn-ghost">← {{ t('Dashboard', 'لوحة التحكم') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.pl-filter { background:var(--cl-surface); border-radius:10px; padding:16px 20px; margin-bottom:24px;
+             box-shadow:0 2px 6px rgba(0,0,0,.06); display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+.pl-filter .pf-label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; margin-bottom:4px; color:var(--cl-muted); }
+
+.pl-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+@media(max-width:800px){ .pl-grid { grid-template-columns:1fr; } }
+
+.pl-card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); overflow:hidden; }
+.pl-card-head { padding:14px 20px; border-bottom:1px solid var(--cl-border); font-weight:700; font-size:14px;
+                display:flex; justify-content:space-between; align-items:center; }
+.pl-card-head.revenue { border-left:4px solid #22c55e; }
+.pl-card-head.expense { border-left:4px solid #ef4444; }
+
+.pl-table { width:100%; border-collapse:collapse; }
+.pl-table th { background:var(--cl-primary); color:#fff; padding:9px 16px; text-align:left; font-size:11px;
+               font-weight:700; text-transform:uppercase; }
+.pl-table td { padding:9px 16px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.pl-table tr:last-child td { border-bottom:none; }
+.pl-table tr:hover td { background:rgba(0,0,0,.02); }
+.pl-table tfoot td { font-weight:800; font-size:14px; border-top:2px solid var(--cl-border); }
+
+.pl-summary { background:var(--cl-surface); border-radius:12px; padding:28px; text-align:center;
+              box-shadow:0 2px 8px rgba(0,0,0,.07); margin-bottom:24px; }
+.pl-sum-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:20px; }
+.pl-sum-item { padding:16px; border-radius:8px; }
+.pl-sum-label { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); margin-bottom:6px; }
+.pl-sum-val   { font-size:22px; font-weight:800; }
+.export-note { font-size:12px; color:var(--cl-muted); margin-top:12px; }
+</style>
+
+<!-- Filter form -->
+<form method="get" class="pl-filter">
+  <div>
+    <label class="pf-label">{{ t('From', 'من') }}</label>
+    <input type="date" name="date_from" value="{{ date_from }}" class="pf-input" style="width:150px;">
+  </div>
+  <div>
+    <label class="pf-label">{{ t('To', 'إلى') }}</label>
+    <input type="date" name="date_to" value="{{ date_to }}" class="pf-input" style="width:150px;">
+  </div>
+  <button type="submit" class="pf-btn pf-btn-primary">{{ t('Apply Filter', 'تطبيق الفلتر') }}</button>
+  <a href="{{ url_for('accounting.profit_loss') }}" class="pf-btn pf-btn-ghost">{{ t('Reset', 'إعادة تعيين') }}</a>
+</form>
+
+<!-- Summary -->
+<div class="pl-summary">
+  <div class="pl-sum-row">
+    <div class="pl-sum-item" style="background:#f0fdf4;">
+      <div class="pl-sum-label">{{ t('Total Revenue', 'إجمالي الإيرادات') }}</div>
+      <div class="pl-sum-val" style="color:#15803d;">{{ "{:,.0f}".format(total_revenue) }} EGP</div>
+    </div>
+    <div class="pl-sum-item" style="background:#fef2f2;">
+      <div class="pl-sum-label">{{ t('Total Expenses', 'إجمالي المصروفات') }}</div>
+      <div class="pl-sum-val" style="color:#dc2626;">{{ "{:,.0f}".format(total_expenses) }} EGP</div>
+    </div>
+    <div class="pl-sum-item" style="background:{{ '#f0fdf4' if net_profit >= 0 else '#fef2f2' }};">
+      <div class="pl-sum-label">{{ t('Net Profit', 'صافي الربح') }}</div>
+      <div class="pl-sum-val" style="color:{{ '#15803d' if net_profit >= 0 else '#dc2626' }};">
+        {{ "{:,.0f}".format(net_profit) }} EGP
+      </div>
+    </div>
+    <div class="pl-sum-item" style="background:#fffbeb;">
+      <div class="pl-sum-label">{{ t('Profit Margin', 'هامش الربح') }}</div>
+      <div class="pl-sum-val" style="color:#d97706;">{{ profit_margin }}%</div>
+    </div>
+  </div>
+  <p class="export-note">* {{ t('Export to PDF or Excel — use browser print / save as PDF', 'تصدير إلى PDF أو Excel — استخدم طباعة المتصفح / حفظ كـ PDF') }}</p>
+</div>
+
+<!-- Revenue & Expenses tables -->
+<div class="pl-grid">
+  <!-- Revenue -->
+  <div class="pl-card">
+    <div class="pl-card-head revenue">
+      <span>💵 {{ t('Revenue Breakdown', 'تفاصيل الإيرادات') }}</span>
+      <span style="font-size:14px;color:#15803d;">{{ "{:,.0f}".format(total_revenue) }} EGP</span>
+    </div>
+    <table class="pl-table">
+      <thead>
+        <tr>
+          <th>{{ t('Service / Item', 'الخدمة / الصنف') }}</th>
+          <th>{{ t('Type', 'النوع') }}</th>
+          <th style="text-align:right">{{ t('Count', 'العدد') }}</th>
+          <th style="text-align:right">{{ t('Amount (EGP)', 'المبلغ (جنيه)') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in revenue_rows %}
+        <tr>
+          <td>{{ row.item or '—' }}</td>
+          <td><span class="pf-badge success">{{ row.line_type or 'service' }}</span></td>
+          <td style="text-align:right;color:var(--cl-muted);">{{ row.count }}</td>
+          <td style="text-align:right;font-weight:700;color:#15803d;">{{ "{:,.0f}".format(row.total or 0) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="text-align:center;padding:20px;color:var(--cl-muted);">{{ t('No revenue data', 'لا توجد بيانات إيرادات') }}</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if revenue_rows %}
+      <tfoot>
+        <tr>
+          <td colspan="3">{{ t('Total Revenue', 'إجمالي الإيرادات') }}</td>
+          <td style="text-align:right;color:#15803d;">{{ "{:,.0f}".format(total_revenue) }}</td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+
+  <!-- Expenses -->
+  <div class="pl-card">
+    <div class="pl-card-head expense">
+      <span>🧾 {{ t('Expense Breakdown', 'تفاصيل المصروفات') }}</span>
+      <span style="font-size:14px;color:#dc2626;">{{ "{:,.0f}".format(total_expenses) }} EGP</span>
+    </div>
+    <table class="pl-table">
+      <thead>
+        <tr>
+          <th>{{ t('Category', 'الفئة') }}</th>
+          <th style="text-align:right">{{ t('Count', 'العدد') }}</th>
+          <th style="text-align:right">{{ t('Amount (EGP)', 'المبلغ (جنيه)') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in expense_rows %}
+        <tr>
+          <td>{{ row.category or t('General', 'عام') }}</td>
+          <td style="text-align:right;color:var(--cl-muted);">{{ row.count }}</td>
+          <td style="text-align:right;font-weight:700;color:#dc2626;">{{ "{:,.0f}".format(row.total or 0) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" style="text-align:center;padding:20px;color:var(--cl-muted);">{{ t('No expenses in range', 'لا توجد مصروفات في هذه الفترة') }}</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if expense_rows %}
+      <tfoot>
+        <tr>
+          <td colspan="2">{{ t('Total Expenses', 'إجمالي المصروفات') }}</td>
+          <td style="text-align:right;color:#dc2626;">{{ "{:,.0f}".format(total_expenses) }}</td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% endblock %}

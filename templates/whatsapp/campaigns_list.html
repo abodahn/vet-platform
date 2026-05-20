@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp Campaigns{% endblock %}
+{% block page_title %}Campaigns{% endblock %}
+{% block page_sub %}Bulk WhatsApp messaging campaigns via Wapilot{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">← Control Center</a>
+<a href="{{ url_for('whatsapp.campaign_new') }}"   class="pf-btn pf-btn-primary">➕ New Campaign</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.cmp-grid  { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:20px; }
+.cmp-card  { background:var(--card-bg,#fff); border:1px solid var(--border,#e2e8f0);
+             border-radius:14px; padding:22px; }
+.cmp-card h4 { font-size:1rem; font-weight:700; margin:0 0 10px; }
+.cmp-id    { font-size:.78rem; color:var(--muted,#64748b); font-family:monospace; margin-bottom:12px; }
+.cmp-stat  { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+.cmp-stat span { font-size:.82rem; color:var(--muted,#64748b); }
+.cmp-stat b   { color:var(--text,#1e293b); font-size:.95rem; }
+.status-pill { display:inline-block; padding:3px 10px; border-radius:12px;
+               font-size:.78rem; font-weight:600; margin-bottom:10px; }
+.pill-active   { background:#dcfce7; color:#166534; }
+.pill-paused   { background:#fef3c7; color:#92400e; }
+.pill-finished { background:#f1f5f9; color:#475569; }
+.pill-scheduled{ background:#ede9fe; color:#5b21b6; }
+.pill-other    { background:#f1f5f9; color:#475569; }
+.cmp-actions   { display:flex; flex-wrap:wrap; gap:8px; }
+.empty-state   { text-align:center; padding:60px; color:var(--muted,#64748b); }
+.empty-state .ico { font-size:3rem; margin-bottom:16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="pf-alert pf-alert-warning" style="margin-bottom:20px">
+  ⚠️ Could not load campaigns from Wapilot: {{ error }}<br>
+  <small>Check your API token and instance ID in <a href="{{ url_for('whatsapp.wa_settings') }}">Settings</a>.</small>
+</div>
+{% endif %}
+
+{% if campaigns %}
+<div class="cmp-grid">
+  {% for c in campaigns %}
+  {% set st = (c.status or c.state or 'unknown')|lower %}
+  <div class="cmp-card">
+    <div class="cmp-id">ID: {{ c.id or c.campaign_id or '—' }}</div>
+    <h4>{{ c.name or c.default_message or 'Campaign' | truncate(50) }}</h4>
+
+    <span class="status-pill
+      {% if st == 'active' %}pill-active
+      {% elif st == 'paused' %}pill-paused
+      {% elif st == 'finished' or st == 'done' %}pill-finished
+      {% elif st == 'scheduled' %}pill-scheduled
+      {% else %}pill-other{% endif %}">
+      {{ st | title }}
+    </span>
+
+    <div class="cmp-stat">
+      <span>Total: <b>{{ c.total or c.messages_count or 0 }}</b></span>
+      <span>Sent: <b>{{ c.sent or c.done or 0 }}</b></span>
+      <span>Failed: <b>{{ c.failed or 0 }}</b></span>
+      <span>Queued: <b>{{ c.queued or 0 }}</b></span>
+    </div>
+
+    <div class="cmp-actions">
+      <a href="{{ url_for('whatsapp.campaign_detail', campaign_id=c.id or c.campaign_id) }}"
+         class="pf-btn pf-btn-primary" style="font-size:.82rem;padding:6px 12px">📊 Details</a>
+      <button class="pf-btn pf-btn-secondary" style="font-size:.82rem;padding:6px 12px"
+              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'start')">▶ Start</button>
+      <button class="pf-btn pf-btn-ghost" style="font-size:.82rem;padding:6px 12px"
+              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'pause')">⏸ Pause</button>
+      <button class="pf-btn pf-btn-ghost" style="font-size:.82rem;padding:6px 12px"
+              onclick="showScheduleModal('{{ c.id or c.campaign_id }}')">🕐 Schedule</button>
+      <button class="pf-btn pf-btn-ghost" style="font-size:.82rem;padding:6px 12px"
+              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'copy')">📋 Copy</button>
+      <button class="pf-btn pf-btn-danger" style="font-size:.82rem;padding:6px 12px"
+              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'reset-failed')">↩ Reset</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="ico">📣</div>
+  <h3>No campaigns yet</h3>
+  <p>Create your first campaign to send bulk WhatsApp messages.</p>
+  <a href="{{ url_for('whatsapp.campaign_new') }}" class="pf-btn pf-btn-primary" style="margin-top:14px">
+    ➕ Create Campaign
+  </a>
+</div>
+{% endif %}
+
+<!-- Schedule modal -->
+<div id="schedule-modal" style="display:none;position:fixed;inset:0;z-index:1000;
+     background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:380px;max-width:90vw">
+    <h3 style="margin:0 0 18px">📅 Schedule Campaign</h3>
+    <input type="datetime-local" id="schedule-dt" class="pf-input" style="width:100%;margin-bottom:16px">
+    <div style="display:flex;gap:10px">
+      <button class="pf-btn pf-btn-primary" style="flex:1" onclick="doSchedule()">Schedule</button>
+      <button class="pf-btn pf-btn-ghost"   style="flex:1" onclick="closeSchedule()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="wa-toast" style="position:fixed;bottom:24px;right:24px;z-index:9999;
+     background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;
+     font-size:.9rem;display:none;max-width:320px;box-shadow:0 4px 20px rgba(0,0,0,.3)"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+let _schedulingCid = null;
+
+function toast(msg, ok=true) {
+  const el = document.getElementById('wa-toast');
+  el.textContent = msg;
+  el.style.background = ok ? '#166534' : '#991b1b';
+  el.style.display = 'block';
+  setTimeout(() => el.style.display='none', 4000);
+}
+
+const ACTION_MAP = {
+  start: {method:'POST', url: cid => `/whatsapp/api/campaigns/${cid}/start`},
+  pause: {method:'POST', url: cid => `/whatsapp/api/campaigns/${cid}/pause`},
+  copy:  {method:'POST', url: cid => `/whatsapp/api/campaigns/${cid}/copy`},
+  'reset-failed': {method:'POST', url: cid => `/whatsapp/api/campaigns/${cid}/reset-failed`},
+};
+
+async function campaignAction(cid, action) {
+  const cfg = ACTION_MAP[action];
+  if (!cfg) return;
+  const r    = await fetch(cfg.url(cid), {
+    method: cfg.method,
+    headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? `${action} triggered` : `Error: ${json.error}`, json.ok);
+  if (json.ok) setTimeout(() => location.reload(), 1500);
+}
+
+function showScheduleModal(cid) {
+  _schedulingCid = cid;
+  document.getElementById('schedule-modal').style.display = 'flex';
+}
+function closeSchedule() {
+  document.getElementById('schedule-modal').style.display = 'none';
+}
+async function doSchedule() {
+  const dt = document.getElementById('schedule-dt').value;
+  if (!dt) { toast('Select a date/time first', false); return; }
+  const r = await fetch(`/whatsapp/api/campaigns/${_schedulingCid}/schedule`, {
+    method:'POST', body:JSON.stringify({schedule_date: dt}),
+    headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF}
+  });
+  const json = await r.json();
+  toast(json.ok ? 'Campaign scheduled' : `Error: ${json.error}`, json.ok);
+  closeSchedule();
+  if (json.ok) setTimeout(() => location.reload(), 1500);
+}
+</script>
+{% endblock %}

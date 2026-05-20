@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp Settings{% endblock %}
+{% block page_title %}WhatsApp Settings{% endblock %}
+{% block page_sub %}Configure Wapilot API connection and reminder messages{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">← Control Center</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" style="max-width:760px">
+  <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
+
+  <!-- Wapilot Connection -->
+  <div style="background:var(--card-bg,#fff);border:1px solid var(--border,#e2e8f0);
+              border-radius:14px;padding:28px;margin-bottom:24px">
+    <h3 style="margin:0 0 4px;font-size:1.05rem">🔌 Wapilot API Connection</h3>
+    <p style="color:var(--muted,#64748b);font-size:.85rem;margin:0 0 22px">
+      Credentials from <a href="https://wapilot.net" target="_blank">wapilot.net</a> dashboard.
+    </p>
+
+    {% for key, label, desc in wapilot_keys %}
+    <div style="margin-bottom:18px">
+      <label style="display:block;font-weight:600;font-size:.9rem;margin-bottom:4px">{{ label }}</label>
+      <p style="color:var(--muted,#64748b);font-size:.82rem;margin:0 0 6px">{{ desc }}</p>
+      <input type="{{ 'password' if 'token' in key else 'text' }}"
+             name="{{ key }}" value="{{ settings.get(key,'') }}"
+             class="pf-input" style="width:100%;max-width:480px"
+             placeholder="{{ 'API token…' if 'token' in key else 'instance4042' }}">
+    </div>
+    {% endfor %}
+
+    <!-- Test connection button -->
+    <button type="button" class="pf-btn pf-btn-ghost" onclick="testConnection()">
+      🔍 Test Connection
+    </button>
+    <span id="test-result" style="margin-left:14px;font-size:.85rem"></span>
+  </div>
+
+  <!-- Reminder Messages -->
+  <div style="background:var(--card-bg,#fff);border:1px solid var(--border,#e2e8f0);
+              border-radius:14px;padding:28px;margin-bottom:24px">
+    <h3 style="margin:0 0 4px;font-size:1.05rem">🔔 Automated Reminder Settings</h3>
+    <p style="color:var(--muted,#64748b);font-size:.85rem;margin:0 0 22px">
+      Variables: <code>{owner}</code> <code>{pet}</code> <code>{date}</code> <code>{time}</code>
+      <code>{vaccine}</code> <code>{invoice}</code> <code>{amount}</code>
+    </p>
+
+    {% for key, default, label, desc in reminder_keys %}
+    <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border,#e2e8f0)">
+      {% if key.endswith('_enabled') %}
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" name="{{ key }}" value="1"
+               {{ 'checked' if settings.get(key,'1')=='1' else '' }}
+               style="width:18px;height:18px">
+        <span>
+          <strong style="font-size:.9rem">{{ label }}</strong>
+          {% if desc %}<br><span style="font-size:.82rem;color:var(--muted,#64748b)">{{ desc }}</span>{% endif %}
+        </span>
+      </label>
+      {% else %}
+      <label style="display:block;font-weight:600;font-size:.9rem;margin-bottom:4px">{{ label }}</label>
+      {% if desc %}<p style="color:var(--muted,#64748b);font-size:.82rem;margin:0 0 6px">{{ desc }}</p>{% endif %}
+      <textarea name="{{ key }}" rows="3" class="pf-input" style="width:100%;resize:vertical">{{ settings.get(key, default) }}</textarea>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="pf-btn pf-btn-primary" style="padding:12px 32px;font-size:1rem">
+    💾 Save Settings
+  </button>
+  <a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost" style="margin-left:12px">
+    Cancel
+  </a>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function testConnection() {
+  const el = document.getElementById('test-result');
+  el.textContent = 'Testing…';
+  el.style.color = 'var(--muted,#64748b)';
+  try {
+    const r    = await fetch('/whatsapp/api/instance/status');
+    const json = await r.json();
+    if (json.ok) {
+      el.textContent = '✅ Connected — Status: ' + (json.data?.status || json.data?.state || 'OK');
+      el.style.color = '#166534';
+    } else {
+      el.textContent = '❌ ' + (json.error || 'Connection failed');
+      el.style.color = '#991b1b';
+    }
+  } catch(e) {
+    el.textContent = '❌ Network error: ' + e.message;
+    el.style.color = '#991b1b';
+  }
+}
+</script>
+{% endblock %}

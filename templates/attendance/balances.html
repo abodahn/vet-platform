@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Leave Balances{% endblock %}
+{% block page_title %}Leave Balances{% endblock %}
+{% block page_sub %}{{ year }} — {{ users|length }} staff members{% endblock %}
+
+{% block topbar_actions %}
+  <form method="GET" style="display:flex;gap:8px;align-items:center">
+    <select name="year" class="pf-form-control" style="width:100px" onchange="this.form.submit()">
+      {% for y in range(2024, 2028) %}
+      <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <a href="{{ url_for('attendance.leave_types') }}" class="pf-btn pf-btn-sm">Leave Types</a>
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Set Balance Modal (hidden by default) -->
+<div id="balance-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="pf-card" style="width:400px;max-width:95vw">
+    <div class="pf-card-header">
+      <div class="pf-card-title">⚖️ Set Balance</div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--cl-text-muted)">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('attendance.balance_set') }}">
+      <input type="hidden" name="year" value="{{ year }}">
+      <input type="hidden" name="user_id" id="modal-user-id">
+      <input type="hidden" name="leave_type_id" id="modal-lt-id">
+      <div style="margin-bottom:12px;padding:10px;background:var(--cl-surface-2);border-radius:var(--cl-radius-sm)">
+        <div id="modal-label" style="font-weight:600"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="pf-form-group">
+          <label class="pf-form-label">Allocated</label>
+          <input type="number" name="allocated" id="modal-alloc" class="pf-form-control" step="0.5" min="0">
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-form-label">Used</label>
+          <input type="number" name="used" id="modal-used" class="pf-form-control" step="0.5" min="0">
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-form-label">Pending</label>
+          <input type="number" name="pending" id="modal-pending" class="pf-form-control" step="0.5" min="0">
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--cl-text-muted);margin-bottom:12px">Remaining = Allocated − Used − Pending</div>
+      <div style="display:flex;gap:10px">
+        <button type="submit" class="pf-btn pf-btn-primary">Save Balance</button>
+        <button type="button" class="pf-btn pf-btn-sm" onclick="closeModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Balance Matrix -->
+<div class="pf-card" style="overflow-x:auto">
+  <div class="pf-card-header">
+    <div>
+      <div class="pf-card-title">📊 Balance Matrix — {{ year }}</div>
+      <div class="pf-card-sub">Click any cell to set/edit the balance for that staff member</div>
+    </div>
+  </div>
+  <table class="pf-table" style="min-width:700px">
+    <thead>
+      <tr>
+        <th style="min-width:160px">Staff Member</th>
+        {% for lt in ltypes %}
+        <th style="text-align:center;min-width:120px">
+          <span style="display:flex;align-items:center;gap:4px;justify-content:center">
+            <span style="width:8px;height:8px;border-radius:50%;background:{{ lt.color }}"></span>
+            {{ lt.name }}
+          </span>
+          <div style="font-size:10px;font-weight:400;color:var(--cl-text-muted)">{{ lt.days_per_year }}d/yr</div>
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td>
+          <div style="font-weight:600">{{ u.full_name }}</div>
+          <div style="font-size:11px;color:var(--cl-text-muted)">{{ u.role }}</div>
+        </td>
+        {% for lt in ltypes %}
+        {% set b = matrix[u.id][lt.id] %}
+        <td style="text-align:center;cursor:pointer"
+            onclick="openModal({{ u.id }},'{{ u.full_name }}',{{ lt.id }},'{{ lt.name }}',
+              {{ b.allocated if b else lt.days_per_year }},
+              {{ b.used if b else 0 }},
+              {{ b.pending if b else 0 }})">
+          {% if b %}
+          <div style="font-weight:700;color:{{ lt.color }};font-size:15px">{{ '%.1f'|format(b.remaining) }}</div>
+          <div style="font-size:10px;color:var(--cl-text-muted)">/ {{ '%.1f'|format(b.allocated) }}</div>
+          {% else %}
+          <div style="color:var(--cl-text-muted);font-size:12px">—</div>
+          <div style="font-size:10px;color:var(--cl-text-muted)">click to set</div>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openModal(userId, userName, ltId, ltName, alloc, used, pending) {
+  document.getElementById('modal-user-id').value = userId;
+  document.getElementById('modal-lt-id').value = ltId;
+  document.getElementById('modal-label').textContent = userName + ' — ' + ltName;
+  document.getElementById('modal-alloc').value = alloc;
+  document.getElementById('modal-used').value = used;
+  document.getElementById('modal-pending').value = pending;
+  document.getElementById('balance-modal').style.display = 'flex';
+}
+function closeModal() {
+  document.getElementById('balance-modal').style.display = 'none';
+}
+document.getElementById('balance-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+{% endblock %}

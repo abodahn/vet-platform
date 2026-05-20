@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Payroll Dashboard{% endblock %}
+{% block content %}
+<div class="pf-page-header">
+  <div>
+    <h1 class="pf-page-title">💰 Payroll Dashboard</h1>
+    <p class="pf-page-subtitle">Manage staff salaries and payroll runs</p>
+  </div>
+  <div class="pf-topbar-actions">
+    {% set months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+    <form method="get" style="display:flex;gap:8px;align-items:center">
+      <select name="year" class="pf-input" style="width:90px">
+        {% for y in range(year-2, year+2) %}<option value="{{ y }}" {% if y==year %}selected{% endif %}>{{ y }}</option>{% endfor %}
+      </select>
+      <select name="month" class="pf-input" style="width:80px">
+        {% for m in range(1,13) %}<option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ months[m-1] }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="pf-btn pf-btn-secondary">Filter</button>
+    </form>
+    <a href="{{ url_for('payroll.salary_new') }}" class="pf-btn pf-btn-primary">+ New Salary</a>
+    <a href="{{ url_for('payroll.salary_grades') }}" class="pf-btn pf-btn-secondary">⚙ Grades</a>
+    <form method="post" action="{{ url_for('payroll.bulk_generate') }}" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="year" value="{{ year }}">
+      <input type="hidden" name="month" value="{{ month }}">
+      <button type="submit" class="pf-btn pf-btn-secondary"
+        onclick="return confirm('Bulk-generate Draft salaries for all staff without records this period?')">
+        ⚡ Bulk Generate
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Stats strip -->
+<div class="pf-stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:24px">
+  <div class="pf-stat-card">
+    <div class="pf-stat-value">{{ stats.total }}</div>
+    <div class="pf-stat-label">Total Records</div>
+  </div>
+  <div class="pf-stat-card" style="border-top:3px solid #6b7280">
+    <div class="pf-stat-value">{{ stats.draft }}</div>
+    <div class="pf-stat-label">Draft</div>
+  </div>
+  <div class="pf-stat-card" style="border-top:3px solid #2563eb">
+    <div class="pf-stat-value">{{ stats.approved }}</div>
+    <div class="pf-stat-label">Approved</div>
+  </div>
+  <div class="pf-stat-card" style="border-top:3px solid #16a34a">
+    <div class="pf-stat-value">{{ stats.paid }}</div>
+    <div class="pf-stat-label">Paid</div>
+  </div>
+  <div class="pf-stat-card" style="border-top:3px solid #16a34a">
+    <div class="pf-stat-value">EGP {{ '{:,.0f}'.format(stats.total_paid) }}</div>
+    <div class="pf-stat-label">Total Paid Out</div>
+  </div>
+  <div class="pf-stat-card" style="border-top:3px solid #f59e0b">
+    <div class="pf-stat-value">EGP {{ '{:,.0f}'.format(stats.total_pending) }}</div>
+    <div class="pf-stat-label">Pending Payment</div>
+  </div>
+</div>
+
+{% if active_staff > stats.total %}
+<div class="pf-alert pf-alert-warning" style="margin-bottom:16px">
+  ⚠ <strong>{{ active_staff - stats.total }}</strong> active staff have no salary record for this period.
+  Use <strong>Bulk Generate</strong> to create draft records.
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <div class="pf-card-header"><h2 class="pf-card-title">Salary Records — {{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month-1] }} {{ year }}</h2></div>
+  <div class="pf-table-wrapper">
+    <table class="pf-table">
+      <thead><tr>
+        <th>Staff</th><th>Role</th>
+        <th>Basic</th><th>Allowances</th><th>Deductions</th>
+        <th>Gross</th><th>Net</th><th>Status</th><th>Actions</th>
+      </tr></thead>
+      <tbody>
+        {% for r in recent %}
+        <tr>
+          <td><strong>{{ r.full_name }}</strong></td>
+          <td><span class="pf-badge">{{ r.role }}</span></td>
+          <td>{{ '{:,.0f}'.format(r.basic_salary) }}</td>
+          <td>{{ '{:,.0f}'.format(r.allowances) }}</td>
+          <td class="text-danger">{{ '{:,.0f}'.format(r.deductions + r.absence_deduction + r.tax_deduction) }}</td>
+          <td>{{ '{:,.0f}'.format(r.gross) }}</td>
+          <td><strong>{{ '{:,.0f}'.format(r.net) }}</strong></td>
+          <td>
+            <span class="pf-badge" style="background:{{ status_colors.get(r.status,'#6b7280') }}20;color:{{ status_colors.get(r.status,'#6b7280') }}">
+              {{ r.status }}
+            </span>
+          </td>
+          <td>
+            <a href="{{ url_for('payroll.salary_detail', sid=r.id) }}" class="pf-btn pf-btn-sm pf-btn-secondary">View</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" style="text-align:center;color:#6b7280;padding:32px">No salary records for this period.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if recent %}
+  <div style="padding:12px 16px">
+    <a href="{{ url_for('payroll.salaries_list', year=year, month=month) }}" class="pf-btn pf-btn-secondary">View All →</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

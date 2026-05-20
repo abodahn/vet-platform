@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Label — {{ item.medication_name or item.item_name }}</title>
+  <style>
+    @media print {
+      body { margin: 0; }
+      .no-print { display: none !important; }
+    }
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 20px;
+      background: #fff;
+      color: #000;
+    }
+    .label {
+      border: 2px solid #1a365d;
+      border-radius: 8px;
+      padding: 16px 20px;
+      max-width: 380px;
+      page-break-inside: avoid;
+    }
+    .label-header {
+      border-bottom: 1px solid #1a365d;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .clinic-name { font-size: 14px; font-weight: 700; color: #1a365d; }
+    .clinic-sub  { font-size: 11px; color: #555; }
+    .rx-title    { font-size: 18px; font-weight: 800; color: #1a365d; margin: 6px 0 2px; }
+    .field-label { font-size: 10px; text-transform: uppercase; color: #777; letter-spacing: .5px; margin-top: 8px; }
+    .field-value { font-size: 13px; font-weight: 600; margin-top: 2px; }
+    .medication  { font-size: 16px; font-weight: 700; color: #1a365d; }
+    .instructions { font-size: 12px; margin-top: 6px; padding: 8px; background: #f0f4f8; border-radius: 4px; }
+    .footer { margin-top: 12px; font-size: 10px; color: #777; border-top: 1px solid #ddd; padding-top: 8px; }
+    .no-print { margin-top: 20px; display: flex; gap: 10px; }
+    .btn { padding: 8px 18px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .btn-print { background: #1a365d; color: #fff; }
+    .btn-close { background: #e2e8f0; color: #333; }
+  </style>
+</head>
+<body>
+
+<div class="label">
+  <div class="label-header">
+    <div class="clinic-name">{{ clinic.get('name', 'Premium Animal Hospital') if clinic else 'Premium Animal Hospital' }}</div>
+    <div class="clinic-sub">{{ clinic.get('address', '') if clinic else '' }}
+      {% if clinic and clinic.get('phone') %} · {{ clinic.phone }}{% endif %}
+    </div>
+  </div>
+
+  <div class="rx-title">💊 Rx #{{ rx.id }}</div>
+
+  <div class="field-label">Patient</div>
+  <div class="field-value">{{ rx.pet_name }} ({{ rx.species }})
+    {% if rx.weight_kg %} · {{ rx.weight_kg }} kg{% endif %}
+  </div>
+
+  <div class="field-label">Owner</div>
+  <div class="field-value">{{ rx.owner_name }}</div>
+
+  <div class="field-label">Medication</div>
+  <div class="medication">{{ item.medication_name or item.item_name }}</div>
+  {% if item.unit %}
+  <div style="font-size:12px;color:#555">Unit: {{ item.unit }}</div>
+  {% endif %}
+
+  <div class="field-label">Quantity</div>
+  <div class="field-value">{{ item.quantity }} {{ item.unit or '' }}</div>
+
+  {% if item.instructions %}
+  <div class="field-label">Instructions</div>
+  <div class="instructions">{{ item.instructions }}</div>
+  {% endif %}
+
+  {% if item.frequency %}
+  <div class="field-label">Frequency</div>
+  <div class="field-value">{{ item.frequency }}</div>
+  {% endif %}
+
+  {% if item.duration_days %}
+  <div class="field-label">Duration</div>
+  <div class="field-value">{{ item.duration_days }} days</div>
+  {% endif %}
+
+  <div class="footer">
+    Dispensed: {{ dispensed_date }} &nbsp;|&nbsp;
+    Doctor: {{ rx.doctor_name or '—' }} &nbsp;|&nbsp;
+    Visit: {{ rx.visit_date or '—' }}
+  </div>
+</div>
+
+<div class="no-print">
+  <button class="btn btn-print" onclick="window.print()">🖨 Print Label</button>
+  <button class="btn btn-close" onclick="window.close()">Close</button>
+</div>
+
+</body>
+</html>

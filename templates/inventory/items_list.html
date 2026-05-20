@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Inventory Items', 'أصناف المخزون') }}{% endblock %}
+{% block page_title %}{{ t('Inventory Items', 'أصناف المخزون') }}{% endblock %}
+{% block page_sub %}{{ t('All active items with current stock levels', 'جميع الأصناف النشطة مع مستويات المخزون الحالية') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('inventory.item_new') }}" class="pf-btn pf-btn-primary">{{ t('+ New Item', '+ صنف جديد') }}</a>
+<a href="{{ url_for('inventory.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('Dashboard', 'لوحة التحكم') }}</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.filter-bar {
+  background: var(--cl-surface); border-radius: 12px;
+  padding: 16px 20px; margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
+}
+.filter-group { display:flex; flex-direction:column; gap:4px; }
+.filter-group label { font-size:0.75rem; font-weight:600; color:var(--cl-muted); text-transform:uppercase; }
+.filter-group input, .filter-group select {
+  padding: 7px 12px; border: 1px solid var(--cl-border); border-radius: 8px;
+  font-size: 0.85rem; background: var(--cl-bg); color: var(--cl-text);
+  min-width: 140px;
+}
+.filter-group input:focus, .filter-group select:focus {
+  outline: none; border-color: var(--cl-primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}
+.pf-btn { padding:8px 18px; border-radius:8px; font-size:0.85rem; font-weight:600; cursor:pointer; border:none; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+.pf-btn-primary { background: var(--cl-primary); color:#fff; }
+.pf-btn-primary:hover { opacity:0.9; }
+.pf-btn-secondary { background: var(--cl-surface); color:var(--cl-text); border:1px solid var(--cl-border); }
+.pf-btn-secondary:hover { background:var(--cl-bg); }
+.pf-btn-sm { padding:5px 12px; font-size:0.78rem; }
+
+.pf-table-wrap { background:var(--cl-surface); border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,0.07); overflow:hidden; }
+table.pf-table { width:100%; border-collapse:collapse; }
+table.pf-table thead { background: linear-gradient(135deg, var(--cl-primary) 0%, #1e40af 100%); }
+table.pf-table thead th { color:#fff; padding:12px 14px; text-align:left; font-size:0.79rem; font-weight:600; white-space:nowrap; }
+table.pf-table tbody tr { border-bottom:1px solid var(--cl-border); transition:background 0.1s; }
+table.pf-table tbody tr:hover { background:var(--cl-bg); }
+table.pf-table tbody td { padding:10px 14px; font-size:0.84rem; color:var(--cl-text); vertical-align:middle; }
+table.pf-table tbody tr:last-child { border-bottom:none; }
+
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.72rem; font-weight:600; }
+.badge-success { background:#d1fae5; color:#065f46; }
+.badge-warning { background:#fef3c7; color:#92400e; }
+.badge-danger  { background:#fee2e2; color:#991b1b; }
+.badge-secondary { background:#f1f5f9; color:#475569; }
+.badge-info { background:#dbeafe; color:#1e40af; }
+
+.stock-bar-wrap { display:flex; align-items:center; gap:8px; }
+.stock-bar-bg { height:6px; border-radius:4px; background:var(--cl-border); flex:1; min-width:60px; overflow:hidden; }
+.stock-bar-fill { height:100%; border-radius:4px; transition:width 0.3s; }
+.stock-val { font-weight:700; font-size:0.85rem; white-space:nowrap; }
+.stock-val.ok { color:var(--cl-success); }
+.stock-val.low { color:var(--cl-warning); }
+.stock-val.critical { color:var(--cl-danger); }
+
+.item-name { font-weight:600; }
+.item-sku { font-size:0.75rem; color:var(--cl-muted); }
+.action-links a { color:var(--cl-primary); font-size:0.8rem; font-weight:600; text-decoration:none; margin-right:10px; }
+.action-links a:hover { text-decoration:underline; }
+.result-count { font-size:0.82rem; color:var(--cl-muted); padding:10px 16px; border-bottom:1px solid var(--cl-border); background:var(--cl-bg); }
+.empty-state { text-align:center; padding:50px; color:var(--cl-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="get" class="filter-bar">
+  <div class="filter-group">
+    <label>{{ t('Search', 'بحث') }}</label>
+    <input type="text" name="q" value="{{ search }}" placeholder="{{ t('Name, SKU, barcode…', 'الاسم، الرمز، الباركود…') }}">
+  </div>
+  <div class="filter-group">
+    <label>{{ t('Category', 'الفئة') }}</label>
+    <select name="category_id">
+      <option value="">{{ t('All Categories', 'كل الفئات') }}</option>
+      {% for cat in categories %}
+      <option value="{{ cat.id }}" {% if category_id|string == cat.id|string %}selected{% endif %}>
+        {{ cat.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>{{ t('Type', 'النوع') }}</label>
+    <select name="is_medication">
+      <option value="">{{ t('All Types', 'كل الأنواع') }}</option>
+      <option value="1" {% if is_medication == '1' %}selected{% endif %}>{{ t('Medications Only', 'الأدوية فقط') }}</option>
+      <option value="0" {% if is_medication == '0' %}selected{% endif %}>{{ t('Non-Medication', 'غير دوائي') }}</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>&nbsp;</label>
+    <button type="submit" class="pf-btn pf-btn-primary">{{ t('Search', 'بحث') }}</button>
+  </div>
+  {% if search or category_id or is_medication %}
+  <div class="filter-group">
+    <label>&nbsp;</label>
+    <a href="{{ url_for('inventory.items_list') }}" class="pf-btn pf-btn-secondary">{{ t('Clear', 'مسح') }}</a>
+  </div>
+  {% endif %}
+</form>
+
+<div class="pf-table-wrap">
+  <div class="result-count">{{ t(items|length|string + ' item(s) found', items|length|string + ' صنف موجود') }}</div>
+  <table class="pf-table">
+    <thead>
+      <tr>
+        <th>{{ t('SKU', 'رمز المنتج') }}</th>
+        <th>{{ t('Name', 'الاسم') }}</th>
+        <th>{{ t('Category', 'الفئة') }}</th>
+        <th>{{ t('Stock Level', 'مستوى المخزون') }}</th>
+        <th>{{ t('Unit', 'الوحدة') }}</th>
+        <th>{{ t('Sell Price', 'سعر البيع') }}</th>
+        <th>{{ t('Type', 'النوع') }}</th>
+        <th>{{ t('Actions', 'إجراءات') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      {% set stock = item.current_stock | float %}
+      {% set reorder = item.reorder_level | float %}
+      {% set max_s = item.max_stock | float or 1000 %}
+      {% set pct = [[(stock / max_s * 100), 0]|max, 100]|min %}
+      {% if stock <= reorder %}
+        {% set stock_class = 'critical' %}
+        {% set bar_color = 'var(--cl-danger)' %}
+      {% elif stock <= reorder * 2 %}
+        {% set stock_class = 'low' %}
+        {% set bar_color = 'var(--cl-warning)' %}
+      {% else %}
+        {% set stock_class = 'ok' %}
+        {% set bar_color = 'var(--cl-success)' %}
+      {% endif %}
+      <tr>
+        <td><span class="item-sku">{{ item.sku or '—' }}</span></td>
+        <td>
+          <div class="item-name">{{ item.name }}</div>
+          {% if item.name_ar %}<div class="item-sku">{{ item.name_ar }}</div>{% endif %}
+        </td>
+        <td>{{ item.category_name or '—' }}</td>
+        <td>
+          <div class="stock-bar-wrap">
+            <div class="stock-bar-bg">
+              <div class="stock-bar-fill" style="width:{{ pct }}%;background:{{ bar_color }};"></div>
+            </div>
+            <span class="stock-val {{ stock_class }}">{{ stock | round(1) }}</span>
+          </div>
+          <div style="font-size:0.72rem;color:var(--cl-muted);margin-top:2px">{{ t('Reorder:', 'إعادة الطلب:') }} {{ reorder | round(0) | int }}</div>
+        </td>
+        <td>{{ item.unit }}</td>
+        <td style="font-weight:600">{{ "%.2f"|format(item.sell_price or 0) }}</td>
+        <td>
+          {% if item.is_medication %}
+            <span class="badge badge-info">💊 {{ t('Medication', 'دواء') }}</span>
+            {% if item.is_controlled %}<span class="badge badge-danger" style="margin-top:3px;display:block">{{ t('Controlled', 'مادة خاضعة للرقابة') }}</span>{% endif %}
+          {% else %}
+            <span class="badge badge-secondary">{{ t('Supply', 'مستلزمات') }}</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="action-links">
+            <a href="{{ url_for('inventory.item_detail', item_id=item.id) }}">{{ t('View', 'عرض') }}</a>
+            <a href="{{ url_for('inventory.item_edit', item_id=item.id) }}">{{ t('Edit', 'تعديل') }}</a>
+            <a href="{{ url_for('inventory.batch_new', item_id=item.id) }}">{{ t('+Stock', '+مخزون') }}</a>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="empty-state">{{ t('No items found.', 'لا توجد أصناف.') }} <a href="{{ url_for('inventory.item_new') }}">{{ t('Add the first item →', 'أضف الصنف الأول →') }}</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

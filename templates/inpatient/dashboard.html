@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Inpatient / Hospitalisation{% endblock %}
+
+{% block content %}
+<div class="pf-page-header">
+  <div>
+    <h1 class="pf-page-title">🏥 Inpatient Ward</h1>
+    <p class="pf-page-sub">Active hospitalisations &amp; clinical monitoring</p>
+  </div>
+  <div class="pf-topbar-actions">
+    <a href="{{ url_for('inpatient.admit') }}" class="pf-btn pf-btn-primary">+ Admit Patient</a>
+  </div>
+</div>
+
+{# ── Stats row ── #}
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
+  {% set s = stats %}
+  <div class="pf-card" style="text-align:center;padding:1rem">
+    <div style="font-size:2rem;font-weight:700;color:#2563eb">{{ s.active or 0 }}</div>
+    <div style="font-size:.8rem;color:var(--cl-muted)">Active Stays</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1rem">
+    <div style="font-size:2rem;font-weight:700;color:#dc2626">{{ s.critical or 0 }}</div>
+    <div style="font-size:.8rem;color:var(--cl-muted)">Critical</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1rem">
+    <div style="font-size:2rem;font-weight:700;color:#d97706">{{ s.ready or 0 }}</div>
+    <div style="font-size:.8rem;color:var(--cl-muted)">Ready for Discharge</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1rem">
+    <div style="font-size:2rem;font-weight:700;color:#16a34a">{{ s.discharged_today or 0 }}</div>
+    <div style="font-size:.8rem;color:var(--cl-muted)">Discharged Today</div>
+  </div>
+</div>
+
+{# ── Filter bar ── #}
+<div class="pf-card" style="padding:.8rem 1rem;margin-bottom:1rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+  <span style="font-weight:600;font-size:.85rem">Filter:</span>
+  <a href="{{ url_for('inpatient.dashboard') }}"
+     class="pf-btn {% if not status_f %}pf-btn-primary{% else %}pf-btn-secondary{% endif %}" style="font-size:.8rem;padding:4px 12px">All Active</a>
+  {% for st in statuses %}
+  <a href="{{ url_for('inpatient.dashboard', status=st) }}"
+     class="pf-btn {% if status_f==st %}pf-btn-primary{% else %}pf-btn-secondary{% endif %}" style="font-size:.8rem;padding:4px 12px">{{ st }}</a>
+  {% endfor %}
+</div>
+
+{# ── Stays grid ── #}
+{% if stays %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem">
+  {% for s in stays %}
+  {% set color = status_colors.get(s.status, '#6b7280') %}
+  <a href="{{ url_for('inpatient.stay_detail', stay_id=s.id) }}" style="text-decoration:none">
+    <div class="pf-card" style="border-left:4px solid {{ color }};padding:1rem;transition:box-shadow .2s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.15)'" onmouseout="this.style.boxShadow=''">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem">
+        <div>
+          <div style="font-weight:700;font-size:1rem;color:var(--cl-text)">🐾 {{ s.pet_name }}</div>
+          <div style="font-size:.8rem;color:var(--cl-muted)">{{ s.species }}{% if s.breed %} · {{ s.breed }}{% endif %}</div>
+        </div>
+        <span class="pf-badge" style="background:{{ color }};color:#fff;font-size:.75rem">{{ s.status }}</span>
+      </div>
+      <div style="font-size:.82rem;color:var(--cl-muted);margin-bottom:.4rem">
+        👤 {{ s.owner_name }} · {{ s.owner_phone }}
+      </div>
+      <div style="font-size:.82rem;margin-bottom:.3rem"><strong>Reason:</strong> {{ s.reason[:80] }}{% if s.reason|length > 80 %}…{% endif %}</div>
+      <div style="display:flex;gap:1rem;font-size:.78rem;color:var(--cl-muted)">
+        <span>🏥 Ward: {{ s.ward }}</span>
+        {% if s.cage_number %}<span>🔢 Cage: {{ s.cage_number }}</span>{% endif %}
+        <span>📅 Admitted: {{ s.admitted_at[:10] }}</span>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="pf-card" style="text-align:center;padding:3rem;color:var(--cl-muted)">
+  <div style="font-size:3rem;margin-bottom:1rem">🏥</div>
+  <div style="font-size:1.1rem;font-weight:600">No active inpatient stays</div>
+  <a href="{{ url_for('inpatient.admit') }}" class="pf-btn pf-btn-primary" style="margin-top:1rem">Admit First Patient</a>
+</div>
+{% endif %}
+{% endblock %}

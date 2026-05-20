@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ t('My Profile', 'ملفي الشخصي') }}{% endblock %}
+{% block page_title %}{{ t('My Profile', 'ملفي الشخصي') }}{% endblock %}
+{% block page_sub %}{{ t('Preferences and account settings', 'التفضيلات وإعدادات الحساب') }}{% endblock %}
+
+{% block content %}
+<div style="max-width:560px">
+
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div>
+        <div class="pf-card-title">👤 {{ t('Account Profile', 'الملف الشخصي') }}</div>
+        <div class="pf-card-sub">{{ user.username }} · {{ user.role.replace('_',' ') }}</div>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('auth.profile') }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+      <div class="pf-form-group">
+        <label class="pf-label">{{ t('Full Name', 'الاسم الكامل') }}</label>
+        <input class="pf-input" type="text" value="{{ user.full_name or '' }}" disabled>
+      </div>
+
+      <div class="pf-form-group">
+        <label class="pf-label">{{ t('Username', 'اسم المستخدم') }}</label>
+        <input class="pf-input" type="text" value="{{ user.username }}" disabled>
+      </div>
+
+      <div class="pf-form-group">
+        <label class="pf-label">{{ t('Role', 'الدور') }}</label>
+        <input class="pf-input" type="text" value="{{ user.role.replace('_',' ') | title }}" disabled>
+      </div>
+
+      <div class="pf-divider"></div>
+
+      <div class="pf-form-group">
+        <label class="pf-label">{{ t('Platform Theme', 'مظهر المنصة') }}</label>
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 14px;border:1.5px solid var(--cl-border);border-radius:var(--cl-radius-sm);flex:1;transition:border-color .18s"
+                 id="lbl-medical">
+            <input type="radio" name="theme" value="medical"
+                   {% if (user.theme_preference or 'medical') == 'medical' %}checked{% endif %}
+                   onchange="document.getElementById('lbl-medical').style.borderColor='var(--cl-primary)';document.getElementById('lbl-logo').style.borderColor='var(--cl-border)'">
+            <span>
+              <strong style="display:block;font-size:13px">⚕️ {{ t('Medical', 'طبي') }}</strong>
+              <span style="font-size:11px;color:var(--cl-text-muted)">{{ t('White · Navy · Gold', 'أبيض · كحلي · ذهبي') }}</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="pf-form-group">
+        <label class="pf-label">{{ t('Language', 'اللغة') }}</label>
+        <select class="pf-select" name="lang">
+          <option value="en" {% if (user.language or 'en') == 'en' %}selected{% endif %}>🇬🇧 English</option>
+          <option value="ar" {% if user.language == 'ar' %}selected{% endif %}>🇸🇦 العربية</option>
+        </select>
+      </div>
+
+      <button type="submit" class="pf-btn pf-btn-primary">{{ t('Save Preferences', 'حفظ التفضيلات') }}</button>
+
+    </form>
+  </div>
+
+  <div class="pf-card" style="margin-top:16px">
+    <div class="pf-card-header">
+      <div class="pf-card-title">🔗 {{ t('Quick Links', 'روابط سريعة') }}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <a href="{{ url_for('launcher.index') }}" class="pf-btn pf-btn-ghost pf-btn-sm">🚀 {{ t('Module Launcher', 'لوحة الوحدات') }}</a>
+      <a href="/launcher/legacy/start" target="_blank" class="pf-btn pf-btn-ghost pf-btn-sm">🩺 {{ t('Examination Module', 'وحدة الفحص') }}</a>
+      <a href="{{ url_for('auth.logout') }}" class="pf-btn pf-btn-ghost pf-btn-sm" style="color:var(--cl-danger)">🔓 {{ t('Logout', 'تسجيل الخروج') }}</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var medChecked = document.querySelector('input[value="medical"]').checked;
+  document.getElementById('lbl-medical').style.borderColor = medChecked ? 'var(--cl-primary)' : 'var(--cl-border)';
+})();
+</script>
+{% endblock %}

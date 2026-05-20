@@ -1,0 +1,492 @@
+{% extends "base.html" %}
+
+{% block title %}{{ pet.pet_name }}{% endblock %}
+{% block page_title %}{{ pet._emoji }} {{ pet.pet_name }}{% endblock %}
+{% block page_sub %}{{ pet.species }}{% if pet.breed %} · {{ pet.breed }}{% endif %} — owned by {{ pet.owner_name }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('appointments.appt_new', pet_id=pet.id, owner_id=pet.owner_id) }}"
+     class="pf-btn pf-btn-primary">📅 New Appointment</a>
+  <button onclick="openPetSummary({{ pet.id }})"
+          style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;
+                 border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:600;font-size:.85rem;
+                 margin-left:8px">
+    ✨ AI Summary
+  </button>
+  <a href="{{ url_for('crm.pet_edit', pet_id=pet.id) }}"
+     class="pf-btn" style="background:var(--cl-surface);color:var(--cl-primary);border:1.5px solid var(--cl-primary);margin-left:8px;">✏️ Edit</a>
+  <a href="{{ url_for('crm.owner_detail', owner_id=pet.owner_id) }}"
+     class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">← Owner</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  .detail-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 22px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .detail-layout { grid-template-columns: 1fr; } }
+
+  /* ── Pet card ───────────────────────────── */
+  .pet-info-card {
+    background: var(--cl-surface);
+    border-radius: 14px;
+    box-shadow: 0 2px 18px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .pet-card-header {
+    background: linear-gradient(135deg, var(--cl-primary) 0%, color-mix(in srgb, var(--cl-primary) 75%, var(--cl-accent)) 100%);
+    padding: 28px 20px 20px;
+    text-align: center;
+  }
+  .pet-big-emoji { font-size: 4rem; display: block; margin-bottom: 10px; }
+  .pet-card-name { color:#fff; font-size:1.3rem; font-weight:800; margin-bottom:4px; }
+  .pet-card-species { color:rgba(255,255,255,0.78); font-size:0.9rem; }
+
+  .status-pills {
+    display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 12px;
+  }
+  .status-pill {
+    font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+    background: rgba(255,255,255,0.2); color: #fff;
+  }
+
+  .pet-info-rows { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .pet-info-row { display: flex; gap: 10px; align-items: flex-start; }
+  .pet-info-icon { font-size: 1rem; flex-shrink: 0; margin-top: 2px; }
+  .pet-info-label { font-size: 0.75rem; color: var(--cl-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .pet-info-value { font-size: 0.92rem; color: var(--cl-text); font-weight: 500; margin-top: 1px; }
+  .allergy-alert {
+    background: color-mix(in srgb, var(--cl-danger) 10%, var(--cl-bg));
+    border: 1.5px solid color-mix(in srgb, var(--cl-danger) 30%, var(--cl-border));
+    border-radius: 8px; padding: 10px 14px;
+    font-size: 0.85rem; color: var(--cl-danger); font-weight: 600;
+    margin: 0 20px 16px;
+  }
+
+  .pet-card-divider { height: 1px; background: var(--cl-border); margin: 0 20px; }
+  .pet-card-footer { padding: 14px 20px; display: flex; gap: 8px; }
+  .pet-card-footer a {
+    flex: 1; text-align: center; padding: 8px;
+    border-radius: 8px; font-size: 0.82rem; font-weight: 600;
+    text-decoration: none; border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg); color: var(--cl-text);
+    transition: all 0.15s;
+  }
+  .pet-card-footer a:hover { border-color: var(--cl-primary); color: var(--cl-primary); }
+
+  /* Owner mini-card */
+  .owner-mini {
+    margin: 0 20px 16px;
+    padding: 12px 14px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--cl-primary) 6%, var(--cl-bg));
+    border: 1.5px solid color-mix(in srgb, var(--cl-primary) 20%, var(--cl-border));
+    display: flex; align-items: center; gap: 10px;
+    text-decoration: none; color: var(--cl-text);
+    transition: all 0.15s;
+  }
+  .owner-mini:hover { border-color: var(--cl-primary); }
+  .owner-mini-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--cl-primary), var(--cl-accent));
+    color: #fff; font-weight: 700; font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .owner-mini-name { font-weight: 700; font-size: 0.9rem; }
+  .owner-mini-phone { font-size: 0.8rem; color: var(--cl-muted); }
+
+  /* ── Section cards ─────────────────────── */
+  .section-card {
+    background: var(--cl-surface);
+    border-radius: 14px;
+    box-shadow: 0 2px 14px rgba(0,0,0,0.07);
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 15px 20px; border-bottom: 1px solid var(--cl-border);
+  }
+  .section-header h3 { font-size: 0.97rem; font-weight: 700; color: var(--cl-text); margin: 0; display: flex; align-items: center; gap: 8px; }
+  .section-body { padding: 18px 20px; }
+
+  /* ── Timeline ──────────────────────────── */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .timeline-item {
+    display: flex; gap: 14px; padding: 14px 0;
+    border-bottom: 1px solid var(--cl-border);
+    position: relative;
+  }
+  .timeline-item:last-child { border-bottom: none; }
+  .timeline-dot {
+    width: 38px; height: 38px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; flex-shrink: 0;
+    position: relative; z-index: 1;
+  }
+  .dot-visit    { background: color-mix(in srgb, var(--cl-info) 15%, var(--cl-bg));    border: 2px solid var(--cl-info); }
+  .dot-vaccine  { background: color-mix(in srgb, var(--cl-success) 15%, var(--cl-bg)); border: 2px solid var(--cl-success); }
+  .dot-surgery  { background: color-mix(in srgb, var(--cl-danger) 15%, var(--cl-bg));  border: 2px solid var(--cl-danger); }
+  .dot-grooming { background: color-mix(in srgb, var(--cl-accent) 15%, var(--cl-bg));  border: 2px solid var(--cl-accent); }
+  .dot-invoice  { background: color-mix(in srgb, #22c55e 15%, var(--cl-bg));            border: 2px solid #22c55e; }
+  .dot-lab      { background: color-mix(in srgb, #06b6d4 15%, var(--cl-bg));            border: 2px solid #06b6d4; }
+  .timeline-item a { text-decoration: none; color: inherit; display: contents; }
+  .timeline-item:hover { background: color-mix(in srgb, var(--cl-primary) 4%, var(--cl-bg)); border-radius: 8px; }
+
+  .timeline-content { flex: 1; }
+  .timeline-title { font-weight: 700; font-size: 0.93rem; color: var(--cl-text); }
+  .timeline-date  { font-size: 0.8rem; color: var(--cl-muted); margin-top: 2px; }
+  .timeline-summary { font-size: 0.85rem; color: var(--cl-muted); margin-top: 4px; font-style: italic; }
+
+  /* ── Vaccination table ─────────────────── */
+  .vacc-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .vacc-table thead th {
+    background: color-mix(in srgb, var(--cl-success) 12%, var(--cl-bg));
+    color: var(--cl-success); font-weight: 700; padding: 10px 14px;
+    text-align: left; border-bottom: 2px solid color-mix(in srgb, var(--cl-success) 25%, var(--cl-border));
+  }
+  .vacc-table tbody td { padding: 10px 14px; border-bottom: 1px solid var(--cl-border); color: var(--cl-text); }
+  .vacc-table tbody tr:last-child td { border-bottom: none; }
+  .vacc-table tbody tr:hover { background: color-mix(in srgb, var(--cl-success) 4%, transparent); }
+  .due-soon { color: var(--cl-warning); font-weight: 700; }
+  .overdue  { color: var(--cl-danger);  font-weight: 700; }
+
+  /* ── Weight chart ──────────────────────── */
+  .weight-chart-wrap {
+    background: var(--cl-bg);
+    border: 1.5px solid var(--cl-border);
+    border-radius: 10px;
+    padding: 16px;
+    min-height: 120px;
+    display: flex; align-items: flex-end; gap: 6px;
+    overflow-x: auto;
+  }
+  .weight-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 44px; }
+  .weight-bar {
+    width: 28px; border-radius: 4px 4px 0 0;
+    background: linear-gradient(to top, var(--cl-primary), var(--cl-accent));
+    transition: height 0.4s;
+    min-height: 4px;
+  }
+  .weight-label { font-size: 0.7rem; color: var(--cl-muted); white-space: nowrap; }
+  .weight-val   { font-size: 0.75rem; font-weight: 700; color: var(--cl-primary); }
+
+  .empty-state { text-align: center; padding: 30px; color: var(--cl-muted); font-size: 0.9rem; }
+
+  .quick-action-btns { display: flex; gap: 10px; flex-wrap: wrap; padding: 16px 20px; border-top: 1px solid var(--cl-border); }
+  .quick-action-btns a {
+    padding: 8px 18px; border-radius: 8px; font-size: 0.87rem; font-weight: 600;
+    text-decoration: none; border: 1.5px solid var(--cl-border);
+    background: var(--cl-bg); color: var(--cl-text); transition: all 0.15s;
+  }
+  .quick-action-btns a:hover { border-color: var(--cl-primary); color: var(--cl-primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-layout">
+
+  <!-- LEFT: Pet Info Card -->
+  <div>
+    <div class="pet-info-card">
+      <div class="pet-card-header">
+        <span class="pet-big-emoji">{{ pet._emoji }}</span>
+        <div class="pet-card-name">{{ pet.pet_name }}</div>
+        <div class="pet-card-species">{{ pet.species }}{% if pet.breed %} · {{ pet.breed }}{% endif %}</div>
+        <div class="status-pills">
+          {% if pet.sex and pet.sex != 'Unknown' %}
+          <span class="status-pill">{{ pet.sex }}</span>
+          {% endif %}
+          {% if pet._age != 'Unknown' %}
+          <span class="status-pill">{{ pet._age }}</span>
+          {% endif %}
+          {% if pet.neutered %}
+          <span class="status-pill" style="background:rgba(16,185,129,0.3);">Neutered</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="pet-info-rows">
+        {% if pet.weight_kg %}
+        <div class="pet-info-row">
+          <span class="pet-info-icon">⚖️</span>
+          <div>
+            <div class="pet-info-label">Weight</div>
+            <div class="pet-info-value">{{ pet.weight_kg }} kg</div>
+          </div>
+        </div>
+        {% endif %}
+        {% if pet.dob %}
+        <div class="pet-info-row">
+          <span class="pet-info-icon">🎂</span>
+          <div>
+            <div class="pet-info-label">Date of Birth</div>
+            <div class="pet-info-value">{{ pet.dob[:10] }}</div>
+          </div>
+        </div>
+        {% endif %}
+        {% if pet.color %}
+        <div class="pet-info-row">
+          <span class="pet-info-icon">🎨</span>
+          <div>
+            <div class="pet-info-label">Color</div>
+            <div class="pet-info-value">{{ pet.color }}</div>
+          </div>
+        </div>
+        {% endif %}
+        {% if pet.microchip_id %}
+        <div class="pet-info-row">
+          <span class="pet-info-icon">💿</span>
+          <div>
+            <div class="pet-info-label">Microchip</div>
+            <div class="pet-info-value" style="font-family:monospace;font-size:0.85rem;">{{ pet.microchip_id }}</div>
+          </div>
+        </div>
+        {% endif %}
+        {% if pet.chronic_conditions %}
+        <div class="pet-info-row">
+          <span class="pet-info-icon">🏥</span>
+          <div>
+            <div class="pet-info-label">Chronic Conditions</div>
+            <div class="pet-info-value">{{ pet.chronic_conditions }}</div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if pet.allergies %}
+      <div class="allergy-alert">⚠️ Allergies: {{ pet.allergies }}</div>
+      {% endif %}
+
+      <div class="pet-card-divider"></div>
+
+      <!-- Owner link -->
+      <div style="padding:14px 20px 0;">
+        <a href="{{ url_for('crm.owner_detail', owner_id=pet.owner_id) }}" class="owner-mini">
+          <div class="owner-mini-avatar">{{ (pet.owner_name or 'O')[:2] | upper }}</div>
+          <div>
+            <div class="owner-mini-name">{{ pet.owner_name }}</div>
+            <div class="owner-mini-phone">📱 {{ pet.owner_phone or '—' }}</div>
+          </div>
+          <span style="margin-left:auto;color:var(--cl-muted);">→</span>
+        </a>
+      </div>
+
+      <div class="pet-card-footer">
+        <a href="{{ url_for('crm.pet_edit', pet_id=pet.id) }}">✏️ Edit</a>
+        <a href="{{ url_for('appointments.appt_new', pet_id=pet.id, owner_id=pet.owner_id) }}">📅 Book</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Main content -->
+  <div>
+
+    <!-- Weight history chart -->
+    {% if weight_history %}
+    <div class="section-card">
+      <div class="section-header">
+        <h3>⚖️ Weight History</h3>
+        <span style="font-size:0.82rem;color:var(--cl-muted);">Last {{ weight_history|length }} measurements</span>
+      </div>
+      <div class="section-body">
+        {% set max_w = weight_history | map(attribute='weight') | max %}
+        <div class="weight-chart-wrap">
+          {% for rec in weight_history %}
+          {% set bar_h = ((rec.weight / max_w) * 100) | int %}
+          <div class="weight-bar-col">
+            <span class="weight-val">{{ rec.weight }}kg</span>
+            <div class="weight-bar" style="height:{{ bar_h }}px;"></div>
+            <span class="weight-label">{{ rec.date[5:] }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Timeline -->
+    <div class="section-card">
+      <div class="section-header">
+        <h3>📋 Medical Timeline</h3>
+        <span style="font-size:0.82rem;color:var(--cl-muted);">{{ timeline | length }} events</span>
+      </div>
+      <div class="section-body">
+        {% if timeline %}
+        <div class="timeline">
+          {% for ev in timeline %}
+          <div class="timeline-item">
+            <div class="timeline-dot dot-{{ ev.type }}">{{ ev.icon }}</div>
+            <div class="timeline-content">
+              {# ── Make each event a deep-link ── #}
+              {% if ev.type == 'visit' %}
+                <a href="{{ url_for('visits.visit_detail', visit_id=ev.id) }}" class="timeline-title" style="color:inherit">{{ ev.title }}</a>
+              {% elif ev.type == 'invoice' %}
+                <a href="{{ url_for('finance.invoice_detail', inv_id=ev.id) }}" class="timeline-title" style="color:inherit">{{ ev.title }}</a>
+              {% elif ev.type == 'vaccine' %}
+                <span class="timeline-title">{{ ev.title }}</span>
+              {% elif ev.type == 'surgery' %}
+                <span class="timeline-title">{{ ev.title }}</span>
+              {% elif ev.type == 'grooming' %}
+                <span class="timeline-title">{{ ev.title }}</span>
+              {% elif ev.type == 'lab' %}
+                <span class="timeline-title">{{ ev.title }}</span>
+              {% else %}
+                <span class="timeline-title">{{ ev.title }}</span>
+              {% endif %}
+              <div class="timeline-date">{{ ev.dt[:10] if ev.dt else '—' }}</div>
+              {% if ev.summary %}
+              <div class="timeline-summary">{{ ev.summary }}</div>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">No medical events recorded yet.</div>
+        {% endif %}
+      </div>
+      <div class="quick-action-btns">
+        <a href="{{ url_for('appointments.appt_new', pet_id=pet.id, owner_id=pet.owner_id) }}">📅 New Appointment</a>
+        <a href="/visits/new?pet_id={{ pet.id }}&owner_id={{ pet.owner_id }}">🩺 New Visit</a>
+      </div>
+    </div>
+
+    <!-- Vaccinations -->
+    <div class="section-card">
+      <div class="section-header">
+        <h3>💉 Vaccinations</h3>
+        <a href="/vaccinations/new?pet_id={{ pet.id }}" class="pf-btn pf-btn-primary" style="font-size:0.82rem;padding:6px 14px;">➕ Add</a>
+      </div>
+      <div class="section-body" style="padding:0;">
+        {% if vaccinations %}
+        <table class="vacc-table">
+          <thead>
+            <tr>
+              <th>Vaccine</th>
+              <th>Brand</th>
+              <th>Administered</th>
+              <th>Next Due</th>
+              <th>By</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in vaccinations %}
+            <tr>
+              <td><strong>{{ v.vaccine_name }}</strong></td>
+              <td>{{ v.vaccine_brand or '—' }}</td>
+              <td>{{ v.administered_at[:10] if v.administered_at else '—' }}</td>
+              <td>
+                {% if v.next_due_at %}
+                  {% set due = v.next_due_at[:10] %}
+                  <span class="{% if due < today_str %}overdue{% elif due <= soon_str %}due-soon{% endif %}">
+                    {{ due }}
+                  </span>
+                {% else %}—{% endif %}
+              </td>
+              <td>{{ v.administered_by or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">No vaccinations recorded yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Notes -->
+    {% if pet.notes %}
+    <div class="section-card">
+      <div class="section-header"><h3>📝 Notes</h3></div>
+      <div class="section-body">
+        <div style="background:color-mix(in srgb,var(--cl-accent) 8%,var(--cl-bg));border:1.5px solid color-mix(in srgb,var(--cl-accent) 25%,var(--cl-border));border-radius:9px;padding:14px 18px;font-size:0.93rem;white-space:pre-wrap;">{{ pet.notes }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+<!-- AI Pet Summary Modal -->
+<div id="petSummaryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+     z-index:9999;align-items:flex-start;justify-content:center;padding-top:60px">
+  <div style="background:linear-gradient(160deg,#0f172a,#1e1b4b);border:1px solid rgba(139,92,246,.4);
+              border-radius:16px;padding:28px;width:640px;max-width:95vw;
+              box-shadow:0 8px 60px rgba(139,92,246,.25);max-height:80vh;overflow-y:auto;position:relative">
+    <div style="position:absolute;top:-40px;right:-40px;width:200px;height:200px;
+                background:radial-gradient(circle,rgba(139,92,246,.12) 0%,transparent 70%);
+                border-radius:50%;pointer-events:none"></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <span style="background:linear-gradient(135deg,#8b5cf6,#3b82f6);border-radius:10px;
+                   padding:7px 11px;font-size:1.2rem">🤖</span>
+      <div>
+        <div style="color:#e2e8f0;font-weight:700;font-size:1.05rem">AI Medical Summary</div>
+        <div style="color:rgba(148,163,184,.7);font-size:.78rem">Generated by Gemini 2.5 Flash</div>
+      </div>
+      <button onclick="document.getElementById('petSummaryModal').style.display='none'"
+              style="margin-left:auto;background:none;border:none;color:#94a3b8;
+                     font-size:1.4rem;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div id="petSummaryContent" style="color:#cbd5e1;font-size:.88rem;line-height:1.7;white-space:pre-wrap">
+      <div style="display:flex;align-items:center;gap:10px;color:rgba(148,163,184,.6)">
+        <span style="animation:pulse 1s infinite">⏳</span> Generating clinical summary...
+      </div>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="printSummary()"
+              style="background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.4);
+                     color:#c4b5fd;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.83rem">
+        🖨 Print
+      </button>
+      <button onclick="document.getElementById('petSummaryModal').style.display='none'"
+              style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+                     color:#94a3b8;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.83rem">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+<style>
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+
+{% block scripts %}
+<script>
+  // Pass today's date to template via JS for due date coloring
+  // (already used inline via Jinja — just keeping the block clean)
+
+  function openPetSummary(petId) {
+    var modal = document.getElementById('petSummaryModal');
+    var content = document.getElementById('petSummaryContent');
+    modal.style.display = 'flex';
+    content.innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:rgba(148,163,184,.6)"><span style="animation:pulse 1s infinite">⏳</span> Generating clinical summary...</div>';
+
+    var _csrf = (document.querySelector('meta[name=csrf-token]')||{}).content || '';
+    fetch('/ai/pet-summary/' + petId, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrf}})
+      .then(function(r){ return r.json(); })
+      .then(function(d) {
+        if (d.error) {
+          content.innerHTML = '<div style="color:#fca5a5">⚠️ ' + d.error + '</div>';
+        } else {
+          content.textContent = d.summary;
+        }
+      })
+      .catch(function() {
+        content.innerHTML = '<div style="color:#fca5a5">⚠️ Could not generate summary. Is the AI service running?</div>';
+      });
+  }
+
+  function printSummary() {
+    var text = document.getElementById('petSummaryContent').textContent;
+    var win = window.open('', '_blank');
+    win.document.write('<pre style="font-family:serif;font-size:12pt;padding:30px;max-width:700px;margin:auto">' + text + '</pre>');
+    win.print();
+  }
+</script>
+{% endblock %}

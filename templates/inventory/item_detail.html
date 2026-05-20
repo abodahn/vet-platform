@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}{{ item.name }}{% endblock %}
+{% block page_title %}{{ item.name }}{% endblock %}
+{% block page_sub %}{{ t('Item detail, batches & movement history', 'تفاصيل الصنف والدفعات وسجل الحركات') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('inventory.batch_new', item_id=item.id) }}" class="pf-btn pf-btn-primary">{{ t('+ Receive Stock', '+ استلام مخزون') }}</a>
+<a href="{{ url_for('inventory.item_edit', item_id=item.id) }}" class="pf-btn pf-btn-secondary">{{ t('Edit Item', 'تعديل الصنف') }}</a>
+<a href="{{ url_for('inventory.items_list') }}" class="pf-btn pf-btn-secondary">{{ t('← Items', '← الأصناف') }}</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.pf-btn { padding:8px 18px; border-radius:8px; font-size:0.85rem; font-weight:600; cursor:pointer; border:none; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+.pf-btn-primary { background:var(--cl-primary); color:#fff; }
+.pf-btn-primary:hover { opacity:0.9; }
+.pf-btn-secondary { background:var(--cl-surface); color:var(--cl-text); border:1px solid var(--cl-border); }
+
+.detail-grid { display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-bottom:20px; }
+@media(max-width:900px){ .detail-grid { grid-template-columns:1fr; } }
+
+.info-card {
+  background:var(--cl-surface); border-radius:14px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.07); overflow:hidden;
+}
+.info-card-header {
+  padding:14px 20px;
+  background:linear-gradient(135deg, var(--cl-primary) 0%, #1e40af 100%);
+  color:#fff; font-weight:700; font-size:0.95rem;
+}
+.info-card-body { padding:20px; }
+
+.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.info-item label { font-size:0.73rem; font-weight:600; color:var(--cl-muted); text-transform:uppercase; display:block; margin-bottom:3px; }
+.info-item .val { font-size:0.92rem; font-weight:600; color:var(--cl-text); }
+.info-item .val.muted { color:var(--cl-muted); font-weight:400; }
+
+.stock-summary { display:flex; flex-direction:column; gap:12px; }
+.stock-wh-item {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 14px; background:var(--cl-bg); border-radius:8px;
+}
+.stock-wh-name { font-size:0.85rem; font-weight:600; }
+.stock-wh-qty { font-size:1.1rem; font-weight:800; }
+.stock-wh-qty.ok { color:var(--cl-success); }
+.stock-wh-qty.low { color:var(--cl-warning); }
+.stock-wh-qty.critical { color:var(--cl-danger); }
+
+.total-stock-box {
+  text-align:center; padding:20px;
+  border-bottom:1px solid var(--cl-border); margin-bottom:14px;
+}
+.total-stock-val { font-size:2.5rem; font-weight:900; }
+.total-stock-label { font-size:0.8rem; color:var(--cl-muted); margin-top:4px; }
+
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.72rem; font-weight:600; }
+.badge-success { background:#d1fae5; color:#065f46; }
+.badge-warning { background:#fef3c7; color:#92400e; }
+.badge-danger  { background:#fee2e2; color:#991b1b; }
+.badge-secondary { background:#f1f5f9; color:#475569; }
+.badge-info { background:#dbeafe; color:#1e40af; }
+
+.section-card { background:var(--cl-surface); border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,0.07); margin-bottom:20px; overflow:hidden; }
+.section-header-bar { padding:14px 20px; background:linear-gradient(135deg,var(--cl-primary) 0%,#1e40af 100%); color:#fff; font-weight:700; font-size:0.95rem; }
+
+table.pf-table { width:100%; border-collapse:collapse; }
+table.pf-table thead th { background:var(--cl-bg); color:var(--cl-muted); padding:10px 14px; text-align:left; font-size:0.76rem; font-weight:700; text-transform:uppercase; border-bottom:2px solid var(--cl-border); }
+table.pf-table tbody tr { border-bottom:1px solid var(--cl-border); transition:background 0.1s; }
+table.pf-table tbody tr:hover { background:var(--cl-bg); }
+table.pf-table tbody td { padding:10px 14px; font-size:0.84rem; color:var(--cl-text); }
+table.pf-table tbody tr:last-child { border-bottom:none; }
+
+.expiry-ok { color:var(--cl-success); font-weight:600; }
+.expiry-warn { color:var(--cl-warning); font-weight:600; }
+.expiry-critical { color:var(--cl-danger); font-weight:700; }
+.empty-state { text-align:center; padding:30px; color:var(--cl-muted); font-size:0.88rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-grid">
+
+  <!-- Left: Item Info -->
+  <div>
+    <div class="info-card">
+      <div class="info-card-header">📦 {{ t('Item Information', 'معلومات الصنف') }}</div>
+      <div class="info-card-body">
+        <div class="info-grid">
+          <div class="info-item">
+            <label>{{ t('SKU', 'رمز المنتج') }}</label>
+            <div class="val">{{ item.sku or '—' }}</div>
+          </div>
+          <div class="info-item">
+            <label>{{ t('Barcode', 'الباركود') }}</label>
+            <div class="val">{{ item.barcode or '—' }}</div>
+          </div>
+          <div class="info-item">
+            <label>{{ t('Category', 'الفئة') }}</label>
+            <div class="val">{{ item.category_name or '—' }}</div>
+          </div>
+          <div class="info-item">
+            <label>{{ t('Unit', 'الوحدة') }}</label>
+            <div class="val">{{ item.unit }}</div>
+          </div>
+          <div class="info-item">
+            <label>{{ t('Cost Price', 'سعر التكلفة') }}</label>
+            <div class="val">EGP {{ "%.2f"|format(item.cost_price or 0) }}</div>
+          </div>
+          <div class="info-item">
+            <label>{{ t('Sell Price', 'سعر البيع') }}</label>
+            <div class="val">EGP {{ "%.2f"|format(item.sell_price or 0) }}</div>
+          </div>
+          <div class="info-item">
+            <label>{{ t('Reorder Level', 'مستوى إعادة الطلب') }}</label>
+            <div class="val {% if total_stock <= item.reorder_level %}val critical{% endif %}">
+              {{ item.reorder_level | int }} {{ item.unit }}
+            </div>
+          </div>
+          <div class="info-item">
+            <label>{{ t('Max Stock', 'الحد الأقصى للمخزون') }}</label>
+            <div class="val">{{ item.max_stock | int }} {{ item.unit }}</div>
+          </div>
+          <div class="info-item">
+            <label>{{ t('Type', 'النوع') }}</label>
+            <div class="val">
+              {% if item.is_medication %}<span class="badge badge-info">💊 {{ t('Medication', 'دواء') }}</span>{% endif %}
+              {% if item.is_controlled %}<span class="badge badge-danger">🔒 {{ t('Controlled', 'مادة خاضعة للرقابة') }}</span>{% endif %}
+              {% if item.requires_rx %}<span class="badge badge-warning">📋 {{ t('Rx Required', 'يستلزم وصفة طبية') }}</span>{% endif %}
+              {% if not item.is_medication %}<span class="badge badge-secondary">{{ t('Supply', 'مستلزمات') }}</span>{% endif %}
+            </div>
+          </div>
+          {% if item.name_ar %}
+          <div class="info-item">
+            <label>{{ t('Arabic Name', 'الاسم بالعربية') }}</label>
+            <div class="val" dir="rtl">{{ item.name_ar }}</div>
+          </div>
+          {% endif %}
+          {% if item.storage_notes %}
+          <div class="info-item" style="grid-column:1/-1">
+            <label>{{ t('Storage Notes', 'ملاحظات التخزين') }}</label>
+            <div class="val muted">{{ item.storage_notes }}</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Stock Summary -->
+  <div>
+    <div class="info-card">
+      <div class="info-card-header">📊 {{ t('Current Stock', 'المخزون الحالي') }}</div>
+      <div class="info-card-body" style="padding-top:14px">
+        {% set total_f = total_stock | float %}
+        {% set reorder_f = item.reorder_level | float %}
+        <div class="total-stock-box">
+          <div class="total-stock-val {% if total_f <= reorder_f %}expiry-critical{% elif total_f <= reorder_f*2 %}expiry-warn{% else %}expiry-ok{% endif %}">
+            {{ total_f | round(1) }}
+          </div>
+          <div class="total-stock-label">{{ t('Total', 'إجمالي') }} {{ item.unit }}(s) {{ t('in stock', 'في المخزون') }}</div>
+          {% if total_f <= reorder_f %}
+            <span class="badge badge-danger" style="margin-top:8px">{{ t('Below Reorder Level', 'أقل من مستوى إعادة الطلب') }}</span>
+          {% elif total_f <= reorder_f * 2 %}
+            <span class="badge badge-warning" style="margin-top:8px">{{ t('Low Stock', 'مخزون منخفض') }}</span>
+          {% else %}
+            <span class="badge badge-success" style="margin-top:8px">{{ t('Stock OK', 'المخزون جيد') }}</span>
+          {% endif %}
+        </div>
+        <div class="stock-summary">
+          {% for wh in stock_by_wh %}
+          <div class="stock-wh-item">
+            <span class="stock-wh-name">{{ wh.warehouse_name }}</span>
+            <span class="stock-wh-qty {% if wh.qty <= reorder_f %}critical{% elif wh.qty <= reorder_f*2 %}low{% else %}ok{% endif %}">
+              {{ wh.qty | round(1) }}
+            </span>
+          </div>
+          {% else %}
+          <div style="color:var(--cl-muted);font-size:0.85rem;text-align:center;padding:10px">{{ t('No stock in warehouses', 'لا يوجد مخزون في المستودعات') }}</div>
+          {% endfor %}
+        </div>
+        <div style="margin-top:14px;text-align:center">
+          <a href="{{ url_for('inventory.batch_new', item_id=item.id) }}" class="pf-btn pf-btn-primary" style="width:100%;justify-content:center">{{ t('+ Receive Stock', '+ استلام مخزون') }}</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Batches -->
+<div class="section-card">
+  <div class="section-header-bar">📋 {{ t('Stock Batches', 'دفعات المخزون') }}</div>
+  <table class="pf-table">
+    <thead>
+      <tr>
+        <th>{{ t('Batch #', 'رقم الدفعة') }}</th>
+        <th>{{ t('Lot #', 'رقم الحزمة') }}</th>
+        <th>{{ t('Expiry Date', 'تاريخ انتهاء الصلاحية') }}</th>
+        <th>{{ t('Quantity', 'الكمية') }}</th>
+        <th>{{ t('Unit Cost', 'تكلفة الوحدة') }}</th>
+        <th>{{ t('Warehouse', 'المستودع') }}</th>
+        <th>{{ t('Received', 'تاريخ الاستلام') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in batches %}
+      {% set exp = b.expiry_date or '' %}
+      {% if exp and exp < today %}
+        {% set exp_class = 'expiry-critical' %}
+        {% set exp_label = t(' (EXPIRED)', ' (منتهي الصلاحية)') %}
+      {% elif exp and exp <= (today[:7] + '-' + '%02d'|format((today[8:10]|int + 30))) %}
+        {% set exp_class = 'expiry-warn' %}
+        {% set exp_label = t(' (Soon)', ' (قريباً)') %}
+      {% else %}
+        {% set exp_class = 'expiry-ok' %}
+        {% set exp_label = '' %}
+      {% endif %}
+      <tr>
+        <td><strong>{{ b.batch_number or '—' }}</strong></td>
+        <td>{{ b.lot_number or '—' }}</td>
+        <td>
+          {% if exp %}
+            <span class="{{ exp_class }}">{{ exp }}{{ exp_label }}</span>
+          {% else %}
+            <span style="color:var(--cl-muted)">{{ t('No expiry', 'لا تاريخ انتهاء') }}</span>
+          {% endif %}
+        </td>
+        <td><strong>{{ b.quantity | round(2) }} {{ item.unit }}</strong></td>
+        <td>EGP {{ "%.2f"|format(b.unit_cost or 0) }}</td>
+        <td>{{ b.warehouse_name or t('Main', 'الرئيسي') }}</td>
+        <td>{{ b.received_at[:10] if b.received_at else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty-state">{{ t('No batches found.', 'لا توجد دفعات.') }} <a href="{{ url_for('inventory.batch_new', item_id=item.id) }}">{{ t('Receive stock now →', 'استلام مخزون الآن →') }}</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Movement History -->
+<div class="section-card">
+  <div class="section-header-bar">🔄 {{ t('Movement History (Last 20)', 'سجل الحركات (آخر 20)') }}</div>
+  <table class="pf-table">
+    <thead>
+      <tr>
+        <th>{{ t('Date', 'التاريخ') }}</th>
+        <th>{{ t('Type', 'النوع') }}</th>
+        <th>{{ t('Quantity', 'الكمية') }}</th>
+        <th>{{ t('Reference', 'المرجع') }}</th>
+        <th>{{ t('Notes', 'ملاحظات') }}</th>
+        <th>{{ t('By', 'بواسطة') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in movements %}
+      <tr>
+        <td>{{ m.created_at[:16] if m.created_at else '—' }}</td>
+        <td>
+          {% if m.movement_type == 'in' %}
+            <span class="badge badge-success">{{ t('IN', 'وارد') }}</span>
+          {% elif m.movement_type == 'out' %}
+            <span class="badge badge-danger">{{ t('OUT', 'صادر') }}</span>
+          {% elif m.movement_type == 'adjustment' %}
+            <span class="badge badge-warning">{{ t('ADJUST', 'تسوية') }}</span>
+          {% elif m.movement_type == 'expired' %}
+            <span class="badge badge-secondary">{{ t('EXPIRED', 'منتهي الصلاحية') }}</span>
+          {% else %}
+            <span class="badge badge-secondary">{{ m.movement_type | upper }}</span>
+          {% endif %}
+        </td>
+        <td><strong>{{ m.quantity | round(2) }}</strong></td>
+        <td>{{ m.reference_type or '—' }}{% if m.reference_id %} #{{ m.reference_id }}{% endif %}</td>
+        <td style="color:var(--cl-muted)">{{ m.notes or '—' }}</td>
+        <td>{{ m.created_by or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty-state">{{ t('No movements recorded yet.', 'لا توجد حركات مسجلة بعد.') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

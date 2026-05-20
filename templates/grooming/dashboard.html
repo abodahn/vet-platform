@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Grooming{% endblock %}
+{% block page_title %}Grooming{% endblock %}
+{% block page_sub %}Pet grooming bookings & services{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('grooming.booking_new_form') }}" class="pf-btn pf-btn-primary">+ New Booking</a>
+<a href="{{ url_for('grooming.services_list') }}" class="pf-btn pf-btn-secondary">Services</a>
+{% endblock %}
+
+{% block content %}
+<!-- Stat cards -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-bottom:1.5rem">
+  <div class="pf-card" style="text-align:center;padding:1.25rem">
+    <div style="font-size:2rem;font-weight:800;color:var(--pf-primary)">{{ stats_today }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Today's Bookings</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1.25rem">
+    <div style="font-size:2rem;font-weight:800;color:var(--pf-accent)">{{ stats_week }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">This Week</div>
+  </div>
+  <div class="pf-card" style="text-align:center;padding:1.25rem">
+    <div style="font-size:2rem;font-weight:800;color:#10b981">{{ stats_inprogress }}</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">In Progress</div>
+  </div>
+</div>
+
+<!-- Today's bookings -->
+<div class="pf-card" style="margin-bottom:1.5rem">
+  <div class="pf-card-header" style="display:flex;justify-content:space-between;align-items:center">
+    <h3 class="pf-card-title">📅 Today's Schedule</h3>
+    <span style="font-size:.85rem;color:var(--pf-muted)">{{ today_bookings|length }} booking(s)</span>
+  </div>
+  <table class="pf-table">
+    <thead>
+      <tr><th>Time</th><th>Pet</th><th>Owner</th><th>Service</th><th>Groomer</th><th>Duration</th><th>Price</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for b in today_bookings %}
+      <tr>
+        <td style="white-space:nowrap">{{ (b.booking_date or '')[:16] }}</td>
+        <td><strong>{{ b.pet_name }}</strong><br><small style="color:var(--pf-muted)">{{ b.species }}</small></td>
+        <td>{{ b.owner_name }}<br><small style="color:var(--pf-muted)">{{ b.phone }}</small></td>
+        <td>{{ b.service_name or '—' }}</td>
+        <td>{{ b.groomer_name or '—' }}</td>
+        <td>{{ b.duration_min or '—' }}{% if b.duration_min %} min{% endif %}</td>
+        <td>{% if b.price %}{{ "%.2f"|format(b.price|float) }} EGP{% else %}—{% endif %}</td>
+        <td>
+          {% if b.status == 'Scheduled' %}<span class="pf-badge warning">Scheduled</span>
+          {% elif b.status == 'In Progress' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">In Progress</span>
+          {% elif b.status == 'Completed' %}<span class="pf-badge success">Completed</span>
+          {% else %}<span class="pf-badge error">{{ b.status }}</span>{% endif %}
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('grooming.update_booking_status', booking_id=b.id) }}" style="display:flex;gap:.3rem">
+            <select name="status" class="pf-input" style="width:120px;padding:4px 6px;font-size:.8rem">
+              {% for s in ['Scheduled','In Progress','Completed','Cancelled'] %}
+              <option {% if b.status==s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="pf-btn pf-btn-ghost" style="padding:4px 8px;font-size:.8rem">✓</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" style="text-align:center;color:var(--pf-muted);padding:2rem">No bookings today.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Upcoming bookings -->
+{% if upcoming %}
+<div class="pf-card">
+  <div class="pf-card-header" style="display:flex;justify-content:space-between;align-items:center">
+    <h3 class="pf-card-title">📆 Upcoming (next 7 days)</h3>
+    <a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost" style="font-size:.85rem">View All</a>
+  </div>
+  <table class="pf-table">
+    <thead>
+      <tr><th>Date</th><th>Pet</th><th>Owner</th><th>Service</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      {% for b in upcoming %}
+      <tr>
+        <td style="white-space:nowrap">{{ (b.booking_date or '')[:16] }}</td>
+        <td><strong>{{ b.pet_name }}</strong> <small style="color:var(--pf-muted)">{{ b.species }}</small></td>
+        <td>{{ b.owner_name }}</td>
+        <td>{{ b.service_name or '—' }}</td>
+        <td><span class="pf-badge warning">{{ b.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Report — {{ src_label }}{% endblock %}
+{% block page_title %}{{ src_label }} Report{% endblock %}
+{% block page_sub %}{{ total }} row{{ 's' if total != 1 else '' }} returned{% if date_from or date_to %} &middot; {{ date_from or '…' }} → {{ date_to or '…' }}{% endif %}{% if status %} &middot; {{ status }}{% endif %}{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('reports.builder') }}" class="pf-btn pf-btn-ghost">← Builder</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.rb-export-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.rb-export-bar form{display:inline}
+</style>
+
+<!-- Export / re-run bar -->
+<div class="rb-export-bar">
+  <span style="font-weight:600;color:var(--cl-muted);font-size:.88rem">Export as:</span>
+
+  <!-- CSV -->
+  <form method="post" action="{{ url_for('reports.builder_run') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="source" value="{{ source }}">
+    {% for c in safe_cols %}<input type="hidden" name="cols" value="{{ c }}">{% endfor %}
+    <input type="hidden" name="date_from" value="{{ date_from }}">
+    <input type="hidden" name="date_to" value="{{ date_to }}">
+    <input type="hidden" name="status_filter" value="{{ status }}">
+    <input type="hidden" name="limit" value="{{ limit }}">
+    <input type="hidden" name="format" value="csv">
+    <button type="submit" class="pf-btn pf-btn-secondary pf-btn-sm">⬇ CSV</button>
+  </form>
+
+  <!-- Excel -->
+  <form method="post" action="{{ url_for('reports.builder_run') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="source" value="{{ source }}">
+    {% for c in safe_cols %}<input type="hidden" name="cols" value="{{ c }}">{% endfor %}
+    <input type="hidden" name="date_from" value="{{ date_from }}">
+    <input type="hidden" name="date_to" value="{{ date_to }}">
+    <input type="hidden" name="status_filter" value="{{ status }}">
+    <input type="hidden" name="limit" value="{{ limit }}">
+    <input type="hidden" name="format" value="xlsx">
+    <button type="submit" class="pf-btn pf-btn-secondary pf-btn-sm" style="background:#16a34a;color:#fff;border-color:#16a34a">⬇ Excel</button>
+  </form>
+
+  <span style="margin-left:auto;font-size:.85rem;color:var(--cl-muted)">
+    {% if total >= limit %}<span style="color:#d97706">⚠ Showing limit of {{ limit }} rows — increase limit or filter further</span>{% else %}<strong>{{ total }}</strong> rows{% endif %}
+  </span>
+</div>
+
+<!-- Results Table -->
+<div class="pf-card">
+  <div style="overflow-x:auto">
+    <table class="pf-table" id="resultsTable">
+      <thead>
+        <tr>
+          {% for lbl in col_labels %}
+          <th>{{ lbl }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          {% for col in safe_cols %}
+          {% set key = col.split('.')[-1] %}
+          <td>{{ row.get(key, '') or '' }}</td>
+          {% endfor %}
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="{{ col_labels|length }}" style="text-align:center;padding:2rem;color:var(--cl-muted)">
+            No data found for the selected filters.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Print button -->
+<div style="margin-top:12px;text-align:right">
+  <button onclick="window.print()" class="pf-btn pf-btn-ghost pf-btn-sm">🖨 Print</button>
+</div>
+
+<style>
+@media print {
+  .pf-sidebar,.pf-topbar,.rb-export-bar,button{display:none!important}
+  .pf-card{box-shadow:none!important;border:1px solid #ccc}
+  body{font-size:11pt}
+}
+</style>
+{% endblock %}

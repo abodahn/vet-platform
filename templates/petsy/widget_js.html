@@ -1,0 +1,127 @@
+/* Petsy Chat Widget — embed on any website
+   Usage: <script src="{{ base_url }}/petsy/widget.js"></script>
+*/
+{% raw %}
+(function() {
+  'use strict';
+{% endraw %}
+  var BASE = '{{ base_url }}';
+{% raw %}
+  if (window.__petsy_loaded) return;
+  window.__petsy_loaded = true;
+
+  var style = document.createElement('style');
+  style.textContent =
+    '#petsy-fab{position:fixed;bottom:24px;right:24px;z-index:99998;' +
+    'width:64px;height:64px;border-radius:50%;border:none;cursor:pointer;' +
+    'background:linear-gradient(135deg,#7c3aed,#4f46e5);' +
+    'box-shadow:0 4px 20px rgba(124,58,237,.5);' +
+    'display:flex;align-items:center;justify-content:center;' +
+    'padding:8px;transition:transform .2s,box-shadow .2s;}' +
+
+    '#petsy-fab:hover{transform:scale(1.12);box-shadow:0 6px 28px rgba(124,58,237,.65);}' +
+
+    '#petsy-hint-ext{position:fixed;bottom:100px;right:24px;z-index:99997;' +
+    'background:white;color:#1e1b4b;padding:10px 14px;border-radius:12px;' +
+    'font-size:13px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.15);' +
+    'white-space:nowrap;pointer-events:none;' +
+    'animation:petsy-pop-ext .4s ease;}' +
+
+    '#petsy-hint-ext::after{content:"";position:absolute;bottom:-7px;right:20px;' +
+    'border:7px solid transparent;border-top-color:white;border-bottom:none;}' +
+
+    '#petsy-panel-ext{position:fixed;bottom:24px;right:24px;z-index:99999;' +
+    'width:370px;height:560px;border-radius:20px;overflow:hidden;' +
+    'box-shadow:0 12px 40px rgba(0,0,0,.2);' +
+    'display:none;flex-direction:column;' +
+    'transition:opacity .25s,transform .25s;opacity:0;' +
+    'transform:scale(.9) translateY(20px);}' +
+
+    '#petsy-panel-ext.open{display:flex;opacity:1;transform:scale(1) translateY(0);}' +
+    '#petsy-panel-ext iframe{width:100%;height:100%;border:none;}' +
+
+    '#petsy-close-ext{position:absolute;top:12px;right:12px;z-index:100000;' +
+    'width:28px;height:28px;border-radius:50%;border:none;' +
+    'background:rgba(255,255,255,.25);color:white;font-size:14px;' +
+    'cursor:pointer;display:flex;align-items:center;justify-content:center;}' +
+
+    '@keyframes petsy-pop-ext{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}' +
+
+    '@media(max-width:420px){#petsy-panel-ext{width:calc(100vw - 16px);' +
+    'right:8px;height:80vh;bottom:90px;}}';
+  document.head.appendChild(style);
+
+  var fabSVG =
+    '<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">' +
+    '<ellipse cx="18" cy="14" rx="9" ry="12" transform="rotate(-20,18,14)" fill="white" opacity=".35"/>' +
+    '<ellipse cx="62" cy="14" rx="9" ry="12" transform="rotate(20,62,14)" fill="white" opacity=".35"/>' +
+    '<ellipse cx="18" cy="15" rx="5" ry="7" transform="rotate(-20,18,15)" fill="#f9a8d4" opacity=".8"/>' +
+    '<ellipse cx="62" cy="15" rx="5" ry="7" transform="rotate(20,62,15)" fill="#f9a8d4" opacity=".8"/>' +
+    '<circle cx="28" cy="32" r="7" fill="white"/>' +
+    '<circle cx="52" cy="32" r="7" fill="white"/>' +
+    '<circle cx="29" cy="33" r="4" fill="#1e0a3c"/>' +
+    '<circle cx="53" cy="33" r="4" fill="#1e0a3c"/>' +
+    '<circle cx="31" cy="31" r="1.5" fill="white"/>' +
+    '<circle cx="55" cy="31" r="1.5" fill="white"/>' +
+    '<ellipse cx="40" cy="43" rx="5" ry="3.5" fill="white" opacity=".5"/>' +
+    '<path d="M32 49 Q40 57 48 49" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>' +
+    '<ellipse cx="22" cy="44" rx="5" ry="3" fill="rgba(251,113,133,0.5)"/>' +
+    '<ellipse cx="58" cy="44" rx="5" ry="3" fill="rgba(251,113,133,0.5)"/>' +
+    '</svg>';
+
+  var fab = document.createElement('button');
+  fab.id = 'petsy-fab';
+  fab.title = 'Chat with Petsy';
+  fab.innerHTML = fabSVG;
+  document.body.appendChild(fab);
+
+  var hint = document.createElement('div');
+  hint.id = 'petsy-hint-ext';
+  hint.textContent = 'Hi! I\'m Petsy — ask me anything!';
+  document.body.appendChild(hint);
+  setTimeout(function() { hint.style.display = 'none'; }, 5000);
+
+  var panel = document.createElement('div');
+  panel.id = 'petsy-panel-ext';
+
+  var closeBtn = document.createElement('button');
+  closeBtn.id = 'petsy-close-ext';
+  closeBtn.title = 'Close';
+  closeBtn.innerHTML = '&#x2715;';
+  closeBtn.onclick = function(e) { e.stopPropagation(); closePanel(); };
+
+  var iframe = document.createElement('iframe');
+  iframe.title = 'Petsy Chat';
+  iframe.allow = 'clipboard-write';
+
+  panel.appendChild(closeBtn);
+  panel.appendChild(iframe);
+  document.body.appendChild(panel);
+
+  var open = false;
+  var loaded = false;
+
+  function openPanel() {
+    if (!loaded) {
+      iframe.src = BASE + '/petsy/embed';
+      loaded = true;
+    }
+    open = true;
+    panel.classList.add('open');
+    fab.style.transform = 'scale(0)';
+    fab.style.opacity = '0';
+    hint.style.display = 'none';
+  }
+
+  function closePanel() {
+    open = false;
+    panel.classList.remove('open');
+    fab.style.transform = '';
+    fab.style.opacity = '';
+  }
+
+  fab.addEventListener('click', function() {
+    if (open) closePanel(); else openPanel();
+  });
+})();
+{% endraw %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}{{ t('All Pets', 'جميع الحيوانات') }}{% endblock %}
+{% block page_title %}{{ t('All Pets', 'جميع الحيوانات') }}{% endblock %}
+{% block page_sub %}{{ t('Browse and search registered pets', 'تصفح وبحث الحيوانات المسجلة') }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('crm.owners_list') }}" class="pf-btn pf-btn-ghost pf-btn-sm">
+    👥 {{ t('Owners', 'الملاك') }}
+  </a>
+  <a href="{{ url_for('crm.pet_new') }}" class="pf-btn pf-btn-primary pf-btn-sm">
+    + {{ t('New Pet', 'حيوان جديد') }}
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filter bar -->
+<form method="get" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center">
+  <input class="pf-input" type="text" name="q" value="{{ q }}"
+         placeholder="{{ t('Search by name or microchip…', 'بحث بالاسم أو الميكروشيب…') }}"
+         style="width:240px">
+  <select class="pf-input" name="species" style="width:160px">
+    <option value="">{{ t('All Species', 'جميع الأنواع') }}</option>
+    {% for s in species_options %}
+    <option value="{{ s }}" {% if species == s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="pf-btn pf-btn-secondary">{{ t('Filter', 'تصفية') }}</button>
+  <a href="{{ url_for('crm.pets_list') }}" class="pf-btn pf-btn-ghost">{{ t('Clear', 'مسح') }}</a>
+  <span style="margin-right:auto;color:var(--cl-text-muted);font-size:13px">
+    {{ pets|length }} {{ t('pet(s) found', 'حيوان') }}
+  </span>
+</form>
+
+<!-- Grid -->
+{% if pets %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px">
+  {% for p in pets %}
+  <a href="{{ url_for('crm.pet_detail', pet_id=p.id) }}"
+     style="text-decoration:none;color:inherit;display:block;background:var(--cl-surface);
+            border:1.5px solid var(--cl-border);border-radius:var(--cl-radius);padding:16px;
+            transition:box-shadow .18s,transform .18s"
+     onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,.1)';this.style.transform='translateY(-2px)'"
+     onmouseout="this.style.boxShadow='';this.style.transform=''">
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <div style="width:44px;height:44px;border-radius:50%;background:var(--cl-primary-light,#e8f4ff);
+                  display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
+        {% if p.species and p.species.lower() == 'cat' %}🐱
+        {% elif p.species and p.species.lower() == 'dog' %}🐶
+        {% elif p.species and p.species.lower() == 'bird' %}🐦
+        {% elif p.species and p.species.lower() == 'rabbit' %}🐰
+        {% else %}🐾{% endif %}
+      </div>
+      <div style="overflow:hidden">
+        <div style="font-size:15px;font-weight:700;color:var(--cl-text)">{{ p.pet_name }}</div>
+        <div style="font-size:12px;color:var(--cl-text-muted)">{{ p.species }}{% if p.breed %} · {{ p.breed }}{% endif %}</div>
+      </div>
+      {% if p.neutered %}
+      <span style="margin-right:auto;font-size:10px;padding:2px 7px;border-radius:20px;
+                   background:#e0f2fe;color:#0284c7;font-weight:600">
+        {{ t('Neutered', 'محوّل') }}
+      </span>
+      {% endif %}
+    </div>
+
+    <div style="font-size:12.5px;color:var(--cl-text-muted);display:flex;flex-direction:column;gap:4px">
+      <div>👤 {{ p.owner_name }}</div>
+      {% if p.sex and p.sex != 'Unknown' %}
+      <div>{{ t('Sex', 'الجنس') }}: {{ p.sex }}</div>
+      {% endif %}
+      {% if p.weight_kg %}
+      <div>⚖️ {{ p.weight_kg }} kg</div>
+      {% endif %}
+      {% if p.microchip_id %}
+      <div>🔖 {{ p.microchip_id }}</div>
+      {% endif %}
+      {% if p.allergies %}
+      <div style="color:#dc2626">⚠ {{ p.allergies }}</div>
+      {% endif %}
+    </div>
+
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+<div style="text-align:center;padding:60px 20px;color:var(--cl-text-muted)">
+  <div style="font-size:3rem;margin-bottom:12px">🐾</div>
+  <div style="font-size:16px;font-weight:600;margin-bottom:8px">
+    {{ t('No pets found', 'لا توجد حيوانات') }}
+  </div>
+  {% if q or species %}
+  <a href="{{ url_for('crm.pets_list') }}" class="pf-btn pf-btn-ghost" style="margin-top:12px;display:inline-block">
+    {{ t('Clear filters', 'مسح التصفية') }}
+  </a>
+  {% else %}
+  <a href="{{ url_for('crm.pet_new') }}" class="pf-btn pf-btn-primary" style="margin-top:12px;display:inline-block">
+    + {{ t('Add First Pet', 'إضافة أول حيوان') }}
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

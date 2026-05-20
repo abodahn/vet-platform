@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Salary Grades{% endblock %}
+{% block content %}
+<div class="pf-page-header">
+  <div>
+    <h1 class="pf-page-title">⚙ Salary Grades</h1>
+    <p class="pf-page-subtitle">Default basic salary and overtime rate per role. Used when bulk-generating payroll.</p>
+  </div>
+  <div class="pf-topbar-actions">
+    <a href="{{ url_for('payroll.dashboard') }}" class="pf-btn pf-btn-secondary">← Payroll</a>
+  </div>
+</div>
+
+<div class="pf-card" style="max-width:900px;margin:0 auto">
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="pf-table-wrapper">
+      <table class="pf-table">
+        <thead><tr>
+          <th>Role</th>
+          <th>Basic Salary (EGP/month)</th>
+          <th>Overtime Rate (EGP/hour)</th>
+          <th>Notes</th>
+        </tr></thead>
+        <tbody>
+          {% for role in roles %}
+          {% set g = grades.get(role, {}) %}
+          <tr>
+            <td><span class="pf-badge">{{ role }}</span></td>
+            <td><input type="number" step="0.01" name="basic_{{ role }}" class="pf-input" style="width:140px" value="{{ g.basic_salary or 0 }}"></td>
+            <td><input type="number" step="0.01" name="ot_{{ role }}" class="pf-input" style="width:120px" value="{{ g.overtime_rate or 0 }}"></td>
+            <td><input type="text" name="notes_{{ role }}" class="pf-input" value="{{ g.notes or '' }}" placeholder="optional"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:16px">
+      <button type="submit" class="pf-btn pf-btn-primary">💾 Save All Grades</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

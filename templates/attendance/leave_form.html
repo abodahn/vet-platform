@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Request Leave{% endblock %}
+{% block page_title %}New Leave Request{% endblock %}
+{% block page_sub %}Submit a leave application{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">← My Leaves</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px">
+
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div class="pf-card-title">📋 Leave Application</div>
+    </div>
+    <form method="POST" id="leave-form">
+      <div class="pf-form-group">
+        <label class="pf-form-label">Leave Type <span style="color:#ef4444">*</span></label>
+        <select name="leave_type_id" id="lt-select" class="pf-form-control" required onchange="updateBalance()">
+          <option value="">— Select leave type —</option>
+          {% for lt in leave_types %}
+          <option value="{{ lt.id }}"
+                  data-remaining="{{ balances[lt.id].remaining if lt.id in balances else lt.days_per_year }}"
+                  data-paid="{{ lt.is_paid }}"
+                  data-color="{{ lt.color }}">
+            {{ lt.name }} {% if lt.is_paid %}(Paid){% else %}(Unpaid){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="pf-form-group">
+          <label class="pf-form-label">Start Date <span style="color:#ef4444">*</span></label>
+          <input type="date" name="start_date" id="start-date" class="pf-form-control" required
+                 min="{{ today }}" onchange="calcDays()">
+        </div>
+        <div class="pf-form-group">
+          <label class="pf-form-label">End Date <span style="color:#ef4444">*</span></label>
+          <input type="date" name="end_date" id="end-date" class="pf-form-control" required
+                 min="{{ today }}" onchange="calcDays()">
+        </div>
+      </div>
+
+      <div id="days-preview" style="display:none;margin-bottom:16px;padding:12px;background:var(--cl-surface-2);border-radius:var(--cl-radius-sm);border-left:3px solid #3b82f6">
+        <span id="days-text" style="font-weight:600"></span>
+        <span style="color:var(--cl-text-muted);font-size:12px"> (business days, excl. weekends & holidays)</span>
+      </div>
+
+      <div class="pf-form-group">
+        <label class="pf-form-label">Reason</label>
+        <textarea name="reason" class="pf-form-control" rows="4"
+                  placeholder="Briefly describe the reason for your leave request..."></textarea>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="pf-btn pf-btn-primary">Submit Request</button>
+        <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Balance Panel -->
+  <div>
+    <div class="pf-card">
+      <div class="pf-card-header">
+        <div class="pf-card-title">⚖️ My Balances</div>
+      </div>
+      <div id="balance-panel">
+        {% for lt in leave_types %}
+        {% set b = balances[lt.id] if lt.id in balances else {'remaining': lt.days_per_year, 'used': 0, 'pending': 0, 'allocated': lt.days_per_year} %}
+        <div class="lt-balance" data-lt-id="{{ lt.id }}" style="margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="width:10px;height:10px;border-radius:50%;background:{{ lt.color }}"></span>
+            <span style="font-weight:600;font-size:13px">{{ lt.name }}</span>
+            {% if lt.is_paid %}<span class="pf-badge active" style="font-size:10px">Paid</span>
+            {% else %}<span class="pf-badge" style="font-size:10px">Unpaid</span>{% endif %}
+          </div>
+          <div style="background:var(--cl-border);border-radius:4px;height:8px;overflow:hidden;margin-bottom:4px">
+            {% set pct = ((b.allocated - b.remaining) / b.allocated * 100) if b.allocated else 0 %}
+            <div style="height:100%;background:{{ lt.color }};width:{{ pct }}%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--cl-text-muted)">
+            <span>Used: {{ '%.1f'|format(b.used or 0) }}d</span>
+            <span style="font-weight:700;color:{{ lt.color }}">Remaining: {{ '%.1f'|format(b.remaining or lt.days_per_year) }}d</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="pf-card" style="margin-top:12px">
+      <div class="pf-card-header"><div class="pf-card-title">ℹ️ Notes</div></div>
+      <ul style="font-size:12px;color:var(--cl-text-muted);margin:0;padding-left:16px;line-height:2">
+        <li>Days counted are business days only</li>
+        <li>Weekends and public holidays excluded</li>
+        <li>Manager approval required</li>
+        <li>Balance deducted upon approval</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var balances = {{ balances | tojson }};
+
+function updateBalance() {
+  var sel = document.getElementById('lt-select');
+  var ltId = sel.value;
+  // highlight selected balance row
+  document.querySelectorAll('.lt-balance').forEach(function(el) {
+    el.style.outline = (el.dataset.ltId == ltId) ? '2px solid var(--cl-primary)' : '';
+    el.style.padding = (el.dataset.ltId == ltId) ? '8px' : '';
+    el.style.borderRadius = (el.dataset.ltId == ltId) ? '6px' : '';
+  });
+}
+
+function calcDays() {
+  var s = document.getElementById('start-date').value;
+  var e = document.getElementById('end-date').value;
+  var preview = document.getElementById('days-preview');
+  var txt = document.getElementById('days-text');
+  if (!s || !e || e < s) { preview.style.display='none'; return; }
+  // Simple weekday count (server will calculate exact with holidays)
+  var start = new Date(s), end = new Date(e), count = 0;
+  for (var d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
+    if (d.getDay() !== 0 && d.getDay() !== 6) count++;
+  }
+  txt.textContent = 'Approx. ' + count + ' business day' + (count !== 1 ? 's' : '');
+  preview.style.display = 'block';
+}
+</script>
+{% endblock %}

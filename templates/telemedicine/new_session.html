@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}New Telemedicine Session{% endblock %}
+{% block page_title %}New Video Consultation{% endblock %}
+{% block page_sub %}Schedule a telemedicine session{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('telemedicine.dashboard') }}" class="pf-btn pf-btn-ghost">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" action="{{ url_for('telemedicine.new_session') }}" style="max-width:700px">
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Patient</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Owner *</label>
+        <select name="owner_id" id="ownerSel" class="pf-input" required data-searchable onchange="loadPets(this.value)">
+          <option value="">— Select Owner —</option>
+          {% for o in owners %}
+          <option value="{{ o.id }}">{{ o.full_name }} · {{ o.phone }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="pf-label">Pet</label>
+        <select name="pet_id" id="petSel" class="pf-input">
+          <option value="">— Select owner first —</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="pf-card" style="margin-bottom:1.5rem">
+    <div class="pf-card-header"><h3 class="pf-card-title">Session Details</h3></div>
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <label class="pf-label">Doctor Name</label>
+        <input type="text" name="doctor_name" class="pf-input" value="{{ default_doctor }}" placeholder="Dr. ...">
+      </div>
+      <div>
+        <label class="pf-label">Duration</label>
+        <select name="duration_min" class="pf-input">
+          <option value="15">15 minutes</option>
+          <option value="30" selected>30 minutes</option>
+          <option value="45">45 minutes</option>
+          <option value="60">60 minutes</option>
+        </select>
+      </div>
+      <div style="grid-column:span 2">
+        <label class="pf-label">Scheduled Date &amp; Time *</label>
+        <input type="datetime-local" name="scheduled_at" class="pf-input" required>
+      </div>
+      <div style="grid-column:span 2">
+        <label class="pf-label">Chief Complaint / Reason</label>
+        <textarea name="chief_complaint" class="pf-input" rows="3" placeholder="Why is the owner requesting a video consultation?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="pf-card" style="margin-bottom:1.5rem;border-left:4px solid var(--cl-primary)">
+    <div style="padding:1rem 1.25rem;display:flex;gap:1rem;align-items:flex-start">
+      <span style="font-size:1.8rem">🎥</span>
+      <div>
+        <strong>How it works</strong>
+        <div style="font-size:.85rem;color:var(--cl-muted);margin-top:4px">
+          A unique Jitsi Meet room link is automatically generated. You can share it with the owner via WhatsApp directly from the session page. No app download needed — works in any browser.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:1rem">
+    <button type="submit" class="pf-btn pf-btn-primary">🎥 Create Session</button>
+    <a href="{{ url_for('telemedicine.dashboard') }}" class="pf-btn pf-btn-ghost">Cancel</a>
+  </div>
+</form>
+
+<script>
+function loadPets(ownerId) {
+  var sel = document.getElementById('petSel');
+  if (!ownerId) { sel.innerHTML = '<option value="">— Select owner first —</option>'; return; }
+  sel.innerHTML = '<option value="">Loading...</option>';
+  fetch('/telemedicine/api/pets/' + ownerId)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      sel.innerHTML = '<option value="">— No specific pet —</option>';
+      (data.pets || []).forEach(function(p){
+        sel.innerHTML += '<option value="' + p.id + '">' + p.pet_name + ' (' + p.species + ')</option>';
+      });
+    })
+    .catch(function(){ sel.innerHTML = '<option value="">Error loading</option>'; });
+}
+</script>
+{% endblock %}

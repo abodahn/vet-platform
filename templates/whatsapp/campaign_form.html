@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}New Campaign{% endblock %}
+{% block page_title %}Create Campaign{% endblock %}
+{% block page_sub %}Create a new bulk WhatsApp campaign via Wapilot{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.campaigns_list') }}" class="pf-btn pf-btn-ghost">← Campaigns</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:640px">
+<form method="post">
+  <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
+
+  <div style="background:var(--card-bg,#fff);border:1px solid var(--border,#e2e8f0);
+              border-radius:14px;padding:28px;margin-bottom:20px">
+
+    <div style="margin-bottom:22px">
+      <label style="display:block;font-weight:600;font-size:.9rem;margin-bottom:6px">
+        Default Message
+      </label>
+      <p style="color:var(--muted,#64748b);font-size:.82rem;margin:0 0 8px">
+        This message will be sent to contacts that don't have an individual message set.
+        You can also leave this empty and assign messages when adding contacts.
+      </p>
+      <textarea name="default_message" rows="5" class="pf-input"
+                style="width:100%;resize:vertical"
+                placeholder="Hello {name}, this is a message from Premium Animal Hospital…">{{ form.get('default_message','') }}</textarea>
+    </div>
+
+    <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:14px;font-size:.85rem;color:#92400e">
+      <strong>ℹ️ Note:</strong> The campaign will be created using your configured instance
+      (<strong>instance4042</strong>). After creation, you'll be taken to the campaign page
+      where you can add contacts and start sending.
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px">
+    <button type="submit" class="pf-btn pf-btn-primary" style="padding:11px 28px">
+      🚀 Create Campaign
+    </button>
+    <a href="{{ url_for('whatsapp.campaigns_list') }}" class="pf-btn pf-btn-ghost">Cancel</a>
+  </div>
+</form>
+</div>
+{% endblock %}

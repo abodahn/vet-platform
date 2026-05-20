@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Doctor Revenue Report{% endblock %}
+{% block page_title %}👨‍⚕️ Doctor Revenue Report{% endblock %}
+{% block page_sub %}{{ date_from }} → {{ date_to }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('reports.dashboard') }}" class="pf-btn pf-btn-secondary">← Reports</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.dr-filter { background:var(--cl-surface);border-radius:10px;padding:14px 18px;
+             margin-bottom:20px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;
+             box-shadow:0 1px 4px rgba(0,0,0,.06) }
+.dr-kpis   { display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+             gap:16px;margin-bottom:24px }
+.dr-kpi    { background:var(--cl-surface);border-radius:12px;padding:18px 20px;
+             box-shadow:0 2px 8px rgba(0,0,0,.07);text-align:center }
+.dr-kpi .val { font-size:1.6rem;font-weight:800 }
+.dr-kpi .lbl { font-size:.75rem;color:var(--cl-muted);font-weight:600;text-transform:uppercase }
+.dr-table  { width:100%;border-collapse:collapse;font-size:.88rem }
+.dr-table th { background:#eff6ff;color:#1e40af;font-weight:700;padding:.6rem .8rem;
+                text-align:left;border-bottom:2px solid #bfdbfe }
+.dr-table td { padding:.55rem .8rem;border-bottom:1px solid var(--cl-border) }
+.dr-table tr:hover td { background:var(--cl-bg) }
+.bar { height:8px;border-radius:4px;background:#dbeafe;position:relative;overflow:hidden }
+.bar-fill { height:100%;background:var(--cl-primary);border-radius:4px }
+.badge-collected { background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:10px;
+                   font-size:.75rem;font-weight:700 }
+.badge-pending   { background:#fef9c3;color:#a16207;padding:2px 8px;border-radius:10px;
+                   font-size:.75rem;font-weight:700 }
+.breakdown-row td { background:#f8fafc;font-size:.82rem;color:var(--cl-muted) }
+</style>
+
+<!-- Date filter -->
+<form method="get" class="dr-filter">
+  <div>
+    <label style="font-size:.78rem;font-weight:700;color:var(--cl-muted);display:block;margin-bottom:4px">From</label>
+    <input type="date" name="date_from" value="{{ date_from }}"
+           class="pf-input" style="font-size:.85rem">
+  </div>
+  <div>
+    <label style="font-size:.78rem;font-weight:700;color:var(--cl-muted);display:block;margin-bottom:4px">To</label>
+    <input type="date" name="date_to" value="{{ date_to }}"
+           class="pf-input" style="font-size:.85rem">
+  </div>
+  <button type="submit" class="pf-btn pf-btn-primary">Apply</button>
+</form>
+
+<!-- KPI bar -->
+<div class="dr-kpis">
+  <div class="dr-kpi" style="border-top:4px solid var(--cl-primary)">
+    <div class="val">{{ by_doctor|length }}</div>
+    <div class="lbl">Active Doctors</div>
+  </div>
+  <div class="dr-kpi" style="border-top:4px solid #3b82f6">
+    <div class="val" style="color:#1d4ed8">{{ "{:,.0f}".format(grand_invoiced) }}</div>
+    <div class="lbl">Total Invoiced (EGP)</div>
+  </div>
+  <div class="dr-kpi" style="border-top:4px solid #16a34a">
+    <div class="val" style="color:#15803d">{{ "{:,.0f}".format(grand_collected) }}</div>
+    <div class="lbl">Collected (EGP)</div>
+  </div>
+  <div class="dr-kpi" style="border-top:4px solid #ca8a04">
+    <div class="val" style="color:#a16207">{{ "{:,.0f}".format(grand_pending) }}</div>
+    <div class="lbl">Pending (EGP)</div>
+  </div>
+  <div class="dr-kpi" style="border-top:4px solid #7c3aed">
+    <div class="val" style="color:#7c3aed">
+      {% if grand_invoiced > 0 %}{{ "{:.0f}".format(grand_collected/grand_invoiced*100) }}%{% else %}—{% endif %}
+    </div>
+    <div class="lbl">Collection Rate</div>
+  </div>
+</div>
+
+{% if by_doctor %}
+<div class="pf-card" style="overflow-x:auto">
+  <table class="dr-table">
+    <thead>
+      <tr>
+        <th>Doctor</th>
+        <th style="text-align:center">Invoices</th>
+        <th style="text-align:right">Invoiced (EGP)</th>
+        <th style="text-align:right">Collected</th>
+        <th style="text-align:right">Pending</th>
+        <th style="min-width:120px">Collection %</th>
+        <th>Service Breakdown</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in by_doctor %}
+      {% set pct = (doc.collected / doc.total_invoiced * 100) if doc.total_invoiced > 0 else 0 %}
+      <tr>
+        <td style="font-weight:700">👨‍⚕️ {{ doc.doctor_name }}</td>
+        <td style="text-align:center">{{ doc.invoice_count }}</td>
+        <td style="text-align:right;font-weight:600">{{ "{:,.0f}".format(doc.total_invoiced) }}</td>
+        <td style="text-align:right">
+          <span class="badge-collected">{{ "{:,.0f}".format(doc.collected) }}</span>
+        </td>
+        <td style="text-align:right">
+          {% if doc.pending > 0 %}
+          <span class="badge-pending">{{ "{:,.0f}".format(doc.pending) }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="bar" style="flex:1">
+              <div class="bar-fill" style="width:{{ [pct,100]|min }}%"></div>
+            </div>
+            <span style="font-size:.8rem;font-weight:700;min-width:36px">{{ "{:.0f}".format(pct) }}%</span>
+          </div>
+        </td>
+        <td style="font-size:.78rem;color:var(--cl-muted)">
+          {% if breakdown.get(doc.doctor_name) %}
+            {% for b in breakdown[doc.doctor_name][:3] %}
+              <span style="background:var(--cl-bg);border:1px solid var(--cl-border);
+                           border-radius:6px;padding:1px 6px;margin-right:3px;display:inline-block">
+                {{ b.line_type }}: {{ "{:,.0f}".format(b.subtotal) }}
+              </span>
+            {% endfor %}
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      <!-- Grand total row -->
+      <tr style="background:#eff6ff;font-weight:700;border-top:2px solid #bfdbfe">
+        <td>TOTAL</td>
+        <td style="text-align:center">{{ by_doctor|sum(attribute='invoice_count') }}</td>
+        <td style="text-align:right;color:#1d4ed8">{{ "{:,.0f}".format(grand_invoiced) }}</td>
+        <td style="text-align:right;color:#15803d">{{ "{:,.0f}".format(grand_collected) }}</td>
+        <td style="text-align:right;color:#a16207">{{ "{:,.0f}".format(grand_pending) }}</td>
+        <td colspan="2"></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Bar chart (pure CSS) -->
+<div class="pf-card" style="margin-top:20px">
+  <div style="font-weight:700;font-size:.9rem;color:var(--cl-muted);text-transform:uppercase;
+              letter-spacing:.06em;margin-bottom:16px">Revenue by Doctor</div>
+  {% set max_val = by_doctor|map(attribute='total_invoiced')|max %}
+  {% for doc in by_doctor %}
+  {% set bar_pct = (doc.total_invoiced / max_val * 100) if max_val > 0 else 0 %}
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+    <div style="width:160px;font-size:.83rem;font-weight:600;text-align:right;
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+      {{ doc.doctor_name }}
+    </div>
+    <div style="flex:1;background:#e2e8f0;border-radius:6px;height:22px;overflow:hidden">
+      <div style="width:{{ bar_pct|int }}%;height:100%;background:var(--cl-primary);
+                  border-radius:6px;display:flex;align-items:center;padding:0 8px;
+                  font-size:.75rem;color:#fff;font-weight:700;min-width:40px">
+        {{ "{:,.0f}".format(doc.total_invoiced) }}
+      </div>
+    </div>
+    <div style="width:80px;font-size:.8rem;color:var(--cl-muted);text-align:right">
+      {{ "{:.0f}".format((doc.total_invoiced/grand_invoiced*100) if grand_invoiced else 0) }}%
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="pf-card" style="text-align:center;padding:48px;color:var(--cl-muted)">
+  <div style="font-size:2.5rem;margin-bottom:12px">📊</div>
+  <div>No invoice data found for the selected period.</div>
+  <div style="font-size:.85rem;margin-top:6px">Try a different date range.</div>
+</div>
+{% endif %}
+
+{% endblock %}

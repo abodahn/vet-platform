@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Pet Shop{% endblock %}
+{% block page_title %}Pet Shop & Orders{% endblock %}
+{% block page_sub %}Products, point-of-sale, stock, and revenue{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('petshop.pos') }}" class="pf-btn pf-btn-primary">🛒 New Sale (POS)</a>
+<a href="{{ url_for('petshop.product_new') }}" class="pf-btn pf-btn-secondary">+ Add Product</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.ps-kpi { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; margin-bottom:28px; }
+.ps-card { background:var(--cl-surface); border-radius:14px; padding:20px; box-shadow:var(--cl-shadow-card); }
+.ps-card.accent { border-left:5px solid var(--cl-primary); }
+.ps-card.green  { border-left:5px solid #22c55e; }
+.ps-card.amber  { border-left:5px solid #f59e0b; }
+.ps-card.red    { border-left:5px solid #ef4444; }
+.kpi-val  { font-size:28px; font-weight:900; color:var(--cl-primary); line-height:1; margin:6px 0 4px; }
+.kpi-lbl  { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--cl-text-muted); }
+.kpi-icon { font-size:24px; margin-bottom:6px; }
+.sec-card { background:var(--cl-surface); border-radius:14px; padding:22px; box-shadow:var(--cl-shadow-card); margin-bottom:20px; }
+.sec-title{ font-size:14px; font-weight:800; color:var(--cl-primary); margin-bottom:14px; padding-bottom:10px; border-bottom:2px solid var(--cl-border); display:flex; justify-content:space-between; align-items:center; }
+.tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.tbl th { text-align:left; padding:9px 12px; background:var(--cl-bg); font-weight:700; color:var(--cl-text-muted); font-size:11px; text-transform:uppercase; }
+.tbl td { padding:9px 12px; border-bottom:1px solid var(--cl-border); }
+.tbl tr:last-child td { border-bottom:none; }
+.status-paid   { background:#dcfce7; color:#15803d; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; }
+.status-draft  { background:#fef3c7; color:#92400e; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; }
+.status-cancelled { background:#fee2e2; color:#991b1b; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; }
+.low-pill { background:#fee2e2; color:#991b1b; border-radius:6px; padding:3px 8px; font-size:11px; font-weight:700; }
+</style>
+
+<!-- KPI cards -->
+<div class="ps-kpi">
+  <div class="ps-card accent">
+    <div class="kpi-icon">📦</div>
+    <div class="kpi-val">{{ stats.products }}</div>
+    <div class="kpi-lbl">Active Products</div>
+  </div>
+  <div class="ps-card green">
+    <div class="kpi-icon">🛒</div>
+    <div class="kpi-val">{{ stats.orders_today }}</div>
+    <div class="kpi-lbl">Sales Today</div>
+  </div>
+  <div class="ps-card green">
+    <div class="kpi-icon">💰</div>
+    <div class="kpi-val">{{ "{:,.0f}".format(stats.revenue_today) }} EGP</div>
+    <div class="kpi-lbl">Revenue Today</div>
+  </div>
+  <div class="ps-card {% if stats.low_stock > 0 %}red{% else %}accent{% endif %}">
+    <div class="kpi-icon">⚠️</div>
+    <div class="kpi-val">{{ stats.low_stock }}</div>
+    <div class="kpi-lbl">Low Stock Items</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+  <!-- Recent orders -->
+  <div class="sec-card">
+    <div class="sec-title">
+      <span>🧾 Recent Orders</span>
+      <a href="{{ url_for('petshop.orders') }}" style="font-size:12px;color:var(--cl-primary)">View all →</a>
+    </div>
+    {% if recent_orders %}
+    <table class="tbl">
+      <thead><tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for o in recent_orders %}
+        <tr>
+          <td><a href="{{ url_for('petshop.order_detail', oid=o.id) }}"
+                 style="color:var(--cl-primary);font-weight:600">{{ o.order_number }}</a></td>
+          <td>{{ o.owner_name or 'Walk-in' }}</td>
+          <td style="font-weight:700">{{ "{:,.2f}".format(o.total) }} EGP</td>
+          <td><span class="status-{{ o.status }}">{{ o.status }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:24px;color:var(--cl-text-muted)">No orders yet today</div>
+    {% endif %}
+  </div>
+
+  <!-- Low stock alerts -->
+  <div class="sec-card">
+    <div class="sec-title">
+      <span>⚠️ Low Stock Alerts</span>
+      <a href="{{ url_for('petshop.products') }}" style="font-size:12px;color:var(--cl-primary)">All products →</a>
+    </div>
+    {% if low_stock %}
+    <table class="tbl">
+      <thead><tr><th>Product</th><th>Stock</th><th>Reorder At</th></tr></thead>
+      <tbody>
+        {% for p in low_stock %}
+        <tr>
+          <td style="font-weight:600">{{ p.name }}</td>
+          <td><span class="low-pill">{{ p.stock_qty }} {{ p.unit }}</span></td>
+          <td style="color:var(--cl-text-muted)">≤ {{ p.reorder_level }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:24px;color:var(--cl-text-muted)">✅ All stock levels healthy</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Quick nav -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-top:20px">
+  {% for label, icon, url in [
+    ('Point of Sale','🛒', url_for('petshop.pos')),
+    ('Products','📦', url_for('petshop.products')),
+    ('Orders','🧾', url_for('petshop.orders')),
+    ('Categories','🏷️', url_for('petshop.categories')),
+    ('Reports','📊', url_for('petshop.reports')),
+  ] %}
+  <a href="{{ url }}" style="display:flex;flex-direction:column;align-items:center;gap:8px;
+     padding:18px 12px;background:var(--cl-surface);border-radius:12px;
+     box-shadow:var(--cl-shadow-card);text-decoration:none;color:var(--cl-text);
+     transition:.2s;border:1.5px solid transparent" onmouseover="this.style.borderColor='var(--cl-primary)'"
+     onmouseout="this.style.borderColor='transparent'">
+    <span style="font-size:28px">{{ icon }}</span>
+    <span style="font-size:12px;font-weight:700;color:var(--cl-text-muted)">{{ label }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

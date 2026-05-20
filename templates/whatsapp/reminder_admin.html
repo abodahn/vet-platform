@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}Reminder Admin{% endblock %}
+{% block page_title %}Reminder Admin{% endblock %}
+{% block page_sub %}View, create, and manually trigger WhatsApp reminders{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">← Control Center</a>
+<form method="post" action="{{ url_for('whatsapp.reminder_trigger') }}" style="display:inline">
+  <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
+  <button type="submit" class="pf-btn pf-btn-primary"
+          onclick="return confirm('Run the reminder job now?')">
+    ▶ Run Reminder Job Now
+  </button>
+</form>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.ra-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
+.ra-stat  { background:var(--cl-surface); border-radius:12px; padding:20px 24px; box-shadow:0 2px 8px rgba(0,0,0,.06); text-align:center; }
+.ra-stat .num  { font-size:36px; font-weight:900; }
+.ra-stat .lbl  { font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; margin-top:4px; }
+.ra-stat.pending .num { color:#d97706; }
+.ra-stat.sent    .num { color:#16a34a; }
+.ra-stat.failed  .num { color:#dc2626; }
+.section-title { font-size:15px; font-weight:700; margin:24px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--cl-border); }
+.rem-table { width:100%; border-collapse:collapse; background:var(--cl-surface); border-radius:10px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.06); font-size:13px; }
+.rem-table th { background:var(--cl-primary); color:#fff; padding:10px 14px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; }
+.rem-table td { padding:10px 14px; border-bottom:1px solid var(--cl-border); vertical-align:middle; }
+.rem-table tr:last-child td { border-bottom:none; }
+.rem-table tr:hover td { background:var(--cl-bg); }
+.type-badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+.type-appointment { background:#dbeafe; color:#1d4ed8; }
+.type-vaccine     { background:#ede9fe; color:#5b21b6; }
+.type-followup    { background:#d1fae5; color:#065f46; }
+.type-medication  { background:#fce7f3; color:#9d174d; }
+.type-custom      { background:#f3f4f6; color:#374151; }
+.overdue-row td   { background:#fff7ed; }
+.btn-sm { padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; border:none; }
+.btn-send-now { background:#25D366; color:#fff; }
+.btn-cancel   { background:#fee2e2; color:#dc2626; }
+.run-log { background:var(--cl-surface); border-radius:10px; padding:0; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.run-row { display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.run-row:last-child { border-bottom:none; }
+.new-rem-form { background:var(--cl-surface); border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:24px; }
+.new-rem-form h3 { font-size:14px; font-weight:700; margin-bottom:16px; }
+.form-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+.form-row-wide { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+label { font-size:12px; font-weight:600; color:var(--cl-muted); display:block; margin-bottom:4px; }
+select, input, textarea { width:100%; padding:8px 10px; border:1.5px solid var(--cl-border); border-radius:7px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; box-sizing:border-box; }
+textarea { min-height:70px; resize:vertical; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats -->
+<div class="ra-stats">
+  <div class="ra-stat pending">
+    <div class="num">{{ pending_count }}</div>
+    <div class="lbl">⏳ Pending</div>
+  </div>
+  <div class="ra-stat sent">
+    <div class="num">{{ sent_count }}</div>
+    <div class="lbl">✅ Sent</div>
+  </div>
+  <div class="ra-stat failed">
+    <div class="num">{{ failed_count }}</div>
+    <div class="lbl">❌ Failed</div>
+  </div>
+</div>
+
+<!-- Create New Reminder -->
+<div class="new-rem-form">
+  <h3>➕ Create Manual Reminder</h3>
+  <form method="post" action="{{ url_for('whatsapp.reminder_create') }}">
+    <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
+    <div class="form-row">
+      <div>
+        <label>Owner ID *</label>
+        <input type="number" name="owner_id" required placeholder="Owner ID">
+      </div>
+      <div>
+        <label>Pet ID (optional)</label>
+        <input type="number" name="pet_id" placeholder="Pet ID">
+      </div>
+      <div>
+        <label>Reminder Type</label>
+        <select name="reminder_type">
+          <option value="appointment">Appointment</option>
+          <option value="vaccine">Vaccine</option>
+          <option value="followup">Follow-up</option>
+          <option value="medication">Medication</option>
+          <option value="custom" selected>Custom</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row-wide">
+      <div>
+        <label>Scheduled For *</label>
+        <input type="datetime-local" name="scheduled_for" required>
+      </div>
+      <div>
+        <label>Message *</label>
+        <textarea name="message" required placeholder="Dear {name}, your appointment is tomorrow…"></textarea>
+      </div>
+    </div>
+    <button type="submit" class="pf-btn pf-btn-primary" style="margin-top:14px">💾 Create Reminder</button>
+  </form>
+</div>
+
+<!-- Overdue -->
+{% if overdue %}
+<div class="section-title" style="color:#dc2626">🔴 Overdue Reminders ({{ overdue|length }})</div>
+<div style="overflow-x:auto;margin-bottom:24px">
+  <table class="rem-table">
+    <thead><tr><th>Scheduled</th><th>Owner</th><th>Pet</th><th>Type</th><th>Message</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for r in overdue %}
+      <tr class="overdue-row">
+        <td style="color:#dc2626;font-weight:700">{{ r.scheduled_for[:16] if r.scheduled_for else '—' }}</td>
+        <td>
+          <div style="font-weight:600">{{ r.owner_name or '—' }}</div>
+          {% if r.whatsapp_phone %}<div style="font-size:11px;color:var(--cl-muted)">{{ r.whatsapp_phone }}</div>{% endif %}
+        </td>
+        <td>{{ r.pet_name or '—' }}</td>
+        <td><span class="type-badge type-{{ r.reminder_type or 'custom' }}">{{ (r.reminder_type or 'custom').replace('_',' ').title() }}</span></td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ r.message or '' }}">{{ r.message or '—' }}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <form method="post" action="{{ url_for('whatsapp.reminder_send_now', rid=r.id) }}" style="display:inline">
+              <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
+              <button class="btn-sm btn-send-now" type="submit">📱 Send Now</button>
+            </form>
+            <form method="post" action="{{ url_for('whatsapp.reminder_cancel', rid=r.id) }}" style="display:inline">
+              <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
+              <button class="btn-sm btn-cancel" type="submit" onclick="return confirm('Cancel this reminder?')">✕</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Upcoming -->
+<div class="section-title">📅 Upcoming Reminders ({{ upcoming|length }})</div>
+{% if upcoming %}
+<div style="overflow-x:auto;margin-bottom:24px">
+  <table class="rem-table">
+    <thead><tr><th>Scheduled</th><th>Owner</th><th>Pet</th><th>Type</th><th>Message</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for r in upcoming %}
+      <tr>
+        <td style="font-weight:600;color:var(--cl-primary)">{{ r.scheduled_for[:16] if r.scheduled_for else '—' }}</td>
+        <td>
+          <div style="font-weight:600">{{ r.owner_name or '—' }}</div>
+          {% if r.whatsapp_phone %}<div style="font-size:11px;color:var(--cl-muted)">{{ r.whatsapp_phone }}</div>{% endif %}
+        </td>
+        <td>{{ r.pet_name or '—' }}</td>
+        <td><span class="type-badge type-{{ r.reminder_type or 'custom' }}">{{ (r.reminder_type or 'custom').replace('_',' ').title() }}</span></td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ r.message or '' }}">{{ r.message or '—' }}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <form method="post" action="{{ url_for('whatsapp.reminder_send_now', rid=r.id) }}" style="display:inline">
+              <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
+              <button class="btn-sm btn-send-now" type="submit">📱 Send Now</button>
+            </form>
+            <form method="post" action="{{ url_for('whatsapp.reminder_cancel', rid=r.id) }}" style="display:inline">
+              <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
+              <button class="btn-sm btn-cancel" type="submit" onclick="return confirm('Cancel this reminder?')">✕</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:40px;color:var(--cl-muted);background:var(--cl-surface);border-radius:10px;margin-bottom:24px">
+  🎉 No upcoming reminders
+</div>
+{% endif %}
+
+<!-- Run Log -->
+<div class="section-title">📋 Reminder Run Log</div>
+{% if run_log %}
+<div class="run-log" style="margin-bottom:24px">
+  {% for run in run_log %}
+  <div class="run-row">
+    <div>
+      <span style="font-weight:600">{{ run.run_at[:19] if run.run_at else '—' }}</span>
+      <span style="margin-left:12px;color:var(--cl-muted);font-size:12px">{{ run.run_type or 'scheduled' }}</span>
+    </div>
+    <div style="display:flex;gap:16px;font-size:12px">
+      <span style="color:#16a34a">✅ {{ run.sent_count or 0 }} sent</span>
+      <span style="color:#dc2626">❌ {{ run.failed_count or 0 }} failed</span>
+      <span style="color:var(--cl-muted)">{{ run.total_processed or 0 }} processed</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div style="text-align:center;padding:30px;color:var(--cl-muted);background:var(--cl-surface);border-radius:10px;margin-bottom:24px">
+  No runs yet. Click "Run Reminder Job Now" to start.
+</div>
+{% endif %}
+
+{% endblock %}

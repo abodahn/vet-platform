@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Legacy Data Migration{% endblock %}
+{% block page_title %}Legacy Data Migration{% endblock %}
+{% block page_sub %}Import owners, pets, and examination records from the legacy Excel-based app{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('system.backup') }}" class="pf-btn pf-btn-secondary">💾 Backup Manager</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.mig-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+.mig-card { background:var(--cl-surface); border-radius:14px; padding:22px; box-shadow:var(--cl-shadow-card); }
+.mig-title { font-size:15px; font-weight:700; color:var(--cl-primary); margin-bottom:14px;
+             padding-bottom:10px; border-bottom:2px solid var(--cl-border); }
+.file-row { display:flex; justify-content:space-between; align-items:center;
+            padding:8px 0; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.file-row:last-child { border-bottom:none; }
+.badge-ok  { background:#dcfce7; color:#15803d; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:700; }
+.badge-miss{ background:#fee2e2; color:#dc2626; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:700; }
+.count-pill { text-align:center; padding:14px; background:var(--cl-bg); border-radius:10px; }
+.count-num  { font-size:22px; font-weight:800; color:var(--cl-primary); }
+.count-lbl  { font-size:11px; color:var(--cl-text-muted); text-transform:capitalize; margin-top:2px; }
+.counts-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
+.warning-box { background:#fef3c7; border-left:4px solid #f59e0b; border-radius:8px;
+               padding:14px 18px; font-size:13px; color:#78350f; margin-bottom:20px; }
+.action-box  { background:var(--cl-surface); border-radius:14px; padding:24px;
+               box-shadow:var(--cl-shadow-card); margin-bottom:24px; }
+.action-title{ font-size:16px; font-weight:800; color:var(--cl-primary); margin-bottom:8px; }
+.action-desc { font-size:13px; color:var(--cl-text-muted); margin-bottom:18px; line-height:1.6; }
+.btn-migrate { padding:12px 28px; background:var(--cl-primary); color:#fff; border:none;
+               border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; }
+.btn-dryrun  { padding:12px 28px; background:var(--cl-accent,#c9a227); color:#fff; border:none;
+               border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; margin-right:10px; }
+.btn-migrate:hover { background:var(--cl-primary-dark); }
+.hist-table { width:100%; border-collapse:collapse; font-size:12px; }
+.hist-table th { text-align:left; padding:8px 10px; background:var(--cl-bg);
+                 font-weight:700; color:var(--cl-text-muted); font-size:11px; text-transform:uppercase; }
+.hist-table td { padding:8px 10px; border-bottom:1px solid var(--cl-border); }
+</style>
+
+{% if not legacy_exists %}
+<div style="background:#fee2e2;border-left:4px solid #dc2626;border-radius:8px;padding:16px 20px;margin-bottom:20px;font-size:14px;color:#991b1b;">
+  <strong>⚠️ Legacy app data directory not found:</strong> <code>{{ legacy_dir }}</code><br>
+  Make sure the legacy app (<code>ppc_diagnostics_work</code>) is present on this machine.
+</div>
+{% else %}
+
+<div class="warning-box">
+  ⚠️ <strong>Always run a dry-run first.</strong> A full backup is automatically created before any real migration.
+  Duplicate records are detected by phone number (owners) and name+owner (pets) and will be skipped.
+</div>
+
+<div class="mig-grid">
+  <!-- Legacy files status -->
+  <div class="mig-card">
+    <div class="mig-title">📂 Legacy Data Files Found</div>
+    {% for fname, found in files_found.items() %}
+    <div class="file-row">
+      <span style="font-family:monospace">{{ fname }}</span>
+      {% if found %}
+      <span class="badge-ok">✓ Found</span>
+      {% else %}
+      <span class="badge-miss">✗ Missing</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <div style="font-size:11px;color:var(--cl-text-muted);margin-top:10px;">
+      Location: <code style="font-size:11px">{{ legacy_dir }}</code>
+    </div>
+  </div>
+
+  <!-- Platform current counts -->
+  <div class="mig-card">
+    <div class="mig-title">🗄️ Current Platform Records</div>
+    <div class="counts-grid">
+      {% for table, count in platform_counts.items() %}
+      <div class="count-pill">
+        <div class="count-num">{{ count }}</div>
+        <div class="count-lbl">{{ table }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Migration actions -->
+<div class="action-box">
+  <div class="action-title">🔄 Run Migration</div>
+  <div class="action-desc">
+    Imports <strong>owners, pets, examination records (bookings), and services</strong> from the legacy Excel files
+    into the platform database.<br>
+    • Duplicate owners matched by phone number — skipped safely<br>
+    • Duplicate pets matched by name + owner — skipped safely<br>
+    • Examination records (bookings) imported as platform Visits with diagnoses and prescriptions preserved<br>
+    • A full database backup is created before any changes
+  </div>
+  <form method="post" action="{{ url_for('migration.run_migration') }}" onsubmit="return confirmMigrate(this)">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="dry_run" id="dry_run_field" value="1">
+    <button type="submit" class="btn-dryrun"
+            onclick="document.getElementById('dry_run_field').value='1'">
+      🧪 Dry Run (preview only)
+    </button>
+    <button type="submit" class="btn-migrate"
+            onclick="document.getElementById('dry_run_field').value='0'">
+      🚀 Run Full Migration
+    </button>
+  </form>
+</div>
+
+<!-- Migration history -->
+{% if history %}
+<div class="mig-card" style="margin-bottom:0">
+  <div class="mig-title">📋 Migration History (Last 50 actions)</div>
+  <div style="overflow-x:auto">
+    <table class="hist-table">
+      <thead><tr><th>Time</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+      <tbody>
+        {% for h in history %}
+        <tr>
+          <td style="white-space:nowrap;color:var(--cl-text-muted)">{{ h.timestamp[:16] if h.timestamp else '—' }}</td>
+          <td><code style="font-size:11px">{{ h.action }}</code></td>
+          <td style="color:var(--cl-text-muted)">{{ h.entity_type }} #{{ h.entity_id }}</td>
+          <td style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+              title="{{ h.details }}">{{ h.details }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmMigrate(form) {
+  var isDry = document.getElementById('dry_run_field').value === '1';
+  if (isDry) return true;
+  return confirm('Run the full migration now?\n\nA backup will be created automatically. Duplicate records will be skipped.\n\nContinue?');
+}
+</script>
+{% endblock %}

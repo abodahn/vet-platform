@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Surgeries{% endblock %}
+{% block page_title %}Surgeries{% endblock %}
+{% block page_sub %}Surgical procedure records{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('clinical.surgery_new') }}" class="pf-btn pf-btn-primary">
+  ＋ Record Surgery
+</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.outcome-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.outcome-Successful    { background: #dcfce7; color: #166534; }
+.outcome-Complicated   { background: #fef3c7; color: #92400e; }
+.outcome-Unsuccessful  { background: #fee2e2; color: #991b1b; }
+.outcome-Ongoing       { background: #e0f2fe; color: #0369a1; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-card">
+  <div class="pf-card-header">
+    <span>🔧 Surgery Records</span>
+    <span style="font-size:0.82rem;color:var(--text-muted)">{{ surgeries|length }} records</span>
+  </div>
+
+  {% if surgeries %}
+  <div class="pf-table-wrap">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Patient</th>
+          <th>Procedure</th>
+          <th>Surgeon</th>
+          <th>Anesthesia</th>
+          <th>Duration</th>
+          <th>Outcome</th>
+          <th>Follow-up</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in surgeries %}
+        <tr>
+          <td style="white-space:nowrap;font-size:0.85rem;color:var(--text-muted)">
+            {{ s.surgery_date[:10] if s.surgery_date else '—' }}
+          </td>
+          <td>
+            <div style="font-weight:600">{{ s.pet_name }}</div>
+            <div style="font-size:0.78rem;color:var(--text-muted)">{{ s.species }} · {{ s.owner_name }}</div>
+          </td>
+          <td>
+            <div style="font-weight:500">{{ s.procedure_name }}</div>
+            {% if s.anesthetist %}
+            <div style="font-size:0.78rem;color:var(--text-muted)">Anesthetist: {{ s.anesthetist }}</div>
+            {% endif %}
+          </td>
+          <td style="font-size:0.875rem">{{ s.surgeon or '—' }}</td>
+          <td style="font-size:0.85rem;color:var(--text-muted)">{{ s.anesthesia_type or '—' }}</td>
+          <td style="font-size:0.85rem;white-space:nowrap">
+            {% if s.duration_min %}{{ s.duration_min }} min{% else %}—{% endif %}
+          </td>
+          <td>
+            {% set oc = s.outcome or 'Successful' %}
+            <span class="outcome-badge outcome-{{ oc|replace(' ','') }}">{{ oc }}</span>
+          </td>
+          <td style="font-size:0.83rem;white-space:nowrap;color:var(--text-muted)">
+            {{ s.followup_date or '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="pf-card-body" style="text-align:center;color:var(--text-muted);padding:2.5rem">
+    <div style="font-size:2rem;margin-bottom:0.75rem">🔧</div>
+    <p>No surgery records yet.</p>
+    <a href="{{ url_for('clinical.surgery_new') }}" class="pf-btn pf-btn-primary" style="margin-top:0.5rem">
+      Record First Surgery
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

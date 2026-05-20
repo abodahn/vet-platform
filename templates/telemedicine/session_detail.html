@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Telemedicine #{{ ts.id }}{% endblock %}
+{% block page_title %}Video Consultation #{{ ts.id }}{% endblock %}
+{% block page_sub %}{{ ts.owner_name }} — {{ ts.pet_name or 'No pet specified' }}{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('telemedicine.dashboard') }}" class="pf-btn pf-btn-ghost">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;max-width:1000px">
+
+  <!-- Left: main info + video room -->
+  <div>
+    <!-- Status + join card -->
+    <div class="pf-card" style="margin-bottom:1.5rem;border-left:4px solid {% if ts.status=='Completed' %}#16a34a{% elif ts.status=='Cancelled' %}#dc2626{% elif ts.status=='In Progress' %}#3b82f6{% else %}#f59e0b{% endif %}">
+      <div style="padding:1.25rem">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <span style="font-size:2rem">🎥</span>
+          <div>
+            <div style="font-size:1.1rem;font-weight:700">
+              {{ ts.status }}
+              {% if ts.status == 'Scheduled' %}&nbsp;→ {{ (ts.scheduled_at or '')[:16] }}{% endif %}
+            </div>
+            <div style="font-size:.85rem;color:var(--cl-muted)">{{ ts.duration_min }} min · Dr. {{ ts.doctor_name or '?' }}</div>
+          </div>
+          <div style="margin-left:auto">
+            <span class="pf-badge {% if ts.status=='Completed' %}success{% elif ts.status=='Cancelled' %}error{% elif ts.status=='In Progress' %}{% else %}warning{% endif %}">{{ ts.status }}</span>
+          </div>
+        </div>
+
+        <!-- Room URL -->
+        <div style="background:var(--cl-bg,#f8fafc);border:1.5px solid var(--cl-border);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+          <code style="font-size:.8rem;flex:1;word-break:break-all;color:var(--cl-primary)">{{ ts.room_url }}</code>
+          <button onclick="navigator.clipboard.writeText('{{ ts.room_url }}');this.textContent='✓ Copied!';setTimeout(()=>this.textContent='📋 Copy',1500)"
+                  class="pf-btn pf-btn-sm pf-btn-ghost">📋 Copy</button>
+        </div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+          {% if ts.status in ('Scheduled','In Progress') %}
+          <a href="{{ ts.room_url }}" target="_blank" rel="noopener"
+             class="pf-btn pf-btn-primary" style="font-size:1rem;padding:10px 24px">
+            🎥 Join Video Call
+          </a>
+          {% endif %}
+
+          {% if ts.status == 'Scheduled' %}
+          <form method="post" action="{{ url_for('telemedicine.start_session', sid=ts.id) }}" style="display:inline">
+            <button type="submit" class="pf-btn pf-btn-secondary">▶ Mark as Started</button>
+          </form>
+          {% endif %}
+
+          {% if ts.status in ('Scheduled', 'In Progress') %}
+          <button onclick="document.getElementById('completeModal').style.display='flex'"
+                  class="pf-btn pf-btn-primary" style="background:#16a34a;border-color:#16a34a">
+            ✅ Complete Session
+          </button>
+          {% endif %}
+
+          {% if ts.whatsapp_phone and ts.status != 'Cancelled' %}
+          <form method="post" action="{{ url_for('telemedicine.share_link', sid=ts.id) }}" style="display:inline">
+            <button type="submit" class="pf-btn pf-btn-secondary">📱 Send Link via WhatsApp</button>
+          </form>
+          {% endif %}
+
+          {% if ts.status != 'Completed' and ts.status != 'Cancelled' %}
+          <form method="post" action="{{ url_for('telemedicine.cancel_session', sid=ts.id) }}" style="display:inline;margin-left:auto">
+            <button type="submit" class="pf-btn pf-btn-ghost" style="color:var(--pf-error)"
+                    onclick="return confirm('Cancel this session?')">✕ Cancel</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Chief complaint / notes -->
+    {% if ts.chief_complaint or ts.notes %}
+    <div class="pf-card" style="margin-bottom:1.5rem">
+      <div class="pf-card-header"><h3 class="pf-card-title">Clinical Notes</h3></div>
+      <div style="padding:1.25rem">
+        {% if ts.chief_complaint %}
+        <div style="margin-bottom:10px">
+          <label class="pf-label">Chief Complaint</label>
+          <div style="background:var(--cl-bg,#f8fafc);padding:10px;border-radius:6px">{{ ts.chief_complaint }}</div>
+        </div>
+        {% endif %}
+        {% if ts.notes %}
+        <div>
+          <label class="pf-label">Doctor Notes</label>
+          <div style="background:var(--cl-bg,#f8fafc);padding:10px;border-radius:6px">{{ ts.notes }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if ts.invoice_id %}
+    <div class="pf-card" style="border-left:4px solid #16a34a">
+      <div style="padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem">
+        <span style="font-size:1.5rem">🧾</span>
+        <div><strong>Invoice generated</strong><br><small style="color:var(--cl-muted)">Invoice #{{ ts.invoice_id }}</small></div>
+        <a href="{{ url_for('finance.invoice_detail', inv_id=ts.invoice_id) }}" class="pf-btn pf-btn-secondary" style="margin-left:auto">View Invoice</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: owner / pet info -->
+  <div>
+    <div class="pf-card" style="margin-bottom:1rem">
+      <div class="pf-card-header"><h3 class="pf-card-title">Owner</h3></div>
+      <div style="padding:1rem">
+        <div style="font-weight:700;margin-bottom:4px">{{ ts.owner_name }}</div>
+        {% if ts.phone %}<div style="font-size:.85rem;color:var(--cl-muted)">📞 {{ ts.phone }}</div>{% endif %}
+        {% if ts.whatsapp_phone %}<div style="font-size:.85rem;color:#25d366">📱 {{ ts.whatsapp_phone }}</div>{% endif %}
+        {% if ts.email %}<div style="font-size:.85rem;color:var(--cl-muted)">✉ {{ ts.email }}</div>{% endif %}
+      </div>
+    </div>
+
+    {% if ts.pet_name %}
+    <div class="pf-card" style="margin-bottom:1rem">
+      <div class="pf-card-header"><h3 class="pf-card-title">Patient</h3></div>
+      <div style="padding:1rem">
+        <div style="font-weight:700">{{ ts.pet_name }}</div>
+        <div style="font-size:.85rem;color:var(--cl-muted)">{{ ts.species or '' }}{% if ts.breed %} · {{ ts.breed }}{% endif %}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="pf-card">
+      <div class="pf-card-header"><h3 class="pf-card-title">Session Info</h3></div>
+      <div style="padding:1rem;font-size:.88rem">
+        <div style="margin-bottom:6px"><span style="color:var(--cl-muted)">Scheduled:</span> {{ (ts.scheduled_at or '')[:16] }}</div>
+        <div style="margin-bottom:6px"><span style="color:var(--cl-muted)">Duration:</span> {{ ts.duration_min }} minutes</div>
+        {% if ts.started_at %}<div style="margin-bottom:6px"><span style="color:var(--cl-muted)">Started:</span> {{ (ts.started_at or '')[:16] }}</div>{% endif %}
+        {% if ts.ended_at %}<div style="margin-bottom:6px"><span style="color:var(--cl-muted)">Ended:</span> {{ (ts.ended_at or '')[:16] }}</div>{% endif %}
+        <div style="margin-bottom:6px"><span style="color:var(--cl-muted)">Created by:</span> {{ ts.created_by or '—' }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Complete Modal -->
+<div id="completeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--cl-surface);border-radius:12px;padding:24px;width:480px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.3)">
+    <h3 style="margin-bottom:16px">✅ Complete Session</h3>
+    <form method="post" action="{{ url_for('telemedicine.complete_session', sid=ts.id) }}">
+      <label class="pf-label">Doctor Notes (optional)</label>
+      <textarea name="notes" class="pf-input" rows="4" placeholder="Summary of the consultation, findings, recommendations..."></textarea>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button type="submit" class="pf-btn pf-btn-primary">Complete & Generate Invoice</button>
+        <button type="button" onclick="document.getElementById('completeModal').style.display='none'" class="pf-btn pf-btn-ghost">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

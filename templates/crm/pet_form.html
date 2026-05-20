@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_sub %}{% if is_edit %}Update pet information{% else %}Register a new pet for {{ owner.full_name }}{% endif %}{% endblock %}
+
+{% block topbar_actions %}
+  {% if is_edit %}
+  <a href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);">
+    ← Back to Pet
+  </a>
+  {% else %}
+  <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);">
+    ← Back to Owner
+  </a>
+  {% endif %}
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  .owner-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: linear-gradient(135deg, var(--cl-primary), color-mix(in srgb, var(--cl-primary) 80%, var(--cl-accent)));
+    color: #fff;
+    border-radius: 12px;
+    padding: 16px 22px;
+    margin-bottom: 22px;
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--cl-primary) 30%, transparent);
+  }
+  .owner-banner-avatar {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    border: 2px solid rgba(255,255,255,0.5);
+    font-size: 1.2rem; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .owner-banner-label { font-size: 0.78rem; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.04em; }
+  .owner-banner-name { font-size: 1.05rem; font-weight: 700; }
+
+  .form-card {
+    background: var(--cl-surface);
+    border-radius: 14px;
+    box-shadow: 0 2px 18px rgba(0,0,0,0.08);
+    margin-bottom: 22px;
+    overflow: hidden;
+  }
+  .form-card-header {
+    background: linear-gradient(135deg, var(--cl-primary) 0%, color-mix(in srgb, var(--cl-primary) 80%, var(--cl-accent)) 100%);
+    color: #fff;
+    padding: 16px 24px;
+    font-size: 1rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .form-card-body { padding: 24px; }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 18px;
+  }
+  .form-grid-full { grid-column: 1 / -1; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label {
+    font-size: 0.85rem; font-weight: 600;
+    color: var(--cl-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .form-label .req { color: var(--cl-danger); margin-left: 2px; }
+  .form-control {
+    padding: 10px 14px;
+    border: 1.5px solid var(--cl-border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: var(--cl-bg);
+    color: var(--cl-text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .form-control:focus {
+    border-color: var(--cl-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--cl-primary) 15%, transparent);
+  }
+  textarea.form-control { resize: vertical; min-height: 85px; }
+  select.form-control { cursor: pointer; }
+
+  .checkbox-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    border: 1.5px solid var(--cl-border);
+    border-radius: 8px;
+    background: var(--cl-bg);
+    cursor: pointer;
+  }
+  .checkbox-row input[type="checkbox"] {
+    width: 18px; height: 18px;
+    accent-color: var(--cl-primary);
+    cursor: pointer;
+  }
+  .checkbox-row label { font-size: 0.95rem; font-weight: 500; color: var(--cl-text); cursor: pointer; flex: 1; }
+
+  .species-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+  }
+  .species-option { display: none; }
+  .species-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px;
+    border: 2px solid var(--cl-border);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--cl-text);
+    background: var(--cl-bg);
+    transition: all 0.18s;
+    text-align: center;
+  }
+  .species-label .sp-emoji { font-size: 1.6rem; }
+  .species-option:checked + .species-label {
+    border-color: var(--cl-primary);
+    background: color-mix(in srgb, var(--cl-primary) 10%, var(--cl-bg));
+    color: var(--cl-primary);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--cl-primary) 20%, transparent);
+  }
+  .species-label:hover {
+    border-color: var(--cl-primary);
+    transform: translateY(-2px);
+  }
+
+  .alert-box {
+    padding: 12px 16px;
+    border-radius: 8px;
+    border-left: 4px solid var(--cl-danger);
+    background: color-mix(in srgb, var(--cl-danger) 8%, var(--cl-bg));
+    color: var(--cl-text);
+    font-size: 0.9rem;
+    margin-top: 4px;
+  }
+
+  .form-actions {
+    display: flex; gap: 12px; align-items: center;
+    padding: 20px 24px;
+    background: color-mix(in srgb, var(--cl-primary) 4%, var(--cl-surface));
+    border-top: 1px solid var(--cl-border);
+  }
+  .btn-save {
+    padding: 11px 28px;
+    background: linear-gradient(135deg, var(--cl-primary), color-mix(in srgb, var(--cl-primary) 80%, var(--cl-accent)));
+    color: #fff; border: none; border-radius: 9px;
+    font-size: 0.97rem; font-weight: 700;
+    cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-save:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-cancel {
+    padding: 11px 22px;
+    background: var(--cl-surface); color: var(--cl-text);
+    border: 1.5px solid var(--cl-border); border-radius: 9px;
+    font-size: 0.97rem; font-weight: 600;
+    text-decoration: none; cursor: pointer; transition: border-color 0.2s;
+  }
+  .btn-cancel:hover { border-color: var(--cl-primary); }
+  .hint { font-size: 0.8rem; color: var(--cl-muted); margin-top: 3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Owner banner -->
+<div class="owner-banner">
+  <div class="owner-banner-avatar">{{ (owner.full_name or 'O')[:2] | upper }}</div>
+  <div>
+    <div class="owner-banner-label">Owner</div>
+    <div class="owner-banner-name">{{ owner.full_name }}</div>
+  </div>
+  <div style="margin-left:auto;font-size:0.85rem;opacity:0.8;">
+    📱 {{ owner.phone or '—' }}
+  </div>
+</div>
+
+<form method="post" autocomplete="off">
+  <input type="hidden" name="owner_id" value="{{ owner.id }}">
+
+  <!-- ── Identity ──────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-card-header">🐾 Pet Identity</div>
+    <div class="form-card-body">
+
+      <!-- Species selector -->
+      <div class="form-group" style="margin-bottom:20px;">
+        <label class="form-label">Species <span class="req">*</span></label>
+        <div class="species-selector">
+          {% set current_species = pet.get('species','') %}
+          {% for sp_val, sp_label, sp_emoji in [
+            ('Dog','Dog','🐕'),
+            ('Cat','Cat','🐈'),
+            ('Rabbit','Rabbit','🐰'),
+            ('Bird','Bird','🐦'),
+            ('Hamster','Hamster','🐹'),
+            ('Fish','Fish','🐟'),
+            ('Turtle','Turtle','🐢'),
+            ('Other','Other','🐾'),
+          ] %}
+          <span>
+            <input type="radio" name="species" id="sp_{{ sp_val }}" value="{{ sp_val }}"
+                   class="species-option"
+                   {% if current_species == sp_val or (not current_species and sp_val == 'Dog') %}checked{% endif %}>
+            <label for="sp_{{ sp_val }}" class="species-label">
+              <span class="sp-emoji">{{ sp_emoji }}</span>
+              {{ sp_label }}
+            </label>
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label" for="pet_name">Pet Name <span class="req">*</span></label>
+          <input type="text" id="pet_name" name="pet_name" class="form-control"
+                 value="{{ pet.get('pet_name','') }}" required placeholder="e.g. Max, Bella">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="breed">Breed</label>
+          <input type="text" id="breed" name="breed" class="form-control"
+                 value="{{ pet.get('breed','') }}" placeholder="e.g. Golden Retriever">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="sex">Sex</label>
+          <select id="sex" name="sex" class="form-control">
+            {% for s in ['Male', 'Female', 'Unknown'] %}
+            <option value="{{ s }}" {% if pet.get('sex','Unknown') == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="dob">Date of Birth</label>
+          <input type="date" id="dob" name="dob" class="form-control"
+                 value="{{ pet.get('dob','')[:10] if pet.get('dob') else '' }}">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Physical ──────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-card-header">⚖️ Physical Details</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label" for="weight_kg">Weight (kg)</label>
+          <input type="number" id="weight_kg" name="weight_kg" class="form-control"
+                 value="{{ pet.get('weight_kg','') }}" step="0.1" min="0" placeholder="e.g. 4.5">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="color">Color / Markings</label>
+          <input type="text" id="color" name="color" class="form-control"
+                 value="{{ pet.get('color','') }}" placeholder="e.g. Golden, Black & White">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="microchip_id">Microchip ID</label>
+          <input type="text" id="microchip_id" name="microchip_id" class="form-control"
+                 value="{{ pet.get('microchip_id','') }}" placeholder="15-digit microchip number">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Neutered / Spayed</label>
+          <div class="checkbox-row">
+            <input type="checkbox" id="neutered" name="neutered" value="1"
+                   {% if pet.get('neutered') %}checked{% endif %}>
+            <label for="neutered">Yes, this pet is neutered/spayed</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Medical ───────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-card-header">🏥 Medical Information</div>
+    <div class="form-card-body">
+      <div class="form-grid">
+        <div class="form-group form-grid-full">
+          <label class="form-label" for="allergies">Known Allergies</label>
+          <textarea id="allergies" name="allergies" class="form-control"
+                    placeholder="List any known allergies or sensitivities…">{{ pet.get('allergies','') }}</textarea>
+          {% if pet.get('allergies') %}
+          <div class="alert-box">⚠️ Allergy alert on file</div>
+          {% endif %}
+        </div>
+        <div class="form-group form-grid-full">
+          <label class="form-label" for="chronic_conditions">Chronic Conditions</label>
+          <textarea id="chronic_conditions" name="chronic_conditions" class="form-control"
+                    placeholder="Diabetes, epilepsy, heart disease, etc.">{{ pet.get('chronic_conditions','') }}</textarea>
+        </div>
+        <div class="form-group form-grid-full">
+          <label class="form-label" for="diet_notes">Diet Notes</label>
+          <textarea id="diet_notes" name="diet_notes" class="form-control"
+                    placeholder="Special diet requirements, feeding schedule…">{{ pet.get('diet_notes','') }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Notes ─────────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-card-header">📝 Additional Notes</div>
+    <div class="form-card-body">
+      <div class="form-group">
+        <textarea name="notes" class="form-control" style="min-height:100px;"
+                  placeholder="Any other relevant notes about this pet…">{{ pet.get('notes','') }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Actions ───────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="form-actions">
+      <button type="submit" class="btn-save">
+        {% if is_edit %}💾 Save Changes{% else %}✅ Register Pet{% endif %}
+      </button>
+      {% if is_edit %}
+      <a href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}" class="btn-cancel">Cancel</a>
+      {% else %}
+      <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn-cancel">Cancel</a>
+      {% endif %}
+    </div>
+  </div>
+
+</form>
+{% endblock %}

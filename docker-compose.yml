@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  platform:
+    build: .
+    container_name: pah_platform
+    ports:
+      - "5100:5100"
+    volumes:
+      - platform_data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_PATH=/app/data/platform.db
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - SEED_ADMIN_PASS=${SEED_ADMIN_PASS:-admin1234}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - WAPILOT_TOKEN=${WAPILOT_TOKEN:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5100/auth/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  platform_data:

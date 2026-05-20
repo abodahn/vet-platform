@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}All Admissions{% endblock %}
+{% block content %}
+<div class="pf-page-header">
+  <div>
+    <h1 class="pf-page-title">🏥 All Admissions</h1>
+  </div>
+  <div class="pf-topbar-actions">
+    <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+    <a href="{{ url_for('inpatient.admit') }}" class="pf-btn pf-btn-primary">+ Admit</a>
+  </div>
+</div>
+
+<div class="pf-card" style="margin-bottom:16px">
+  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;padding:16px">
+    <input type="text" name="q" class="pf-input" placeholder="Search pet or owner..." value="{{ q }}" style="width:220px">
+    <select name="status" class="pf-input" style="width:140px">
+      <option value="">All status</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if status_f==s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="pf-btn pf-btn-secondary">Filter</button>
+  </form>
+</div>
+
+<div class="pf-card">
+  <div class="pf-table-wrapper">
+    <table class="pf-table">
+      <thead><tr>
+        <th>ID</th><th>Pet</th><th>Owner</th><th>Ward</th>
+        <th>Admitted</th><th>Discharged</th><th>Status</th><th>Net</th><th>Actions</th>
+      </tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>#{{ r.id }}</td>
+          <td><strong>{{ r.pet_name or '—' }}</strong></td>
+          <td>{{ r.owner_name or '—' }}</td>
+          <td>{{ r.ward or '—' }}</td>
+          <td>{{ r.admission_date }}</td>
+          <td>{{ r.discharge_date or '—' }}</td>
+          <td>
+            <span class="pf-badge" style="background:{{ status_colors.get(r.status,'#6b7280') }}20;color:{{ status_colors.get(r.status,'#6b7280') }}">
+              {{ r.status }}
+            </span>
+          </td>
+          <td>EGP {{ '{:,.0f}'.format((r.total_charges or 0)) }}</td>
+          <td>
+            <a href="{{ url_for('inpatient.detail', hid=r.id) }}" class="pf-btn pf-btn-sm pf-btn-secondary">View</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" style="text-align:center;padding:32px;color:#6b7280">No records found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
