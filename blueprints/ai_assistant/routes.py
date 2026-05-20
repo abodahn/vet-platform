@@ -19,10 +19,11 @@ from . import ai_bp
 from blueprints.auth.routes import login_required
 import models.database as db
 
-# ── freellmapi config ─────────────────────────────────────────────────────────
-FREELLM_BASE_URL = "http://localhost:3001/v1"
-FREELLM_API_KEY  = "freellmapi-4ddad5d50504e98e27a4001eb5422e23a89cc957233ea3d0"
-FREELLM_MODEL    = "gemini-2.5-flash"   # fast, capable; change to gpt-4o for OpenAI
+# ── AI config — read from environment (falls back to local freellmapi) ────────
+import os as _os
+FREELLM_BASE_URL = _os.environ.get("AI_BASE_URL", "http://localhost:3001/v1")
+FREELLM_API_KEY  = _os.environ.get("AI_API_KEY",  "freellmapi-4ddad5d50504e98e27a4001eb5422e23a89cc957233ea3d0")
+FREELLM_MODEL    = _os.environ.get("AI_MODEL",    "gemini-2.5-flash")
 
 
 # ── System prompts ────────────────────────────────────────────────────────────

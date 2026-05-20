@@ -16,30 +16,64 @@ import models.database as db
 # ── Table init ────────────────────────────────────────────────────────────────
 
 def _ensure_tables():
+    """Create telemedicine_sessions table if it doesn't exist.
+    Uses PostgreSQL-compatible syntax (SERIAL, NOW()); also works with SQLite
+    because the fallback path never uses SERIAL.
+    """
     conn = get_db()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS telemedicine_sessions (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            owner_id        INTEGER NOT NULL,
-            pet_id          INTEGER,
-            doctor_name     TEXT,
-            scheduled_at    TEXT NOT NULL,
-            duration_min    INTEGER DEFAULT 30,
-            room_token      TEXT NOT NULL UNIQUE,
-            room_url        TEXT NOT NULL,
-            status          TEXT DEFAULT 'Scheduled',
-            chief_complaint TEXT,
-            notes           TEXT,
-            prescription_id INTEGER,
-            invoice_id      INTEGER,
-            created_by      TEXT,
-            created_at      TEXT DEFAULT (datetime('now')),
-            started_at      TEXT,
-            ended_at        TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
+    try:
+        # Try PostgreSQL syntax first
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS telemedicine_sessions (
+                id              SERIAL PRIMARY KEY,
+                owner_id        INTEGER NOT NULL,
+                pet_id          INTEGER,
+                doctor_name     TEXT,
+                scheduled_at    TIMESTAMP NOT NULL,
+                duration_min    INTEGER DEFAULT 30,
+                room_token      TEXT NOT NULL UNIQUE,
+                room_url        TEXT NOT NULL,
+                status          TEXT DEFAULT 'Scheduled',
+                chief_complaint TEXT,
+                notes           TEXT,
+                prescription_id INTEGER,
+                invoice_id      INTEGER,
+                created_by      TEXT,
+                created_at      TIMESTAMP DEFAULT NOW(),
+                started_at      TIMESTAMP,
+                ended_at        TIMESTAMP
+            )
+        """)
+        conn.commit()
+    except Exception:
+        # SQLite fallback
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS telemedicine_sessions (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    owner_id        INTEGER NOT NULL,
+                    pet_id          INTEGER,
+                    doctor_name     TEXT,
+                    scheduled_at    TEXT NOT NULL,
+                    duration_min    INTEGER DEFAULT 30,
+                    room_token      TEXT NOT NULL UNIQUE,
+                    room_url        TEXT NOT NULL,
+                    status          TEXT DEFAULT 'Scheduled',
+                    chief_complaint TEXT,
+                    notes           TEXT,
+                    prescription_id INTEGER,
+                    invoice_id      INTEGER,
+                    created_by      TEXT,
+                    created_at      TEXT DEFAULT (datetime('now')),
+                    started_at      TEXT,
+                    ended_at        TEXT
+                )
+            """)
+            conn.commit()
+        except Exception:
+            pass
+    finally:
+        conn.close()
 
 
 def _make_room_url(token: str) -> str:
