@@ -1,17 +1,179 @@
 {% extends "base.html" %}
 {% block title %}{{ code }} — {{ t('Error', 'خطأ') }}{% endblock %}
-{% block page_title %}{{ t('Error', 'خطأ') }} {{ code }}{% endblock %}
+{% block page_title %}{% endblock %}
 
 {% block content %}
-<div class="pf-error-wrap">
-  <div class="pf-error-code">{{ code }}</div>
-  <div class="pf-error-msg">{{ msg }}</div>
-  <div class="pf-text-muted pf-text-sm" style="margin-top:4px">
-    {{ t(app_title, app_title_ar) }}
+<style>
+.al-error-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: 40px 20px;
+}
+.al-error-code-wrap {
+  position: relative;
+  margin-bottom: 24px;
+}
+.al-error-code {
+  font-size: clamp(6rem, 18vw, 10rem);
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--al-primary) 0%, var(--al-primary-mid) 50%, var(--al-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -4px;
+  user-select: none;
+}
+.al-error-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  animation: errorBounce .6s ease;
+}
+@keyframes errorBounce {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1);   opacity: 1; }
+}
+.al-error-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--al-text);
+  margin-bottom: 8px;
+}
+.al-error-msg {
+  font-size: 1rem;
+  color: var(--al-text-muted);
+  max-width: 420px;
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+.al-error-divider {
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--al-primary), var(--al-gold));
+  border-radius: 999px;
+  margin: 0 auto 24px;
+}
+.al-error-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.al-error-brand {
+  margin-top: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: .45;
+  font-size: .8rem;
+  color: var(--al-text-muted);
+}
+.al-error-brand img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+/* Error-specific icons & colours */
+.err-404 .al-error-icon::after { content: '🔍'; }
+.err-403 .al-error-icon::after { content: '🔒'; }
+.err-413 .al-error-icon::after { content: '📦'; }
+.err-500 .al-error-icon::after { content: '⚡'; }
+.err-generic .al-error-icon::after { content: '🐾'; }
+
+/* Tips panel */
+.al-error-tips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 28px;
+  max-width: 500px;
+}
+.al-error-tip {
+  background: var(--al-surface-2);
+  border: 1px solid var(--al-border);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: .78rem;
+  color: var(--al-text-muted);
+  cursor: pointer;
+  transition: all .2s;
+  text-decoration: none;
+}
+.al-error-tip:hover {
+  border-color: var(--al-primary);
+  color: var(--al-primary);
+  background: var(--al-primary-light);
+}
+</style>
+
+{% set err_class = 'err-' ~ code if code in (404, 403, 413, 500) else 'err-generic' %}
+
+<div class="al-error-page {{ err_class }}">
+
+  <div class="al-error-icon"></div>
+
+  <div class="al-error-code-wrap">
+    <div class="al-error-code">{{ code }}</div>
   </div>
-  <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;justify-content:center">
-    <a href="{{ url_for('launcher.index') }}" class="pf-btn pf-btn-primary">← {{ t('Back to Launcher', 'العودة للوحة الوحدات') }}</a>
-    <a href="javascript:history.back()" class="pf-btn pf-btn-ghost">{{ t('Go Back', 'رجوع') }}</a>
+
+  <div class="al-error-divider"></div>
+
+  <div class="al-error-title">
+    {% if code == 404 %}
+      {{ t('Page not found', 'الصفحة غير موجودة') }}
+    {% elif code == 403 %}
+      {{ t('Access denied', 'الوصول مرفوض') }}
+    {% elif code == 413 %}
+      {{ t('File too large', 'الملف كبير جداً') }}
+    {% elif code == 500 %}
+      {{ t('Server error', 'خطأ في الخادم') }}
+    {% else %}
+      {{ t('Something went wrong', 'حدث خطأ ما') }}
+    {% endif %}
   </div>
+
+  <div class="al-error-msg">
+    {% if msg %}
+      {{ msg }}
+    {% elif code == 404 %}
+      {{ t("The page you're looking for doesn't exist or has been moved.", "الصفحة التي تبحث عنها غير موجودة أو تم نقلها.") }}
+    {% elif code == 403 %}
+      {{ t("You don't have permission to access this page. Contact your administrator if you think this is a mistake.", "ليس لديك صلاحية الوصول لهذه الصفحة. تواصل مع المسؤول إذا كان هذا خطأ.") }}
+    {% elif code == 413 %}
+      {{ t("The file you tried to upload is too large. Maximum allowed size is 16 MB.", "الملف الذي حاولت رفعه كبير جداً. الحجم الأقصى المسموح به هو 16 ميجابايت.") }}
+    {% else %}
+      {{ t("An unexpected error occurred. The team has been notified.", "حدث خطأ غير متوقع. تم إشعار الفريق.") }}
+    {% endif %}
+  </div>
+
+  <!-- Quick nav tips -->
+  <div class="al-error-tips">
+    <a href="{{ url_for('appointments.index') }}" class="al-error-tip">📅 {{ t('Appointments', 'المواعيد') }}</a>
+    <a href="{{ url_for('crm.owners_list') }}" class="al-error-tip">👥 {{ t('Owners', 'الملاك') }}</a>
+    <a href="{{ url_for('finance.invoices_list') }}" class="al-error-tip">💰 {{ t('Finance', 'المالية') }}</a>
+    <a href="{{ url_for('inventory.index') }}" class="al-error-tip">📦 {{ t('Inventory', 'المخزون') }}</a>
+  </div>
+
+  <div class="al-error-actions">
+    <a href="{{ url_for('launcher.index') }}" class="al-btn al-btn-primary" style="min-width:160px">
+      🏠 {{ t('Back to Dashboard', 'العودة للوحة التحكم') }}
+    </a>
+    <button onclick="history.back()" class="al-btn al-btn-ghost" style="min-width:120px">
+      ← {{ t('Go Back', 'رجوع') }}
+    </button>
+  </div>
+
+  <div class="al-error-brand">
+    <img src="{{ url_for('static', filename='images/aleefy-logo.png') }}" alt="Aleefy">
+    <span>{{ t(app_title, app_title_ar) }} · {{ app_tagline }}</span>
+  </div>
+
 </div>
 {% endblock %}

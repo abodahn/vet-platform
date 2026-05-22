@@ -1,297 +1,150 @@
 {% extends "base.html" %}
 
-{% block title %}{{ t('Platform Launcher', 'لوحة الوحدات') }}{% endblock %}
-{% block page_title %}{{ t('Platform Launcher', 'لوحة الوحدات') }}{% endblock %}
-{% block page_sub %}{{ t(app_title, app_title_ar) }} — {{ t('Select a module to begin', 'اختر وحدة للبدء') }}{% endblock %}
+{% block title %}{{ t('Dashboard', 'لوحة التحكم') }}{% endblock %}
+{% block page_title %}{{ t('Dashboard', 'لوحة التحكم') }}{% endblock %}
+{% block page_sub %}{{ t('Welcome back', 'أهلاً بعودتك') }}, {{ current_user.get('full_name') or current_user.get('username') }} 👋{% endblock %}
 
 {% block topbar_actions %}
-  <a href="/launcher/legacy/start" target="_blank" class="pf-btn pf-btn-primary pf-btn-sm">
+  <a href="/launcher/legacy/start" target="_blank" class="al-btn al-btn-primary al-btn-sm">
     🩺 {{ t('Open Exam Module', 'وحدة الفحص') }}
   </a>
-  <a href="{{ legacy_url }}/easy/landing" target="_blank" class="pf-btn pf-btn-accent pf-btn-sm">
+  <a href="{{ legacy_url }}/easy/landing" target="_blank" class="al-btn al-btn-gold al-btn-sm">
     🧾 {{ t('Quick Invoice', 'فاتورة سريعة') }}
   </a>
 {% endblock %}
 
 {% block content %}
 
-<!-- ── Welcome Banner ──────────────────────────────────────── -->
-<div class="pf-welcome-banner">
-  <div class="pf-welcome-text">
-    <div class="pf-welcome-title">
-      {{ t('Welcome back', 'أهلاً بعودتك') }}, {{ current_user.get('full_name') or current_user.get('username') }} 👋
-    </div>
-    <div class="pf-welcome-sub">
-      {{ active_count }} {{ t('of', 'من') }} {{ total_count }} {{ t('modules are live', 'وحدة نشطة') }} &nbsp;·&nbsp;
-      {{ t(app_title, app_title_ar) }} &nbsp;·&nbsp; {{ app_subtitle }}
-    </div>
-  </div>
-  <div class="pf-welcome-logo">🐾</div>
-</div>
-
 <!-- ── Quick Stats ─────────────────────────────────────────── -->
-<div class="pf-stats-grid" style="margin-bottom:28px;grid-template-columns:repeat(4,1fr)">
+<div class="al-stat-grid" style="margin-bottom:24px">
 
-  <div class="pf-stat-card" style="--stat-color:#1a3a6b">
-    <span class="pf-stat-icon">📅</span>
-    <div class="pf-stat-label">{{ t("Today's Appointments", 'مواعيد اليوم') }}</div>
-    <div class="pf-stat-value">{{ stats.bookings_today }}</div>
-    <div class="pf-stat-sub">{{ stats.visits_today }} {{ t('visit(s) in progress', 'زيارة جارية') }}</div>
+  <div class="al-stat-card">
+    <div class="al-stat-icon" style="background:linear-gradient(135deg,#1B6B5C,#2A9D8F)">📅</div>
+    <div class="al-stat-body">
+      <div class="al-stat-label">{{ t("Today's Appointments", 'مواعيد اليوم') }}</div>
+      <div class="al-stat-value">{{ stats.bookings_today }}</div>
+      <div class="al-stat-sub">{{ stats.visits_today }} {{ t('visit(s) in progress', 'زيارة جارية') }}</div>
+    </div>
   </div>
 
-  <div class="pf-stat-card" style="--stat-color:#8b5cf6">
-    <span class="pf-stat-icon">👥</span>
-    <div class="pf-stat-label">{{ t('Total Owners', 'إجمالي الملاك') }}</div>
-    <div class="pf-stat-value">{{ stats.owners }}</div>
-    <div class="pf-stat-sub">{{ stats.pets }} {{ t('registered pets', 'حيوان مسجل') }}</div>
+  <div class="al-stat-card">
+    <div class="al-stat-icon" style="background:linear-gradient(135deg,#0369a1,#0ea5e9)">👥</div>
+    <div class="al-stat-body">
+      <div class="al-stat-label">{{ t('Owners & Pets', 'الملاك والحيوانات') }}</div>
+      <div class="al-stat-value">{{ stats.owners }}</div>
+      <div class="al-stat-sub">{{ stats.pets }} {{ t('registered pets', 'حيوان مسجل') }}</div>
+    </div>
   </div>
 
-  <div class="pf-stat-card" style="--stat-color:#10b981">
-    <span class="pf-stat-icon">💰</span>
-    <div class="pf-stat-label">{{ t('Revenue Today', 'إيرادات اليوم') }}</div>
-    <div class="pf-stat-value" style="font-size:1.5rem">{{ '{:,.0f}'.format(stats.revenue_today) }}</div>
-    <div class="pf-stat-sub">{{ t('EGP collected', 'جنيه محصّل') }}</div>
+  <div class="al-stat-card">
+    <div class="al-stat-icon" style="background:linear-gradient(135deg,#C9A84C,#e6c56a)">💰</div>
+    <div class="al-stat-body">
+      <div class="al-stat-label">{{ t("Revenue Today", 'إيرادات اليوم') }}</div>
+      <div class="al-stat-value" style="font-size:1.4rem">{{ '{:,.0f}'.format(stats.revenue_today) }}</div>
+      <div class="al-stat-sub">{{ t('EGP collected', 'جنيه محصّل') }}</div>
+    </div>
   </div>
 
-  <div class="pf-stat-card" style="--stat-color:#ef4444">
-    <span class="pf-stat-icon">🧾</span>
-    <div class="pf-stat-label">{{ t('Outstanding Balance', 'الرصيد المستحق') }}</div>
-    <div class="pf-stat-value" style="font-size:1.5rem">{{ '{:,.0f}'.format(stats.outstanding) }}</div>
-    <div class="pf-stat-sub">{{ stats.invoices_unpaid }} {{ t('unpaid invoice(s)', 'فاتورة غير مدفوعة') }}</div>
+  <div class="al-stat-card">
+    <div class="al-stat-icon" style="background:linear-gradient(135deg,#dc2626,#ef4444)">🧾</div>
+    <div class="al-stat-body">
+      <div class="al-stat-label">{{ t('Outstanding', 'المستحق') }}</div>
+      <div class="al-stat-value" style="font-size:1.4rem">{{ '{:,.0f}'.format(stats.outstanding) }}</div>
+      <div class="al-stat-sub">{{ stats.invoices_unpaid }} {{ t('unpaid invoice(s)', 'فاتورة غير مدفوعة') }}</div>
+    </div>
   </div>
 
 </div>
 
 <!-- ── AI Command Center ──────────────────────────────────── -->
-<div style="display:grid;grid-template-columns:1fr 340px;gap:18px;margin-bottom:28px" id="aiCommandRow">
+<div style="display:grid;grid-template-columns:1fr 320px;gap:18px;margin-bottom:24px" id="aiCommandRow">
 
-  <!-- AI Insights Panel -->
-  <div id="aiInsightsCard" style="
-    background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%);
-    border:1px solid rgba(139,92,246,.35);
-    border-radius:16px;padding:20px 24px;
-    box-shadow:0 0 40px rgba(139,92,246,.12),0 4px 24px rgba(0,0,0,.25);
-    position:relative;overflow:hidden;min-height:160px">
-
-    <!-- Animated background glow -->
-    <div style="position:absolute;top:-60px;right:-60px;width:200px;height:200px;
-                background:radial-gradient(circle,rgba(139,92,246,.15) 0%,transparent 70%);
+  <!-- AI Insights Panel — Aleefy teal theme -->
+  <div class="al-card" style="border-left:3px solid var(--al-primary);min-height:160px;position:relative;overflow:hidden">
+    <div style="position:absolute;top:-50px;right:-50px;width:180px;height:180px;
+                background:radial-gradient(circle,rgba(27,107,92,.12) 0%,transparent 70%);
                 border-radius:50%;pointer-events:none"></div>
-    <div style="position:absolute;bottom:-40px;left:40px;width:150px;height:150px;
-                background:radial-gradient(circle,rgba(59,130,246,.1) 0%,transparent 70%);
-                border-radius:50%;pointer-events:none"></div>
-
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;position:relative">
-      <div style="background:linear-gradient(135deg,#8b5cf6,#3b82f6);border-radius:10px;
-                  padding:6px 10px;font-size:1.1rem">🤖</div>
-      <div>
-        <div style="color:#e2e8f0;font-weight:700;font-size:.95rem;letter-spacing:.02em">AI Smart Insights</div>
-        <div style="color:rgba(148,163,184,.7);font-size:.75rem" id="aiInsightsTime">Loading...</div>
+    <div class="al-card-header" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="background:linear-gradient(135deg,var(--al-primary),var(--al-primary-mid));
+                    border-radius:10px;padding:7px 10px;font-size:1.1rem">🤖</div>
+        <div>
+          <div style="font-weight:700;font-size:.95rem;color:var(--al-text)">{{ t('AI Smart Insights', 'رؤى الذكاء الاصطناعي') }}</div>
+          <div style="color:var(--al-text-muted);font-size:.75rem" id="aiInsightsTime">{{ t('Loading...', 'جارٍ التحميل...') }}</div>
+        </div>
       </div>
-      <button onclick="loadInsights(true)" id="refreshBtn"
-              style="margin-left:auto;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.4);
-                     color:#c4b5fd;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:.78rem;
-                     transition:all .2s" onmouseover="this.style.background='rgba(139,92,246,.35)'"
-              onmouseout="this.style.background='rgba(139,92,246,.2)'">
-        ↺ Refresh
+      <button onclick="loadInsights(true)" id="refreshBtn" class="al-btn al-btn-ghost al-btn-sm" style="margin-left:auto">
+        ↺ {{ t('Refresh', 'تحديث') }}
       </button>
     </div>
-
-    <div id="aiInsightsList" style="display:grid;gap:8px;position:relative">
-      <!-- Skeleton loader -->
-      <div class="ai-skeleton" style="height:36px;border-radius:8px"></div>
-      <div class="ai-skeleton" style="height:36px;border-radius:8px"></div>
-      <div class="ai-skeleton" style="height:36px;border-radius:8px"></div>
+    <div id="aiInsightsList" style="display:grid;gap:8px">
+      <div class="al-skeleton" style="height:36px;border-radius:8px"></div>
+      <div class="al-skeleton" style="height:36px;border-radius:8px"></div>
+      <div class="al-skeleton" style="height:36px;border-radius:8px"></div>
     </div>
   </div>
 
-  <!-- Predictive Alerts Panel -->
-  <div id="aiAlertsCard" style="
-    background:linear-gradient(135deg,#0f172a,#1c1917);
-    border:1px solid rgba(239,68,68,.25);
-    border-radius:16px;padding:20px;
-    box-shadow:0 0 30px rgba(239,68,68,.08),0 4px 20px rgba(0,0,0,.2);
-    position:relative;overflow:hidden">
-
-    <div style="position:absolute;top:-40px;right:-40px;width:120px;height:120px;
-                background:radial-gradient(circle,rgba(239,68,68,.1) 0%,transparent 70%);
+  <!-- Action Required Panel -->
+  <div class="al-card" style="border-left:3px solid #ef4444;position:relative;overflow:hidden">
+    <div style="position:absolute;top:-30px;right:-30px;width:100px;height:100px;
+                background:radial-gradient(circle,rgba(239,68,68,.08) 0%,transparent 70%);
                 border-radius:50%;pointer-events:none"></div>
-
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-      <div style="background:linear-gradient(135deg,#ef4444,#f97316);border-radius:8px;
-                  padding:5px 9px;font-size:1rem">⚡</div>
-      <div style="color:#f1f5f9;font-weight:700;font-size:.9rem">Action Required</div>
+    <div class="al-card-header" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="background:linear-gradient(135deg,#ef4444,#f97316);border-radius:8px;padding:6px 9px;font-size:.95rem">⚡</div>
+        <span style="font-weight:700;font-size:.9rem">{{ t('Action Required', 'إجراء مطلوب') }}</span>
+      </div>
       <span id="alertBadge" style="margin-left:auto;background:#ef4444;color:#fff;
             border-radius:999px;padding:1px 8px;font-size:.72rem;font-weight:700;display:none">0</span>
     </div>
-
     <div id="aiAlertsList" style="display:flex;flex-direction:column;gap:6px">
-      <div class="ai-skeleton" style="height:28px;border-radius:6px"></div>
-      <div class="ai-skeleton" style="height:28px;border-radius:6px"></div>
-      <div class="ai-skeleton" style="height:28px;border-radius:6px"></div>
+      <div class="al-skeleton" style="height:28px;border-radius:6px"></div>
+      <div class="al-skeleton" style="height:28px;border-radius:6px"></div>
+      <div class="al-skeleton" style="height:28px;border-radius:6px"></div>
     </div>
   </div>
+
 </div>
 
-<style>
-.ai-skeleton{background:linear-gradient(90deg,rgba(255,255,255,.05) 0%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.05) 100%);
-             background-size:200% 100%;animation:aiShimmer 1.5s infinite}
-@keyframes aiShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.ai-insight-item{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;
-                 border-radius:8px;border:1px solid;font-size:.82rem;line-height:1.4;
-                 animation:aiFadeIn .4s ease forwards;opacity:0}
-@keyframes aiFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-.ai-insight-item.critical{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#fca5a5}
-.ai-insight-item.warning{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3);color:#fcd34d}
-.ai-insight-item.success{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.3);color:#6ee7b7}
-.ai-insight-item.info{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.3);color:#93c5fd}
-.ai-alert-item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;
-               font-size:.78rem;color:#cbd5e1;cursor:pointer;transition:background .15s;text-decoration:none}
-.ai-alert-item:hover{background:rgba(255,255,255,.06)}
-.ai-alert-item.critical .ai-alert-dot{background:#ef4444;box-shadow:0 0 6px #ef4444}
-.ai-alert-item.warning .ai-alert-dot{background:#f59e0b;box-shadow:0 0 6px #f59e0b}
-.ai-alert-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-@media(max-width:900px){[id=aiCommandRow]{grid-template-columns:1fr}}
-</style>
-
-<script>
-var _insightsLoaded = false;
-
-function loadInsights(force) {
-  if (_insightsLoaded && !force) return;
-  _insightsLoaded = true;
-  var btn = document.getElementById('refreshBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '...'; }
-
-  // Load insights
-  fetch('/ai/insights', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token': (document.querySelector('meta[name=csrf-token]')||{}).content||''}})
-    .then(function(r){return r.json()})
-    .then(function(d){
-      var list = document.getElementById('aiInsightsList');
-      var ts   = document.getElementById('aiInsightsTime');
-      if (ts) ts.textContent = 'Generated now · ' + new Date().toLocaleTimeString();
-      if (!d.insights || !d.insights.length) {
-        list.innerHTML = '<div class="ai-insight-item info"><span>🤖</span><span>No insights available right now.</span></div>';
-        return;
-      }
-      list.innerHTML = '';
-      d.insights.forEach(function(ins, i) {
-        var el = document.createElement('div');
-        el.className = 'ai-insight-item ' + (ins.type || 'info');
-        el.style.animationDelay = (i * 0.1) + 's';
-        el.innerHTML = '<span style="font-size:1.1rem;flex-shrink:0">' + (ins.icon||'•') + '</span><span>' + ins.text + '</span>';
-        list.appendChild(el);
-      });
-    })
-    .catch(function(){
-      document.getElementById('aiInsightsList').innerHTML =
-        '<div class="ai-insight-item warning"><span>⚠️</span><span>Could not load AI insights.</span></div>';
-    })
-    .finally(function(){
-      if (btn) { btn.disabled = false; btn.textContent = '↺ Refresh'; }
-    });
-
-  // Load predictive alerts
-  fetch('/ai/health-alerts')
-    .then(function(r){return r.json()})
-    .then(function(d){
-      var list  = document.getElementById('aiAlertsList');
-      var badge = document.getElementById('alertBadge');
-      if (!d.alerts || !d.alerts.length) {
-        list.innerHTML = '<div style="color:rgba(148,163,184,.6);font-size:.8rem;text-align:center;padding:8px">✅ All clear — no urgent actions</div>';
-        return;
-      }
-      if (badge) { badge.textContent = d.alerts.length; badge.style.display = ''; }
-      list.innerHTML = '';
-      d.alerts.slice(0, 6).forEach(function(a) {
-        var el = document.createElement('a');
-        el.className = 'ai-alert-item ' + (a.type || 'info');
-        el.href = a.link || '#';
-        el.innerHTML = '<span class="ai-alert-dot"></span>' +
-          '<span style="font-size:.9rem;flex-shrink:0">' + (a.icon||'•') + '</span>' +
-          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + a.text + '">' + a.text + '</span>';
-        list.appendChild(el);
-      });
-    })
-    .catch(function(){});
-
-  // Load Outbreak Radar
-  fetch('/ai/outbreak-radar')
-    .then(function(r){return r.json()})
-    .then(function(d){
-      var card = document.getElementById('outbreakCard');
-      var body = document.getElementById('outbreakBody');
-      if (!card || !body) return;
-      if (!d.outbreaks || !d.outbreaks.length) {
-        body.innerHTML = '<div style="color:rgba(148,163,184,.5);font-size:.78rem;text-align:center;padding:8px">🟢 No clusters detected in the last 7 days</div>';
-        return;
-      }
-      card.style.borderColor = d.alert_count > 0 ? 'rgba(239,68,68,.5)' : 'rgba(245,158,11,.4)';
-      body.innerHTML = '';
-      d.outbreaks.forEach(function(ob) {
-        var el = document.createElement('div');
-        el.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.78rem;color:#cbd5e1';
-        var dot = ob.level === 'alert' ? '#ef4444' : '#f59e0b';
-        el.innerHTML =
-          '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0;box-shadow:0 0 6px ' + dot + '"></span>' +
-          '<span style="flex:1"><strong>' + ob.diagnosis + '</strong></span>' +
-          '<span style="color:' + dot + ';font-weight:700">' + ob.pet_count + ' pets</span>';
-        body.appendChild(el);
-      });
-      if (d.ai_comment) {
-        var cmt = document.createElement('div');
-        cmt.style.cssText = 'margin-top:8px;padding:8px;background:rgba(239,68,68,.08);border-radius:6px;font-size:.75rem;color:#fca5a5;line-height:1.5';
-        cmt.textContent = '🤖 ' + d.ai_comment;
-        body.appendChild(cmt);
-      }
-    })
-    .catch(function(){});
-}
-
-// Auto-load on page ready, refresh every 10 minutes
-document.addEventListener('DOMContentLoaded', function() { loadInsights(false); });
-setTimeout(function(){ loadInsights(true); }, 600000);
-</script>
-
 <!-- ── Outbreak Radar ───────────────────────────────────────── -->
-<div id="outbreakCard" style="
-  background:linear-gradient(135deg,#0f172a,#1c0a0a);
-  border:1px solid rgba(245,158,11,.25);border-radius:14px;
-  padding:18px 22px;margin-bottom:22px;
-  box-shadow:0 0 30px rgba(239,68,68,.06)">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-    <span style="background:linear-gradient(135deg,#ef4444,#f97316);border-radius:8px;
-                 padding:5px 9px;font-size:1rem">🦠</span>
-    <div style="color:#f1f5f9;font-weight:700;font-size:.92rem">Outbreak Radar</div>
-    <span style="color:rgba(148,163,184,.5);font-size:.72rem;margin-left:4px">Last 7 days · auto-scan</span>
+<div id="outbreakCard" class="al-card" style="border-left:3px solid var(--al-gold);margin-bottom:24px">
+  <div class="al-card-header" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="background:linear-gradient(135deg,#ef4444,#f97316);border-radius:8px;padding:6px 9px;font-size:.95rem">🦠</div>
+      <div>
+        <div style="font-weight:700;font-size:.9rem;color:var(--al-text)">{{ t('Outbreak Radar', 'رادار التفشيات') }}</div>
+        <div style="color:var(--al-text-muted);font-size:.72rem">{{ t('Last 7 days · auto-scan', 'آخر 7 أيام · مسح تلقائي') }}</div>
+      </div>
+    </div>
     <a href="/ai/outbreak-radar" target="_blank"
-       style="margin-left:auto;font-size:.72rem;color:rgba(148,163,184,.5);text-decoration:none">Full report →</a>
+       class="al-btn al-btn-ghost al-btn-sm" style="margin-left:auto;font-size:.72rem">
+      {{ t('Full report', 'تقرير كامل') }} →
+    </a>
   </div>
   <div id="outbreakBody">
-    <div class="ai-skeleton" style="height:22px;border-radius:5px;margin-bottom:6px"></div>
-    <div class="ai-skeleton" style="height:22px;border-radius:5px"></div>
+    <div class="al-skeleton" style="height:22px;border-radius:5px;margin-bottom:6px"></div>
+    <div class="al-skeleton" style="height:22px;border-radius:5px"></div>
   </div>
 </div>
 
 <!-- ── Module Sections ─────────────────────────────────────── -->
 {% for cat_meta, cat_modules in grouped %}
-<div class="pf-modules-section">
+<div class="al-module-section" style="margin-bottom:28px">
 
-  <div class="pf-section-header">
-    <span class="pf-section-icon">{{ cat_meta.icon }}</span>
-    <span class="pf-section-title">{{ t(cat_meta.label, cat_meta.label_ar) }}</span>
-    <span class="pf-section-count">{{ cat_modules|length }} {{ t('module(s)', 'وحدة') }}</span>
+  <div class="al-section-header" style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--al-border)">
+    <span style="font-size:1.3rem">{{ cat_meta.icon }}</span>
+    <span style="font-weight:700;font-size:1rem;color:var(--al-text)">{{ t(cat_meta.label, cat_meta.label_ar) }}</span>
+    <span class="al-badge al-badge-teal" style="margin-left:4px">{{ cat_modules|length }}</span>
+    <div style="flex:1"></div>
   </div>
 
-  <div class="pf-modules-grid">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">
     {% for mod in cat_modules %}
 
-    {# ── Determine card state ── #}
     {% set is_active = mod.status == 'active' %}
     {% set is_beta   = mod.status == 'beta' %}
     {% set is_soon   = mod.status in ('coming_soon', 'planned') %}
 
-    {# ── Build the URL ── #}
     {% if is_active or is_beta %}
       {% if mod.legacy %}
         {% set mod_url = legacy_url + mod.legacy_path %}
@@ -308,59 +161,50 @@ setTimeout(function(){ loadInsights(true); }, 600000);
       {% set mod_target = '_self' %}
     {% endif %}
 
-    <div class="pf-module-card {% if is_soon %}disabled{% endif %}"
-         style="--module-accent:{{ mod.color }}"
-         {% if not is_soon %}data-href="{{ mod_url }}" data-target="{{ mod_target }}"{% endif %}>
+    <div class="al-module-card {% if is_soon %}al-module-card--disabled{% endif %}"
+         style="--mod-accent:{{ mod.color }}"
+         {% if not is_soon %}data-href="{{ mod_url }}" data-target="{{ mod_target }}" onclick="if(this.dataset.href!='#'){window.open(this.dataset.href,this.dataset.target)}"{% endif %}>
 
-      <!-- Card Header -->
-      <div class="pf-module-card-header">
-        <div class="pf-module-icon-wrap">{{ mod.icon }}</div>
-        <div class="pf-module-card-meta">
-          <div class="pf-module-card-name">{{ t(mod.name, mod.name_ar) }}</div>
-          <div class="pf-module-card-name-ar">{{ mod.name_ar }}</div>
+      <div class="al-module-card-top">
+        <div class="al-module-icon">{{ mod.icon }}</div>
+        <div style="flex:1;min-width:0">
+          <div class="al-module-name">{{ t(mod.name, mod.name_ar) }}</div>
+          {% if (current_lang or 'en') == 'ar' %}
+          <div class="al-module-name-sub">{{ mod.name }}</div>
+          {% else %}
+          <div class="al-module-name-sub" dir="rtl">{{ mod.name_ar }}</div>
+          {% endif %}
         </div>
+        <!-- Status dot -->
+        {% if is_active %}
+          <span class="al-live-dot" title="{{ t('Live','نشط') }}"></span>
+        {% elif is_beta %}
+          <span style="color:var(--al-gold);font-size:.7rem;font-weight:700">β</span>
+        {% else %}
+          <span style="color:var(--al-text-muted);font-size:.8rem">⏳</span>
+        {% endif %}
       </div>
 
-      <!-- Card Body -->
-      <div class="pf-module-card-body">
-        <div class="pf-module-card-desc">{{ mod.description }}</div>
+      <div class="al-module-desc">{{ mod.description }}</div>
 
-        <div class="pf-module-card-footer">
-
-          <!-- Status badge -->
-          {% if is_active %}
-            <span class="pf-badge active">
-              <span class="pf-live-dot"></span>
-              {{ t('Live', 'نشط') }}
-            </span>
-          {% elif is_beta %}
-            <span class="pf-badge beta">🔧 {{ t('Beta', 'تجريبي') }}</span>
-          {% elif mod.status == 'coming_soon' %}
-            <span class="pf-badge soon">🗓 {{ t('Soon', 'قريباً') }}</span>
-          {% else %}
-            <span class="pf-badge planned">🔮 {{ t('Planned', 'مخطط') }}</span>
-          {% endif %}
-
-          <!-- Open button -->
-          {% if is_active %}
-            <a href="{{ mod_url }}" target="{{ mod_target }}"
-               class="pf-module-open-btn"
-               style="--module-accent:{{ mod.color }}"
-               onclick="event.stopPropagation()">
-              {{ t('Open', 'فتح') }} →
-            </a>
-          {% elif is_beta %}
-            <a href="{{ mod_url }}" target="{{ mod_target }}"
-               class="pf-module-open-btn"
-               style="--module-accent:{{ mod.color }}"
-               onclick="event.stopPropagation()">
-              {{ t('Preview', 'معاينة') }} →
-            </a>
-          {% else %}
-            <span class="pf-module-open-btn disabled">{{ t('Coming Soon', 'قريباً') }}</span>
-          {% endif %}
-
-        </div>
+      <div class="al-module-footer">
+        {% if is_active %}
+          <span class="al-badge al-badge-green">{{ t('Live', 'نشط') }}</span>
+          <a href="{{ mod_url }}" target="{{ mod_target }}" class="al-module-open" onclick="event.stopPropagation()">
+            {{ t('Open', 'فتح') }} →
+          </a>
+        {% elif is_beta %}
+          <span class="al-badge al-badge-gold">{{ t('Beta', 'تجريبي') }}</span>
+          <a href="{{ mod_url }}" target="{{ mod_target }}" class="al-module-open" onclick="event.stopPropagation()">
+            {{ t('Preview', 'معاينة') }} →
+          </a>
+        {% elif mod.status == 'coming_soon' %}
+          <span class="al-badge">{{ t('Soon', 'قريباً') }}</span>
+          <span class="al-module-open" style="opacity:.4;cursor:default">{{ t('Coming Soon', 'قريباً') }}</span>
+        {% else %}
+          <span class="al-badge">{{ t('Planned', 'مخطط') }}</span>
+          <span class="al-module-open" style="opacity:.4;cursor:default">{{ t('Planned', 'مخطط') }}</span>
+        {% endif %}
       </div>
 
     </div>
@@ -370,38 +214,234 @@ setTimeout(function(){ loadInsights(true); }, 600000);
 </div>
 {% endfor %}
 
-<!-- ── Platform Roadmap Footer ──────────────────────────────── -->
-<div class="pf-card" style="margin-top:16px;margin-bottom:8px">
-  <div class="pf-card-header">
+<!-- ── Platform Roadmap ──────────────────────────────── -->
+<div class="al-card" style="margin-top:8px;margin-bottom:8px">
+  <div class="al-card-header" style="margin-bottom:16px">
     <div>
-      <div class="pf-card-title">🗺 {{ t('Development Roadmap', 'خارطة طريق التطوير') }}</div>
-      <div class="pf-card-sub">{{ t('Phased delivery plan for the full ERP platform', 'خطة تسليم مرحلية لمنصة ERP الكاملة') }}</div>
+      <div class="al-card-title">🗺 {{ t('Development Roadmap', 'خارطة طريق التطوير') }}</div>
+      <div class="al-card-sub">{{ t('Phased delivery plan for the full ERP platform', 'خطة تسليم مرحلية لمنصة ERP الكاملة') }}</div>
     </div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
 
     {% set phases = [
-      ('Phase 1', 'المرحلة ١', 'Platform shell · Module launcher · Auth · Role navigation', 'واجهة المنصة · لوحة الوحدات · المصادقة · التنقل', 'active', '✅ Live'),
-      ('Phase 2', 'المرحلة ٢', 'Admin & HR · Role management · Staff profiles', 'الإدارة والموارد البشرية · إدارة الأدوار · ملفات الموظفين', 'active', '✅ Live'),
-      ('Phase 3', 'المرحلة ٣', 'Appointments · Reception workspace · Doctor workspace', 'المواعيد · مساحة الاستقبال · مساحة الطبيب', 'active', '✅ Live'),
-      ('Phase 4', 'المرحلة ٤', 'Inventory · Warehouse · Pharmacy · Procurement', 'المخزون · المستودع · الصيدلية · المشتريات', 'active', '✅ Live'),
-      ('Phase 5', 'المرحلة ٥', 'Finance · Invoicing · Payments · P&L · Cash flow', 'المالية · الفواتير · المدفوعات · الأرباح والخسائر', 'active', '✅ Live'),
-      ('Phase 6', 'المرحلة ٦', 'Lab · Vaccination · Surgery · Grooming · Boarding', 'المختبر · التطعيمات · الجراحة · التجميل · الإيواء', 'active', '✅ Live'),
-      ('Phase 7', 'المرحلة ٧', 'AI Assistant · Role-based AI · Smart forecasting', 'المساعد الذكي · ذكاء اصطناعي حسب الدور · التنبؤ الذكي', 'active', '✅ Live'),
-      ('Phase 8', 'المرحلة ٨', 'Security hardening · Production config · Backup', 'تعزيز الأمان · إعداد الإنتاج · النسخ الاحتياطي', 'soon', '🔧 ' ~ t('In Progress', 'قيد التنفيذ')),
+      ('Phase 1', 'المرحلة ١', 'Platform shell · Module launcher · Auth', 'واجهة المنصة · لوحة الوحدات · المصادقة', 'active'),
+      ('Phase 2', 'المرحلة ٢', 'Admin & HR · Role management · Staff', 'الإدارة والموارد البشرية · إدارة الأدوار', 'active'),
+      ('Phase 3', 'المرحلة ٣', 'Appointments · Reception · Doctor workspace', 'المواعيد · الاستقبال · مساحة الطبيب', 'active'),
+      ('Phase 4', 'المرحلة ٤', 'Inventory · Pharmacy · Procurement', 'المخزون · الصيدلية · المشتريات', 'active'),
+      ('Phase 5', 'المرحلة ٥', 'Finance · Invoicing · Payments · P&L', 'المالية · الفواتير · المدفوعات', 'active'),
+      ('Phase 6', 'المرحلة ٦', 'Lab · Vaccination · Grooming · Boarding', 'المختبر · التطعيمات · التجميل · الإيواء', 'active'),
+      ('Phase 7', 'المرحلة ٧', 'AI Assistant · Smart forecasting · Petsy', 'الذكاء الاصطناعي · التنبؤ الذكي', 'active'),
+      ('Phase 8', 'المرحلة ٨', 'Security · Production · Backup & Restore', 'الأمان · الإنتاج · النسخ الاحتياطي', 'beta'),
     ] %}
 
-    {% for phase_en, phase_ar, desc_en, desc_ar, phase_status, phase_badge in phases %}
-    <div style="padding:12px;background:var(--cl-surface-2);border:1px solid var(--cl-border);border-radius:var(--cl-radius-sm)">
+    {% for phase_en, phase_ar, desc_en, desc_ar, phase_status in phases %}
+    <div style="padding:12px;background:var(--al-surface-2);border:1px solid var(--al-border);border-radius:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:13px;font-weight:700;color:var(--cl-text)">{{ t(phase_en, phase_ar) }}</span>
-        <span class="pf-badge {{ phase_status }}" style="font-size:10px">{{ phase_badge }}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--al-text)">{{ t(phase_en, phase_ar) }}</span>
+        {% if phase_status == 'active' %}
+          <span class="al-badge al-badge-green" style="font-size:10px">✅ {{ t('Live','نشط') }}</span>
+        {% else %}
+          <span class="al-badge al-badge-gold" style="font-size:10px">🔧 {{ t('In Progress','قيد التنفيذ') }}</span>
+        {% endif %}
       </div>
-      <div style="font-size:11.5px;color:var(--cl-text-muted);line-height:1.5">{{ t(desc_en, desc_ar) }}</div>
+      <div style="font-size:11.5px;color:var(--al-text-muted);line-height:1.5">{{ t(desc_en, desc_ar) }}</div>
     </div>
     {% endfor %}
 
   </div>
 </div>
+
+<!-- ── Inline styles for module cards & AI panels ─────── -->
+<style>
+/* Module cards */
+.al-module-card {
+  background: var(--al-surface);
+  border: 1px solid var(--al-border);
+  border-radius: 14px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all .2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.al-module-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--mod-accent, var(--al-primary));
+  opacity: 0;
+  transition: opacity .2s;
+}
+.al-module-card:hover { border-color: var(--mod-accent, var(--al-primary)); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+.al-module-card:hover::before { opacity: 1; }
+.al-module-card--disabled { opacity: .55; cursor: default; pointer-events: none; }
+.al-module-card-top { display: flex; align-items: center; gap: 10px; }
+.al-module-icon { font-size: 1.5rem; flex-shrink: 0; }
+.al-module-name { font-weight: 700; font-size: .9rem; color: var(--al-text); line-height: 1.3; }
+.al-module-name-sub { font-size: .72rem; color: var(--al-text-muted); }
+.al-module-desc { font-size: .78rem; color: var(--al-text-muted); line-height: 1.5; flex: 1; }
+.al-module-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.al-module-open {
+  font-size: .78rem; font-weight: 600;
+  color: var(--mod-accent, var(--al-primary));
+  text-decoration: none;
+  transition: opacity .15s;
+}
+.al-module-open:hover { opacity: .7; }
+
+/* AI insight items */
+.al-insight-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 12px; border-radius: 8px; border: 1px solid;
+  font-size: .82rem; line-height: 1.4;
+  animation: alFadeIn .4s ease forwards; opacity: 0;
+}
+@keyframes alFadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.al-insight-item.critical { background:rgba(239,68,68,.08); border-color:rgba(239,68,68,.25); color:#dc2626; }
+.al-insight-item.warning  { background:rgba(201,168,76,.08); border-color:rgba(201,168,76,.3);  color:#9a6f10; }
+.al-insight-item.success  { background:rgba(27,107,92,.08);  border-color:rgba(27,107,92,.25);  color:#1B6B5C; }
+.al-insight-item.info     { background:rgba(3,105,161,.06);  border-color:rgba(3,105,161,.2);   color:#0369a1; }
+.al-alert-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border-radius: 6px;
+  font-size: .78rem; color: var(--al-text-muted);
+  cursor: pointer; transition: background .15s; text-decoration: none;
+}
+.al-alert-item:hover { background: var(--al-surface-2); }
+.al-alert-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.al-alert-item.critical .al-alert-dot { background:#ef4444; box-shadow:0 0 6px #ef4444; }
+.al-alert-item.warning  .al-alert-dot { background:#C9A84C; box-shadow:0 0 6px #C9A84C; }
+.al-alert-item.info     .al-alert-dot { background:#0369a1; box-shadow:0 0 4px #0369a1; }
+
+/* Badges */
+.al-badge { display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:600; background:var(--al-surface-2);color:var(--al-text-muted);border:1px solid var(--al-border); }
+.al-badge-green { background:rgba(27,107,92,.1); color:#1B6B5C; border-color:rgba(27,107,92,.25); }
+.al-badge-teal  { background:rgba(42,157,143,.1); color:#2A9D8F; border-color:rgba(42,157,143,.25); }
+.al-badge-gold  { background:rgba(201,168,76,.1); color:#9a6f10; border-color:rgba(201,168,76,.3); }
+
+/* Live dot */
+.al-live-dot {
+  display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:var(--al-primary);flex-shrink:0;
+  box-shadow:0 0 0 0 rgba(27,107,92,.5);
+  animation:livePulse 2s infinite;
+}
+@keyframes livePulse {
+  0%   { box-shadow:0 0 0 0 rgba(27,107,92,.5); }
+  70%  { box-shadow:0 0 0 5px rgba(27,107,92,0); }
+  100% { box-shadow:0 0 0 0 rgba(27,107,92,0); }
+}
+
+/* Btn gold */
+.al-btn-gold { background:var(--al-gold); color:var(--al-navy); border-color:var(--al-gold); }
+.al-btn-gold:hover { background:#b8941e; border-color:#b8941e; }
+
+@media(max-width:900px){[id=aiCommandRow]{grid-template-columns:1fr}}
+</style>
+
+<script>
+var _insightsLoaded = false;
+
+function loadInsights(force) {
+  if (_insightsLoaded && !force) return;
+  _insightsLoaded = true;
+  var btn = document.getElementById('refreshBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+  var csrf = (document.querySelector('meta[name=csrf-token]')||{}).content||'';
+
+  // Load insights
+  fetch('/ai/insights', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      var list = document.getElementById('aiInsightsList');
+      var ts   = document.getElementById('aiInsightsTime');
+      if (ts) ts.textContent = '{{ t("Generated", "تم التوليد") }} — ' + new Date().toLocaleTimeString();
+      if (!d.insights || !d.insights.length) {
+        list.innerHTML = '<div class="al-insight-item info"><span>🤖</span><span>{{ t("No insights available right now.","لا توجد رؤى متاحة الآن.") }}</span></div>';
+        return;
+      }
+      list.innerHTML = '';
+      d.insights.forEach(function(ins, i) {
+        var el = document.createElement('div');
+        el.className = 'al-insight-item ' + (ins.type || 'info');
+        el.style.animationDelay = (i * 0.1) + 's';
+        el.innerHTML = '<span style="font-size:1.1rem;flex-shrink:0">' + (ins.icon||'•') + '</span><span>' + ins.text + '</span>';
+        list.appendChild(el);
+      });
+    })
+    .catch(function(){
+      document.getElementById('aiInsightsList').innerHTML =
+        '<div class="al-insight-item warning"><span>⚠️</span><span>{{ t("Could not load AI insights.","تعذّر تحميل الرؤى.") }}</span></div>';
+    })
+    .finally(function(){
+      if (btn) { btn.disabled = false; btn.textContent = '↺ {{ t("Refresh","تحديث") }}'; }
+    });
+
+  // Load predictive alerts
+  fetch('/ai/health-alerts')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      var list  = document.getElementById('aiAlertsList');
+      var badge = document.getElementById('alertBadge');
+      if (!d.alerts || !d.alerts.length) {
+        list.innerHTML = '<div style="color:var(--al-text-muted);font-size:.8rem;text-align:center;padding:8px">✅ {{ t("All clear — no urgent actions","كل شيء على ما يرام") }}</div>';
+        return;
+      }
+      if (badge) { badge.textContent = d.alerts.length; badge.style.display = ''; }
+      list.innerHTML = '';
+      d.alerts.slice(0, 6).forEach(function(a) {
+        var el = document.createElement('a');
+        el.className = 'al-alert-item ' + (a.type || 'info');
+        el.href = a.link || '#';
+        el.innerHTML = '<span class="al-alert-dot"></span>' +
+          '<span style="font-size:.9rem;flex-shrink:0">' + (a.icon||'•') + '</span>' +
+          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + a.text + '">' + a.text + '</span>';
+        list.appendChild(el);
+      });
+    })
+    .catch(function(){});
+
+  // Load Outbreak Radar
+  fetch('/ai/outbreak-radar')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      var card = document.getElementById('outbreakCard');
+      var body = document.getElementById('outbreakBody');
+      if (!card || !body) return;
+      if (!d.outbreaks || !d.outbreaks.length) {
+        body.innerHTML = '<div style="color:var(--al-text-muted);font-size:.78rem;text-align:center;padding:8px">🟢 {{ t("No clusters detected in the last 7 days","لا توجد تجمعات خلال آخر 7 أيام") }}</div>';
+        return;
+      }
+      card.style.borderColor = d.alert_count > 0 ? '#ef4444' : 'var(--al-gold)';
+      body.innerHTML = '';
+      d.outbreaks.forEach(function(ob) {
+        var el = document.createElement('div');
+        el.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--al-border);font-size:.78rem;color:var(--al-text-muted)';
+        var dot = ob.level === 'alert' ? '#ef4444' : '#C9A84C';
+        el.innerHTML =
+          '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0;box-shadow:0 0 6px ' + dot + '"></span>' +
+          '<span style="flex:1"><strong>' + ob.diagnosis + '</strong></span>' +
+          '<span style="color:' + dot + ';font-weight:700">' + ob.pet_count + ' {{ t("pets","حيوان") }}</span>';
+        body.appendChild(el);
+      });
+      if (d.ai_comment) {
+        var cmt = document.createElement('div');
+        cmt.style.cssText = 'margin-top:8px;padding:8px;background:rgba(201,168,76,.08);border-radius:6px;font-size:.75rem;color:var(--al-text-muted);line-height:1.5;border:1px solid rgba(201,168,76,.2)';
+        cmt.textContent = '🤖 ' + d.ai_comment;
+        body.appendChild(cmt);
+      }
+    })
+    .catch(function(){});
+}
+
+document.addEventListener('DOMContentLoaded', function() { loadInsights(false); });
+setTimeout(function(){ loadInsights(true); }, 600000);
+</script>
 
 {% endblock %}

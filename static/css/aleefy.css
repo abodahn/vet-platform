@@ -679,6 +679,9 @@ a:hover { color: var(--al-primary-mid); }
 .al-stat-delta.down { background: var(--al-danger-bg);  color: var(--al-danger); }
 .al-stat-delta.flat { background: var(--al-cream-dark); color: var(--al-text-mid); }
 
+.al-stat-body { flex: 1; min-width: 0; }
+.al-stat-sub  { font-size: 0.72rem; color: var(--al-text-light); margin-top: 2px; }
+
 /* ═══════════════════════════════════════════════════════════
    7. BUTTONS
 ═══════════════════════════════════════════════════════════ */
