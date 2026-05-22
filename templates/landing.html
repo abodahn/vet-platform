@@ -50,36 +50,32 @@ a,button,input,select,textarea,label,[role="button"]{
 }
 
 /* ── Custom cursor ────────────────────────── */
-#cursor-dot {
-  position:fixed;width:10px;height:10px;
-  background:var(--g);border-radius:50%;
-  pointer-events:none !important;z-index:999999;
-  left:-50px;top:-50px;
-  transform:translate(-50%,-50%);
-  transition:width .12s,height .12s,background .12s;
-  will-change:left,top;
+#cursor-dot{
+  position:fixed;top:0;left:0;
+  width:10px;height:10px;
+  background:#C9A84C;border-radius:50%;
+  pointer-events:none;z-index:999999;
+  transition:width .12s,height .12s,background .12s,box-shadow .12s;
 }
-#cursor-ring {
-  position:fixed;width:38px;height:38px;
-  border:2px solid rgba(201,168,76,.6);
-  border-radius:50%;pointer-events:none !important;z-index:999998;
-  left:-50px;top:-50px;
-  transform:translate(-50%,-50%);
-  transition:width .22s,height .22s,border-color .22s;
-  will-change:left,top;
+#cursor-ring{
+  position:fixed;top:0;left:0;
+  width:40px;height:40px;
+  border:2px solid rgba(201,168,76,.55);
+  border-radius:50%;
+  pointer-events:none;z-index:999998;
+  transition:width .2s,height .2s,border-color .2s;
 }
-#cursor-glow {
-  position:fixed;width:220px;height:220px;
-  border-radius:50%;pointer-events:none !important;z-index:999996;
-  background:radial-gradient(circle,rgba(27,107,92,.14) 0%,transparent 70%);
-  left:-110px;top:-110px;
-  transform:translate(-50%,-50%);
-  will-change:left,top;
+#cursor-glow{
+  position:fixed;top:0;left:0;
+  width:200px;height:200px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(27,107,92,.13) 0%,transparent 70%);
+  pointer-events:none;z-index:999996;
 }
-body.hovering #cursor-dot{width:16px;height:16px;background:var(--pm);box-shadow:0 0 12px rgba(42,157,143,.6);}
-body.hovering #cursor-ring{width:56px;height:56px;border-color:rgba(42,157,143,.8);border-width:2px;}
-body.clicking #cursor-dot{width:5px;height:5px;background:var(--g);}
-body.clicking #cursor-ring{width:24px;height:24px;border-color:rgba(201,168,76,.9);}
+body.hovering #cursor-dot{width:16px;height:16px;background:#2A9D8F;box-shadow:0 0 14px rgba(42,157,143,.7);}
+body.hovering #cursor-ring{width:54px;height:54px;border-color:rgba(42,157,143,.8);}
+body.clicking  #cursor-dot{width:6px;height:6px;}
+body.clicking  #cursor-ring{width:26px;height:26px;}
 
 /* ── Noise grain overlay ──────────────────── */
 body::before{
@@ -853,44 +849,38 @@ reObserve();
   var dot  = document.getElementById('cursor-dot');
   var ring = document.getElementById('cursor-ring');
   var glow = document.getElementById('cursor-glow');
-  if(!dot||!ring||!glow) return;
+  if(!dot) return;
 
-  var mx=window.innerWidth/2, my=window.innerHeight/2;
-  var rx=mx, ry=my;
-  var active=false;
+  var mx=0, my=0, rx=0, ry=0;
+  var DW=5, DH=5; /* half of dot size */
+  var RW=20, RH=20; /* half of ring size */
+  var GW=100, GH=100; /* half of glow size */
 
-  /* Snap cursor to center until first mouse move */
-  function setDot(x,y){
-    dot.style.left  = x+'px';
-    dot.style.top   = y+'px';
-    glow.style.left = x+'px';
-    glow.style.top  = y+'px';
-  }
-  setDot(mx,my);
+  document.addEventListener('mousemove', function(e){
+    mx = e.clientX;
+    my = e.clientY;
+    dot.style.transform  = 'translate('+(mx-DW)+'px,'+(my-DH)+'px)';
+    glow.style.transform = 'translate('+(mx-GW)+'px,'+(my-GH)+'px)';
+  }, { passive: true });
 
-  document.addEventListener('mousemove',function(e){
-    mx=e.clientX; my=e.clientY;
-    if(!active){ active=true; dot.style.opacity='1'; ring.style.opacity='1'; glow.style.opacity='1'; }
-    setDot(mx,my);
-  },{ passive:true });
-
-  /* Ring lags with lerp */
-  (function animRing(){
-    rx += (mx-rx) * 0.13;
-    ry += (my-ry) * 0.13;
-    ring.style.left = rx+'px';
-    ring.style.top  = ry+'px';
-    requestAnimationFrame(animRing);
+  /* Ring follows with smooth lerp */
+  (function loop(){
+    rx += (mx - rx) * 0.14;
+    ry += (my - ry) * 0.14;
+    ring.style.transform = 'translate('+(rx-RW)+'px,'+(ry-RH)+'px)';
+    requestAnimationFrame(loop);
   })();
 
-  /* Hover state */
-  document.addEventListener('mouseover',function(e){
-    var t=e.target.closest('a,button,.mod-card,.feat-card,.cat-tab,.nav-cta,.qlink-card,.btn-hero');
-    if(t){ document.body.classList.add('hovering'); }
-    else  { document.body.classList.remove('hovering'); }
+  /* Hover: grow cursor on interactive elements */
+  document.addEventListener('mouseover', function(e){
+    if(e.target.closest('a,button,.mod-card,.feat-card,.cat-tab,.qlink-card,.btn-hero,.nav-cta')){
+      document.body.classList.add('hovering');
+    } else {
+      document.body.classList.remove('hovering');
+    }
   });
-  document.addEventListener('mousedown',function(){ document.body.classList.add('clicking'); });
-  document.addEventListener('mouseup',  function(){ document.body.classList.remove('clicking'); });
+  document.addEventListener('mousedown', function(){ document.body.classList.add('clicking'); });
+  document.addEventListener('mouseup',   function(){ document.body.classList.remove('clicking'); });
 })();
 
 // ════════════ FLOATING PARTICLES ════════════
