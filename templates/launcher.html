@@ -673,7 +673,7 @@ function v3AnimateCount(el) {
 function v3LoadAIInsights() {
   var el = document.getElementById('ai-insights-text');
   if (!el) return;
-  var csrf = (document.querySelector('meta[name=csrf-token]') || {}).content || '{{ csrf_token() if csrf_token is defined else "" }}';
+  var csrf = (document.querySelector('meta[name=csrf-token]') || {}).content || '';
   fetch('/ai/insights', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
