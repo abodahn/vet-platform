@@ -1,5 +1,5 @@
 """
-Premium Animal Hospital Platform — Entry Point
+Aleefy — Smart Veterinary Platform — Entry Point
 Run:  python run.py
 Env:  set PLATFORM_PORT=5100  (default)
       set PLATFORM_DEBUG=1    (dev mode)
@@ -148,8 +148,8 @@ def main():
 
     url = f"http://localhost:{port}"
     print(f"\n{'='*60}")
-    print(f"  Premium Animal Hospital — Platform v1.0")
-    print(f"  Dr. Hatem El Khateeb")
+    print(f"  Aleefy — Smart Veterinary Platform v2.0")
+    print(f"  Happy Pets, Healthy Lives")
     print(f"{'='*60}")
     print(f"  Platform URL : {url}")
     print(f"  Legacy App   : {Config.LEGACY_APP_URL}")

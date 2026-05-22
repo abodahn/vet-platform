@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="{{ current_lang or 'en' }}"
-      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}">
+      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}"
+      data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +10,15 @@
   <title>{% block title %}{{ page_title or 'Dashboard' }}{% endblock %} — Aleefy</title>
 
   <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/aleefy-logo.svg') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/aleefy-logo.png') }}">
+
+  <!-- Dark mode — apply before first paint (no flash) -->
+  <script>
+    (function(){
+      var t=localStorage.getItem('al-theme')||'light';
+      document.documentElement.setAttribute('data-theme',t);
+    })();
+  </script>
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -406,6 +415,12 @@
       <div class="al-topbar-right">
         {% block topbar_actions %}{% endblock %}
 
+        <!-- Dark / Light mode toggle -->
+        <button id="al-theme-toggle" class="al-theme-toggle" onclick="alToggleTheme()"
+                title="{{ t('Toggle dark/light mode','تبديل الوضع المظلم/الفاتح') }}">
+          <span id="al-theme-icon">🌙</span>
+        </button>
+
         <!-- AI Command Search -->
         {% if current_user %}
         <button class="al-cmd-trigger" onclick="openCmdPalette()" title="AI Command Search (Ctrl+K)">
@@ -415,7 +430,7 @@
         </button>
 
         <!-- Notifications -->
-        <a href="{{ url_for('notifications.index') }}" class="al-topbar-btn"
+        <a href="{{ url_for('notifications.index') }}" class="al-topbar-btn{% if unread_count and unread_count > 0 %} has-notif{% endif %}"
            title="{{ t('Notifications', 'الإشعارات') }}">
           🔔
           {% if unread_count and unread_count > 0 %}
@@ -527,24 +542,131 @@
   <iframe id="petsy-iframe" src="" title="Petsy AI Chat" allow="clipboard-write"></iframe>
 </div>
 <script>
+/* ── Petsy: draggable FAB + panel ────────────────────────── */
 (function(){
-  var open=false,loaded=false;
-  setTimeout(function(){var h=document.getElementById('petsy-hint');if(h)h.style.display='none';},5000);
+  var open=false, loaded=false;
+  var fab=null, panel=null;
+  var fabX=null, fabY=null; /* null = CSS default (bottom-right) */
+  var dragging=false, dx=0, dy=0;
+  var PANEL_W=360, PANEL_H=520;
+
+  setTimeout(function(){
+    var h=document.getElementById('petsy-hint');
+    if(h){h.style.opacity='0';h.style.transition='opacity .4s';
+      setTimeout(function(){h.style.display='none';},400);}
+  },5000);
+
   window.petsyToggle=function(){
-    var panel=document.getElementById('petsy-panel-global');
-    var fab=document.getElementById('petsy-fab-global');
+    if(!fab)fab=document.getElementById('petsy-fab-global');
+    if(!panel)panel=document.getElementById('petsy-panel-global');
     open=!open;
+    var h=document.getElementById('petsy-hint');if(h)h.style.display='none';
     if(open){
       if(!loaded){document.getElementById('petsy-iframe').src='{{ url_for("petsy.embed") }}';loaded=true;}
       panel.classList.add('open');
-      fab.style.transform='scale(0)';fab.style.opacity='0';
-      var h=document.getElementById('petsy-hint');if(h)h.style.display='none';
+      /* Position panel near FAB */
+      _positionPanel();
+      if(fab){fab.style.opacity='0.4';fab.style.transform='scale(0.85)';}
     } else {
       panel.classList.remove('open');
-      fab.style.transform='';fab.style.opacity='';
+      if(fab){fab.style.opacity='';fab.style.transform='';}
     }
   };
-  document.addEventListener('keydown',function(e){if(e.altKey&&(e.key==='p'||e.key==='P')){e.preventDefault();window.petsyToggle();}});
+
+  function _positionPanel(){
+    if(!panel||!fab)return;
+    var vw=window.innerWidth,vh=window.innerHeight;
+    if(fabX!==null){
+      /* Float near FAB */
+      var px=Math.min(fabX-PANEL_W/2, vw-PANEL_W-12);
+      var py=Math.min(fabY-PANEL_H-12, vh-PANEL_H-12);
+      px=Math.max(px,8); py=Math.max(py,8);
+      panel.style.cssText='display:flex;opacity:1;transform:scale(1) translateY(0);'+
+        'right:auto;bottom:auto;left:'+px+'px;top:'+py+'px;'+
+        'width:'+PANEL_W+'px;height:'+PANEL_H+'px;z-index:9000;';
+      panel.classList.add('floating');
+    } else {
+      panel.style.cssText='';
+    }
+  }
+
+  /* Drag logic */
+  document.addEventListener('DOMContentLoaded',function(){
+    fab=document.getElementById('petsy-fab-global');
+    panel=document.getElementById('petsy-panel-global');
+    if(!fab)return;
+
+    var startX,startY,origLeft,origBottom;
+
+    function onMove(cx,cy){
+      if(!dragging)return;
+      var nx=origLeft+(cx-startX);
+      var ny=origBottom-(cy-startY);
+      var vw=window.innerWidth,vh=window.innerHeight;
+      var fabSz=60;
+      nx=Math.max(8,Math.min(vw-fabSz-8,nx));
+      ny=Math.max(8,Math.min(vh-fabSz-8,ny));
+      fab.style.left=nx+'px'; fab.style.bottom=ny+'px';
+      fab.style.right='auto'; fab.style.top='auto';
+      fabX=nx+fabSz/2; fabY=vh-ny-fabSz/2;
+      if(open)_positionPanel();
+    }
+
+    function onDown(cx,cy){
+      dragging=true;
+      var r=fab.getBoundingClientRect();
+      startX=cx; startY=cy;
+      origLeft=r.left; origBottom=window.innerHeight-r.bottom;
+      fabX=r.left+r.width/2; fabY=r.top+r.height/2;
+      fab.classList.add('dragging');
+      fab.style.transition='none';
+    }
+    function onUp(){
+      if(!dragging)return;
+      dragging=false;
+      fab.classList.remove('dragging');
+      fab.style.transition='';
+    }
+
+    fab.addEventListener('mousedown',function(e){
+      if(e.button!==0)return;
+      onDown(e.clientX,e.clientY);
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove',function(e){onMove(e.clientX,e.clientY);});
+    document.addEventListener('mouseup',function(e){
+      if(!dragging)return;
+      onUp();
+      /* If barely moved, treat as click */
+      var dd=Math.hypot(e.clientX-startX,e.clientY-startY);
+      if(dd<6)window.petsyToggle();
+    });
+
+    /* Touch drag */
+    fab.addEventListener('touchstart',function(e){
+      var t=e.touches[0];
+      onDown(t.clientX,t.clientY);
+    },{passive:true});
+    fab.addEventListener('touchmove',function(e){
+      var t=e.touches[0];
+      onMove(t.clientX,t.clientY);
+      e.preventDefault();
+    },{passive:false});
+    fab.addEventListener('touchend',function(e){
+      if(!dragging)return;
+      var moved=Math.hypot(
+        e.changedTouches[0].clientX-startX,
+        e.changedTouches[0].clientY-startY
+      );
+      onUp();
+      if(moved<6)window.petsyToggle();
+    });
+  });
+
+  document.addEventListener('keydown',function(e){
+    if(e.altKey&&(e.key==='p'||e.key==='P')){e.preventDefault();window.petsyToggle();}
+    if(e.key==='Escape'&&open){e.preventDefault();window.petsyToggle();}
+  });
 })();
 </script>
 {% endif %}
@@ -556,6 +678,18 @@
 <!-- Aleefy JS -->
 <script>
 (function(){
+  /* ── Dark/Light mode ── */
+  var _theme = localStorage.getItem('al-theme') || 'light';
+  function _applyTheme(t){
+    document.documentElement.setAttribute('data-theme',t);
+    var icon=document.getElementById('al-theme-icon');
+    if(icon)icon.textContent=t==='dark'?'☀️':'🌙';
+    localStorage.setItem('al-theme',t);
+    _theme=t;
+  }
+  _applyTheme(_theme); /* apply before paint */
+  window.alToggleTheme=function(){_applyTheme(_theme==='dark'?'light':'dark');};
+
   /* ── Sidebar toggle ── */
   window.toggleSidebar = function(){
     var sb = document.getElementById('al-sidebar');
@@ -595,16 +729,7 @@
   });
 
   /* ── Auto-dismiss flash messages ── */
-  document.querySelectorAll('.al-flash[data-autodismiss]').forEach(function(el){
-    var ms=parseInt(el.getAttribute('data-autodismiss'))||5000;
-    setTimeout(function(){
-      el.style.transition='opacity 0.4s';
-      el.style.opacity='0';
-      setTimeout(function(){el.remove();},400);
-    },ms);
-  });
-  /* Also handle old pf-flash class */
-  document.querySelectorAll('.pf-flash[data-autodismiss]').forEach(function(el){
+  document.querySelectorAll('.al-flash[data-autodismiss],.pf-flash[data-autodismiss]').forEach(function(el){
     var ms=parseInt(el.getAttribute('data-autodismiss'))||5000;
     setTimeout(function(){
       el.style.transition='opacity 0.4s';el.style.opacity='0';

@@ -100,6 +100,95 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   1b. SURFACE TOKENS (used by cards, panels etc.)
+═══════════════════════════════════════════════════════════ */
+:root {
+  --al-surface:   #FFFFFF;
+  --al-surface-2: #F4F7F6;
+  --al-surface-3: #EAF0EE;
+  --al-text-muted: #7A9BAD;
+  --al-glass-bg:  rgba(255,255,255,0.72);
+  --al-glass-border: rgba(255,255,255,0.55);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   1c. DARK MODE — [data-theme="dark"]
+═══════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  /* Backgrounds */
+  --al-bg:             #080F1A;
+  --al-bg-white:       #0D1828;
+  --al-bg-card:        #0D1828;
+  --al-bg-hover:       #162238;
+  --al-surface:        #0D1828;
+  --al-surface-2:      #111E30;
+  --al-surface-3:      #162238;
+  --al-cream:          #080F1A;
+  --al-cream-dark:     #0D1828;
+
+  /* Text */
+  --al-text:           #DDE6EE;
+  --al-text-mid:       #8BA5BC;
+  --al-text-light:     #5A7A94;
+  --al-text-muted:     #5A7A94;
+  --al-navy:           #DDE6EE;
+
+  /* Borders */
+  --al-border:         rgba(42,157,143,0.18);
+  --al-border-mid:     rgba(42,157,143,0.28);
+
+  /* Status colors — slightly brightened for dark bg */
+  --al-success-bg:     rgba(30,140,90,0.14);
+  --al-warning-bg:     rgba(201,133,10,0.14);
+  --al-danger-bg:      rgba(192,57,43,0.14);
+  --al-info-bg:        rgba(26,111,168,0.14);
+  --al-primary-light:  rgba(27,107,92,0.18);
+  --al-gold-light:     rgba(201,168,76,0.14);
+
+  /* Sidebar */
+  --al-sidebar-bg:        #060E18;
+  --al-sidebar-bg-mid:    #080F1A;
+  --al-sidebar-text:      #7AACB8;
+  --al-sidebar-text-dim:  #3A6878;
+  --al-sidebar-active-bg: rgba(201,168,76,0.15);
+  --al-sidebar-hover-bg:  rgba(255,255,255,0.04);
+
+  /* Topbar */
+  --al-topbar-bg:      #0D1828;
+  --al-topbar-border:  rgba(42,157,143,0.15);
+
+  /* Shadows */
+  --al-shadow-sm:  0 1px 3px rgba(0,0,0,0.35);
+  --al-shadow-md:  0 4px 12px rgba(0,0,0,0.45);
+  --al-shadow-lg:  0 8px 28px rgba(0,0,0,0.55);
+  --al-shadow-xl:  0 20px 60px rgba(0,0,0,0.65);
+
+  /* Glass */
+  --al-glass-bg:  rgba(13,24,40,0.72);
+  --al-glass-border: rgba(42,157,143,0.22);
+}
+
+/* Dark mode — inverted form controls */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--al-surface-2) !important;
+  color: var(--al-text) !important;
+  border-color: var(--al-border) !important;
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder { color: var(--al-text-muted) !important; }
+
+/* Animated mesh background on content area */
+[data-theme="dark"] .al-content {
+  background:
+    radial-gradient(ellipse 600px 400px at 10% 20%, rgba(27,107,92,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 500px 300px at 90% 70%, rgba(201,168,76,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 400px 300px at 50% 50%, rgba(42,157,143,0.04) 0%, transparent 60%),
+    var(--al-bg);
+}
+
+/* ═══════════════════════════════════════════════════════════
    2. RESET & BASE
 ═══════════════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1485,6 +1574,243 @@ a:hover { color: var(--al-primary-mid); }
 .pf-stub-badge { display: inline-block; background: var(--al-gold-light); color: #7a5a0a; border-radius: 999px; padding: 4px 14px; font-size: 0.78rem; font-weight: 600; margin-bottom: 12px; border: 1px solid rgba(201,168,76,0.3); }
 .pf-stub-title { font-size: 1.5rem; font-weight: 700; color: var(--al-text); margin-bottom: 8px; }
 .pf-stub-sub   { font-size: 0.9rem; color: var(--al-text-muted); max-width: 420px; line-height: 1.6; }
+
+/* ═══════════════════════════════════════════════════════════
+   V3 VISUAL UPGRADES — Glass cards, gradients, dark mode polish
+═══════════════════════════════════════════════════════════ */
+
+/* ── Sidebar logo — proper sizing ────────────────── */
+.al-brand-logo {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.al-brand-logo img {
+  width: 44px !important;
+  height: 44px !important;
+  object-fit: cover !important;
+  border-radius: 10px;
+}
+
+/* ── Dark mode toggle button ─────────────────────── */
+.al-theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: var(--al-r-md);
+  border: 1px solid var(--al-border);
+  background: var(--al-surface-2);
+  color: var(--al-text-mid);
+  cursor: pointer;
+  font-size: 1.05rem;
+  transition: all var(--al-transition);
+  flex-shrink: 0;
+}
+.al-theme-toggle:hover {
+  border-color: var(--al-primary);
+  color: var(--al-primary);
+  background: var(--al-primary-light);
+}
+[data-theme="dark"] .al-theme-toggle {
+  border-color: rgba(42,157,143,0.3);
+  background: rgba(42,157,143,0.08);
+  color: #7DD5C8;
+}
+[data-theme="dark"] .al-theme-toggle:hover {
+  background: rgba(42,157,143,0.18);
+  border-color: rgba(42,157,143,0.5);
+}
+
+/* ── Gradient primary button ──────────────────────── */
+.al-btn-primary {
+  background: linear-gradient(135deg, var(--al-primary) 0%, var(--al-primary-mid) 100%) !important;
+  border-color: var(--al-primary) !important;
+  box-shadow: 0 2px 8px rgba(27,107,92,0.35) !important;
+}
+.al-btn-primary:hover {
+  background: linear-gradient(135deg, var(--al-primary-dark) 0%, var(--al-primary) 100%) !important;
+  box-shadow: 0 4px 14px rgba(27,107,92,0.45) !important;
+  transform: translateY(-1px);
+}
+
+/* ── Glowing stat cards (V3) ──────────────────────── */
+.al-stat-card {
+  background: var(--al-bg-card) !important;
+  border: 1px solid var(--al-border) !important;
+  position: relative;
+  overflow: hidden;
+  transition: all .25s ease !important;
+}
+.al-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--al-primary), var(--al-primary-mid));
+}
+.al-stat-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 8px 28px rgba(27,107,92,0.15) !important;
+  border-color: var(--al-border-mid) !important;
+}
+[data-theme="dark"] .al-stat-card:hover {
+  box-shadow: 0 8px 28px rgba(27,107,92,0.25) !important;
+}
+
+/* ── Glass cards in dark mode ──────────────────────── */
+[data-theme="dark"] .al-card {
+  background: rgba(13,24,40,0.85) !important;
+  border-color: rgba(42,157,143,0.2) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+[data-theme="dark"] .al-stat-card {
+  background: rgba(13,24,40,0.85) !important;
+  border-color: rgba(42,157,143,0.2) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Sidebar V3 — depth gradient ──────────────────── */
+.al-sidebar {
+  background: linear-gradient(180deg,
+    #081C17 0%,
+    #0D2B24 30%,
+    #0A2320 70%,
+    #061810 100%) !important;
+  border-right: 1px solid rgba(42,157,143,0.15);
+}
+.al-sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 200px;
+  background: radial-gradient(ellipse 200px 200px at 50% 0%, rgba(27,107,92,0.2) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── Topbar V3 ─────────────────────────────────────── */
+.al-topbar {
+  border-bottom: 1px solid var(--al-topbar-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+[data-theme="dark"] .al-topbar {
+  background: rgba(13,24,40,0.92) !important;
+  border-bottom-color: rgba(42,157,143,0.15) !important;
+}
+
+/* ── Table V3 ──────────────────────────────────────── */
+.al-table thead th {
+  background: var(--al-surface-2) !important;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.al-table tbody tr {
+  transition: background var(--al-transition), transform var(--al-transition);
+}
+.al-table tbody tr:hover {
+  background: var(--al-primary-light) !important;
+}
+[data-theme="dark"] .al-table tbody tr:hover {
+  background: rgba(27,107,92,0.12) !important;
+}
+
+/* ── Content area — subtle grain ──────────────────── */
+.al-content {
+  background-image:
+    radial-gradient(ellipse 800px 500px at 100% 0%, rgba(27,107,92,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse 600px 400px at 0% 100%, rgba(201,168,76,0.03) 0%, transparent 50%);
+}
+
+/* ── Page header V3 ────────────────────────────────── */
+.al-page-header {
+  position: relative;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--al-border);
+}
+.al-page-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0;
+  width: 48px; height: 2px;
+  background: linear-gradient(90deg, var(--al-primary), var(--al-primary-mid));
+  border-radius: 999px;
+}
+
+/* ── Draggable Petsy ───────────────────────────────── */
+#petsy-fab-global {
+  cursor: grab !important;
+  user-select: none;
+  touch-action: none;
+}
+#petsy-fab-global.dragging {
+  cursor: grabbing !important;
+  transform: scale(1.1) !important;
+  box-shadow: 0 12px 40px rgba(27,107,92,0.6) !important;
+}
+#petsy-panel-global.floating {
+  transition: none !important;
+}
+
+/* ── Nav active item — golden bar ──────────────────── */
+.al-nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 60%;
+  background: var(--al-gold);
+  border-radius: 0 3px 3px 0;
+}
+.al-nav-link { position: relative; }
+
+/* ── Badge glow in dark mode ───────────────────────── */
+[data-theme="dark"] .al-live-dot {
+  box-shadow: 0 0 8px var(--al-primary), 0 0 16px rgba(27,107,92,0.4) !important;
+}
+
+/* ── Input focus ring ──────────────────────────────── */
+.al-input:focus, .al-select:focus, input:focus, select:focus, textarea:focus {
+  border-color: var(--al-primary) !important;
+  box-shadow: 0 0 0 3px rgba(27,107,92,0.14) !important;
+  outline: none !important;
+}
+[data-theme="dark"] .al-input:focus,
+[data-theme="dark"] .al-select:focus,
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  box-shadow: 0 0 0 3px rgba(42,157,143,0.2) !important;
+}
+
+/* ── Notification bell bounce ──────────────────────── */
+@keyframes bellBounce {
+  0%,100% { transform: rotate(0deg); }
+  15%     { transform: rotate(-15deg); }
+  30%     { transform: rotate(15deg); }
+  45%     { transform: rotate(-10deg); }
+  60%     { transform: rotate(10deg); }
+  75%     { transform: rotate(-5deg); }
+}
+.al-topbar-btn.has-notif { animation: bellBounce 2s ease 1s 1; }
+
+/* ── Smooth page transitions ─────────────────────── */
+.al-content { animation: contentFadeIn .3s ease; }
+@keyframes contentFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 /* ═══════════════════════════════════════════════════════════
    22. AI COMMAND PALETTE — Aleefy brand

@@ -155,10 +155,10 @@
 
   <!-- Quick nav tips -->
   <div class="al-error-tips">
-    <a href="{{ url_for('appointments.index') }}" class="al-error-tip">📅 {{ t('Appointments', 'المواعيد') }}</a>
+    <a href="/appointments/schedule" class="al-error-tip">📅 {{ t('Appointments', 'المواعيد') }}</a>
     <a href="{{ url_for('crm.owners_list') }}" class="al-error-tip">👥 {{ t('Owners', 'الملاك') }}</a>
     <a href="{{ url_for('finance.invoices_list') }}" class="al-error-tip">💰 {{ t('Finance', 'المالية') }}</a>
-    <a href="{{ url_for('inventory.index') }}" class="al-error-tip">📦 {{ t('Inventory', 'المخزون') }}</a>
+    <a href="/inventory" class="al-error-tip">📦 {{ t('Inventory', 'المخزون') }}</a>
   </div>
 
   <div class="al-error-actions">

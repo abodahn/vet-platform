@@ -618,7 +618,15 @@ def _call_petsy(messages: list, system: str) -> tuple[str, str]:
         resp   = client.chat.completions.create(
             model=_MODEL, messages=full, max_tokens=800
         )
-        text  = resp.choices[0].message.content or ""
+        choice = resp.choices[0]
+        # Handle content-filter / safety blocks gracefully
+        finish = getattr(choice, "finish_reason", None)
+        text   = (choice.message.content or "").strip()
+        if not text or finish == "content_filter":
+            text = (
+                "🐾 I wasn't able to answer that — my safety filters flagged the content. "
+                "Try rephrasing your question or ask about something else!"
+            )
         model = ""
         try:
             model = resp._raw_response.headers.get("x-routed-via", "") or resp.model or _MODEL
@@ -626,7 +634,10 @@ def _call_petsy(messages: list, system: str) -> tuple[str, str]:
             model = resp.model or _MODEL
         return text, model
     except Exception as e:
-        return f"Petsy is temporarily unavailable: {e}", "none"
+        err = str(e)
+        if "context" in err.lower() or "blocked" in err.lower() or "safety" in err.lower():
+            return "🐾 My safety filters blocked that response. Please try rephrasing!", "none"
+        return f"🐾 Petsy is temporarily unavailable. Please try again shortly.", "none"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
