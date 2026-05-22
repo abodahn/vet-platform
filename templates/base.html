@@ -11,10 +11,12 @@
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}{{ app_title or page_title or 'Dashboard' }}{% endblock %} — Aleefy</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/aleefy-logo.png') }}">
-  <!-- Fonts: Inter + Cairo -->
+  <!-- Fonts: DM Sans + Cairo -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <!-- CSS: platform.css → aleefy.css → v3.css (order matters) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/platform.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/aleefy.css') }}">
@@ -54,29 +56,29 @@
       {# ── GROUP: CLINIC ── #}
       <div class="v3-nav-group" data-group="clinic">
         <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
-          <span class="v3-nav-group-icon">🏥</span>
+          <span class="v3-nav-group-icon"><i class="bi bi-hospital"></i></span>
           <span class="v3-nav-group-label">{{ t('CLINIC', 'العيادة') }}</span>
           <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="v3-nav-items">
           <a href="{{ url_for('launcher.index') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🏠</span>
+            <span class="v3-nav-icon"><i class="bi bi-grid-1x2"></i></span>
             <span>{{ t('Dashboard', 'لوحة التحكم') }}</span>
           </a>
           <a href="{{ url_for('appointments.schedule') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">📅</span>
+            <span class="v3-nav-icon"><i class="bi bi-calendar-check"></i></span>
             <span>{{ t('Appointments', 'المواعيد') }}</span>
           </a>
           <a href="{{ url_for('crm.owners_list') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🐾</span>
+            <span class="v3-nav-icon"><i class="bi bi-people"></i></span>
             <span>{{ t('Pets & Owners', 'الملاك والحيوانات') }}</span>
           </a>
           <a href="{{ url_for('visits.visits_list') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🩺</span>
+            <span class="v3-nav-icon"><i class="bi bi-clipboard2-pulse"></i></span>
             <span>{{ t('Medical Visits', 'الفحوصات') }}</span>
           </a>
           <a href="{{ url_for('pharmacy.index') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">💊</span>
+            <span class="v3-nav-icon"><i class="bi bi-capsule"></i></span>
             <span>{{ t('Pharmacy', 'الصيدلية') }}</span>
           </a>
         </div>
@@ -85,33 +87,33 @@
       {# ── GROUP: CLINICAL ── #}
       <div class="v3-nav-group" data-group="clinical">
         <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
-          <span class="v3-nav-group-icon">🔬</span>
+          <span class="v3-nav-group-icon"><i class="bi bi-activity"></i></span>
           <span class="v3-nav-group-label">{{ t('CLINICAL', 'السريري') }}</span>
           <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="v3-nav-items">
           <a href="{{ url_for('clinical.lab_list') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🧪</span>
+            <span class="v3-nav-icon"><i class="bi bi-droplet-half"></i></span>
             <span>{{ t('Lab & Vaccines', 'المختبر والتطعيمات') }}</span>
           </a>
           <a href="{{ url_for('inpatient.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🏨</span>
+            <span class="v3-nav-icon"><i class="bi bi-heart-pulse"></i></span>
             <span>{{ t('Inpatient', 'تنويم') }}</span>
           </a>
           <a href="{{ url_for('grooming.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">✂️</span>
+            <span class="v3-nav-icon"><i class="bi bi-scissors"></i></span>
             <span>{{ t('Grooming', 'التجميل') }}</span>
           </a>
           <a href="{{ url_for('boarding.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🐕</span>
+            <span class="v3-nav-icon"><i class="bi bi-house-heart"></i></span>
             <span>{{ t('Boarding', 'الإيواء') }}</span>
           </a>
           <a href="{{ url_for('telemedicine.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🎥</span>
+            <span class="v3-nav-icon"><i class="bi bi-camera-video"></i></span>
             <span>{{ t('Telemedicine', 'الاستشارة عن بُعد') }}</span>
           </a>
           <a href="{{ url_for('doctor.workspace') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">👨‍⚕️</span>
+            <span class="v3-nav-icon"><i class="bi bi-person-badge"></i></span>
             <span>{{ t('Doctor Workspace', 'مساحة الطبيب') }}</span>
           </a>
         </div>
@@ -120,41 +122,41 @@
       {# ── GROUP: BUSINESS ── #}
       <div class="v3-nav-group" data-group="business">
         <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
-          <span class="v3-nav-group-icon">💼</span>
+          <span class="v3-nav-group-icon"><i class="bi bi-briefcase"></i></span>
           <span class="v3-nav-group-label">{{ t('BUSINESS', 'الأعمال') }}</span>
           <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="v3-nav-items">
           <a href="{{ url_for('finance.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">💰</span>
+            <span class="v3-nav-icon"><i class="bi bi-receipt"></i></span>
             <span>{{ t('Finance', 'الفواتير والمالية') }}</span>
           </a>
           <a href="{{ url_for('accounting.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">📒</span>
+            <span class="v3-nav-icon"><i class="bi bi-journal-text"></i></span>
             <span>{{ t('Accounting', 'المحاسبة') }}</span>
           </a>
           <a href="{{ url_for('inventory.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">📦</span>
+            <span class="v3-nav-icon"><i class="bi bi-box-seam"></i></span>
             <span>{{ t('Inventory', 'المخزون') }}</span>
           </a>
           <a href="{{ url_for('petshop.index') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🏪</span>
+            <span class="v3-nav-icon"><i class="bi bi-shop"></i></span>
             <span>{{ t('Pet Shop', 'متجر الحيوانات') }}</span>
           </a>
           <a href="{{ url_for('petshop.pos') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🧾</span>
+            <span class="v3-nav-icon"><i class="bi bi-cash-register"></i></span>
             <span>{{ t('Point of Sale', 'نقطة البيع') }}</span>
           </a>
           <a href="{{ url_for('procurement.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🔄</span>
+            <span class="v3-nav-icon"><i class="bi bi-cart3"></i></span>
             <span>{{ t('Procurement', 'المشتريات') }}</span>
           </a>
           <a href="{{ url_for('catalog.index') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🏷️</span>
+            <span class="v3-nav-icon"><i class="bi bi-tags"></i></span>
             <span>{{ t('Price Catalog', 'كتالوج الأسعار') }}</span>
           </a>
           <a href="{{ url_for('reports.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">📊</span>
+            <span class="v3-nav-icon"><i class="bi bi-bar-chart-line"></i></span>
             <span>{{ t('Reports', 'التقارير') }}</span>
           </a>
         </div>
@@ -164,21 +166,21 @@
       {% if current_user and current_user.get('role') in ('super_admin','clinic_owner','branch_manager','support_admin','hr') %}
       <div class="v3-nav-group" data-group="team">
         <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
-          <span class="v3-nav-group-icon">👥</span>
+          <span class="v3-nav-group-icon"><i class="bi bi-people-fill"></i></span>
           <span class="v3-nav-group-label">{{ t('TEAM', 'الفريق') }}</span>
           <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="v3-nav-items">
           <a href="{{ url_for('hr.staff_list') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">👨‍⚕️</span>
+            <span class="v3-nav-icon"><i class="bi bi-person-workspace"></i></span>
             <span>{{ t('HR & Staff', 'الموارد البشرية') }}</span>
           </a>
           <a href="{{ url_for('attendance.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">⏰</span>
+            <span class="v3-nav-icon"><i class="bi bi-clock-history"></i></span>
             <span>{{ t('Attendance', 'الحضور والإجازات') }}</span>
           </a>
           <a href="{{ url_for('payroll.dashboard') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">💳</span>
+            <span class="v3-nav-icon"><i class="bi bi-cash-stack"></i></span>
             <span>{{ t('Payroll', 'الرواتب') }}</span>
           </a>
         </div>
@@ -188,22 +190,22 @@
       {# ── GROUP: PLATFORM ── #}
       <div class="v3-nav-group" data-group="platform">
         <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
-          <span class="v3-nav-group-icon">⚙️</span>
+          <span class="v3-nav-group-icon"><i class="bi bi-cpu"></i></span>
           <span class="v3-nav-group-label">{{ t('PLATFORM', 'المنصة') }}</span>
           <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="v3-nav-items">
           <a href="{{ url_for('ai_assistant.index') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🤖</span>
+            <span class="v3-nav-icon"><i class="bi bi-stars"></i></span>
             <span>{{ t('AI Assistant', 'المساعد الذكي') }}</span>
           </a>
           <a href="{{ url_for('whatsapp.control_center') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">💬</span>
+            <span class="v3-nav-icon"><i class="bi bi-whatsapp"></i></span>
             <span>{{ t('WhatsApp', 'واتساب') }}</span>
           </a>
           {% if current_user %}
           <a href="{{ url_for('notifications.index') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🔔</span>
+            <span class="v3-nav-icon"><i class="bi bi-bell"></i></span>
             <span>{{ t('Notifications', 'الإشعارات') }}</span>
             {% if unread_count and unread_count > 0 %}
             <span class="v3-nav-badge">{{ unread_count if unread_count < 100 else '99+' }}</span>
@@ -212,12 +214,12 @@
           {% endif %}
           {% if current_user and current_user.get('role') in ('super_admin','clinic_owner','branch_manager','support_admin') %}
           <a href="{{ url_for('whatsapp.reminder_settings') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">⚙️</span>
+            <span class="v3-nav-icon"><i class="bi bi-gear"></i></span>
             <span>{{ t('Reminder Settings', 'إعدادات التذكير') }}</span>
           </a>
           {% endif %}
           <a href="{{ url_for('appointments.waiting_room') }}" target="_blank" class="v3-nav-item">
-            <span class="v3-nav-icon">📺</span>
+            <span class="v3-nav-icon"><i class="bi bi-display"></i></span>
             <span>{{ t('Waiting Room TV', 'شاشة الانتظار') }}</span>
           </a>
         </div>
@@ -227,33 +229,33 @@
       {% if current_user and current_user.get('role') in ('super_admin','clinic_owner','support_admin') %}
       <div class="v3-nav-group" data-group="system">
         <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
-          <span class="v3-nav-group-icon">🖥️</span>
+          <span class="v3-nav-group-icon"><i class="bi bi-hdd-rack"></i></span>
           <span class="v3-nav-group-label">{{ t('SYSTEM', 'النظام') }}</span>
           <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="v3-nav-items">
           <a href="{{ url_for('system.settings') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">⚙️</span>
+            <span class="v3-nav-icon"><i class="bi bi-sliders"></i></span>
             <span>{{ t('Settings', 'الإعدادات') }}</span>
           </a>
           <a href="{{ url_for('system.monitor') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🖥️</span>
+            <span class="v3-nav-icon"><i class="bi bi-speedometer2"></i></span>
             <span>{{ t('System Monitor', 'مراقبة النظام') }}</span>
           </a>
           <a href="{{ url_for('system.roles_list') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🔐</span>
+            <span class="v3-nav-icon"><i class="bi bi-shield-lock"></i></span>
             <span>{{ t('Roles & Permissions', 'الأدوار والصلاحيات') }}</span>
           </a>
           <a href="{{ url_for('system.backup') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">💾</span>
+            <span class="v3-nav-icon"><i class="bi bi-cloud-arrow-up"></i></span>
             <span>{{ t('Backup Manager', 'مدير النسخ الاحتياطية') }}</span>
           </a>
           <a href="{{ url_for('system.audit_log') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">📋</span>
+            <span class="v3-nav-icon"><i class="bi bi-journal-bookmark"></i></span>
             <span>{{ t('Audit Log', 'سجل المراجعة') }}</span>
           </a>
           <a href="{{ url_for('migration.index') }}" class="v3-nav-item">
-            <span class="v3-nav-icon">🔄</span>
+            <span class="v3-nav-icon"><i class="bi bi-arrow-left-right"></i></span>
             <span>{{ t('Data Migration', 'ترحيل البيانات') }}</span>
           </a>
         </div>
@@ -280,8 +282,8 @@
           <button class="v3-lang-btn {% if (current_lang or 'en') == 'en' %}active{% endif %}" data-lang-btn="en">EN</button>
           <button class="v3-lang-btn {% if current_lang == 'ar' %}active{% endif %}" data-lang-btn="ar">عربي</button>
         </div>
-        <button class="v3-sidebar-theme-btn" id="v3-sidebar-theme-btn" onclick="v3ToggleTheme()" title="{{ t('Toggle theme','تبديل الوضع') }}">
-          <span id="v3-sidebar-theme-icon">🌙</span>
+        <button class="v3-sidebar-theme-btn" id="v3-sidebar-theme-btn" onclick="v3ToggleTheme()" title="{{ t('Toggle theme','تبديل الوضع') }}" aria-label="Toggle theme">
+          <i class="bi bi-moon-stars" id="v3-sidebar-theme-icon"></i>
         </button>
         {% if current_user %}
         <a href="{{ url_for('auth.logout') }}" class="v3-logout-btn" title="{{ t('Logout','خروج') }}">
@@ -349,8 +351,8 @@
         {% endif %}
 
         <!-- Theme toggle -->
-        <button class="v3-topbar-btn v3-theme-btn" id="v3-topbar-theme-btn" onclick="v3ToggleTheme()" title="{{ t('Toggle theme','تبديل الوضع') }}">
-          <span id="v3-topbar-theme-icon">🌙</span>
+        <button class="v3-topbar-btn v3-theme-btn" id="v3-topbar-theme-btn" onclick="v3ToggleTheme()" title="{{ t('Toggle theme','تبديل الوضع') }}" aria-label="Toggle theme">
+          <i class="bi bi-moon-stars" id="v3-topbar-theme-icon"></i>
         </button>
 
         <!-- User avatar + dropdown -->
@@ -386,7 +388,8 @@
 
       <!-- Offline banner -->
       <div id="v3-offline-banner" class="v3-offline-banner" style="display:none">
-        📡 {{ t('No internet connection — some features may be unavailable', 'لا يوجد اتصال بالإنترنت — بعض الميزات قد تكون غير متاحة') }}
+        <i class="bi bi-wifi-off"></i>
+        {{ t('No internet connection — some features may be unavailable', 'لا يوجد اتصال بالإنترنت — بعض الميزات قد تكون غير متاحة') }}
       </div>
 
       <!-- Flash messages -->
@@ -396,7 +399,7 @@
             {% for category, msg in msgs %}
               <div class="v3-flash v3-flash-{{ category }}" data-autodismiss="5000">
                 <span class="v3-flash-icon">
-                  {% if category == 'success' %}✅{% elif category == 'error' or category == 'danger' %}❌{% elif category == 'warning' %}⚠️{% else %}ℹ️{% endif %}
+                  {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>{% elif category == 'error' or category == 'danger' %}<i class="bi bi-x-circle-fill"></i>{% elif category == 'warning' %}<i class="bi bi-exclamation-triangle-fill"></i>{% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
                 </span>
                 <span class="v3-flash-msg">{{ msg }}</span>
                 <button class="v3-flash-close" onclick="this.closest('.v3-flash').remove()" type="button">&times;</button>
@@ -627,7 +630,7 @@
 <div id="v3-cmd-palette" class="v3-cmd-backdrop" style="display:none" onclick="v3CloseCmdPalette()">
   <div class="v3-cmd-modal" onclick="event.stopPropagation()">
     <div class="v3-cmd-header">
-      <span class="v3-cmd-sparkle">✨</span>
+      <i class="bi bi-stars v3-cmd-sparkle"></i>
       <input id="v3-cmd-input" type="text" class="v3-cmd-input" autocomplete="off"
              placeholder="{{ t('Ask AI anything about your clinic…', 'اسأل المساعد الذكي عن عيادتك…') }}"
              onkeydown="v3CmdKey(event)">
@@ -668,8 +671,12 @@
   var _theme=localStorage.getItem('al-theme')||'light';
   function _applyTheme(t){
     document.documentElement.setAttribute('data-theme',t);
-    var icons=['v3-sidebar-theme-icon','v3-topbar-theme-icon'];
-    icons.forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t==='dark'?'☀️':'🌙';});
+    var ids=['v3-sidebar-theme-icon','v3-topbar-theme-icon'];
+    ids.forEach(function(id){
+      var el=document.getElementById(id);
+      if(!el)return;
+      el.className=t==='dark'?'bi bi-sun':'bi bi-moon-stars';
+    });
     localStorage.setItem('al-theme',t);_theme=t;
   }
   _applyTheme(_theme);
