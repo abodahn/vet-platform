@@ -493,7 +493,7 @@
   border:7px solid transparent;border-top-color:#0D2B24;border-bottom:none}
 @keyframes petsy-pop{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 #petsy-panel-global{
-  position:fixed;bottom:98px;right:24px;z-index:1055;
+  position:fixed;bottom:98px;right:24px;z-index:10000;
   width:380px;height:580px;border-radius:22px;overflow:hidden;
   box-shadow:0 12px 44px rgba(0,0,0,.22);
   display:none;flex-direction:column;
@@ -501,9 +501,9 @@
   opacity:0;transform:scale(.88) translateY(20px)
 }
 #petsy-panel-global.open{display:flex;opacity:1;transform:scale(1) translateY(0)}
-#petsy-panel-global iframe{width:100%;height:100%;border:none}
+#petsy-panel-global iframe{width:100%;height:100%;border:none;pointer-events:auto}
 #petsy-panel-close{
-  position:absolute;top:14px;right:14px;z-index:1060;
+  position:absolute;top:14px;right:14px;z-index:10001;
   width:28px;height:28px;border-radius:50%;border:none;
   background:rgba(255,255,255,.2);color:white;font-size:14px;
   cursor:pointer;display:flex;align-items:center;justify-content:center
@@ -537,7 +537,7 @@
   </svg>
 </button>
 <div id="petsy-hint">🐾 {{ t("Hi! I'm Petsy — ask me anything!", "مرحباً! أنا بيتسي — اسألني أي شيء!") }}</div>
-<div id="petsy-backdrop" onclick="petsyToggle()" style="display:none;position:fixed;inset:0;z-index:8999;background:rgba(0,0,0,0);"></div>
+<div id="petsy-backdrop" onclick="petsyToggle()" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.01);cursor:default;"></div>
 <div id="petsy-panel-global">
   <button id="petsy-panel-close" onclick="petsyToggle()" title="Close">&times;</button>
   <iframe id="petsy-iframe" src="" title="Petsy AI Chat" allow="clipboard-write"></iframe>
@@ -586,7 +586,7 @@
       px=Math.max(px,8); py=Math.max(py,8);
       panel.style.cssText='display:flex;opacity:1;transform:scale(1) translateY(0);'+
         'right:auto;bottom:auto;left:'+px+'px;top:'+py+'px;'+
-        'width:'+PANEL_W+'px;height:'+PANEL_H+'px;z-index:9000;';
+        'width:'+PANEL_W+'px;height:'+PANEL_H+'px;z-index:10000;';
       panel.classList.add('floating');
     } else {
       panel.style.cssText='';
