@@ -1,212 +1,495 @@
 <!doctype html>
-<html lang="en" dir="ltr" data-theme="{{ current_theme or 'medical' }}">
+<html lang="{{ current_lang or 'en' }}" dir="ltr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login — {{ app_title }}</title>
-
+  <title>Aleefy — Smart Veterinary Platform</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/aleefy-logo.svg') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/platform.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/aleefy.css') }}">
+<style>
+/* ── Login Page ── */
+*{box-sizing:border-box;margin:0;padding:0}
 
-  <style>
-    /* Extra login polish */
-    .pf-login-hero-float-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      padding: 5px 13px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.1);
-      border: 1px solid rgba(255,255,255,.15);
-      color: rgba(255,255,255,.85);
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-    .pf-login-divider {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin: 18px 0;
-      color: var(--cl-text-light);
-      font-size: 11.5px;
-    }
-    .pf-login-divider::before,
-    .pf-login-divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--cl-border);
-    }
-    .pf-input-wrap {
-      position: relative;
-    }
-    .pf-input-icon {
-      position: absolute;
-      left: 11px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 15px;
-      pointer-events: none;
-    }
-    .pf-input-wrap .pf-input {
-      padding-left: 36px;
-    }
-    .pf-input-wrap .pf-input-toggle {
-      position: absolute;
-      right: 11px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 14px;
-      color: var(--cl-text-light);
-      padding: 0;
-    }
-    /* Floating module badges on hero */
-    .pf-hero-feature {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      background: rgba(255,255,255,.07);
-      border: 1px solid rgba(255,255,255,.1);
-      border-radius: var(--cl-radius-md);
-      text-align: left;
-      transition: background .18s;
-    }
-    .pf-hero-feature:hover {
-      background: rgba(255,255,255,.12);
-    }
-    .pf-hero-feature-icon { font-size: 20px; flex-shrink: 0; }
-    .pf-hero-feature-text { }
-    .pf-hero-feature-name { font-size: 13px; font-weight: 700; color: #fff; }
-    .pf-hero-feature-sub  { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 1px; }
-    .pf-hero-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-top: 24px;
-      width: 100%;
-      max-width: 460px;
-    }
-    [data-theme="logo"] .pf-login-hero {
-      background: linear-gradient(135deg, #0f2548 0%, #1a3a6b 45%, #1e4d9a 100%);
-    }
-    [data-theme="logo"] .pf-login-hero::after {
-      content: '';
-      position: absolute;
-      bottom: -60px; right: -40px;
-      width: 260px; height: 260px;
-      background: radial-gradient(circle, rgba(245,197,24,.12) 0%, transparent 70%);
-      border-radius: 50%;
-    }
-    [data-theme="logo"] .pf-login-panel {
-      background: linear-gradient(180deg, #f0f6ff 0%, #eef3ff 100%);
-    }
-  </style>
+body {
+  min-height:100vh;
+  background: #F7F3EC;
+  display:flex;
+  font-family:'Plus Jakarta Sans','Cairo',system-ui,sans-serif;
+}
+
+/* Hero side */
+.login-hero {
+  flex:1;
+  min-height:100vh;
+  background: linear-gradient(145deg, #0D2B24 0%, #1B6B5C 45%, #2A9D8F 100%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:48px 40px;
+  position:relative;
+  overflow:hidden;
+}
+
+/* Decorative circles */
+.login-hero::before {
+  content:'';
+  position:absolute;
+  top:-80px; left:-80px;
+  width:360px; height:360px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%);
+}
+.login-hero::after {
+  content:'';
+  position:absolute;
+  bottom:-100px; right:-60px;
+  width:400px; height:400px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(42,157,143,0.15) 0%, transparent 70%);
+}
+
+/* Paw watermark */
+.hero-paw {
+  position:absolute;
+  bottom:30px; left:30px;
+  font-size:8rem;
+  opacity:0.04;
+  transform:rotate(-20deg);
+  pointer-events:none;
+  user-select:none;
+}
+
+.hero-content { position:relative; z-index:1; width:100%; max-width:480px; }
+
+/* Logo mark */
+.hero-logo-wrap {
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin-bottom:32px;
+}
+
+.hero-logo-icon {
+  width:60px; height:60px;
+  border-radius:16px;
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.2);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.hero-logo-icon svg { width:40px; height:40px; }
+
+.hero-logo-text-wrap {}
+
+.hero-logo-name {
+  font-size:2rem;
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-0.03em;
+  line-height:1;
+}
+
+.hero-logo-name .gold { color:#C9A84C; }
+
+.hero-logo-ar {
+  font-size:1rem;
+  color:rgba(255,255,255,0.5);
+  font-family:'Cairo',sans-serif;
+  margin-top:2px;
+}
+
+/* Hero heading */
+.hero-heading {
+  font-size:1.85rem;
+  font-weight:800;
+  color:#fff;
+  line-height:1.2;
+  letter-spacing:-0.02em;
+  margin-bottom:12px;
+}
+
+.hero-heading .accent { color:#C9A84C; }
+
+.hero-sub {
+  font-size:0.9rem;
+  color:rgba(255,255,255,0.65);
+  line-height:1.6;
+  margin-bottom:36px;
+  max-width:380px;
+}
+
+/* Feature cards grid */
+.hero-features {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:32px;
+}
+
+.hero-feature {
+  padding:12px 14px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  transition:background 0.2s;
+}
+
+.hero-feature:hover { background:rgba(255,255,255,0.1); }
+
+.hero-feature-icon { font-size:1.3rem; flex-shrink:0; }
+
+.hero-feature-name {
+  font-size:0.82rem;
+  font-weight:700;
+  color:#fff;
+}
+
+.hero-feature-sub {
+  font-size:0.7rem;
+  color:rgba(255,255,255,0.5);
+  margin-top:1px;
+}
+
+/* Module pills */
+.hero-pills {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+
+.hero-pill {
+  padding:4px 11px;
+  border-radius:999px;
+  background:rgba(201,168,76,0.15);
+  border:1px solid rgba(201,168,76,0.3);
+  color:rgba(255,255,255,0.8);
+  font-size:0.72rem;
+  font-weight:600;
+}
+
+/* ── Login form panel ── */
+.login-panel {
+  width:460px;
+  min-height:100vh;
+  background:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:48px 40px;
+  box-shadow:-8px 0 40px rgba(13,27,42,0.08);
+}
+
+.login-form-wrap {
+  width:100%;
+  max-width:360px;
+}
+
+/* Form header */
+.login-welcome {
+  margin-bottom:28px;
+}
+
+.login-welcome-badge {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 12px;
+  border-radius:999px;
+  background:#E6F4F1;
+  color:#1B6B5C;
+  font-size:0.72rem;
+  font-weight:700;
+  margin-bottom:12px;
+  letter-spacing:0.02em;
+}
+
+.login-welcome-title {
+  font-size:1.6rem;
+  font-weight:800;
+  color:#0D1B2A;
+  letter-spacing:-0.02em;
+  line-height:1.2;
+  margin-bottom:6px;
+}
+
+.login-welcome-sub {
+  font-size:0.85rem;
+  color:#7A9BAD;
+  line-height:1.5;
+}
+
+/* Error */
+.login-error {
+  padding:11px 14px;
+  background:#FDECEA;
+  border:1px solid rgba(192,57,43,0.2);
+  border-radius:10px;
+  color:#C0392B;
+  font-size:0.84rem;
+  font-weight:500;
+  margin-bottom:20px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+/* Form fields */
+.login-field {
+  margin-bottom:18px;
+}
+
+.login-label {
+  display:block;
+  font-size:0.82rem;
+  font-weight:600;
+  color:#1A2E3B;
+  margin-bottom:6px;
+}
+
+.login-input-wrap {
+  position:relative;
+}
+
+.login-input-icon {
+  position:absolute;
+  left:12px; top:50%;
+  transform:translateY(-50%);
+  font-size:1rem;
+  pointer-events:none;
+  opacity:0.5;
+}
+
+.login-input {
+  width:100%;
+  padding:11px 14px 11px 40px;
+  border:1.5px solid #DDE8E5;
+  border-radius:10px;
+  background:#fff;
+  color:#1A2E3B;
+  font-size:0.9rem;
+  font-family:inherit;
+  outline:none;
+  transition:all 0.2s;
+}
+
+.login-input:focus {
+  border-color:#1B6B5C;
+  box-shadow:0 0 0 3px rgba(27,107,92,0.12);
+}
+
+.login-input::placeholder { color:#A0B8C0; }
+
+.pw-toggle {
+  position:absolute;
+  right:12px; top:50%;
+  transform:translateY(-50%);
+  background:none;
+  border:none;
+  cursor:pointer;
+  font-size:1rem;
+  color:#7A9BAD;
+  padding:0;
+  opacity:0.7;
+  transition:opacity 0.2s;
+}
+.pw-toggle:hover { opacity:1; }
+
+/* Submit button */
+.login-submit {
+  width:100%;
+  padding:13px;
+  border-radius:12px;
+  border:none;
+  background:linear-gradient(135deg, #1B6B5C, #2A9D8F);
+  color:#fff;
+  font-size:0.95rem;
+  font-weight:700;
+  font-family:inherit;
+  cursor:pointer;
+  transition:all 0.2s;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  box-shadow:0 4px 16px rgba(27,107,92,0.3);
+  margin-top:8px;
+}
+
+.login-submit:hover {
+  background:linear-gradient(135deg, #124840, #1B6B5C);
+  box-shadow:0 6px 24px rgba(27,107,92,0.4);
+  transform:translateY(-1px);
+}
+
+.login-submit:active { transform:translateY(0); }
+
+/* Footer */
+.login-footer {
+  margin-top:28px;
+  text-align:center;
+  font-size:0.73rem;
+  color:#A0B8C0;
+  line-height:1.6;
+}
+
+.login-footer strong { color:#1B6B5C; }
+
+/* Divider */
+.login-divider {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin:20px 0;
+  color:#A0B8C0;
+  font-size:0.75rem;
+}
+.login-divider::before, .login-divider::after {
+  content:''; flex:1; height:1px; background:#EAE6DF;
+}
+
+/* Responsive */
+@media (max-width:900px) {
+  .login-hero { display:none; }
+  .login-panel { width:100%; box-shadow:none; padding:40px 24px; }
+}
+
+@media (max-width:480px) {
+  .login-panel { padding:32px 20px; }
+  .login-welcome-title { font-size:1.4rem; }
+}
+</style>
 </head>
 <body>
 
-<div class="pf-login-root">
+<div style="display:flex;width:100%;min-height:100vh">
 
-  <!-- ══ HERO PANEL ════════════════════════════════════════════ -->
-  <div class="pf-login-hero">
-    <div class="pf-login-hero-content">
+  <!-- ══ HERO PANEL ═══════════════════════════════════════════ -->
+  <div class="login-hero">
+    <div class="hero-paw">🐾</div>
+
+    <div class="hero-content">
 
       <!-- Logo -->
-      <div class="pf-login-hero-logo">
-        <span class="pf-login-hero-logo-emoji">🐾</span>
+      <div class="hero-logo-wrap">
+        <div class="hero-logo-icon">
+          <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M60 8 L95 92 H76 L60 48 L44 92 H25 Z" fill="white" opacity="0.9"/>
+            <path d="M60 28 L82 85 H70 L60 52 L50 85 H38 Z" fill="#2A9D8F" opacity="0.4"/>
+            <circle cx="60" cy="44" r="9" fill="white" opacity="0.95"/>
+            <circle cx="57" cy="43" r="1.8" fill="#1B6B5C"/>
+            <circle cx="63" cy="43" r="1.8" fill="#1B6B5C"/>
+            <ellipse cx="52" cy="39" rx="4" ry="6" fill="white" opacity="0.85" transform="rotate(-15 52 39)"/>
+            <ellipse cx="68" cy="39" rx="4" ry="6" fill="white" opacity="0.85" transform="rotate(15 68 39)"/>
+            <path d="M60 68 C58 66 53 62 53 58 C53 55.5 55 54 57.5 54 C59 54 60 55.5 60 55.5 C60 55.5 61 54 62.5 54 C65 54 67 55.5 67 58 C67 62 62 66 60 68Z" fill="#C9A84C"/>
+          </svg>
+        </div>
+        <div class="hero-logo-text-wrap">
+          <div class="hero-logo-name">Alee<span class="gold">fy</span></div>
+          <div class="hero-logo-ar">اليفي — رعاية أذكى</div>
+        </div>
       </div>
 
-      <!-- Title -->
-      <div style="margin-bottom: 4px">
-        <span class="pf-login-hero-float-pill">
-          <span>✨</span>
-          <span>Veterinary ERP Platform v1.0</span>
-        </span>
+      <!-- Heading -->
+      <div class="hero-heading">
+        Smart Veterinary<br>
+        <span class="accent">Clinic Management</span>
       </div>
-      <div class="pf-login-hero-title">{{ app_title }}</div>
-      <div class="pf-login-hero-title-ar">{{ app_title_ar }}</div>
-      <div class="pf-login-hero-sub">
-        <span class="pf-login-hero-accent">{{ app_subtitle }}</span><br>
-        Full-stack veterinary management platform —<br>
-        EMR · ERP · CRM · Inventory · Finance · AI
+      <div class="hero-sub">
+        The complete platform for modern animal hospitals &amp; veterinary clinics.
+        AI-powered · Bilingual · Cloud-ready.
       </div>
 
       <!-- Feature grid -->
-      <div class="pf-hero-grid">
-        <div class="pf-hero-feature">
-          <span class="pf-hero-feature-icon">🩺</span>
-          <div class="pf-hero-feature-text">
-            <div class="pf-hero-feature-name">Examinations</div>
-            <div class="pf-hero-feature-sub">Medical records & diagnosis</div>
+      <div class="hero-features">
+        <div class="hero-feature">
+          <span class="hero-feature-icon">🩺</span>
+          <div>
+            <div class="hero-feature-name">Examinations</div>
+            <div class="hero-feature-sub">Medical records & EMR</div>
           </div>
         </div>
-        <div class="pf-hero-feature">
-          <span class="pf-hero-feature-icon">🐾</span>
-          <div class="pf-hero-feature-text">
-            <div class="pf-hero-feature-name">CRM</div>
-            <div class="pf-hero-feature-sub">Owners, pets & timelines</div>
+        <div class="hero-feature">
+          <span class="hero-feature-icon">🐾</span>
+          <div>
+            <div class="hero-feature-name">Patients & CRM</div>
+            <div class="hero-feature-sub">Owners, pets & timelines</div>
           </div>
         </div>
-        <div class="pf-hero-feature">
-          <span class="pf-hero-feature-icon">📦</span>
-          <div class="pf-hero-feature-text">
-            <div class="pf-hero-feature-name">Inventory</div>
-            <div class="pf-hero-feature-sub">Batch · Expiry · Reorder</div>
+        <div class="hero-feature">
+          <span class="hero-feature-icon">📦</span>
+          <div>
+            <div class="hero-feature-name">Inventory</div>
+            <div class="hero-feature-sub">Batch · Expiry · Reorder</div>
           </div>
         </div>
-        <div class="pf-hero-feature">
-          <span class="pf-hero-feature-icon">💰</span>
-          <div class="pf-hero-feature-text">
-            <div class="pf-hero-feature-name">Finance</div>
-            <div class="pf-hero-feature-sub">Invoices · Payments · P&L</div>
+        <div class="hero-feature">
+          <span class="hero-feature-icon">🤖</span>
+          <div>
+            <div class="hero-feature-name">AI Assistant</div>
+            <div class="hero-feature-sub">Role-based AI copilot</div>
           </div>
         </div>
-        <div class="pf-hero-feature">
-          <span class="pf-hero-feature-icon">💬</span>
-          <div class="pf-hero-feature-text">
-            <div class="pf-hero-feature-name">WhatsApp</div>
-            <div class="pf-hero-feature-sub">Reminders & campaigns</div>
+        <div class="hero-feature">
+          <span class="hero-feature-icon">💬</span>
+          <div>
+            <div class="hero-feature-name">WhatsApp</div>
+            <div class="hero-feature-sub">Reminders & campaigns</div>
           </div>
         </div>
-        <div class="pf-hero-feature">
-          <span class="pf-hero-feature-icon">🤖</span>
-          <div class="pf-hero-feature-text">
-            <div class="pf-hero-feature-name">AI Assistant</div>
-            <div class="pf-hero-feature-sub">Role-based AI copilot</div>
+        <div class="hero-feature">
+          <span class="hero-feature-icon">📊</span>
+          <div>
+            <div class="hero-feature-name">Reports & Finance</div>
+            <div class="hero-feature-sub">Invoices · P&L · Payroll</div>
           </div>
         </div>
       </div>
 
       <!-- Module pills -->
-      <div class="pf-login-hero-modules" style="margin-top:20px">
-        <span class="pf-login-hero-pill">📅 Appointments</span>
-        <span class="pf-login-hero-pill">💊 Pharmacy</span>
-        <span class="pf-login-hero-pill">🔬 Laboratory</span>
-        <span class="pf-login-hero-pill">✂️ Grooming</span>
-        <span class="pf-login-hero-pill">🏨 Boarding</span>
-        <span class="pf-login-hero-pill">📊 Reports</span>
-        <span class="pf-login-hero-pill">🌐 Multi-Branch</span>
+      <div class="hero-pills">
+        <span class="hero-pill">📅 Appointments</span>
+        <span class="hero-pill">💊 Pharmacy</span>
+        <span class="hero-pill">🔬 Lab</span>
+        <span class="hero-pill">✂️ Grooming</span>
+        <span class="hero-pill">🏨 Boarding</span>
+        <span class="hero-pill">🎥 Telemedicine</span>
+        <span class="hero-pill">🏥 Inpatient</span>
+        <span class="hero-pill">👥 HR & Payroll</span>
       </div>
 
     </div>
   </div>
 
-  <!-- ══ LOGIN FORM PANEL ══════════════════════════════════════ -->
-  <div class="pf-login-panel">
-    <div class="pf-login-form-wrap">
+  <!-- ══ FORM PANEL ════════════════════════════════════════════ -->
+  <div class="login-panel">
+    <div class="login-form-wrap">
 
-      <!-- Header -->
-      <div class="pf-login-form-title">Welcome back 👋</div>
-      <div class="pf-login-form-sub">Sign in to access the platform</div>
+      <!-- Welcome header -->
+      <div class="login-welcome">
+        <div class="login-welcome-badge">
+          ✦ Secure Clinic Access
+        </div>
+        <div class="login-welcome-title">Welcome back 👋</div>
+        <div class="login-welcome-sub">
+          Sign in to your Aleefy clinic dashboard.<br>
+          <span style="color:#1B6B5C;font-weight:600">Happy Pets, Healthy Lives.</span>
+        </div>
+      </div>
 
       <!-- Error -->
       {% if error %}
-      <div class="pf-login-error">🔐 {{ error }}</div>
+      <div class="login-error">
+        <span>🔐</span> {{ error }}
+      </div>
       {% endif %}
 
       <!-- Form -->
@@ -214,55 +497,43 @@
         {% if request.args.get('next') %}
           <input type="hidden" name="next" value="{{ request.args.get('next') }}">
         {% endif %}
-        <input type="hidden" name="theme" id="form-theme-val" value="{{ current_theme or 'medical' }}">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
 
-        <div class="pf-form-group">
-          <label class="pf-label" for="username">Username</label>
-          <div class="pf-input-wrap">
-            <span class="pf-input-icon">👤</span>
-            <input class="pf-input" type="text" id="username" name="username"
+        <div class="login-field">
+          <label class="login-label" for="username">Username</label>
+          <div class="login-input-wrap">
+            <span class="login-input-icon">👤</span>
+            <input class="login-input" type="text" id="username" name="username"
                    value="{{ username or '' }}" required autocomplete="username"
-                   placeholder="Enter your username">
+                   placeholder="Enter your username" autofocus>
           </div>
         </div>
 
-        <div class="pf-form-group">
-          <label class="pf-label" for="password">Password</label>
-          <div class="pf-input-wrap">
-            <span class="pf-input-icon">🔑</span>
-            <input class="pf-input" type="password" id="password" name="password"
+        <div class="login-field">
+          <label class="login-label" for="password">Password</label>
+          <div class="login-input-wrap">
+            <span class="login-input-icon">🔑</span>
+            <input class="login-input" type="password" id="password" name="password"
                    required autocomplete="current-password"
                    placeholder="Enter your password">
-            <button type="button" class="pf-input-toggle" id="pw-toggle"
-                    title="Show/hide password">👁</button>
+            <button type="button" class="pw-toggle" id="pw-toggle"
+                    title="Show/hide password">👁️</button>
           </div>
         </div>
 
-        <button type="submit" class="pf-login-submit">
-          Sign In &rarr;
+        <button type="submit" class="login-submit">
+          <span>Sign In</span>
+          <span>→</span>
         </button>
       </form>
 
-      <!-- Theme switcher -->
-      <div class="pf-login-divider">Theme</div>
-      <div class="pf-login-theme-switch">
-        <button class="pf-login-theme-pill {% if (current_theme or 'medical') == 'medical' %}active{% endif %}"
-                data-theme-btn="medical"
-                onclick="switchLoginTheme('medical')">
-          ⚕️ Medical
-        </button>
-        <button class="pf-login-theme-pill {% if current_theme == 'logo' %}active{% endif %}"
-                data-theme-btn="logo"
-                onclick="switchLoginTheme('logo')">
-          🐾 Logo
-        </button>
-      </div>
-
       <!-- Footer -->
-      <div class="pf-login-footer">
-        {{ app_title }} Platform v1.0<br>
-        {{ app_tagline }}
+      <div class="login-divider">اليفي</div>
+      <div class="login-footer">
+        <strong>Aleefy</strong> — Veterinary Clinic Management Platform<br>
+        رعاية أذكى… لحياة أحن · Happy Pets, Healthy Lives
+        <br><br>
+        <span style="opacity:0.6">© 2026 Aleefy · Secure & Encrypted</span>
       </div>
 
     </div>
@@ -270,36 +541,12 @@
 
 </div>
 
-<!-- Platform JS -->
-<script src="{{ url_for('static', filename='js/platform.js') }}"></script>
-
 <script>
-// Password toggle
-document.getElementById('pw-toggle').addEventListener('click', function () {
+document.getElementById('pw-toggle').addEventListener('click', function(){
   var inp = document.getElementById('password');
   inp.type = inp.type === 'password' ? 'text' : 'password';
-  this.textContent = inp.type === 'password' ? '👁' : '🙈';
+  this.textContent = inp.type === 'password' ? '👁️' : '🙈';
 });
-
-// Theme switch on login page (just visual + stores in form)
-function switchLoginTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('pah_platform_theme', theme);
-  document.getElementById('form-theme-val').value = theme;
-
-  // Update pill states
-  document.querySelectorAll('.pf-login-theme-pill').forEach(function(btn){
-    btn.classList.toggle('active', btn.getAttribute('data-theme-btn') === theme);
-  });
-}
-
-// Apply stored theme on load
-(function(){
-  var stored = localStorage.getItem('pah_platform_theme') || 'medical';
-  var serverTheme = document.documentElement.getAttribute('data-theme');
-  var theme = serverTheme || stored;
-  switchLoginTheme(theme);
-})();
 </script>
 
 </body>

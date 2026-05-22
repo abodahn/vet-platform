@@ -174,10 +174,10 @@ def create_app(cfg=None) -> Flask:
             return ar if (lang == "ar" and ar) else en
 
         return dict(
-            app_title     = app.config.get("APP_TITLE", "Premium Animal Hospital"),
-            app_title_ar  = app.config.get("APP_TITLE_AR", "مستشفى بريميوم للحيوانات"),
+            app_title     = app.config.get("APP_TITLE", "Aleefy"),
+            app_title_ar  = app.config.get("APP_TITLE_AR", "اليفي"),
             app_subtitle  = app.config.get("APP_SUBTITLE", "Dr. Hatem El Khateeb"),
-            app_tagline   = app.config.get("APP_TAGLINE", "Premium Veterinary Care Platform"),
+            app_tagline   = app.config.get("APP_TAGLINE", "Happy Pets, Healthy Lives"),
             legacy_url    = app.config.get("LEGACY_APP_URL", "http://localhost:5000"),
             current_user  = user,
             current_role  = user.get("role", ""),

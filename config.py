@@ -23,10 +23,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ═══════════════════════════════════════════════════════════════
 class Config:
     # ── Identity ──────────────────────────────────────────────
-    APP_TITLE    = os.environ.get("PLATFORM_TITLE",    "Premium Animal Hospital")
-    APP_TITLE_AR = os.environ.get("PLATFORM_TITLE_AR", "مستشفى بريميوم للحيوانات")
+    APP_TITLE    = os.environ.get("PLATFORM_TITLE",    "Aleefy")
+    APP_TITLE_AR = os.environ.get("PLATFORM_TITLE_AR", "اليفي")
     APP_SUBTITLE = os.environ.get("PLATFORM_SUBTITLE", "Dr. Hatem El Khateeb")
-    APP_TAGLINE  = os.environ.get("PLATFORM_TAGLINE",  "Premium Veterinary Care Platform")
+    APP_TAGLINE  = os.environ.get("PLATFORM_TAGLINE",  "Happy Pets, Healthy Lives")
 
     # ── Security ──────────────────────────────────────────────
     SECRET_KEY = os.environ.get(
