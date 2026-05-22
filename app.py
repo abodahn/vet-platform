@@ -211,9 +211,10 @@ def create_app(cfg=None) -> Flask:
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://meet.jit.si; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; "
-            "connect-src 'self'; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https://cdn.jsdelivr.net; "
+            "connect-src 'self' http://localhost:3001; "
             "frame-src 'self' https://meet.jit.si;"
         )
         # Remove server fingerprint

@@ -529,7 +529,7 @@
     <button id="petsy-minimize-btn" onclick="petsyMinimize()" title="{{ t('Minimize','تصغير') }}">—</button>
     <button id="petsy-close-btn" onclick="petsyClose()" title="{{ t('Close','إغلاق') }}">&times;</button>
   </div>
-  <iframe id="petsy-iframe" src="" title="Petsy AI Chat" allow="clipboard-write"></iframe>
+  <iframe id="petsy-iframe" src="" data-src="{{ url_for('petsy.embed') }}" title="Petsy AI Chat" allow="clipboard-write"></iframe>
 </div>
 
 <script>
@@ -672,12 +672,17 @@
   var _theme=localStorage.getItem('al-theme')||'light';
   function _applyTheme(t){
     document.documentElement.setAttribute('data-theme',t);
+    var isDark=t==='dark';
+    /* Update Bootstrap Icon elements */
     var ids=['v3-sidebar-theme-icon','v3-topbar-theme-icon'];
     ids.forEach(function(id){
       var el=document.getElementById(id);
       if(!el)return;
-      el.className=t==='dark'?'bi bi-sun':'bi bi-moon-stars';
+      el.className=isDark?'bi bi-sun':'bi bi-moon-stars';
     });
+    /* Update sidebar label: in dark → show "Day" (clicking returns to day), else "Night" */
+    var lbl=document.getElementById('v3-sidebar-theme-label');
+    if(lbl)lbl.textContent=isDark?'Day':'Night';
     localStorage.setItem('al-theme',t);_theme=t;
   }
   _applyTheme(_theme);

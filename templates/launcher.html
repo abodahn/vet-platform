@@ -683,18 +683,8 @@
 ══════════════════════════════════════════════════════════════ -->
 <script>
 /* ── KPI count-up animation ──────────────────────────────────── */
-function v3AnimateCount(el) {
-  var target = parseInt(el.dataset.target, 10);
-  if (isNaN(target) || target === 0) return;
-  var start = 0;
-  var duration = 900;
-  var step = Math.ceil(target / (duration / 16));
-  var timer = setInterval(function() {
-    start = Math.min(start + step, target);
-    el.textContent = start.toLocaleString();
-    if (start >= target) clearInterval(timer);
-  }, 16);
-}
+/* NOTE: Uses v3.js global v3AnimateCount(el, target, duration) — do NOT
+   redefine it here; v3.js runs AFTER this block and would override anyway. */
 
 /* ── AI Insights load ────────────────────────────────────────── */
 function v3LoadAIInsights() {
@@ -787,9 +777,13 @@ function v3FilterModules(q) {
 
 /* ── Init on DOM ready ───────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', function() {
-  // Animate KPI counters
+  // Animate KPI counters — call v3.js global with correct 3-arg signature
   document.querySelectorAll('.v3-stat-value[data-target]').forEach(function(el) {
-    v3AnimateCount(el);
+    var tgt = parseInt(el.dataset.target, 10);
+    if (isNaN(tgt) || tgt === 0) return;
+    if (typeof v3AnimateCount === 'function') {
+      v3AnimateCount(el, tgt, 900);
+    }
   });
   // Load AI insights
   v3LoadAIInsights();
