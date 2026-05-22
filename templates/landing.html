@@ -1,9 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
+<script>(function(){var t=localStorage.getItem('al-theme');if(t==='light')document.documentElement.setAttribute('data-theme','light');})();</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aleefy — Smart Veterinary Platform</title>
+<title>Aleefy — Smart Veterinary Platform | اليفي</title>
+<meta name="description" content="Aleefy — The complete veterinary clinic management platform. AI-powered, bilingual, 32 modules.">
 <link rel="icon" type="image/png" href="/static/images/aleefy-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -443,6 +445,39 @@ section{padding:100px 24px;position:relative;}
 }
 
 /* ════════════════════════════════════════════
+   QUICK LINKS SECTION
+════════════════════════════════════════════ */
+.qlinks-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+  gap:16px;
+}
+.qlink-card{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px 16px;
+  border-radius:16px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.04);
+  text-align:center;
+  transition:all .25s;
+  cursor:pointer;
+  text-decoration:none;color:inherit;
+}
+.qlink-card:hover{
+  background:rgba(42,157,143,.1);
+  border-color:rgba(42,157,143,.4);
+  transform:translateY(-4px);
+  box-shadow:0 8px 28px rgba(27,107,92,.25);
+}
+.qlink-card.primary-card{
+  background:linear-gradient(135deg,rgba(27,107,92,.2),rgba(42,157,143,.15));
+  border-color:rgba(42,157,143,.4);
+}
+.qlink-icon{font-size:2rem;margin-bottom:10px}
+.qlink-name{font-weight:700;font-size:.95rem;color:var(--txt);margin-bottom:4px}
+.qlink-sub{font-size:.75rem;color:var(--mid)}
+
+/* ════════════════════════════════════════════
    FOOTER
 ════════════════════════════════════════════ */
 footer{
@@ -525,9 +560,9 @@ footer{
 
   <div class="hero-actions">
     <button class="btn-hero primary" onclick="window.location.href='/auth/login'">
-      🚀 Launch Platform
+      🚀 Enter Platform
     </button>
-    <button class="btn-hero secondary" onclick="document.getElementById('modules').scrollIntoView({behavior:'smooth'})">
+    <button class="btn-hero secondary" onclick="document.getElementById('quicklinks').scrollIntoView({behavior:'smooth'})">
       📋 Explore Modules
     </button>
   </div>
@@ -552,13 +587,71 @@ footer{
   </div>
 </section>
 
+<!-- ═══════════ QUICK LINKS ═══════════ -->
+<section id="quicklinks" class="wrap">
+  <div class="section-inner">
+    <div class="reveal">
+      <div class="section-label">Quick Access</div>
+      <h2 class="section-title">Jump directly to any module</h2>
+      <p class="section-sub">All modules are active. Sign in to access your clinic dashboard.</p>
+    </div>
+    <div class="qlinks-grid reveal" style="margin-top:36px">
+      <a href="/auth/login" class="qlink-card primary-card">
+        <span class="qlink-icon">🏥</span>
+        <div class="qlink-name">Dashboard</div>
+        <div class="qlink-sub">Clinic overview & stats</div>
+      </a>
+      <a href="/auth/login" class="qlink-card">
+        <span class="qlink-icon">📅</span>
+        <div class="qlink-name">Appointments</div>
+        <div class="qlink-sub">Schedule & calendar</div>
+      </a>
+      <a href="/auth/login" class="qlink-card">
+        <span class="qlink-icon">🐾</span>
+        <div class="qlink-name">Pets & Owners</div>
+        <div class="qlink-sub">Patient & CRM records</div>
+      </a>
+      <a href="/auth/login" class="qlink-card">
+        <span class="qlink-icon">🩺</span>
+        <div class="qlink-name">Examinations</div>
+        <div class="qlink-sub">Clinical visit workflow</div>
+      </a>
+      <a href="/auth/login" class="qlink-card">
+        <span class="qlink-icon">💰</span>
+        <div class="qlink-name">Invoices</div>
+        <div class="qlink-sub">Billing & payments</div>
+      </a>
+      <a href="/auth/login" class="qlink-card">
+        <span class="qlink-icon">📦</span>
+        <div class="qlink-name">Inventory</div>
+        <div class="qlink-sub">Stock & pharmacy</div>
+      </a>
+      <a href="/auth/login" class="qlink-card">
+        <span class="qlink-icon">📊</span>
+        <div class="qlink-name">Reports</div>
+        <div class="qlink-sub">Analytics & exports</div>
+      </a>
+      <a href="/auth/login" class="qlink-card">
+        <span class="qlink-icon">💬</span>
+        <div class="qlink-name">WhatsApp</div>
+        <div class="qlink-sub">Reminders & campaigns</div>
+      </a>
+    </div>
+    <div style="text-align:center;margin-top:28px">
+      <button class="btn-hero primary" style="display:inline-flex" onclick="window.location.href='/auth/login'">
+        🔐 Sign In to Access All Modules
+      </button>
+    </div>
+  </div>
+</section>
+
 <!-- ═══════════ MODULES ═══════════ -->
 <section id="modules" class="wrap">
   <div class="section-inner">
     <div class="reveal">
-      <div class="section-label">All Modules</div>
+      <div class="section-label">All 24 Modules</div>
       <h2 class="section-title">Everything your clinic needs</h2>
-      <p class="section-sub">Click any module to expand and explore its features. All modules are live and integrated.</p>
+      <p class="section-sub">Click any module to expand and explore its features. All modules are live and fully integrated.</p>
     </div>
 
     <!-- Category filter tabs -->
@@ -652,7 +745,7 @@ var MODULES = [
   {cat:'Clinical',icon:'🩺',name:'Examinations',name_ar:'الفحوصات',status:'live',url:'/visits/',desc:'Complete clinical workflow — chief complaint, physical exam, diagnosis, treatment plan, and discharge.',feats:['Visit tracking','Diagnosis codes','Treatment plans','Discharge notes']},
   {cat:'Clinical',icon:'📅',name:'Appointments',name_ar:'المواعيد',status:'live',url:'/appointments/schedule',desc:'Smart scheduling with slot blocking, doctor assignment, and waiting room display.',feats:['Slot blocking','Doctor filter','Calendar view','SMS/WhatsApp alerts']},
   {cat:'Clinical',icon:'👨‍⚕️',name:'Doctor Workspace',name_ar:'مساحة الطبيب',status:'live',url:'/doctor/',desc:'Dedicated dashboard for doctors — today\'s queue, patient history, prescriptions.',feats:['My queue','Patient timeline','Rx pad','Lab results']},
-  {cat:'Clinical',icon:'🧪',name:'Lab & Vaccination',name_ar:'المختبر والتطعيم',status:'live',url:'/clinical/',desc:'Lab result entry, vaccination schedules, auto-reminders for overdue vaccines.',feats:['Lab panels','Vaccine cards','Auto-reminders','Herd tracking']},
+  {cat:'Clinical',icon:'🧪',name:'Lab & Vaccination',name_ar:'المختبر والتطعيم',status:'live',url:'/clinical/vaccinations',desc:'Lab result entry, vaccination schedules, auto-reminders for overdue vaccines.',feats:['Lab panels','Vaccine cards','Auto-reminders','Herd tracking']},
   {cat:'Clinical',icon:'🏨',name:'Inpatient',name_ar:'الرعاية المقيمة',status:'live',url:'/inpatient/',desc:'Inpatient ward management — bed assignment, daily rounds, IV logs, discharge.',feats:['Bed map','Daily rounds','IV tracking','Discharge summary']},
   {cat:'Clinical',icon:'📹',name:'Telemedicine',name_ar:'الطب عن بُعد',status:'live',url:'/telemedicine/',desc:'Video consultations built-in via Jitsi. No app install needed for owners.',feats:['Jitsi video','Consultation notes','Owner link','Recording']},
   {cat:'Patients & CRM',icon:'👥',name:'Owners & Pets',name_ar:'الملاك والحيوانات',status:'live',url:'/crm/owners',desc:'Complete owner CRM — pets, medical history, loyalty points, preferred doctor.',feats:['Owner profiles','Pet records','Loyalty points','VIP tagging']},
@@ -672,7 +765,7 @@ var MODULES = [
   {cat:'Platform',icon:'📈',name:'Reports',name_ar:'التقارير',status:'live',url:'/reports/',desc:'Comprehensive reporting — revenue, inventory, doctor performance, and custom date range.',feats:['Revenue report','Inventory report','Doctor revenue','Excel export']},
   {cat:'Platform',icon:'🔔',name:'Notifications',name_ar:'الإشعارات',status:'live',url:'/notifications/',desc:'Real-time in-app notifications with read/unread tracking and role-based targeting.',feats:['Real-time','Role targeting','Read tracking','Push ready']},
   {cat:'Platform',icon:'⚙️',name:'System',name_ar:'الإعدادات',status:'live',url:'/system/',desc:'Clinic settings, backup management, system health monitor, and migration tools.',feats:['Clinic settings','Backup/restore','Health monitor','Migrations']},
-  {cat:'Platform',icon:'🌐',name:'Public API',name_ar:'API العام',status:'live',url:'/api/public/',desc:'REST API endpoints for integration with external systems, websites, and mobile apps.',feats:['REST API','Auth tokens','Rate limiting','JSON responses']},
+  {cat:'Platform',icon:'🔧',name:'System & Diagnostics',name_ar:'النظام والتشخيص',status:'live',url:'/system/diagnostics',desc:'System health monitor, backup management, role permissions, audit log, and diagnostics.',feats:['Health check','Backup/restore','Role management','Audit log']},
 ];
 
 var ALL_CATS = ['All'];

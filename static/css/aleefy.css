@@ -1833,7 +1833,147 @@ a:hover { color: var(--al-primary-mid); }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   23. PRINT STYLES
+   23. GLOBAL DARK MODE — comprehensive coverage
+   Overrides hardcoded colors from platform.css and module templates
+═══════════════════════════════════════════════════════════ */
+
+/* ── Base backgrounds ── */
+[data-theme="dark"],
+[data-theme="dark"] html { background: #080F1A !important; }
+[data-theme="dark"] body { background: var(--al-bg) !important; color: var(--al-text) !important; }
+[data-theme="dark"] .al-main { background: var(--al-bg) !important; }
+
+/* ── Cards & panels ── */
+[data-theme="dark"] .card,
+[data-theme="dark"] .pf-card,
+[data-theme="dark"] .al-card,
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .dropdown-menu,
+[data-theme="dark"] .pf-modal {
+  background: var(--al-bg-card) !important;
+  border-color: var(--al-border) !important;
+  color: var(--al-text) !important;
+}
+
+/* ── Tables ── */
+[data-theme="dark"] table,
+[data-theme="dark"] .table,
+[data-theme="dark"] .al-table {
+  color: var(--al-text) !important;
+  border-color: var(--al-border) !important;
+}
+[data-theme="dark"] .table thead th,
+[data-theme="dark"] .al-table thead th,
+[data-theme="dark"] th {
+  background: var(--al-surface-2) !important;
+  color: var(--al-text) !important;
+  border-color: var(--al-border) !important;
+}
+[data-theme="dark"] .table td,
+[data-theme="dark"] .al-table td,
+[data-theme="dark"] td {
+  border-color: var(--al-border) !important;
+  color: var(--al-text) !important;
+}
+[data-theme="dark"] .table-striped tbody tr:nth-of-type(odd),
+[data-theme="dark"] .al-table-striped tr:nth-child(odd) {
+  background: rgba(255,255,255,0.02) !important;
+}
+[data-theme="dark"] tr:hover td { background: rgba(42,157,143,0.07) !important; }
+
+/* ── Forms ── */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="range"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--al-surface-2) !important;
+  color: var(--al-text) !important;
+  border-color: var(--al-border) !important;
+}
+[data-theme="dark"] label { color: var(--al-text) !important; }
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .al-input,
+[data-theme="dark"] .al-select { background: var(--al-surface-2) !important; color: var(--al-text) !important; border-color: var(--al-border) !important; }
+[data-theme="dark"] .form-control::placeholder { color: var(--al-text-muted) !important; }
+
+/* ── Badges & tags ── */
+[data-theme="dark"] .badge,
+[data-theme="dark"] .al-badge {
+  filter: brightness(0.85);
+}
+
+/* ── Modals ── */
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .al-modal-header {
+  background: var(--al-surface-2) !important;
+  border-color: var(--al-border) !important;
+  color: var(--al-text) !important;
+}
+[data-theme="dark"] .modal-footer,
+[data-theme="dark"] .al-modal-footer {
+  background: var(--al-surface-2) !important;
+  border-color: var(--al-border) !important;
+}
+[data-theme="dark"] .modal-backdrop { background: rgba(0,0,0,0.7) !important; }
+
+/* ── Dropdowns ── */
+[data-theme="dark"] .dropdown-item,
+[data-theme="dark"] .al-dropdown-item {
+  color: var(--al-text) !important;
+}
+[data-theme="dark"] .dropdown-item:hover { background: var(--al-surface-3) !important; }
+[data-theme="dark"] .dropdown-divider { border-color: var(--al-border) !important; }
+
+/* ── Alerts / flash messages ── */
+[data-theme="dark"] .alert,
+[data-theme="dark"] .al-alert {
+  border-color: var(--al-border) !important;
+}
+[data-theme="dark"] .alert-success { background: var(--al-success-bg) !important; color: #5ED89A !important; }
+[data-theme="dark"] .alert-warning { background: var(--al-warning-bg) !important; color: #F0C060 !important; }
+[data-theme="dark"] .alert-danger  { background: var(--al-danger-bg)  !important; color: #F08080 !important; }
+[data-theme="dark"] .alert-info    { background: var(--al-info-bg)    !important; color: #70B8F0 !important; }
+
+/* ── Platform.css hardcoded color overrides ── */
+[data-theme="dark"] .pf-sidebar,
+[data-theme="dark"] .sidebar { background: var(--al-sidebar-bg) !important; }
+[data-theme="dark"] .pf-topbar,
+[data-theme="dark"] .topbar  { background: var(--al-topbar-bg) !important; border-bottom-color: var(--al-topbar-border) !important; }
+[data-theme="dark"] .pf-content { background: var(--al-bg) !important; }
+[data-theme="dark"] .pf-stat-card,
+[data-theme="dark"] .stat-card { background: var(--al-bg-card) !important; border-color: var(--al-border) !important; }
+
+/* ── List groups ── */
+[data-theme="dark"] .list-group-item { background: var(--al-bg-card) !important; color: var(--al-text) !important; border-color: var(--al-border) !important; }
+[data-theme="dark"] .list-group-item:hover { background: var(--al-surface-3) !important; }
+
+/* ── Pagination ── */
+[data-theme="dark"] .page-link { background: var(--al-bg-card) !important; color: var(--al-text) !important; border-color: var(--al-border) !important; }
+[data-theme="dark"] .page-item.active .page-link { background: var(--al-primary) !important; border-color: var(--al-primary) !important; color: #fff !important; }
+[data-theme="dark"] .page-item.disabled .page-link { background: var(--al-surface-2) !important; color: var(--al-text-muted) !important; }
+
+/* ── Nav tabs ── */
+[data-theme="dark"] .nav-tabs { border-color: var(--al-border) !important; }
+[data-theme="dark"] .nav-tabs .nav-link { color: var(--al-text-mid) !important; border-color: transparent !important; }
+[data-theme="dark"] .nav-tabs .nav-link.active { background: var(--al-bg-card) !important; color: var(--al-text) !important; border-color: var(--al-border) var(--al-border) var(--al-bg-card) !important; }
+
+/* ── Pre / code blocks ── */
+[data-theme="dark"] pre,
+[data-theme="dark"] code {
+  background: var(--al-surface-2) !important;
+  color: #7DD5C8 !important;
+  border-color: var(--al-border) !important;
+}
+
+/* ── Tooltips ── */
+[data-theme="dark"] .tooltip-inner { background: var(--al-navy) !important; }
+
+/* ── Print: always light ── */
+@media print {
+  [data-theme="dark"] body { background: #fff !important; color: #000 !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   24. PRINT STYLES
 ═══════════════════════════════════════════════════════════ */
 @media print {
   .al-sidebar,

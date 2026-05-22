@@ -66,6 +66,13 @@ def _get_lab_requests(status_filter: str = "") -> list:
 
 # ── Lab routes ────────────────────────────────────────────────────────────────
 
+@clinical_bp.route("/")
+@login_required
+def index():
+    """Clinical root — redirect to vaccinations overview."""
+    return redirect(url_for("clinical.vaccinations"))
+
+
 @clinical_bp.route("/lab")
 @login_required
 def lab_list():

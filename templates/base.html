@@ -537,9 +537,9 @@
   </svg>
 </button>
 <div id="petsy-hint">🐾 {{ t("Hi! I'm Petsy — ask me anything!", "مرحباً! أنا بيتسي — اسألني أي شيء!") }}</div>
-<div id="petsy-backdrop" onclick="petsyToggle()" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.01);cursor:default;"></div>
+<!-- Petsy backdrop removed — panel only closes via X button or Escape -->
 <div id="petsy-panel-global">
-  <button id="petsy-panel-close" onclick="petsyToggle()" title="Close">&times;</button>
+  <button id="petsy-panel-close" onclick="petsyClose()" title="Close Petsy">&times;</button>
   <iframe id="petsy-iframe" src="" title="Petsy AI Chat" allow="clipboard-write"></iframe>
 </div>
 <script>
@@ -557,23 +557,32 @@
       setTimeout(function(){h.style.display='none';},400);}
   },5000);
 
-  window.petsyToggle=function(){
+  /* petsyOpen / petsyClose are separate — FAB only opens, X only closes */
+  window.petsyOpen=function(){
     if(!fab)fab=document.getElementById('petsy-fab-global');
     if(!panel)panel=document.getElementById('petsy-panel-global');
-    open=!open;
+    if(open)return;
+    open=true;
     var h=document.getElementById('petsy-hint');if(h)h.style.display='none';
-    var bd=document.getElementById('petsy-backdrop');
-    if(open){
-      if(!loaded){document.getElementById('petsy-iframe').src='{{ url_for("petsy.embed") }}';loaded=true;}
-      panel.classList.add('open');
-      if(bd)bd.style.display='block';
-      _positionPanel();
-      if(fab){fab.style.opacity='0.55';fab.style.transform='scale(0.88)';}
-    } else {
-      panel.classList.remove('open');
-      if(bd)bd.style.display='none';
-      if(fab){fab.style.opacity='';fab.style.transform='';}
-    }
+    if(!loaded){document.getElementById('petsy-iframe').src='{{ url_for("petsy.embed") }}';loaded=true;}
+    panel.classList.add('open');
+    _positionPanel();
+    if(fab){fab.style.opacity='0.55';fab.style.transform='scale(0.88)';}
+    localStorage.setItem('petsy-open','1');
+  };
+  window.petsyClose=function(){
+    if(!fab)fab=document.getElementById('petsy-fab-global');
+    if(!panel)panel=document.getElementById('petsy-panel-global');
+    if(!open)return;
+    open=false;
+    panel.classList.remove('open');
+    if(fab){fab.style.opacity='';fab.style.transform='';}
+    localStorage.setItem('petsy-open','0');
+  };
+  /* petsyToggle kept for FAB click — opens only; use petsyClose to close */
+  window.petsyToggle=function(){
+    if(open){ /* FAB click when open: do nothing — only X closes */ return; }
+    petsyOpen();
   };
 
   function _positionPanel(){
@@ -667,8 +676,8 @@
   });
 
   document.addEventListener('keydown',function(e){
-    if(e.altKey&&(e.key==='p'||e.key==='P')){e.preventDefault();window.petsyToggle();}
-    if(e.key==='Escape'&&open){e.preventDefault();window.petsyToggle();}
+    if(e.altKey&&(e.key==='p'||e.key==='P')){e.preventDefault();open?petsyClose():petsyOpen();}
+    if(e.key==='Escape'&&open){e.preventDefault();petsyClose();}
   });
 })();
 </script>
