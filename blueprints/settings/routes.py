@@ -7,6 +7,12 @@ import models.database as db
 _VALID_THEMES = {"medical"}
 
 
+@settings_bp.route("/")
+def index():
+    """Settings root — redirect to the launcher dashboard."""
+    return redirect(url_for("launcher.index"))
+
+
 @settings_bp.route("/theme", methods=["POST"])
 def set_theme():
     """Switch theme for the current user session.

@@ -611,3 +611,21 @@ def legacy_ping():
     from flask import jsonify
     up = _legacy_port_open(5000)
     return jsonify({"up": up})
+
+
+@launcher_bp.route("/coming-soon")
+@login_required
+def coming_soon():
+    from flask import request as req
+    module_name = req.args.get('module', 'This Module')
+    module_icon = req.args.get('icon', '🔧')
+    module_desc = req.args.get('desc', 'This module is currently under development.')
+    expected_features = req.args.getlist('feature') or ['Feature coming soon']
+    eta = req.args.get('eta', 'Q3 2026')
+    return render_template('coming_soon.html',
+        module_name=module_name,
+        module_icon=module_icon,
+        module_desc=module_desc,
+        expected_features=expected_features,
+        eta=eta
+    )

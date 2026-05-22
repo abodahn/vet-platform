@@ -3,364 +3,257 @@
       dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}"
       data-theme="light">
 <head>
+  <!-- NO-FLASH: must run before any CSS to avoid theme flicker -->
+  <script>(function(){var t=localStorage.getItem('al-theme')||'light';document.documentElement.setAttribute('data-theme',t);if(t==='dark')document.documentElement.style.background='#0D1B2A'})();</script>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="application-name" content="Aleefy">
   <meta name="csrf-token" content="{{ csrf_token }}">
-  <title>{% block title %}{{ page_title or 'Dashboard' }}{% endblock %} — Aleefy</title>
-
-  <!-- Favicon -->
+  <title>{% block title %}{{ app_title or page_title or 'Dashboard' }}{% endblock %} — Aleefy</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/aleefy-logo.png') }}">
-
-  <!-- Dark mode — apply before first paint (no flash) -->
-  <script>
-    (function(){
-      var t=localStorage.getItem('al-theme')||'light';
-      document.documentElement.setAttribute('data-theme',t);
-    })();
-  </script>
-
-  <!-- Fonts -->
+  <!-- Fonts: Inter + Cairo -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <!-- CSS -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- CSS: platform.css → aleefy.css → v3.css (order matters) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/platform.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/aleefy.css') }}">
-
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/v3.css') }}">
+  {% block extra_css %}{% endblock %}
   {% block head_extra %}{% endblock %}
 </head>
-<body>
+<body class="v3-body">
 
-<!-- Mobile overlay -->
-<div id="al-overlay" class="al-overlay" onclick="closeSidebar()"></div>
+<!-- Mobile sidebar overlay -->
+<div id="v3-overlay" class="v3-overlay" onclick="v3CloseSidebar()"></div>
 
-<div class="al-layout">
+<!-- ═══════════════════════════════════════════════════
+     V3 APP SHELL
+═══════════════════════════════════════════════════ -->
+<div class="v3-shell" id="v3-shell">
 
-  <!-- ════════════════════════════════════════════════
+  <!-- ──────────────────────────────────────────────
        SIDEBAR
-  ════════════════════════════════════════════════ -->
-  <aside id="al-sidebar" class="al-sidebar" role="navigation" aria-label="Main navigation">
+  ────────────────────────────────────────────── -->
+  <aside id="v3-sidebar" class="v3-sidebar" role="navigation" aria-label="Main navigation">
 
-    <!-- Brand -->
-    <div class="al-brand">
-      <div class="al-brand-logo">
-        <img src="{{ url_for('static', filename='images/aleefy-logo.png') }}" alt="Aleefy" style="width:100%;height:100%;object-fit:contain;border-radius:8px;">
+    <!-- 1. BRAND AREA -->
+    <div class="v3-brand">
+      <div class="v3-brand-logo">
+        <img src="{{ url_for('static', filename='images/aleefy-logo.png') }}" alt="Aleefy" width="44" height="44">
       </div>
-      <div class="al-brand-text">
-        <div class="al-brand-name">Alee<span class="gold">fy</span></div>
-        <div class="al-brand-tagline">
-          {% if (current_lang or 'en') == 'ar' %}رعاية أذكى… لحياة أحن{% else %}Happy Pets, Healthy Lives{% endif %}
-        </div>
+      <div class="v3-brand-text">
+        <div class="v3-brand-name">Aleefy <span class="v3-brand-ar">اليفي</span></div>
+        <span class="v3-version-badge">V3</span>
       </div>
     </div>
 
-    <!-- User panel -->
-    {% if current_user %}
-    <div class="al-user-panel">
-      <div class="al-user-avatar">
-        {{ (current_user.get('full_name') or current_user.get('username') or 'U')[:2] | upper }}
-      </div>
-      <div style="min-width:0;flex:1">
-        <div class="al-user-name">{{ current_user.get('full_name') or current_user.get('username') }}</div>
-        <div class="al-user-role">{{ current_user.get('role','').replace('_',' ') }}</div>
-      </div>
-    </div>
-    {% endif %}
+    <!-- 2. NAVIGATION -->
+    <nav class="v3-nav" id="v3-nav">
 
-    <!-- Navigation -->
-    <nav class="al-nav-scroll">
-
-      {# ── PLATFORM ── #}
-      <div class="al-nav-section" data-section="platform">
-        <div class="al-nav-section-label al-nav-toggle">
-          <span class="dot" style="background:#C9A84C"></span>
-          <span style="flex:1">{{ t('PLATFORM', 'المنصة') }}</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="al-nav-items">
-          <a href="{{ url_for('launcher.index') }}"
-             class="al-nav-item {% if active == 'launcher' %}active{% endif %}">
-            <span class="al-nav-icon">🏠</span>
+      {# ── GROUP: CLINIC ── #}
+      <div class="v3-nav-group" data-group="clinic">
+        <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
+          <span class="v3-nav-group-icon">🏥</span>
+          <span class="v3-nav-group-label">{{ t('CLINIC', 'العيادة') }}</span>
+          <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="v3-nav-items">
+          <a href="{{ url_for('launcher.index') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🏠</span>
             <span>{{ t('Dashboard', 'لوحة التحكم') }}</span>
           </a>
+          <a href="{{ url_for('appointments.schedule') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">📅</span>
+            <span>{{ t('Appointments', 'المواعيد') }}</span>
+          </a>
+          <a href="{{ url_for('crm.owners_list') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🐾</span>
+            <span>{{ t('Pets & Owners', 'الملاك والحيوانات') }}</span>
+          </a>
+          <a href="{{ url_for('visits.visits_list') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🩺</span>
+            <span>{{ t('Medical Visits', 'الفحوصات') }}</span>
+          </a>
+          <a href="{{ url_for('pharmacy.index') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">💊</span>
+            <span>{{ t('Pharmacy', 'الصيدلية') }}</span>
+          </a>
+        </div>
+      </div>
+
+      {# ── GROUP: CLINICAL ── #}
+      <div class="v3-nav-group" data-group="clinical">
+        <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
+          <span class="v3-nav-group-icon">🔬</span>
+          <span class="v3-nav-group-label">{{ t('CLINICAL', 'السريري') }}</span>
+          <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="v3-nav-items">
+          <a href="{{ url_for('clinical.lab_list') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🧪</span>
+            <span>{{ t('Lab & Vaccines', 'المختبر والتطعيمات') }}</span>
+          </a>
+          <a href="{{ url_for('inpatient.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🏨</span>
+            <span>{{ t('Inpatient', 'تنويم') }}</span>
+          </a>
+          <a href="{{ url_for('grooming.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">✂️</span>
+            <span>{{ t('Grooming', 'التجميل') }}</span>
+          </a>
+          <a href="{{ url_for('boarding.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🐕</span>
+            <span>{{ t('Boarding', 'الإيواء') }}</span>
+          </a>
+          <a href="{{ url_for('telemedicine.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🎥</span>
+            <span>{{ t('Telemedicine', 'الاستشارة عن بُعد') }}</span>
+          </a>
+          <a href="{{ url_for('doctor.workspace') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">👨‍⚕️</span>
+            <span>{{ t('Doctor Workspace', 'مساحة الطبيب') }}</span>
+          </a>
+        </div>
+      </div>
+
+      {# ── GROUP: BUSINESS ── #}
+      <div class="v3-nav-group" data-group="business">
+        <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
+          <span class="v3-nav-group-icon">💼</span>
+          <span class="v3-nav-group-label">{{ t('BUSINESS', 'الأعمال') }}</span>
+          <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="v3-nav-items">
+          <a href="{{ url_for('finance.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">💰</span>
+            <span>{{ t('Finance', 'الفواتير والمالية') }}</span>
+          </a>
+          <a href="{{ url_for('accounting.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">📒</span>
+            <span>{{ t('Accounting', 'المحاسبة') }}</span>
+          </a>
+          <a href="{{ url_for('inventory.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">📦</span>
+            <span>{{ t('Inventory', 'المخزون') }}</span>
+          </a>
+          <a href="{{ url_for('petshop.index') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🏪</span>
+            <span>{{ t('Pet Shop', 'متجر الحيوانات') }}</span>
+          </a>
+          <a href="{{ url_for('petshop.pos') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🧾</span>
+            <span>{{ t('Point of Sale', 'نقطة البيع') }}</span>
+          </a>
+          <a href="{{ url_for('procurement.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🔄</span>
+            <span>{{ t('Procurement', 'المشتريات') }}</span>
+          </a>
+          <a href="{{ url_for('catalog.index') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🏷️</span>
+            <span>{{ t('Price Catalog', 'كتالوج الأسعار') }}</span>
+          </a>
+          <a href="{{ url_for('reports.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">📊</span>
+            <span>{{ t('Reports', 'التقارير') }}</span>
+          </a>
+        </div>
+      </div>
+
+      {# ── GROUP: TEAM (admin roles only) ── #}
+      {% if current_user and current_user.get('role') in ('super_admin','clinic_owner','branch_manager','support_admin','hr') %}
+      <div class="v3-nav-group" data-group="team">
+        <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
+          <span class="v3-nav-group-icon">👥</span>
+          <span class="v3-nav-group-label">{{ t('TEAM', 'الفريق') }}</span>
+          <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="v3-nav-items">
+          <a href="{{ url_for('hr.staff_list') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">👨‍⚕️</span>
+            <span>{{ t('HR & Staff', 'الموارد البشرية') }}</span>
+          </a>
+          <a href="{{ url_for('attendance.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">⏰</span>
+            <span>{{ t('Attendance', 'الحضور والإجازات') }}</span>
+          </a>
+          <a href="{{ url_for('payroll.dashboard') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">💳</span>
+            <span>{{ t('Payroll', 'الرواتب') }}</span>
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
+      {# ── GROUP: PLATFORM ── #}
+      <div class="v3-nav-group" data-group="platform">
+        <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
+          <span class="v3-nav-group-icon">⚙️</span>
+          <span class="v3-nav-group-label">{{ t('PLATFORM', 'المنصة') }}</span>
+          <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="v3-nav-items">
+          <a href="{{ url_for('ai_assistant.index') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🤖</span>
+            <span>{{ t('AI Assistant', 'المساعد الذكي') }}</span>
+          </a>
+          <a href="{{ url_for('whatsapp.control_center') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">💬</span>
+            <span>{{ t('WhatsApp', 'واتساب') }}</span>
+          </a>
           {% if current_user %}
-          <a href="{{ url_for('notifications.index') }}"
-             class="al-nav-item {% if active == 'notifications' %}active{% endif %}">
-            <span class="al-nav-icon">🔔</span>
+          <a href="{{ url_for('notifications.index') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🔔</span>
             <span>{{ t('Notifications', 'الإشعارات') }}</span>
             {% if unread_count and unread_count > 0 %}
-            <span class="al-nav-badge">{{ unread_count if unread_count < 100 else '99+' }}</span>
+            <span class="v3-nav-badge">{{ unread_count if unread_count < 100 else '99+' }}</span>
             {% endif %}
           </a>
           {% endif %}
-        </div>
-      </div>
-
-      {# ── CLINICAL ── #}
-      <div class="al-nav-section" data-section="clinical">
-        <div class="al-nav-section-label al-nav-toggle">
-          <span class="dot" style="background:#2A9D8F"></span>
-          <span style="flex:1">{{ t('CLINICAL', 'السريري') }}</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="al-nav-items">
-          <a href="{{ url_for('visits.visits_list') }}"
-             class="al-nav-item {% if active in ('examination','visits') %}active{% endif %}">
-            <span class="al-nav-icon">🩺</span>
-            <span>{{ t('Examinations', 'الفحوصات') }}</span>
+          {% if current_user and current_user.get('role') in ('super_admin','clinic_owner','branch_manager','support_admin') %}
+          <a href="{{ url_for('whatsapp.reminder_settings') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">⚙️</span>
+            <span>{{ t('Reminder Settings', 'إعدادات التذكير') }}</span>
           </a>
-          <a href="{{ url_for('appointments.schedule') }}"
-             class="al-nav-item {% if active == 'appointments' %}active{% endif %}">
-            <span class="al-nav-icon">📅</span>
-            <span>{{ t('Appointments', 'المواعيد') }}</span>
-          </a>
-          <a href="{{ url_for('doctor.workspace') }}"
-             class="al-nav-item {% if active == 'doctor' %}active{% endif %}">
-            <span class="al-nav-icon">👨‍⚕️</span>
-            <span>{{ t('Doctor Workspace', 'مساحة الطبيب') }}</span>
-          </a>
-          <a href="{{ url_for('clinical.lab_list') }}"
-             class="al-nav-item {% if active == 'clinical' %}active{% endif %}">
-            <span class="al-nav-icon">🔬</span>
-            <span>{{ t('Lab & Vaccination', 'المختبر والتطعيمات') }}</span>
-          </a>
-          <a href="{{ url_for('inpatient.dashboard') }}"
-             class="al-nav-item {% if active == 'inpatient' %}active{% endif %}">
-            <span class="al-nav-icon">🏥</span>
-            <span>{{ t('Inpatient', 'تنويم') }}</span>
-          </a>
-        </div>
-      </div>
-
-      {# ── PATIENTS & CRM ── #}
-      <div class="al-nav-section" data-section="crm">
-        <div class="al-nav-section-label al-nav-toggle">
-          <span class="dot" style="background:#E8716A"></span>
-          <span style="flex:1">{{ t('PATIENTS & CRM', 'المرضى والعملاء') }}</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="al-nav-items">
-          <a href="{{ url_for('crm.owners_list') }}"
-             class="al-nav-item {% if active == 'crm' %}active{% endif %}">
-            <span class="al-nav-icon">🐾</span>
-            <span>{{ t('Owners & Pets', 'الملاك والحيوانات') }}</span>
-          </a>
-          <a href="{{ url_for('whatsapp.control_center') }}"
-             class="al-nav-item {% if active == 'whatsapp' %}active{% endif %}">
-            <span class="al-nav-icon">💬</span>
-            <span>{{ t('WhatsApp', 'واتساب') }}</span>
-          </a>
-          <a href="{{ url_for('whatsapp.scheduler') }}"
-             class="al-nav-item {% if active == 'whatsapp_scheduler' %}active{% endif %}">
-            <span class="al-nav-icon">⏰</span>
-            <span>{{ t('WA Scheduler', 'جدول الواتساب') }}</span>
-          </a>
-        </div>
-      </div>
-
-      {# ── SERVICES ── #}
-      <div class="al-nav-section" data-section="services">
-        <div class="al-nav-section-label al-nav-toggle">
-          <span class="dot" style="background:#C9A84C"></span>
-          <span style="flex:1">{{ t('SERVICES', 'الخدمات') }}</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="al-nav-items">
-          <a href="{{ url_for('grooming.dashboard') }}"
-             class="al-nav-item {% if active == 'grooming' %}active{% endif %}">
-            <span class="al-nav-icon">✂️</span>
-            <span>{{ t('Grooming', 'التجميل') }}</span>
-          </a>
-          <a href="{{ url_for('boarding.dashboard') }}"
-             class="al-nav-item {% if active == 'boarding' %}active{% endif %}">
-            <span class="al-nav-icon">🏨</span>
-            <span>{{ t('Boarding', 'الإيواء') }}</span>
-          </a>
-          <a href="{{ url_for('pharmacy.index') }}"
-             class="al-nav-item {% if active == 'pharmacy' %}active{% endif %}">
-            <span class="al-nav-icon">💊</span>
-            <span>{{ t('Pharmacy', 'الصيدلية') }}</span>
-          </a>
-          <a href="{{ url_for('catalog.index') }}"
-             class="al-nav-item {% if active == 'catalog' %}active{% endif %}">
-            <span class="al-nav-icon">🏷️</span>
-            <span>{{ t('Price Catalog', 'كتالوج الأسعار') }}</span>
-          </a>
-          <a href="{{ url_for('telemedicine.dashboard') }}"
-             class="al-nav-item {% if active == 'telemedicine' %}active{% endif %}">
-            <span class="al-nav-icon">🎥</span>
-            <span>{{ t('Telemedicine', 'الاستشارة عن بُعد') }}</span>
-          </a>
-          <a href="{{ url_for('appointments.waiting_room') }}" target="_blank"
-             class="al-nav-item">
-            <span class="al-nav-icon">📺</span>
+          {% endif %}
+          <a href="{{ url_for('appointments.waiting_room') }}" target="_blank" class="v3-nav-item">
+            <span class="v3-nav-icon">📺</span>
             <span>{{ t('Waiting Room TV', 'شاشة الانتظار') }}</span>
           </a>
         </div>
       </div>
 
-      {# ── PET SHOP ── #}
-      <div class="al-nav-section" data-section="petshop">
-        <div class="al-nav-section-label al-nav-toggle">
-          <span class="dot" style="background:#2A9D8F"></span>
-          <span style="flex:1">{{ t('PET SHOP', 'متجر الحيوانات') }}</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="al-nav-items">
-          <a href="{{ url_for('petshop.index') }}"
-             class="al-nav-item {% if active == 'petshop' %}active{% endif %}">
-            <span class="al-nav-icon">🛍️</span>
-            <span>{{ t('Pet Shop', 'متجر الحيوانات') }}</span>
-          </a>
-          <a href="{{ url_for('petshop.pos') }}"
-             class="al-nav-item {% if active == 'pos' %}active{% endif %}">
-            <span class="al-nav-icon">🧾</span>
-            <span>{{ t('Point of Sale', 'نقطة البيع') }}</span>
-          </a>
-          <a href="{{ url_for('petshop.products') }}"
-             class="al-nav-item {% if active == 'ps_products' %}active{% endif %}">
-            <span class="al-nav-icon">📦</span>
-            <span>{{ t('Products', 'المنتجات') }}</span>
-          </a>
-          <a href="{{ url_for('petshop.orders') }}"
-             class="al-nav-item {% if active == 'ps_orders' %}active{% endif %}">
-            <span class="al-nav-icon">📋</span>
-            <span>{{ t('Orders', 'الطلبات') }}</span>
-          </a>
-        </div>
-      </div>
-
-      {# ── FINANCE & STOCK ── #}
-      <div class="al-nav-section" data-section="finance">
-        <div class="al-nav-section-label al-nav-toggle">
-          <span class="dot" style="background:#1E8C5A"></span>
-          <span style="flex:1">{{ t('FINANCE & STOCK', 'المالية والمخزون') }}</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="al-nav-items">
-          <a href="{{ url_for('inventory.dashboard') }}"
-             class="al-nav-item {% if active == 'inventory' %}active{% endif %}">
-            <span class="al-nav-icon">📦</span>
-            <span>{{ t('Inventory', 'المخزون') }}</span>
-          </a>
-          <a href="{{ url_for('procurement.dashboard') }}"
-             class="al-nav-item {% if active == 'procurement' %}active{% endif %}">
-            <span class="al-nav-icon">🛒</span>
-            <span>{{ t('Procurement', 'المشتريات') }}</span>
-          </a>
-          <a href="{{ url_for('finance.dashboard') }}"
-             class="al-nav-item {% if active == 'finance' %}active{% endif %}">
-            <span class="al-nav-icon">🧾</span>
-            <span>{{ t('Invoicing', 'الفواتير') }}</span>
-          </a>
-          <a href="{{ url_for('accounting.dashboard') }}"
-             class="al-nav-item {% if active == 'accounting' %}active{% endif %}">
-            <span class="al-nav-icon">💰</span>
-            <span>{{ t('Accounting', 'المحاسبة') }}</span>
-          </a>
-          <a href="{{ url_for('reports.dashboard') }}"
-             class="al-nav-item {% if active == 'reports' %}active{% endif %}">
-            <span class="al-nav-icon">📊</span>
-            <span>{{ t('Reports', 'التقارير') }}</span>
-          </a>
-          <a href="{{ url_for('reports.builder') }}"
-             class="al-nav-item {% if active == 'report_builder' %}active{% endif %}">
-            <span class="al-nav-icon">🔧</span>
-            <span>{{ t('Report Builder', 'منشئ التقارير') }}</span>
-          </a>
-        </div>
-      </div>
-
-      {# ── AI & TOOLS ── #}
-      <div class="al-nav-section" data-section="ai">
-        <div class="al-nav-section-label al-nav-toggle">
-          <span class="dot" style="background:#7C3AED"></span>
-          <span style="flex:1">{{ t('AI & TOOLS', 'الذكاء الاصطناعي') }}</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="al-nav-items">
-          <a href="{{ url_for('ai_assistant.index') }}"
-             class="al-nav-item {% if active == 'ai' %}active{% endif %}">
-            <span class="al-nav-icon">🤖</span>
-            <span>{{ t('AI Assistant', 'المساعد الذكي') }}</span>
-          </a>
-        </div>
-      </div>
-
-      {# ── ADMIN & HR ── #}
-      {% if current_user and current_user.get('role') in ('super_admin','clinic_owner','branch_manager','support_admin','hr') %}
-      <div class="al-nav-section" data-section="admin">
-        <div class="al-nav-section-label al-nav-toggle">
-          <span class="dot" style="background:#6B7280"></span>
-          <span style="flex:1">{{ t('ADMIN & HR', 'الإدارة والموارد البشرية') }}</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="al-nav-items">
-          <a href="{{ url_for('hr.staff_list') }}"
-             class="al-nav-item {% if active == 'hr' %}active{% endif %}">
-            <span class="al-nav-icon">👥</span>
-            <span>{{ t('HR & Staff', 'الموارد البشرية') }}</span>
-          </a>
-          <a href="{{ url_for('attendance.dashboard') }}"
-             class="al-nav-item {% if active == 'attendance' %}active{% endif %}">
-            <span class="al-nav-icon">⏱️</span>
-            <span>{{ t('Attendance & Leave', 'الحضور والإجازات') }}</span>
-          </a>
-          <a href="{{ url_for('payroll.dashboard') }}"
-             class="al-nav-item {% if active == 'payroll' %}active{% endif %}">
-            <span class="al-nav-icon">💰</span>
-            <span>{{ t('Payroll', 'الرواتب') }}</span>
-          </a>
-          {% if current_user.get('role') in ('super_admin','clinic_owner','branch_manager','support_admin') %}
-          <a href="{{ url_for('whatsapp.reminder_settings') }}"
-             class="al-nav-item {% if active == 'whatsapp_settings' %}active{% endif %}">
-            <span class="al-nav-icon">⚙️</span>
-            <span>{{ t('Reminder Settings', 'إعدادات التذكير') }}</span>
-          </a>
-          {% endif %}
-        </div>
-      </div>
-      {% endif %}
-
-      {# ── SYSTEM ── #}
+      {# ── GROUP: SYSTEM (super admin only) ── #}
       {% if current_user and current_user.get('role') in ('super_admin','clinic_owner','support_admin') %}
-      <div class="al-nav-section" data-section="system">
-        <div class="al-nav-section-label al-nav-toggle">
-          <span class="dot" style="background:#E8716A"></span>
-          <span style="flex:1">{{ t('SYSTEM', 'النظام') }}</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="al-nav-items">
-          <a href="{{ url_for('system.roles_list') }}"
-             class="al-nav-item {% if active == 'roles' %}active{% endif %}">
-            <span class="al-nav-icon">🔐</span>
-            <span>{{ t('Roles & Permissions', 'الأدوار والصلاحيات') }}</span>
-          </a>
-          <a href="{{ url_for('system.monitor') }}"
-             class="al-nav-item {% if active == 'system' %}active{% endif %}">
-            <span class="al-nav-icon">🖥️</span>
-            <span>{{ t('System Monitor', 'مراقبة النظام') }}</span>
-          </a>
-          <a href="{{ url_for('system.backup') }}"
-             class="al-nav-item {% if active == 'backup' %}active{% endif %}">
-            <span class="al-nav-icon">💾</span>
-            <span>{{ t('Backup Manager', 'مدير النسخ الاحتياطية') }}</span>
-          </a>
-          <a href="{{ url_for('system.audit_log') }}"
-             class="al-nav-item {% if active == 'audit' %}active{% endif %}">
-            <span class="al-nav-icon">📋</span>
-            <span>{{ t('Audit Log', 'سجل المراجعة') }}</span>
-          </a>
-          <a href="{{ url_for('system.settings') }}"
-             class="al-nav-item {% if active == 'settings' %}active{% endif %}">
-            <span class="al-nav-icon">⚙️</span>
+      <div class="v3-nav-group" data-group="system">
+        <button class="v3-nav-group-header v3-nav-toggle" type="button" aria-expanded="true">
+          <span class="v3-nav-group-icon">🖥️</span>
+          <span class="v3-nav-group-label">{{ t('SYSTEM', 'النظام') }}</span>
+          <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="v3-nav-items">
+          <a href="{{ url_for('system.settings') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">⚙️</span>
             <span>{{ t('Settings', 'الإعدادات') }}</span>
           </a>
-          <a href="{{ url_for('migration.index') }}"
-             class="al-nav-item {% if active == 'migration' %}active{% endif %}">
-            <span class="al-nav-icon">🔄</span>
+          <a href="{{ url_for('system.monitor') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🖥️</span>
+            <span>{{ t('System Monitor', 'مراقبة النظام') }}</span>
+          </a>
+          <a href="{{ url_for('system.roles_list') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🔐</span>
+            <span>{{ t('Roles & Permissions', 'الأدوار والصلاحيات') }}</span>
+          </a>
+          <a href="{{ url_for('system.backup') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">💾</span>
+            <span>{{ t('Backup Manager', 'مدير النسخ الاحتياطية') }}</span>
+          </a>
+          <a href="{{ url_for('system.audit_log') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">📋</span>
+            <span>{{ t('Audit Log', 'سجل المراجعة') }}</span>
+          </a>
+          <a href="{{ url_for('migration.index') }}" class="v3-nav-item">
+            <span class="v3-nav-icon">🔄</span>
             <span>{{ t('Data Migration', 'ترحيل البيانات') }}</span>
           </a>
         </div>
@@ -369,151 +262,236 @@
 
     </nav>
 
-    <!-- Sidebar Footer -->
-    <div class="al-sidebar-footer">
-      <!-- Language toggle -->
-      <div class="al-lang-btns">
-        <button class="al-lang-btn {% if (current_lang or 'en') == 'en' %}active{% endif %}"
-                data-lang-btn="en">🇬🇧 EN</button>
-        <button class="al-lang-btn {% if current_lang == 'ar' %}active{% endif %}"
-                data-lang-btn="ar">🇸🇦 عربي</button>
+    <!-- 3. BOTTOM AREA -->
+    <div class="v3-sidebar-bottom">
+      {% if current_user %}
+      <div class="v3-user-row">
+        <div class="v3-user-avatar">
+          {{ (current_user.get('full_name') or current_user.get('username') or 'U')[:2] | upper }}
+        </div>
+        <div class="v3-user-info">
+          <div class="v3-user-name">{{ current_user.get('full_name') or current_user.get('username') }}</div>
+          <div class="v3-user-role">{{ current_user.get('role','').replace('_',' ') }}</div>
+        </div>
       </div>
-      <div class="al-sidebar-footer-actions">
+      {% endif %}
+      <div class="v3-sidebar-actions">
+        <div class="v3-lang-btns">
+          <button class="v3-lang-btn {% if (current_lang or 'en') == 'en' %}active{% endif %}" data-lang-btn="en">EN</button>
+          <button class="v3-lang-btn {% if current_lang == 'ar' %}active{% endif %}" data-lang-btn="ar">عربي</button>
+        </div>
+        <button class="v3-sidebar-theme-btn" id="v3-sidebar-theme-btn" onclick="v3ToggleTheme()" title="{{ t('Toggle theme','تبديل الوضع') }}">
+          <span id="v3-sidebar-theme-icon">🌙</span>
+        </button>
         {% if current_user %}
-        <a href="{{ url_for('auth.profile') }}" class="al-sidebar-footer-btn">
-          👤 {{ t('Profile', 'حسابي') }}
-        </a>
-        <a href="{{ url_for('auth.logout') }}" class="al-sidebar-footer-btn">
-          🔓 {{ t('Logout', 'خروج') }}
+        <a href="{{ url_for('auth.logout') }}" class="v3-logout-btn" title="{{ t('Logout','خروج') }}">
+          <svg viewBox="0 0 20 20" fill="none" width="16" height="16"><path d="M13 3h4a1 1 0 011 1v12a1 1 0 01-1 1h-4M8 14l4-4-4-4M12 10H3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>{{ t('Logout', 'خروج') }}</span>
         </a>
         {% endif %}
       </div>
-      <div style="text-align:center;margin-top:8px;font-size:0.62rem;color:rgba(168,197,192,0.3);font-weight:500;letter-spacing:0.05em">
-        ALEEFY V2 · اليفي
-      </div>
+      <div class="v3-sidebar-version">ALEEFY V3 · اليفي</div>
     </div>
 
   </aside>
 
-  <!-- ════════════════════════════════════════════════
-       MAIN
-  ════════════════════════════════════════════════ -->
-  <main class="al-main">
+  <!-- ──────────────────────────────────────────────
+       MAIN AREA
+  ────────────────────────────────────────────── -->
+  <div class="v3-main" id="v3-main">
 
-    <!-- Topbar -->
-    <header class="al-topbar">
-      <div class="al-topbar-left">
-        <button id="al-sidebar-toggle" class="al-sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">
-          ☰
+    <!-- TOPBAR -->
+    <header class="v3-topbar" id="v3-topbar">
+
+      <!-- Left: hamburger + breadcrumb -->
+      <div class="v3-topbar-left">
+        <button class="v3-hamburger" id="v3-hamburger" onclick="v3ToggleSidebar()" aria-label="Toggle sidebar">
+          <span></span><span></span><span></span>
         </button>
-        <div>
-          <div class="al-page-title">{% block page_title %}{% endblock %}</div>
-          <div class="al-page-sub">{% block page_sub %}{% endblock %}</div>
+        <nav class="v3-breadcrumb" aria-label="Breadcrumb">
+          <a href="{{ url_for('launcher.index') }}" class="v3-breadcrumb-home">
+            <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M2 6.5L8 2l6 4.5V14a1 1 0 01-1 1H3a1 1 0 01-1-1V6.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+          </a>
+          {% block breadcrumb %}{% endblock %}
+        </nav>
+        <div class="v3-page-title-area">
+          <div class="v3-page-title">{% block page_title %}{% endblock %}</div>
+          <div class="v3-page-sub">{% block page_sub %}{% endblock %}</div>
         </div>
       </div>
 
-      <div class="al-topbar-right">
+      <!-- Center: search bar -->
+      <div class="v3-topbar-center">
+        <div class="v3-search-wrap">
+          <svg class="v3-search-icon" viewBox="0 0 20 20" fill="none" width="16" height="16"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <input type="text" class="v3-search-input" id="v3-search-input"
+                 placeholder="{{ t('Search patients, appointments…', 'ابحث عن مرضى، مواعيد…') }}"
+                 autocomplete="off" onkeydown="v3SearchKey(event)">
+          <kbd class="v3-search-kbd" onclick="v3OpenCmdPalette()">Ctrl+K</kbd>
+        </div>
+      </div>
+
+      <!-- Right: indicators + user -->
+      <div class="v3-topbar-right">
         {% block topbar_actions %}{% endblock %}
 
-        <!-- Dark / Light mode toggle -->
-        <button id="al-theme-toggle" class="al-theme-toggle" onclick="alToggleTheme()"
-                title="{{ t('Toggle dark/light mode','تبديل الوضع المظلم/الفاتح') }}">
-          <span id="al-theme-icon">🌙</span>
-        </button>
-
-        <!-- AI Command Search -->
-        {% if current_user %}
-        <button class="al-cmd-trigger" onclick="openCmdPalette()" title="AI Command Search (Ctrl+K)">
-          <span>✨</span>
-          <span>Ask AI</span>
-          <kbd>Ctrl+K</kbd>
-        </button>
+        <!-- Offline indicator -->
+        <span class="v3-online-dot" id="v3-online-dot" title="Online"></span>
 
         <!-- Notifications -->
-        <a href="{{ url_for('notifications.index') }}" class="al-topbar-btn{% if unread_count and unread_count > 0 %} has-notif{% endif %}"
-           title="{{ t('Notifications', 'الإشعارات') }}">
-          🔔
+        {% if current_user %}
+        <a href="{{ url_for('notifications.index') }}" class="v3-topbar-btn v3-notif-btn{% if unread_count and unread_count > 0 %} has-notif{% endif %}" title="{{ t('Notifications','الإشعارات') }}">
+          <svg viewBox="0 0 20 20" fill="none" width="18" height="18"><path d="M10 2a6 6 0 00-6 6c0 3.5-1.5 5-1.5 5h15S16 11.5 16 8a6 6 0 00-6-6zM8.5 17a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           {% if unread_count and unread_count > 0 %}
-          <span class="badge">{{ unread_count if unread_count < 100 else '99+' }}</span>
+          <span class="v3-notif-badge">{{ unread_count if unread_count < 100 else '99+' }}</span>
           {% endif %}
         </a>
+        {% endif %}
+
+        <!-- Theme toggle -->
+        <button class="v3-topbar-btn v3-theme-btn" id="v3-topbar-theme-btn" onclick="v3ToggleTheme()" title="{{ t('Toggle theme','تبديل الوضع') }}">
+          <span id="v3-topbar-theme-icon">🌙</span>
+        </button>
+
+        <!-- User avatar + dropdown -->
+        {% if current_user %}
+        <div class="v3-user-dropdown" id="v3-user-dropdown">
+          <button class="v3-user-chip" onclick="v3ToggleUserDropdown()" type="button">
+            <div class="v3-topbar-avatar">{{ (current_user.get('full_name') or current_user.get('username') or 'U')[:2] | upper }}</div>
+            <span class="v3-topbar-username">{{ (current_user.get('full_name') or current_user.get('username') or '')[:16] }}</span>
+            <svg viewBox="0 0 12 12" fill="none" width="10" height="10"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          </button>
+          <div class="v3-dropdown-menu" id="v3-dropdown-menu">
+            <a href="{{ url_for('auth.profile') }}" class="v3-dropdown-item">
+              <svg viewBox="0 0 16 16" fill="none" width="14"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              {{ t('Profile', 'حسابي') }}
+            </a>
+            <a href="{{ url_for('system.settings') }}" class="v3-dropdown-item">
+              <svg viewBox="0 0 16 16" fill="none" width="14"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.05 3.05l1.06 1.06M11.89 11.89l1.06 1.06M3.05 12.95l1.06-1.06M11.89 4.11l1.06-1.06" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              {{ t('Settings', 'الإعدادات') }}
+            </a>
+            <div class="v3-dropdown-divider"></div>
+            <a href="{{ url_for('auth.logout') }}" class="v3-dropdown-item v3-dropdown-danger">
+              <svg viewBox="0 0 16 16" fill="none" width="14"><path d="M10 3h3a1 1 0 011 1v8a1 1 0 01-1 1h-3M7 11l3-3-3-3M10 8H2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              {{ t('Logout', 'خروج') }}
+            </a>
+          </div>
+        </div>
         {% endif %}
       </div>
     </header>
 
-    <!-- Content -->
-    <div class="al-content">
+    <!-- CONTENT -->
+    <div class="v3-content" id="v3-content">
+
+      <!-- Offline banner -->
+      <div id="v3-offline-banner" class="v3-offline-banner" style="display:none">
+        📡 {{ t('No internet connection — some features may be unavailable', 'لا يوجد اتصال بالإنترنت — بعض الميزات قد تكون غير متاحة') }}
+      </div>
 
       <!-- Flash messages -->
       {% with msgs = get_flashed_messages(with_categories=True) %}
         {% if msgs %}
-          {% for category, msg in msgs %}
-            <div class="al-flash {{ category }}" data-autodismiss="5000">
-              <span>{{ msg }}</span>
-            </div>
-          {% endfor %}
+          <div class="v3-flash-stack">
+            {% for category, msg in msgs %}
+              <div class="v3-flash v3-flash-{{ category }}" data-autodismiss="5000">
+                <span class="v3-flash-icon">
+                  {% if category == 'success' %}✅{% elif category == 'error' or category == 'danger' %}❌{% elif category == 'warning' %}⚠️{% else %}ℹ️{% endif %}
+                </span>
+                <span class="v3-flash-msg">{{ msg }}</span>
+                <button class="v3-flash-close" onclick="this.closest('.v3-flash').remove()" type="button">&times;</button>
+              </div>
+            {% endfor %}
+          </div>
         {% endif %}
       {% endwith %}
 
       {% block content %}{% endblock %}
 
-    </div>
+    </div><!-- /v3-content -->
+  </div><!-- /v3-main -->
 
-  </main>
+</div><!-- /v3-shell -->
 
-</div>
 
-<!-- ══ PETSY — Global AI Chatbot ══════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════
+     PETSY V3 — Global AI Chatbot FAB
+═══════════════════════════════════════════════════ -->
 {% if current_user %}
 <style>
+/* Petsy FAB */
 #petsy-fab-global {
-  position:fixed;bottom:28px;right:28px;z-index:1050;
-  width:58px;height:58px;border-radius:50%;border:none;cursor:pointer;
-  background:linear-gradient(135deg,#1B6B5C,#124840);
-  box-shadow:0 4px 22px rgba(27,107,92,.55);
-  display:flex;align-items:center;justify-content:center;
-  padding:8px;transition:transform .2s,box-shadow .2s;
+  position: fixed; bottom: 28px; right: 28px; z-index: 1050;
+  width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #0D2B24 0%, #1B6B5C 100%);
+  box-shadow: 0 6px 24px rgba(27,107,92,.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px; transition: transform .2s, box-shadow .2s; outline: none;
 }
-#petsy-fab-global:hover{transform:scale(1.1);box-shadow:0 6px 30px rgba(27,107,92,.7)}
-#petsy-fab-global svg{width:100%;height:100%}
-#petsy-fab-global::before{
-  content:"";position:absolute;inset:-4px;border-radius:50%;
-  background:transparent;border:2px solid rgba(27,107,92,.4);
-  animation:petsy-pulse 2.4s ease-out infinite
+#petsy-fab-global:hover { transform: scale(1.1); box-shadow: 0 8px 32px rgba(27,107,92,.75); }
+#petsy-fab-global::before {
+  content: ""; position: absolute; inset: -5px; border-radius: 50%;
+  border: 2px solid rgba(27,107,92,.4);
+  animation: petsy-pulse 2.4s ease-out infinite;
 }
-@keyframes petsy-pulse{0%{transform:scale(1);opacity:1}100%{transform:scale(1.5);opacity:0}}
-#petsy-hint{
-  position:fixed;bottom:98px;right:20px;z-index:1051;
-  background:#0D2B24;color:#fff;padding:9px 13px;
-  border-radius:12px;font-size:.82rem;font-weight:600;
-  box-shadow:0 4px 16px rgba(0,0,0,.2);white-space:nowrap;
-  pointer-events:none;animation:petsy-pop .4s ease
+@keyframes petsy-pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.55); opacity: 0; } }
+#petsy-fab-global svg { width: 100%; height: 100%; }
+
+/* Petsy hint tooltip */
+#petsy-hint {
+  position: fixed; bottom: 100px; right: 22px; z-index: 1051;
+  background: #0D2B24; color: #fff; padding: 9px 14px;
+  border-radius: 12px; font-size: .82rem; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25); white-space: nowrap; pointer-events: none;
+  animation: petsy-pop .4s ease;
 }
-#petsy-hint::after{content:"";position:absolute;bottom:-7px;right:18px;
-  border:7px solid transparent;border-top-color:#0D2B24;border-bottom:none}
-@keyframes petsy-pop{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-#petsy-panel-global{
-  position:fixed;bottom:98px;right:24px;z-index:10000;
-  width:380px;height:580px;border-radius:22px;overflow:hidden;
-  box-shadow:0 12px 44px rgba(0,0,0,.22);
-  display:none;flex-direction:column;
-  transition:opacity .25s,transform .25s;
-  opacity:0;transform:scale(.88) translateY(20px)
+#petsy-hint::after {
+  content: ""; position: absolute; bottom: -7px; right: 18px;
+  border: 7px solid transparent; border-top-color: #0D2B24; border-bottom: none;
 }
-#petsy-panel-global.open{display:flex;opacity:1;transform:scale(1) translateY(0)}
-#petsy-panel-global iframe{width:100%;height:100%;border:none;pointer-events:auto}
-#petsy-panel-close{
-  position:absolute;top:14px;right:14px;z-index:10001;
-  width:28px;height:28px;border-radius:50%;border:none;
-  background:rgba(255,255,255,.2);color:white;font-size:14px;
-  cursor:pointer;display:flex;align-items:center;justify-content:center
+@keyframes petsy-pop { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Petsy panel */
+#petsy-panel-global {
+  position: fixed; bottom: 100px; right: 26px; z-index: 10000;
+  width: 380px; height: 560px; border-radius: 18px; overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.06);
+  backdrop-filter: blur(2px);
+  display: none; flex-direction: column;
+  transition: opacity .25s, transform .25s;
+  opacity: 0; transform: scale(.9) translateY(16px);
 }
-@media(max-width:480px){
-  #petsy-panel-global{width:calc(100vw - 16px);right:8px;height:78vh;bottom:92px}
+#petsy-panel-global.open {
+  display: flex; opacity: 1; transform: scale(1) translateY(0);
+}
+#petsy-panel-global iframe { width: 100%; flex: 1; border: none; pointer-events: auto; }
+
+/* Panel header */
+.petsy-panel-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px; background: linear-gradient(135deg, #0D2B24, #1B3A30);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  flex-shrink: 0;
+}
+.petsy-panel-title {
+  flex: 1; font-size: .88rem; font-weight: 700; color: #fff; letter-spacing: .01em;
+}
+#petsy-minimize-btn, #petsy-close-btn {
+  width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(255,255,255,.12); color: #fff; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+#petsy-minimize-btn:hover, #petsy-close-btn:hover { background: rgba(255,255,255,.22); }
+
+@media (max-width: 480px) {
+  #petsy-panel-global { width: calc(100vw - 16px); right: 8px; height: 78vh; bottom: 94px; }
+  #petsy-fab-global { right: 16px; bottom: 20px; }
 }
 </style>
 
-<button id="petsy-fab-global" onclick="petsyToggle()" title="Chat with Petsy">
+<!-- FAB -->
+<button id="petsy-fab-global" onclick="petsyToggle()" title="{{ t('Chat with Aleefy Assistant', 'تحدث مع مساعد اليفي') }}">
   <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
     <ellipse cx="18" cy="14" rx="9" ry="12" transform="rotate(-20,18,14)" fill="white" opacity=".35"/>
     <ellipse cx="62" cy="14" rx="9" ry="12" transform="rotate(20,62,14)" fill="white" opacity=".35"/>
@@ -536,295 +514,305 @@
     <line x1="72" y1="46" x2="54" y2="46" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linecap="round"/>
   </svg>
 </button>
+
+<!-- Hint bubble (auto-hides after 5s) -->
 <div id="petsy-hint">🐾 {{ t("Hi! I'm Petsy — ask me anything!", "مرحباً! أنا بيتسي — اسألني أي شيء!") }}</div>
-<!-- Petsy backdrop removed — panel only closes via X button or Escape -->
+
+<!-- Panel (no backdrop — only X closes it) -->
 <div id="petsy-panel-global">
-  <button id="petsy-panel-close" onclick="petsyClose()" title="Close Petsy">&times;</button>
+  <div class="petsy-panel-header">
+    <span class="petsy-panel-title">Aleefy Assistant 🐾</span>
+    <button id="petsy-minimize-btn" onclick="petsyMinimize()" title="{{ t('Minimize','تصغير') }}">—</button>
+    <button id="petsy-close-btn" onclick="petsyClose()" title="{{ t('Close','إغلاق') }}">&times;</button>
+  </div>
   <iframe id="petsy-iframe" src="" title="Petsy AI Chat" allow="clipboard-write"></iframe>
 </div>
-<script>
-/* ── Petsy: draggable FAB + panel ────────────────────────── */
-(function(){
-  var open=false, loaded=false;
-  var fab=null, panel=null;
-  var fabX=null, fabY=null; /* null = CSS default (bottom-right) */
-  var dragging=false, dx=0, dy=0;
-  var PANEL_W=360, PANEL_H=520;
 
+<script>
+/* ── Petsy V3 ────────────────────────────────────────────── */
+(function(){
+  var open=false, minimized=false, loaded=false;
+  var fab=null, panel=null, iframe=null;
+  var dragging=false, startX=0, startY=0, origLeft=0, origBottom=0;
+  var fabPosX=null, fabPosY=null;
+  var PANEL_W=380, PANEL_H=560;
+
+  /* Auto-hide hint after 5s */
   setTimeout(function(){
     var h=document.getElementById('petsy-hint');
-    if(h){h.style.opacity='0';h.style.transition='opacity .4s';
-      setTimeout(function(){h.style.display='none';},400);}
+    if(h){h.style.transition='opacity .4s';h.style.opacity='0';setTimeout(function(){h.style.display='none'},400);}
   },5000);
 
-  /* petsyOpen / petsyClose are separate — FAB only opens, X only closes */
-  window.petsyOpen=function(){
+  function getEls(){
     if(!fab)fab=document.getElementById('petsy-fab-global');
     if(!panel)panel=document.getElementById('petsy-panel-global');
-    if(open)return;
-    open=true;
+    if(!iframe)iframe=document.getElementById('petsy-iframe');
+  }
+
+  window.petsyOpen=function(){
+    getEls();if(open)return;
+    open=true;minimized=false;
     var h=document.getElementById('petsy-hint');if(h)h.style.display='none';
-    if(!loaded){document.getElementById('petsy-iframe').src='{{ url_for("petsy.embed") }}';loaded=true;}
+    if(!loaded){iframe.src='{{ url_for("petsy.embed") }}';loaded=true;}
     panel.classList.add('open');
-    _positionPanel();
-    if(fab){fab.style.opacity='0.55';fab.style.transform='scale(0.88)';}
+    panel.style.height=PANEL_H+'px';
+    if(fab){fab.style.opacity='.55';fab.style.transform='scale(.88)';}
     localStorage.setItem('petsy-open','1');
   };
   window.petsyClose=function(){
-    if(!fab)fab=document.getElementById('petsy-fab-global');
-    if(!panel)panel=document.getElementById('petsy-panel-global');
-    if(!open)return;
-    open=false;
+    getEls();if(!open)return;
+    open=false;minimized=false;
     panel.classList.remove('open');
     if(fab){fab.style.opacity='';fab.style.transform='';}
     localStorage.setItem('petsy-open','0');
   };
-  /* petsyToggle kept for FAB click — opens only; use petsyClose to close */
+  window.petsyMinimize=function(){
+    getEls();if(!open)return;
+    minimized=!minimized;
+    if(minimized){panel.style.height='52px';}
+    else{panel.style.height=PANEL_H+'px';}
+    var btn=document.getElementById('petsy-minimize-btn');
+    if(btn)btn.textContent=minimized?'□':'—';
+  };
   window.petsyToggle=function(){
-    if(open){ /* FAB click when open: do nothing — only X closes */ return; }
+    if(open)return; /* FAB only opens; X closes */
     petsyOpen();
   };
 
-  function _positionPanel(){
-    if(!panel||!fab)return;
-    var vw=window.innerWidth,vh=window.innerHeight;
-    if(fabX!==null){
-      /* Float near FAB */
-      var px=Math.min(fabX-PANEL_W/2, vw-PANEL_W-12);
-      var py=Math.min(fabY-PANEL_H-12, vh-PANEL_H-12);
-      px=Math.max(px,8); py=Math.max(py,8);
-      panel.style.cssText='display:flex;opacity:1;transform:scale(1) translateY(0);'+
-        'right:auto;bottom:auto;left:'+px+'px;top:'+py+'px;'+
-        'width:'+PANEL_W+'px;height:'+PANEL_H+'px;z-index:10000;';
-      panel.classList.add('floating');
-    } else {
-      panel.style.cssText='';
-    }
-  }
-
-  /* Drag logic */
+  /* Drag FAB */
   document.addEventListener('DOMContentLoaded',function(){
-    fab=document.getElementById('petsy-fab-global');
-    panel=document.getElementById('petsy-panel-global');
-    if(!fab)return;
-
-    var startX,startY,origLeft,origBottom;
-
-    function onMove(cx,cy){
-      if(!dragging)return;
-      var nx=origLeft+(cx-startX);
-      var ny=origBottom-(cy-startY);
-      var vw=window.innerWidth,vh=window.innerHeight;
-      var fabSz=60;
-      nx=Math.max(8,Math.min(vw-fabSz-8,nx));
-      ny=Math.max(8,Math.min(vh-fabSz-8,ny));
-      fab.style.left=nx+'px'; fab.style.bottom=ny+'px';
-      fab.style.right='auto'; fab.style.top='auto';
-      fabX=nx+fabSz/2; fabY=vh-ny-fabSz/2;
-      if(open)_positionPanel();
-    }
-
+    getEls();if(!fab)return;
     function onDown(cx,cy){
       dragging=true;
       var r=fab.getBoundingClientRect();
-      startX=cx; startY=cy;
-      origLeft=r.left; origBottom=window.innerHeight-r.bottom;
-      fabX=r.left+r.width/2; fabY=r.top+r.height/2;
-      fab.classList.add('dragging');
-      fab.style.transition='none';
+      startX=cx;startY=cy;
+      origLeft=r.left;origBottom=window.innerHeight-r.bottom;
+      fabPosX=r.left+r.width/2;fabPosY=r.top+r.height/2;
+      fab.classList.add('dragging');fab.style.transition='none';
     }
-    function onUp(){
+    function onMove(cx,cy){
       if(!dragging)return;
-      dragging=false;
-      fab.classList.remove('dragging');
-      fab.style.transition='';
+      var vw=window.innerWidth,vh=window.innerHeight,sz=60;
+      var nx=Math.max(8,Math.min(vw-sz-8,origLeft+(cx-startX)));
+      var ny=Math.max(8,Math.min(vh-sz-8,origBottom-(cy-startY)));
+      fab.style.left=nx+'px';fab.style.bottom=ny+'px';fab.style.right='auto';fab.style.top='auto';
+      fabPosX=nx+sz/2;fabPosY=vh-ny-sz/2;
     }
-
-    fab.addEventListener('mousedown',function(e){
-      if(e.button!==0)return;
-      onDown(e.clientX,e.clientY);
-      e.preventDefault();
-    });
+    function onUp(cx,cy){
+      if(!dragging)return;
+      dragging=false;fab.classList.remove('dragging');fab.style.transition='';
+      if(Math.hypot(cx-startX,cy-startY)<6)petsyToggle();
+    }
+    fab.addEventListener('mousedown',function(e){if(e.button!==0)return;onDown(e.clientX,e.clientY);e.preventDefault();});
     document.addEventListener('mousemove',function(e){onMove(e.clientX,e.clientY);});
-    document.addEventListener('mouseup',function(e){
-      if(!dragging)return;
-      onUp();
-      /* If barely moved, treat as click */
-      var dd=Math.hypot(e.clientX-startX,e.clientY-startY);
-      if(dd<6)window.petsyToggle();
-    });
-
-    /* Touch drag */
-    fab.addEventListener('touchstart',function(e){
-      var t=e.touches[0];
-      onDown(t.clientX,t.clientY);
-    },{passive:true});
-    fab.addEventListener('touchmove',function(e){
-      var t=e.touches[0];
-      onMove(t.clientX,t.clientY);
-      e.preventDefault();
-    },{passive:false});
-    fab.addEventListener('touchend',function(e){
-      if(!dragging)return;
-      var moved=Math.hypot(
-        e.changedTouches[0].clientX-startX,
-        e.changedTouches[0].clientY-startY
-      );
-      onUp();
-      if(moved<6)window.petsyToggle();
-    });
+    document.addEventListener('mouseup',function(e){onUp(e.clientX,e.clientY);});
+    fab.addEventListener('touchstart',function(e){var t=e.touches[0];onDown(t.clientX,t.clientY);},{passive:true});
+    fab.addEventListener('touchmove',function(e){var t=e.touches[0];onMove(t.clientX,t.clientY);e.preventDefault();},{passive:false});
+    fab.addEventListener('touchend',function(e){var t=e.changedTouches[0];onUp(t.clientX,t.clientY);});
   });
 
   document.addEventListener('keydown',function(e){
     if(e.altKey&&(e.key==='p'||e.key==='P')){e.preventDefault();open?petsyClose():petsyOpen();}
-    if(e.key==='Escape'&&open){e.preventDefault();petsyClose();}
+    if(e.key==='Escape'&&open)petsyClose();
   });
 })();
 </script>
 {% endif %}
-<!-- END PETSY -->
+<!-- /PETSY -->
 
-<!-- Platform JS -->
+
+<!-- ═══════════════════════════════════════════════════
+     AI COMMAND PALETTE (Ctrl+K)
+═══════════════════════════════════════════════════ -->
+<div id="v3-cmd-palette" class="v3-cmd-backdrop" style="display:none" onclick="v3CloseCmdPalette()">
+  <div class="v3-cmd-modal" onclick="event.stopPropagation()">
+    <div class="v3-cmd-header">
+      <span class="v3-cmd-sparkle">✨</span>
+      <input id="v3-cmd-input" type="text" class="v3-cmd-input" autocomplete="off"
+             placeholder="{{ t('Ask AI anything about your clinic…', 'اسأل المساعد الذكي عن عيادتك…') }}"
+             onkeydown="v3CmdKey(event)">
+      <kbd class="v3-cmd-esc" onclick="v3CloseCmdPalette()">ESC</kbd>
+    </div>
+    <div class="v3-cmd-quicknav">
+      <div class="v3-cmd-section-label">{{ t('Quick Navigate', 'تنقل سريع') }}</div>
+      <div class="v3-cmd-links">
+        <a href="/finance/invoices" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">🧾 {{ t('Invoices','فواتير') }}</a>
+        <a href="/appointments" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">📅 {{ t('Appointments','مواعيد') }}</a>
+        <a href="/crm/owners" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">🐾 {{ t('Patients','مرضى') }}</a>
+        <a href="/visits" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">🏥 {{ t('Visits','زيارات') }}</a>
+        <a href="/reports" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">📊 {{ t('Reports','تقارير') }}</a>
+        <a href="/telemedicine" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">🎥 {{ t('Telemedicine','عن بُعد') }}</a>
+        <a href="/ai" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">🤖 {{ t('AI Chat','دردشة AI') }}</a>
+      </div>
+    </div>
+    <div id="v3-cmd-response" class="v3-cmd-response" style="display:none"></div>
+    <div class="v3-cmd-footer">
+      <span>{{ t('Powered by Aleefy AI','مدعوم من اليفي AI') }}</span>
+      <span>{{ t('Enter to ask · ESC to close','Enter للسؤال · ESC للإغلاق') }}</span>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     SCRIPTS
+═══════════════════════════════════════════════════ -->
 <script src="{{ url_for('static', filename='js/platform.js') }}"></script>
+<script src="{{ url_for('static', filename='js/v3.js') }}"></script>
 
-<!-- Aleefy JS -->
 <script>
+/* ── V3 Core Shell JS ───────────────────────────────────── */
 (function(){
-  /* ── Dark/Light mode ── */
-  var _theme = localStorage.getItem('al-theme') || 'light';
+
+  /* ── Theme ── */
+  var _theme=localStorage.getItem('al-theme')||'light';
   function _applyTheme(t){
     document.documentElement.setAttribute('data-theme',t);
-    var icon=document.getElementById('al-theme-icon');
-    if(icon)icon.textContent=t==='dark'?'☀️':'🌙';
-    localStorage.setItem('al-theme',t);
-    _theme=t;
+    var icons=['v3-sidebar-theme-icon','v3-topbar-theme-icon'];
+    icons.forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=t==='dark'?'☀️':'🌙';});
+    localStorage.setItem('al-theme',t);_theme=t;
   }
-  _applyTheme(_theme); /* apply before paint */
-  window.alToggleTheme=function(){_applyTheme(_theme==='dark'?'light':'dark');};
+  _applyTheme(_theme);
+  window.v3ToggleTheme=function(){_applyTheme(_theme==='dark'?'light':'dark');};
 
-  /* ── Sidebar toggle ── */
-  window.toggleSidebar = function(){
-    var sb = document.getElementById('al-sidebar');
-    var ov = document.getElementById('al-overlay');
-    sb.classList.toggle('open');
-    ov.classList.toggle('show');
+  /* ── Sidebar ── */
+  window.v3ToggleSidebar=function(){
+    var sb=document.getElementById('v3-sidebar');
+    var ov=document.getElementById('v3-overlay');
+    if(sb){sb.classList.toggle('open');if(ov)ov.classList.toggle('show');}
   };
-  window.closeSidebar = function(){
-    document.getElementById('al-sidebar').classList.remove('open');
-    document.getElementById('al-overlay').classList.remove('show');
+  window.v3CloseSidebar=function(){
+    var sb=document.getElementById('v3-sidebar');
+    var ov=document.getElementById('v3-overlay');
+    if(sb)sb.classList.remove('open');
+    if(ov)ov.classList.remove('show');
   };
 
-  /* ── Show mobile toggle on small screens ── */
-  function checkWidth(){
-    var btn=document.getElementById('al-sidebar-toggle');
-    if(btn) btn.style.display = window.innerWidth<=900?'flex':'none';
-  }
-  checkWidth();
-  window.addEventListener('resize',checkWidth);
-
-  /* ── Nav section collapse ── */
-  document.querySelectorAll('.al-nav-toggle').forEach(function(label){
-    label.addEventListener('click',function(){
-      var section=this.closest('.al-nav-section');
-      if(section) section.classList.toggle('collapsed');
+  /* ── Nav group collapse ── */
+  document.querySelectorAll('.v3-nav-toggle').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var grp=this.closest('.v3-nav-group');
+      if(grp){
+        var expanded=grp.classList.toggle('collapsed');
+        this.setAttribute('aria-expanded',String(!expanded));
+      }
     });
+  });
+
+  /* ── Active nav highlighting ── */
+  var path=window.location.pathname;
+  document.querySelectorAll('.v3-nav-item').forEach(function(a){
+    var href=a.getAttribute('href');
+    if(href&&href!=='/'&&path.startsWith(href)){a.classList.add('active');}
+    else if(href==='/'&&path==='/'){a.classList.add('active');}
+    if(a.classList.contains('active')){
+      var grp=a.closest('.v3-nav-group');
+      if(grp)grp.classList.remove('collapsed');
+    }
   });
 
   /* ── Language toggle ── */
   document.querySelectorAll('[data-lang-btn]').forEach(function(btn){
     btn.addEventListener('click',function(){
       var lang=this.getAttribute('data-lang-btn');
-      fetch('/settings/lang/'+lang,{method:'POST',headers:{'X-CSRF-Token':document.querySelector('meta[name=csrf-token]').content}})
+      var token=(document.querySelector('meta[name=csrf-token]')||{}).content||'';
+      fetch('/settings/lang/'+lang,{method:'POST',headers:{'X-CSRF-Token':token}})
         .then(function(){location.reload();})
         .catch(function(){document.cookie='lang='+lang+';path=/';location.reload();});
     });
   });
 
+  /* ── User dropdown ── */
+  window.v3ToggleUserDropdown=function(){
+    var menu=document.getElementById('v3-dropdown-menu');
+    if(menu)menu.classList.toggle('show');
+  };
+  document.addEventListener('click',function(e){
+    var dd=document.getElementById('v3-user-dropdown');
+    if(dd&&!dd.contains(e.target)){
+      var menu=document.getElementById('v3-dropdown-menu');
+      if(menu)menu.classList.remove('show');
+    }
+  });
+
   /* ── Auto-dismiss flash messages ── */
-  document.querySelectorAll('.al-flash[data-autodismiss],.pf-flash[data-autodismiss]').forEach(function(el){
+  document.querySelectorAll('[data-autodismiss]').forEach(function(el){
     var ms=parseInt(el.getAttribute('data-autodismiss'))||5000;
     setTimeout(function(){
-      el.style.transition='opacity 0.4s';el.style.opacity='0';
+      el.style.transition='opacity .4s,transform .4s';
+      el.style.opacity='0';el.style.transform='translateX(20px)';
       setTimeout(function(){el.remove();},400);
     },ms);
   });
+
+  /* ── Online/Offline indicator ── */
+  var dot=document.getElementById('v3-online-dot');
+  var banner=document.getElementById('v3-offline-banner');
+  function setOnline(on){
+    if(dot){dot.className='v3-online-dot'+(on?'':' offline');dot.title=on?'Online':'Offline';}
+    if(banner){banner.style.display=on?'none':'flex';}
+  }
+  setOnline(navigator.onLine);
+  window.addEventListener('online',function(){setOnline(true);});
+  window.addEventListener('offline',function(){setOnline(false);});
+
+  /* ── Mobile: hide hamburger on wide screens ── */
+  function checkWidth(){
+    var hb=document.getElementById('v3-hamburger');
+    if(hb)hb.style.display=window.innerWidth<=900?'flex':'none';
+  }
+  checkWidth();window.addEventListener('resize',checkWidth);
+
+  /* ── Search → Command Palette ── */
+  window.v3SearchKey=function(e){
+    if(e.key==='Enter'||e.key==='/'||((e.ctrlKey||e.metaKey)&&e.key==='k')){
+      e.preventDefault();v3OpenCmdPalette();
+    }
+  };
+  var _cmdOpen=false;
+  window.v3OpenCmdPalette=function(){
+    _cmdOpen=true;
+    var el=document.getElementById('v3-cmd-palette');
+    if(el){el.style.display='flex';setTimeout(function(){document.getElementById('v3-cmd-input').focus();},50);}
+  };
+  window.v3CloseCmdPalette=function(){
+    _cmdOpen=false;
+    var el=document.getElementById('v3-cmd-palette');
+    if(el)el.style.display='none';
+    var inp=document.getElementById('v3-cmd-input');if(inp)inp.value='';
+    var resp=document.getElementById('v3-cmd-response');if(resp)resp.style.display='none';
+  };
+  document.addEventListener('keydown',function(e){
+    if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();_cmdOpen?v3CloseCmdPalette():v3OpenCmdPalette();}
+    if(e.key==='Escape'&&_cmdOpen)v3CloseCmdPalette();
+  });
+  window.v3CmdKey=function(e){
+    if(e.key==='Enter'){
+      e.preventDefault();
+      var q=(document.getElementById('v3-cmd-input')||{}).value||'';
+      if(q.trim())v3AskAI(q.trim());
+    }
+  };
+  window.v3AskAI=function(q){
+    var resp=document.getElementById('v3-cmd-response');
+    if(!resp)return;
+    resp.style.display='';resp.innerHTML='<span class="v3-cmd-thinking">{{ t("Thinking…","جاري التفكير…") }}</span>';
+    var token=(document.querySelector('meta[name=csrf-token]')||{}).content||'';
+    fetch('/ai/chat',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':token},body:JSON.stringify({message:q})})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        resp.innerHTML='';
+        var text=d.content||d.error||'{{ t("No response.","لا يوجد رد.") }}';
+        var i=0;(function type(){if(i<text.length){resp.textContent=text.slice(0,++i);if(i<text.length)requestAnimationFrame(type);}})();
+      })
+      .catch(function(){resp.innerHTML='<span class="v3-cmd-error">⚠️ {{ t("AI service unavailable.","خدمة الذكاء الاصطناعي غير متاحة.") }}</span>';});
+  };
+
 })();
 </script>
 
 {% block scripts %}{% endblock %}
-
-<!-- ── AI Global Command Palette (Aleefy branded) ─────── -->
-<div id="cmdPalette" style="display:none;position:fixed;inset:0;z-index:99999;
-     background:rgba(13,27,42,.72);backdrop-filter:blur(6px);
-     align-items:flex-start;justify-content:center;padding-top:80px">
-  <div style="background:linear-gradient(160deg,#0D2B24 0%,#0D1B2A 100%);
-              border:1px solid rgba(42,157,143,.4);border-radius:20px;
-              width:600px;max-width:95vw;
-              box-shadow:0 0 60px rgba(27,107,92,.2),0 20px 60px rgba(0,0,0,.5);
-              overflow:hidden">
-    <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;
-                border-bottom:1px solid rgba(42,157,143,.15)">
-      <span style="font-size:1.1rem;flex-shrink:0">✨</span>
-      <input id="cmdInput" type="text" autocomplete="off"
-             placeholder="{{ t('Ask AI anything about your clinic…', 'اسأل المساعد الذكي عن عيادتك…') }}"
-             style="flex:1;background:none;border:none;outline:none;color:#e2e8f0;
-                    font-size:1rem;font-family:inherit"
-             onkeydown="cmdKey(event)">
-      <kbd onclick="closeCmdPalette()"
-           style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
-                  border-radius:6px;padding:2px 8px;font-size:.72rem;color:#94a3b8;cursor:pointer">ESC</kbd>
-    </div>
-    <div style="padding:10px 14px;border-bottom:1px solid rgba(42,157,143,.1)">
-      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-                  color:rgba(168,197,192,.5);margin-bottom:8px">Quick Navigate</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        <a href="/finance/invoices" onclick="closeCmdPalette()" class="cmd-quick">🧾 Invoices</a>
-        <a href="/appointments" onclick="closeCmdPalette()" class="cmd-quick">📅 Appointments</a>
-        <a href="/crm/owners" onclick="closeCmdPalette()" class="cmd-quick">🐾 Patients</a>
-        <a href="/visits" onclick="closeCmdPalette()" class="cmd-quick">🏥 Visits</a>
-        <a href="/reports/builder" onclick="closeCmdPalette()" class="cmd-quick">📊 Reports</a>
-        <a href="/telemedicine" onclick="closeCmdPalette()" class="cmd-quick">🎥 Telemedicine</a>
-        <a href="/ai" onclick="closeCmdPalette()" class="cmd-quick">🤖 AI Chat</a>
-      </div>
-    </div>
-    <div id="cmdResponse" style="padding:16px 20px;min-height:80px;max-height:300px;overflow-y:auto;
-         color:#a8c5c0;font-size:.88rem;line-height:1.6;display:none"></div>
-    <div style="padding:8px 18px;border-top:1px solid rgba(42,157,143,.1);
-                display:flex;align-items:center">
-      <span style="font-size:.68rem;color:rgba(168,197,192,.4)">Powered by Aleefy AI</span>
-      <span style="margin-left:auto;font-size:.68rem;color:rgba(168,197,192,.3)">Enter to ask · ESC to close</span>
-    </div>
-  </div>
-</div>
-
-<script>
-(function(){
-  var _open=false;
-  window.openCmdPalette=function(){_open=true;document.getElementById('cmdPalette').style.display='flex';setTimeout(function(){document.getElementById('cmdInput').focus();},50);};
-  window.closeCmdPalette=function(){_open=false;document.getElementById('cmdPalette').style.display='none';document.getElementById('cmdInput').value='';document.getElementById('cmdResponse').style.display='none';};
-  document.addEventListener('keydown',function(e){
-    if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();_open?closeCmdPalette():openCmdPalette();}
-    if(e.key==='Escape'&&_open)closeCmdPalette();
-  });
-  document.getElementById('cmdPalette').addEventListener('click',function(e){if(e.target===this)closeCmdPalette();});
-  window.cmdKey=function(e){if(e.key==='Enter'){e.preventDefault();var q=document.getElementById('cmdInput').value.trim();if(q)askCmdAi(q);}};
-  window.askCmdAi=function(question){
-    var resp=document.getElementById('cmdResponse');
-    resp.style.display='';
-    resp.innerHTML='<span style="color:rgba(168,197,192,.6)">Thinking...</span>';
-    fetch('/ai/chat',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':(document.querySelector('meta[name=csrf-token]')||{}).content||''},body:JSON.stringify({message:question})})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      resp.innerHTML='';
-      var text=d.content||d.error||'No response.';
-      var i=0;
-      function typeNext(){if(i<text.length){resp.textContent=text.slice(0,++i);if(i<text.length)requestAnimationFrame(typeNext);}}
-      typeNext();
-    })
-    .catch(function(){resp.innerHTML='<span style="color:#fca5a5">⚠️ AI service unavailable.</span>';});
-  };
-})();
-</script>
+{% block extra_js %}{% endblock %}
 
 </body>
 </html>

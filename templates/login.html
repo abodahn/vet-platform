@@ -1,549 +1,815 @@
 <!doctype html>
 <html lang="{{ current_lang or 'en' }}" dir="ltr" data-theme="light">
 <head>
-  <script>(function(){var t=localStorage.getItem('al-theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+  <script>(function(){var t=localStorage.getItem('al-theme')||'light';document.documentElement.setAttribute('data-theme',t);if(t==='dark')document.documentElement.style.background='#0D1B2A'})();</script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Aleefy — Smart Veterinary Platform</title>
+  <title>Aleefy — Secure Clinic Login</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/aleefy-logo.png') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/platform.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/aleefy.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* ── Login Page ── */
-*{box-sizing:border-box;margin:0;padding:0}
+/* ─── V3 CSS Tokens ─────────────────────────────────────────────────────── */
+:root {
+  --bg: #F4F6F9;
+  --bg-card: #FFFFFF;
+  --primary: #1A5276;
+  --primary-mid: #2E86C1;
+  --text: #1B2631;
+  --text-mid: #4A6275;
+  --text-muted: #7F96A8;
+  --border: #D5DEE7;
+  --danger: #C0392B;
+  --danger-bg: #FDEDEC;
+}
+[data-theme="dark"] {
+  --bg: #0D1B2A;
+  --bg-card: #132437;
+  --text: #D6E8F5;
+  --text-mid: #7AACC8;
+  --text-muted: #4A7A9B;
+  --border: rgba(46,134,193,0.2);
+  --danger-bg: rgba(192,57,43,0.14);
+}
 
+/* ─── Reset ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ─── Body ──────────────────────────────────────────────────────────────── */
 body {
-  min-height:100vh;
-  background: var(--al-bg, #F7F3EC);
-  display:flex;
-  font-family:'Plus Jakarta Sans','Cairo',system-ui,sans-serif;
-  color: var(--al-text, #1A2E3B);
+  min-height: 100vh;
+  display: flex;
+  font-family: 'Inter', 'Cairo', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
   transition: background 0.25s, color 0.25s;
 }
 
-/* Hero side */
-.login-hero {
-  flex:1;
-  min-height:100vh;
-  background: linear-gradient(145deg, #0D2B24 0%, #1B6B5C 45%, #2A9D8F 100%);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  padding:48px 40px;
-  position:relative;
-  overflow:hidden;
+/* ════════════════════════════════════════════════════════════════════════════
+   LEFT PANEL — Brand Hero
+   ════════════════════════════════════════════════════════════════════════════ */
+.hero-panel {
+  flex: 0 0 55%;
+  min-height: 100vh;
+  background: linear-gradient(145deg, #050E1A 0%, #0A1828 40%, #0F2030 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 48px;
+  position: relative;
+  overflow: hidden;
 }
 
-/* Decorative circles */
-.login-hero::before {
-  content:'';
-  position:absolute;
-  top:-80px; left:-80px;
-  width:360px; height:360px;
-  border-radius:50%;
-  background:radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%);
+/* Animated orbs */
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
 }
-.login-hero::after {
-  content:'';
-  position:absolute;
-  bottom:-100px; right:-60px;
-  width:400px; height:400px;
-  border-radius:50%;
-  background:radial-gradient(circle, rgba(42,157,143,0.15) 0%, transparent 70%);
+.hero-orb-1 {
+  width: 480px; height: 480px;
+  top: -140px; left: -120px;
+  background: radial-gradient(circle, rgba(30,90,160,0.35) 0%, transparent 70%);
+  animation: orbFloat1 14s ease-in-out infinite;
 }
-
-/* Paw watermark */
-.hero-paw {
-  position:absolute;
-  bottom:30px; left:30px;
-  font-size:8rem;
-  opacity:0.04;
-  transform:rotate(-20deg);
-  pointer-events:none;
-  user-select:none;
+.hero-orb-2 {
+  width: 360px; height: 360px;
+  bottom: -100px; right: -80px;
+  background: radial-gradient(circle, rgba(46,134,193,0.25) 0%, transparent 70%);
+  animation: orbFloat2 18s ease-in-out infinite;
+}
+.hero-orb-3 {
+  width: 260px; height: 260px;
+  top: 45%; left: 55%;
+  background: radial-gradient(circle, rgba(212,172,60,0.12) 0%, transparent 70%);
+  animation: orbFloat3 22s ease-in-out infinite;
 }
 
-.hero-content { position:relative; z-index:1; width:100%; max-width:480px; }
-
-/* Logo mark */
-.hero-logo-wrap {
-  display:flex;
-  align-items:center;
-  gap:14px;
-  margin-bottom:32px;
+@keyframes orbFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%       { transform: translate(30px, 40px) scale(1.06); }
+}
+@keyframes orbFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%       { transform: translate(-20px, -30px) scale(1.04); }
+}
+@keyframes orbFloat3 {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50%       { transform: translate(-50%, -50%) scale(1.12); }
 }
 
-.hero-logo-icon {
-  width:60px; height:60px;
-  border-radius:16px;
-  background:rgba(255,255,255,0.12);
-  border:1px solid rgba(255,255,255,0.2);
-  display:flex; align-items:center; justify-content:center;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+/* Grain noise overlay */
+.hero-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.hero-logo-icon svg { width:40px; height:40px; }
+.hero-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 520px;
+}
 
-.hero-logo-text-wrap {}
+/* Logo row */
+.hero-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 36px;
+}
+
+.hero-logo-img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  padding: 4px;
+}
 
 .hero-logo-name {
-  font-size:2rem;
-  font-weight:800;
-  color:#fff;
-  letter-spacing:-0.03em;
-  line-height:1;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  letter-spacing: -0.035em;
+  line-height: 1;
 }
-
-.hero-logo-name .gold { color:#C9A84C; }
 
 .hero-logo-ar {
-  font-size:1rem;
-  color:rgba(255,255,255,0.5);
-  font-family:'Cairo',sans-serif;
-  margin-top:2px;
+  font-size: 1rem;
+  font-family: 'Cairo', sans-serif;
+  color: #D4AC2C;
+  margin-top: 3px;
+  letter-spacing: 0.01em;
 }
 
-/* Hero heading */
-.hero-heading {
-  font-size:1.85rem;
-  font-weight:800;
-  color:#fff;
-  line-height:1.2;
-  letter-spacing:-0.02em;
-  margin-bottom:12px;
+/* Tagline */
+.hero-tagline {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  margin-bottom: 10px;
 }
 
-.hero-heading .accent { color:#C9A84C; }
-
-.hero-sub {
-  font-size:0.9rem;
-  color:rgba(255,255,255,0.65);
-  line-height:1.6;
-  margin-bottom:36px;
-  max-width:380px;
+.hero-tagline .gold {
+  background: linear-gradient(135deg, #D4AC2C, #F0CC60);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* Feature cards grid */
+.hero-subtitle {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.65;
+  margin-bottom: 36px;
+  max-width: 420px;
+}
+
+/* Feature highlight cards */
 .hero-features {
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-bottom:32px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 28px;
 }
 
-.hero-feature {
-  padding:12px 14px;
-  background:rgba(255,255,255,0.06);
-  border:1px solid rgba(255,255,255,0.1);
-  border-radius:12px;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  transition:background 0.2s;
+.hero-feature-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 13px;
+  backdrop-filter: blur(6px);
+  transition: background 0.2s, border-color 0.2s;
+  cursor: default;
 }
 
-.hero-feature:hover { background:rgba(255,255,255,0.1); }
+.hero-feature-card:hover {
+  background: rgba(255,255,255,0.085);
+  border-color: rgba(255,255,255,0.15);
+}
 
-.hero-feature-icon { font-size:1.3rem; flex-shrink:0; }
+.hero-feature-icon { font-size: 1.35rem; flex-shrink: 0; }
 
 .hero-feature-name {
-  font-size:0.82rem;
-  font-weight:700;
-  color:#fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  line-height: 1.2;
 }
 
 .hero-feature-sub {
-  font-size:0.7rem;
-  color:rgba(255,255,255,0.5);
-  margin-top:1px;
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.45);
+  margin-top: 2px;
 }
 
 /* Module pills */
 .hero-pills {
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 28px;
 }
 
 .hero-pill {
-  padding:4px 11px;
-  border-radius:999px;
-  background:rgba(201,168,76,0.15);
-  border:1px solid rgba(201,168,76,0.3);
-  color:rgba(255,255,255,0.8);
-  font-size:0.72rem;
-  font-weight:600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(212,172,44,0.1);
+  border: 1px solid rgba(212,172,44,0.25);
+  color: rgba(255,255,255,0.75);
+  font-size: 0.71rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background 0.2s;
+}
+.hero-pill:hover {
+  background: rgba(212,172,44,0.2);
 }
 
-/* ── Login form panel ── */
-.login-panel {
-  width:460px;
-  min-height:100vh;
-  background: var(--al-bg-card, #fff);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:48px 40px;
-  box-shadow:-8px 0 40px rgba(13,27,42,0.08);
+/* Hero footer */
+.hero-trusted {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hero-trusted::before {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #4CAF50;
+  box-shadow: 0 0 6px rgba(76,175,80,0.6);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   RIGHT PANEL — Login Form
+   ════════════════════════════════════════════════════════════════════════════ */
+.form-panel {
+  flex: 0 0 45%;
+  min-height: 100vh;
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+  box-shadow: -10px 0 60px rgba(10,24,40,0.1);
+  position: relative;
   transition: background 0.25s;
 }
 
-.login-form-wrap {
-  width:100%;
-  max-width:360px;
+/* Theme toggle */
+.theme-toggle {
+  position: absolute;
+  top: 24px; right: 24px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: var(--text-mid);
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+.theme-toggle:hover {
+  background: var(--border);
+  transform: scale(1.05);
 }
 
-/* Form header */
-.login-welcome {
-  margin-bottom:28px;
+.form-inner {
+  width: 100%;
+  max-width: 360px;
 }
 
-.login-welcome-badge {
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:4px 12px;
-  border-radius:999px;
-  background: var(--al-primary-light, #E6F4F1);
-  color: var(--al-primary, #1B6B5C);
-  font-size:0.72rem;
-  font-weight:700;
-  margin-bottom:12px;
-  letter-spacing:0.02em;
+/* Secure badge */
+.secure-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  background: rgba(26,82,118,0.08);
+  border: 1px solid rgba(26,82,118,0.15);
+  color: var(--primary);
+  font-size: 0.71rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+[data-theme="dark"] .secure-badge {
+  background: rgba(46,134,193,0.12);
+  border-color: rgba(46,134,193,0.22);
+  color: var(--primary-mid);
 }
 
-.login-welcome-title {
-  font-size:1.6rem;
-  font-weight:800;
-  color: var(--al-navy, #0D1B2A);
-  letter-spacing:-0.02em;
-  line-height:1.2;
-  margin-bottom:6px;
+.secure-badge-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #27AE60;
+  box-shadow: 0 0 6px rgba(39,174,96,0.7);
+  animation: pulse 2.5s ease-in-out infinite;
 }
 
-.login-welcome-sub {
-  font-size:0.85rem;
-  color: var(--al-text-light, #7A9BAD);
-  line-height:1.5;
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(39,174,96,0.7); }
+  50%       { opacity: 0.7; box-shadow: 0 0 10px rgba(39,174,96,0.4); }
 }
 
-/* Error */
-.login-error {
-  padding:11px 14px;
-  background: var(--al-danger-bg, #FDECEA);
-  border:1px solid rgba(192,57,43,0.2);
-  border-radius:10px;
-  color: var(--al-danger, #C0392B);
-  font-size:0.84rem;
-  font-weight:500;
-  margin-bottom:20px;
-  display:flex;
-  align-items:center;
-  gap:8px;
+.form-heading {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 8px;
 }
 
-/* Form fields */
-.login-field {
-  margin-bottom:18px;
+.form-subheading {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin-bottom: 28px;
 }
 
-.login-label {
-  display:block;
-  font-size:0.82rem;
-  font-weight:600;
-  color: var(--al-text, #1A2E3B);
-  margin-bottom:6px;
+/* Error alert */
+.login-error-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  border-radius: 11px;
+  background: var(--danger-bg);
+  border: 1px solid rgba(192,57,43,0.18);
+  color: var(--danger);
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 22px;
+}
+[data-theme="dark"] .login-error-box {
+  border-color: rgba(192,57,43,0.3);
 }
 
-.login-input-wrap {
-  position:relative;
+/* Field groups */
+.form-field {
+  margin-bottom: 18px;
 }
 
-.login-input-icon {
-  position:absolute;
-  left:12px; top:50%;
-  transform:translateY(-50%);
-  font-size:1rem;
-  pointer-events:none;
-  opacity:0.5;
+.form-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-mid);
+  margin-bottom: 7px;
+  letter-spacing: 0.01em;
 }
 
-.login-input {
-  width:100%;
-  padding:11px 14px 11px 40px;
-  border:1.5px solid var(--al-border, #DDE8E5);
-  border-radius:10px;
-  background: var(--al-bg-card, #fff);
-  color: var(--al-text, #1A2E3B);
-  font-size:0.9rem;
-  font-family:inherit;
-  outline:none;
-  transition:all 0.2s;
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
-.login-input:focus {
-  border-color:#1B6B5C;
-  box-shadow:0 0 0 3px rgba(27,107,92,0.12);
+.input-prefix-icon {
+  position: absolute;
+  left: 13px;
+  font-size: 0.95rem;
+  pointer-events: none;
+  opacity: 0.45;
+  z-index: 1;
+  line-height: 1;
 }
 
-.login-input::placeholder { color: var(--al-text-muted, #A0B8C0); }
-
-.pw-toggle {
-  position:absolute;
-  right:12px; top:50%;
-  transform:translateY(-50%);
-  background:none;
-  border:none;
-  cursor:pointer;
-  font-size:1rem;
-  color: var(--al-text-light, #7A9BAD);
-  padding:0;
-  opacity:0.7;
-  transition:opacity 0.2s;
+.form-input {
+  width: 100%;
+  padding: 12px 14px 12px 41px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  -webkit-appearance: none;
 }
-.pw-toggle:hover { opacity:1; }
+
+.form-input:focus {
+  border-color: var(--primary-mid);
+  box-shadow: 0 0 0 3.5px rgba(46,134,193,0.18);
+  background: var(--bg-card);
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.form-input::-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg) inset !important;
+  -webkit-text-fill-color: var(--text) !important;
+}
+
+/* Show/hide password toggle */
+.pw-show-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--text-muted);
+  padding: 4px;
+  line-height: 1;
+  transition: opacity 0.2s;
+  opacity: 0.65;
+}
+.pw-show-btn:hover { opacity: 1; }
 
 /* Submit button */
-.login-submit {
-  width:100%;
-  padding:13px;
-  border-radius:12px;
-  border:none;
-  background:linear-gradient(135deg, #1B6B5C, #2A9D8F);
-  color:#fff;
-  font-size:0.95rem;
-  font-weight:700;
-  font-family:inherit;
-  cursor:pointer;
-  transition:all 0.2s;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:8px;
-  box-shadow:0 4px 16px rgba(27,107,92,0.3);
-  margin-top:8px;
+.submit-btn {
+  width: 100%;
+  padding: 13.5px 20px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1A5276 0%, #2E86C1 100%);
+  color: #FFFFFF;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 18px rgba(26,82,118,0.35);
+  transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+  margin-top: 6px;
+  letter-spacing: 0.01em;
+  position: relative;
+  overflow: hidden;
 }
 
-.login-submit:hover {
-  background:linear-gradient(135deg, #124840, #1B6B5C);
-  box-shadow:0 6px 24px rgba(27,107,92,0.4);
-  transform:translateY(-1px);
+.submit-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 100%);
 }
 
-.login-submit:active { transform:translateY(0); }
-
-/* Footer */
-.login-footer {
-  margin-top:28px;
-  text-align:center;
-  font-size:0.73rem;
-  color: var(--al-text-muted, #A0B8C0);
-  line-height:1.6;
+.submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 24px rgba(26,82,118,0.45);
 }
 
-.login-footer strong { color:#1B6B5C; }
+.submit-btn:active { transform: translateY(0); }
+
+.submit-btn.loading {
+  opacity: 0.8;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.submit-btn.loading .btn-arrow { display: none; }
+.submit-btn .btn-spinner { display: none; }
+.submit-btn.loading .btn-spinner { display: inline-block; }
+
+.btn-spinner {
+  width: 17px; height: 17px;
+  border: 2.5px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Divider */
-.login-divider {
-  display:flex;
-  align-items:center;
-  gap:12px;
-  margin:20px 0;
-  color: var(--al-text-muted, #A0B8C0);
-  font-size:0.75rem;
+.form-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 26px 0 18px;
 }
-.login-divider::before, .login-divider::after {
-  content:''; flex:1; height:1px; background: var(--al-border, #EAE6DF);
+.form-divider::before, .form-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.form-divider-text {
+  font-family: 'Cairo', sans-serif;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
-/* Responsive */
-@media (max-width:900px) {
-  .login-hero { display:none; }
-  .login-panel { width:100%; box-shadow:none; padding:40px 24px; }
+/* Footer */
+.form-footer {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.7;
 }
 
-@media (max-width:480px) {
-  .login-panel { padding:32px 20px; }
-  .login-welcome-title { font-size:1.4rem; }
+.form-footer strong {
+  color: var(--primary-mid);
+  font-weight: 700;
+}
+
+.form-footer-ar {
+  font-family: 'Cairo', sans-serif;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  color: var(--primary-mid);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.back-link:hover { opacity: 0.75; }
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hero-panel { display: none; }
+}
+
+@media (max-width: 900px) {
+  .form-panel {
+    flex: 1;
+    box-shadow: none;
+    padding: 40px 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-panel { padding: 32px 18px; }
+  .form-heading { font-size: 1.65rem; }
 }
 </style>
 </head>
 <body>
 
-<div style="display:flex;width:100%;min-height:100vh">
+<!-- ══ LEFT PANEL — Hero ═══════════════════════════════════════════════════ -->
+<div class="hero-panel">
+  <div class="hero-orb hero-orb-1"></div>
+  <div class="hero-orb hero-orb-2"></div>
+  <div class="hero-orb hero-orb-3"></div>
 
-  <!-- ══ HERO PANEL ═══════════════════════════════════════════ -->
-  <div class="login-hero">
-    <div class="hero-paw">🐾</div>
+  <div class="hero-content">
 
-    <div class="hero-content">
-
-      <!-- Logo -->
-      <div class="hero-logo-wrap">
-        <div class="hero-logo-icon" style="background:transparent;box-shadow:none;padding:0;">
-          <img src="/static/images/aleefy-logo.png" alt="Aleefy" style="width:60px;height:60px;object-fit:contain;border-radius:12px;">
-        </div>
-        <div class="hero-logo-text-wrap">
-          <div class="hero-logo-name">Alee<span class="gold">fy</span></div>
-          <div class="hero-logo-ar">اليفي — رعاية أذكى</div>
-        </div>
+    <!-- Logo -->
+    <div class="hero-logo-row">
+      <img src="/static/images/aleefy-logo.png" alt="Aleefy Logo" class="hero-logo-img">
+      <div>
+        <div class="hero-logo-name">Aleefy</div>
+        <div class="hero-logo-ar">اليفي</div>
       </div>
-
-      <!-- Heading -->
-      <div class="hero-heading">
-        Smart Veterinary<br>
-        <span class="accent">Clinic Management</span>
-      </div>
-      <div class="hero-sub">
-        The complete platform for modern animal hospitals &amp; veterinary clinics.
-        AI-powered · Bilingual · Cloud-ready.
-      </div>
-
-      <!-- Feature grid -->
-      <div class="hero-features">
-        <div class="hero-feature">
-          <span class="hero-feature-icon">🩺</span>
-          <div>
-            <div class="hero-feature-name">Examinations</div>
-            <div class="hero-feature-sub">Medical records & EMR</div>
-          </div>
-        </div>
-        <div class="hero-feature">
-          <span class="hero-feature-icon">🐾</span>
-          <div>
-            <div class="hero-feature-name">Patients & CRM</div>
-            <div class="hero-feature-sub">Owners, pets & timelines</div>
-          </div>
-        </div>
-        <div class="hero-feature">
-          <span class="hero-feature-icon">📦</span>
-          <div>
-            <div class="hero-feature-name">Inventory</div>
-            <div class="hero-feature-sub">Batch · Expiry · Reorder</div>
-          </div>
-        </div>
-        <div class="hero-feature">
-          <span class="hero-feature-icon">🤖</span>
-          <div>
-            <div class="hero-feature-name">AI Assistant</div>
-            <div class="hero-feature-sub">Role-based AI copilot</div>
-          </div>
-        </div>
-        <div class="hero-feature">
-          <span class="hero-feature-icon">💬</span>
-          <div>
-            <div class="hero-feature-name">WhatsApp</div>
-            <div class="hero-feature-sub">Reminders & campaigns</div>
-          </div>
-        </div>
-        <div class="hero-feature">
-          <span class="hero-feature-icon">📊</span>
-          <div>
-            <div class="hero-feature-name">Reports & Finance</div>
-            <div class="hero-feature-sub">Invoices · P&L · Payroll</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Module pills -->
-      <div class="hero-pills">
-        <span class="hero-pill">📅 Appointments</span>
-        <span class="hero-pill">💊 Pharmacy</span>
-        <span class="hero-pill">🔬 Lab</span>
-        <span class="hero-pill">✂️ Grooming</span>
-        <span class="hero-pill">🏨 Boarding</span>
-        <span class="hero-pill">🎥 Telemedicine</span>
-        <span class="hero-pill">🏥 Inpatient</span>
-        <span class="hero-pill">👥 HR & Payroll</span>
-      </div>
-
     </div>
-  </div>
 
-  <!-- ══ FORM PANEL ════════════════════════════════════════════ -->
-  <div class="login-panel">
-    <div class="login-form-wrap">
-
-      <!-- Welcome header -->
-      <div class="login-welcome">
-        <div class="login-welcome-badge">
-          ✦ Secure Clinic Access
-        </div>
-        <div class="login-welcome-title">Welcome back 👋</div>
-        <div class="login-welcome-sub">
-          Sign in to your Aleefy clinic dashboard.<br>
-          <span style="color:#1B6B5C;font-weight:600">Happy Pets, Healthy Lives.</span>
-        </div>
-      </div>
-
-      <!-- Error -->
-      {% if error %}
-      <div class="login-error">
-        <span>🔐</span> {{ error }}
-      </div>
-      {% endif %}
-
-      <!-- Form -->
-      <form method="post" action="{{ url_for('auth.login') }}" autocomplete="on">
-        {% if request.args.get('next') %}
-          <input type="hidden" name="next" value="{{ request.args.get('next') }}">
-        {% endif %}
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-
-        <div class="login-field">
-          <label class="login-label" for="username">Username</label>
-          <div class="login-input-wrap">
-            <span class="login-input-icon">👤</span>
-            <input class="login-input" type="text" id="username" name="username"
-                   value="{{ username or '' }}" required autocomplete="username"
-                   placeholder="Enter your username" autofocus>
-          </div>
-        </div>
-
-        <div class="login-field">
-          <label class="login-label" for="password">Password</label>
-          <div class="login-input-wrap">
-            <span class="login-input-icon">🔑</span>
-            <input class="login-input" type="password" id="password" name="password"
-                   required autocomplete="current-password"
-                   placeholder="Enter your password">
-            <button type="button" class="pw-toggle" id="pw-toggle"
-                    title="Show/hide password">👁️</button>
-          </div>
-        </div>
-
-        <button type="submit" class="login-submit">
-          <span>Sign In</span>
-          <span>→</span>
-        </button>
-      </form>
-
-      <!-- Footer -->
-      <div class="login-divider">اليفي</div>
-      <div class="login-footer">
-        <strong>Aleefy</strong> — Veterinary Clinic Management Platform<br>
-        رعاية أذكى… لحياة أحن · Happy Pets, Healthy Lives
-        <br><br>
-        <span style="opacity:0.6">© 2026 Aleefy · Secure & Encrypted</span>
-        <br>
-        <a href="/" style="color:var(--al-primary,#1B6B5C);font-weight:600;text-decoration:none;margin-top:6px;display:inline-block;">← Back to Platform Overview</a>
-      </div>
-
+    <!-- Tagline -->
+    <div class="hero-tagline">
+      Smart Veterinary<br>
+      <span class="gold">Clinic Platform</span>
     </div>
-  </div>
+    <div class="hero-subtitle">
+      The complete operating system for modern animal hospitals.<br>
+      AI-powered · Bilingual · Fully integrated.
+    </div>
 
+    <!-- Feature highlights -->
+    <div class="hero-features">
+      <div class="hero-feature-card">
+        <span class="hero-feature-icon">🐾</span>
+        <div>
+          <div class="hero-feature-name">Pets &amp; Medical Records</div>
+          <div class="hero-feature-sub">Full EMR &amp; clinical history</div>
+        </div>
+      </div>
+      <div class="hero-feature-card">
+        <span class="hero-feature-icon">📅</span>
+        <div>
+          <div class="hero-feature-name">Smart Appointments</div>
+          <div class="hero-feature-sub">Scheduling &amp; reminders</div>
+        </div>
+      </div>
+      <div class="hero-feature-card">
+        <span class="hero-feature-icon">💰</span>
+        <div>
+          <div class="hero-feature-name">Finance &amp; Inventory</div>
+          <div class="hero-feature-sub">Billing, P&amp;L &amp; stock</div>
+        </div>
+      </div>
+      <div class="hero-feature-card">
+        <span class="hero-feature-icon">🤖</span>
+        <div>
+          <div class="hero-feature-name">AI-Powered Insights</div>
+          <div class="hero-feature-sub">Copilot for every role</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Module pills -->
+    <div class="hero-pills">
+      <span class="hero-pill">Appointments</span>
+      <span class="hero-pill">Pharmacy</span>
+      <span class="hero-pill">Lab</span>
+      <span class="hero-pill">Grooming</span>
+      <span class="hero-pill">Boarding</span>
+      <span class="hero-pill">Telemedicine</span>
+      <span class="hero-pill">HR</span>
+      <span class="hero-pill">Reports</span>
+    </div>
+
+    <!-- Trusted footer -->
+    <div class="hero-trusted">Trusted by veterinary teams.</div>
+
+  </div>
 </div>
 
+<!-- ══ RIGHT PANEL — Login Form ════════════════════════════════════════════ -->
+<div class="form-panel">
+
+  <!-- Theme toggle -->
+  <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle dark/light mode">
+    🌙
+  </button>
+
+  <div class="form-inner">
+
+    <!-- Header -->
+    <div class="secure-badge">
+      <span class="secure-badge-dot"></span>
+      Secure Clinic Access
+    </div>
+
+    <h1 class="form-heading">Welcome back 👋</h1>
+    <p class="form-subheading">Sign in to your Aleefy dashboard.</p>
+
+    <!-- Error -->
+    {% if error %}
+    <div class="login-error-box" role="alert">
+      <span>🔐</span>
+      <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Form -->
+    <form method="post" action="{{ url_for('auth.login') }}" autocomplete="on" id="login-form" novalidate>
+      {% if request.args.get('next') %}
+        <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+      {% endif %}
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+      <!-- Username -->
+      <div class="form-field">
+        <label class="form-label" for="username">Username</label>
+        <div class="input-wrap">
+          <span class="input-prefix-icon">👤</span>
+          <input
+            class="form-input"
+            type="text"
+            id="username"
+            name="username"
+            value="{{ username or '' }}"
+            required
+            autocomplete="username"
+            placeholder="Enter your username"
+            autofocus
+          >
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="form-field">
+        <label class="form-label" for="password">Password</label>
+        <div class="input-wrap">
+          <span class="input-prefix-icon">🔑</span>
+          <input
+            class="form-input"
+            type="password"
+            id="password"
+            name="password"
+            required
+            autocomplete="current-password"
+            placeholder="Enter your password"
+            style="padding-right: 42px;"
+          >
+          <button type="button" class="pw-show-btn" id="pw-toggle" aria-label="Show or hide password">👁️</button>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" class="submit-btn" id="submit-btn">
+        <span class="btn-label">Sign In</span>
+        <span class="btn-arrow">→</span>
+        <span class="btn-spinner"></span>
+      </button>
+
+    </form>
+
+    <!-- Divider -->
+    <div class="form-divider">
+      <span class="form-divider-text">اليفي</span>
+    </div>
+
+    <!-- Footer -->
+    <div class="form-footer">
+      <strong>Aleefy</strong> — Veterinary Clinic Management Platform<br>
+      <span class="form-footer-ar">رعاية أذكى · Happy Pets, Healthy Lives</span>
+      <br>
+      <a href="/" class="back-link">← Back to Platform Overview</a>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ Scripts ════════════════════════════════════════════════════════════════ -->
 <script>
-document.getElementById('pw-toggle').addEventListener('click', function(){
-  var inp = document.getElementById('password');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-  this.textContent = inp.type === 'password' ? '👁️' : '🙈';
-});
+(function () {
+  'use strict';
+
+  // ── 1. Theme toggle ────────────────────────────────────────────────────────
+  var themeBtn = document.getElementById('theme-toggle');
+  var html = document.documentElement;
+
+  function applyTheme(t) {
+    html.setAttribute('data-theme', t);
+    if (t === 'dark') {
+      html.style.background = '#0D1B2A';
+      themeBtn.textContent = '☀️';
+    } else {
+      html.style.background = '';
+      themeBtn.textContent = '🌙';
+    }
+    localStorage.setItem('al-theme', t);
+  }
+
+  // Set icon to match current theme on load
+  var currentTheme = localStorage.getItem('al-theme') || 'light';
+  applyTheme(currentTheme);
+
+  themeBtn.addEventListener('click', function () {
+    var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+  });
+
+  // ── 2. Password show/hide ──────────────────────────────────────────────────
+  var pwToggle = document.getElementById('pw-toggle');
+  var pwInput = document.getElementById('password');
+
+  pwToggle.addEventListener('click', function () {
+    if (pwInput.type === 'password') {
+      pwInput.type = 'text';
+      pwToggle.textContent = '🙈';
+    } else {
+      pwInput.type = 'password';
+      pwToggle.textContent = '👁️';
+    }
+  });
+
+  // ── 3. Loading state on submit ─────────────────────────────────────────────
+  var form = document.getElementById('login-form');
+  var submitBtn = document.getElementById('submit-btn');
+
+  form.addEventListener('submit', function () {
+    // Small delay so browser can validate first
+    setTimeout(function () {
+      if (form.checkValidity()) {
+        submitBtn.classList.add('loading');
+        submitBtn.disabled = true;
+      }
+    }, 0);
+  });
+
+})();
 </script>
 
 </body>

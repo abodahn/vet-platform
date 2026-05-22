@@ -1,0 +1,426 @@
+================================================================================
+ALEEFY V3 ROUTING REPORT
+Generated: 2026-05-22
+Total routes: 323
+================================================================================
+
+Blueprint: __root__  (prefix: "")
+------------------------------------------------------------
+  [GET                 ]  /static/<path:filename>
+
+Blueprint: accounting  (prefix: "/accounting")
+------------------------------------------------------------
+  [GET                 ]  /accounting/
+  [GET POST            ]  /accounting/budget
+  [GET                 ]  /accounting/cashflow
+  [GET POST            ]  /accounting/closing
+  [GET                 ]  /accounting/expenses
+  [POST                ]  /accounting/expenses/new
+  [GET                 ]  /accounting/pl
+
+Blueprint: ai_assistant  (prefix: "/ai")
+------------------------------------------------------------
+  [GET                 ]  /ai/
+  [POST                ]  /ai/analyze-photo
+  [POST                ]  /ai/chat
+  [POST                ]  /ai/clear
+  [GET                 ]  /ai/context/visit/<int:visit_id>
+  [POST                ]  /ai/discharge-instructions/<int:visit_id>
+  [POST                ]  /ai/draft-message
+  [POST                ]  /ai/drug-interactions
+  [GET                 ]  /ai/health-alerts
+  [GET                 ]  /ai/history
+  [POST                ]  /ai/insights
+  [POST                ]  /ai/nl-report
+  [GET                 ]  /ai/outbreak-radar
+  [POST                ]  /ai/pet-summary/<int:pet_id>
+
+Blueprint: appointments  (prefix: "/appointments")
+------------------------------------------------------------
+  [GET                 ]  /appointments/
+  [GET                 ]  /appointments/<int:appt_id>
+  [GET POST            ]  /appointments/<int:appt_id>/edit
+  [POST                ]  /appointments/<int:appt_id>/status
+  [GET                 ]  /appointments/api/pets
+  [GET                 ]  /appointments/api/queue
+  [GET                 ]  /appointments/api/risk-score/<int:owner_id>
+  [GET                 ]  /appointments/api/slots
+  [GET                 ]  /appointments/calendar
+  [GET POST            ]  /appointments/new
+  [GET                 ]  /appointments/reception
+  [GET                 ]  /appointments/schedule
+  [GET                 ]  /appointments/waiting-room
+
+Blueprint: attendance  (prefix: "/attendance")
+------------------------------------------------------------
+  [GET                 ]  /attendance/
+  [GET                 ]  /attendance/api/today
+  [GET                 ]  /attendance/balances
+  [POST                ]  /attendance/balances/set
+  [GET POST            ]  /attendance/checkin
+  [GET                 ]  /attendance/holidays
+  [POST                ]  /attendance/holidays/<int:hid>/delete
+  [POST                ]  /attendance/holidays/save
+  [GET                 ]  /attendance/leave-types
+  [POST                ]  /attendance/leave-types/save
+  [GET                 ]  /attendance/leaves
+  [GET                 ]  /attendance/leaves/<int:req_id>
+  [POST                ]  /attendance/leaves/<int:req_id>/approve
+  [POST                ]  /attendance/leaves/<int:req_id>/reject
+  [GET POST            ]  /attendance/leaves/new
+  [GET                 ]  /attendance/records
+  [GET POST            ]  /attendance/records/edit/<int:rec_id>
+  [GET                 ]  /attendance/report
+  [GET                 ]  /attendance/shifts
+  [POST                ]  /attendance/shifts/save
+
+Blueprint: auth  (prefix: "/auth")
+------------------------------------------------------------
+  [GET POST            ]  /auth/login
+  [GET                 ]  /auth/logout
+  [GET POST            ]  /auth/profile
+
+Blueprint: boarding  (prefix: "/boarding")
+------------------------------------------------------------
+  [GET                 ]  /boarding/
+  [GET                 ]  /boarding/bookings
+  [POST                ]  /boarding/bookings/<int:booking_id>/cancel
+  [POST                ]  /boarding/bookings/<int:booking_id>/checkin
+  [POST                ]  /boarding/bookings/<int:booking_id>/checkout
+  [GET                 ]  /boarding/bookings/<int:booking_id>/edit
+  [POST                ]  /boarding/bookings/<int:booking_id>/edit
+  [GET                 ]  /boarding/bookings/<int:booking_id>/invoice
+  [GET                 ]  /boarding/bookings/new
+  [POST                ]  /boarding/bookings/new
+  [GET                 ]  /boarding/rooms
+  [POST                ]  /boarding/rooms/new
+
+Blueprint: catalog  (prefix: "/catalog")
+------------------------------------------------------------
+  [GET                 ]  /catalog/
+  [POST                ]  /catalog/<int:svc_id>/toggle
+  [GET                 ]  /catalog/api/get/<int:svc_id>
+  [GET                 ]  /catalog/api/list
+  [POST                ]  /catalog/save
+
+Blueprint: clinical  (prefix: "/clinical")
+------------------------------------------------------------
+  [GET                 ]  /clinical/
+  [GET                 ]  /clinical/lab
+  [GET                 ]  /clinical/lab/<int:lab_id>
+  [POST                ]  /clinical/lab/<int:lab_id>/results
+  [GET POST            ]  /clinical/lab/new
+  [GET                 ]  /clinical/surgeries
+  [GET POST            ]  /clinical/surgeries/new
+  [GET                 ]  /clinical/vaccinations
+  [GET POST            ]  /clinical/vaccinations/new
+
+Blueprint: crm  (prefix: "/crm")
+------------------------------------------------------------
+  [GET                 ]  /crm/owners
+  [GET                 ]  /crm/owners/<int:owner_id>
+  [POST                ]  /crm/owners/<int:owner_id>/adjust-points
+  [GET POST            ]  /crm/owners/<int:owner_id>/edit
+  [GET                 ]  /crm/owners/<int:owner_id>/pets-json
+  [POST                ]  /crm/owners/<int:owner_id>/redeem-points
+  [GET POST            ]  /crm/owners/new
+  [GET                 ]  /crm/pets
+  [GET                 ]  /crm/pets/
+  [GET                 ]  /crm/pets/<int:pet_id>
+  [GET POST            ]  /crm/pets/<int:pet_id>/edit
+  [GET POST            ]  /crm/pets/new
+
+Blueprint: doctor  (prefix: "/doctor")
+------------------------------------------------------------
+  [GET                 ]  /doctor/
+  [POST                ]  /doctor/appointment/<int:appt_id>/checkin
+  [GET                 ]  /doctor/patients
+  [GET                 ]  /doctor/queue
+  [GET                 ]  /doctor/schedule
+  [GET                 ]  /doctor/stats
+  [GET                 ]  /doctor/visit/<int:visit_id>/quick
+
+Blueprint: finance  (prefix: "/finance")
+------------------------------------------------------------
+  [GET                 ]  /finance/
+  [GET POST            ]  /finance/expenses
+  [GET                 ]  /finance/invoices
+  [GET                 ]  /finance/invoices/<int:inv_id>
+  [POST                ]  /finance/invoices/<int:inv_id>/credit-note
+  [GET POST            ]  /finance/invoices/<int:inv_id>/edit
+  [POST                ]  /finance/invoices/<int:inv_id>/pay
+  [GET                 ]  /finance/invoices/<int:inv_id>/pdf
+  [GET                 ]  /finance/invoices/<int:inv_id>/print
+  [POST                ]  /finance/invoices/<int:inv_id>/whatsapp
+  [GET POST            ]  /finance/invoices/new
+  [GET                 ]  /finance/reports
+  [GET                 ]  /finance/reports/export/xlsx
+
+Blueprint: grooming  (prefix: "/grooming")
+------------------------------------------------------------
+  [GET                 ]  /grooming/
+  [GET                 ]  /grooming/bookings
+  [GET                 ]  /grooming/bookings/<int:booking_id>/edit
+  [POST                ]  /grooming/bookings/<int:booking_id>/edit
+  [GET                 ]  /grooming/bookings/<int:booking_id>/invoice
+  [POST                ]  /grooming/bookings/<int:booking_id>/status
+  [GET                 ]  /grooming/bookings/new
+  [POST                ]  /grooming/bookings/new
+  [GET                 ]  /grooming/services
+  [POST                ]  /grooming/services/new
+
+Blueprint: hr  (prefix: "/hr")
+------------------------------------------------------------
+  [GET                 ]  /hr/
+  [GET                 ]  /hr/roles
+  [GET                 ]  /hr/staff
+  [GET                 ]  /hr/staff/<int:user_id>
+  [GET POST            ]  /hr/staff/<int:user_id>/edit
+  [POST                ]  /hr/staff/<int:user_id>/reset-password
+  [GET POST            ]  /hr/staff/new
+
+Blueprint: inpatient  (prefix: "/inpatient")
+------------------------------------------------------------
+  [GET                 ]  /inpatient/
+  [GET                 ]  /inpatient/<int:stay_id>
+  [POST                ]  /inpatient/<int:stay_id>/discharge
+  [POST                ]  /inpatient/<int:stay_id>/med
+  [POST                ]  /inpatient/<int:stay_id>/round
+  [POST                ]  /inpatient/<int:stay_id>/status
+  [GET POST            ]  /inpatient/admit
+  [GET                 ]  /inpatient/api/owner/<int:owner_id>/pets
+
+Blueprint: inventory  (prefix: "/inventory")
+------------------------------------------------------------
+  [GET                 ]  /inventory/
+  [GET                 ]  /inventory/alerts
+  [GET POST            ]  /inventory/batches/new
+  [GET                 ]  /inventory/items
+  [GET                 ]  /inventory/items/<int:item_id>
+  [GET POST            ]  /inventory/items/<int:item_id>/edit
+  [GET POST            ]  /inventory/items/new
+  [GET                 ]  /inventory/movements
+
+Blueprint: launcher  (prefix: "")
+------------------------------------------------------------
+  [GET                 ]  /
+  [GET                 ]  /coming-soon
+  [GET                 ]  /launcher/legacy/ping
+  [GET                 ]  /launcher/legacy/start
+  [GET                 ]  /module/<module_id>
+  [GET                 ]  /module/<module_id>/stub
+
+Blueprint: migration  (prefix: "")
+------------------------------------------------------------
+  [GET                 ]  /migration/
+  [POST                ]  /migration/run
+
+Blueprint: notifications  (prefix: "/notifications")
+------------------------------------------------------------
+  [GET                 ]  /notifications/
+  [GET                 ]  /notifications/api/unread
+  [POST                ]  /notifications/mark-all-read
+  [POST                ]  /notifications/mark-read/<int:notif_id>
+
+Blueprint: payroll  (prefix: "/payroll")
+------------------------------------------------------------
+  [GET                 ]  /payroll/
+  [GET                 ]  /payroll/api/attendance/<int:uid>/<int:year>/<int:month>
+  [GET                 ]  /payroll/api/grade/<role>
+  [POST                ]  /payroll/bulk-generate
+  [GET POST            ]  /payroll/grades
+  [GET                 ]  /payroll/salaries
+  [GET                 ]  /payroll/salaries/<int:sid>
+  [POST                ]  /payroll/salaries/<int:sid>/approve
+  [GET POST            ]  /payroll/salaries/<int:sid>/edit
+  [POST                ]  /payroll/salaries/<int:sid>/pay
+  [GET                 ]  /payroll/salaries/export/xlsx
+  [GET POST            ]  /payroll/salaries/new
+
+Blueprint: petshop  (prefix: "")
+------------------------------------------------------------
+  [GET                 ]  /petshop/
+  [GET                 ]  /petshop/api/owners/search
+  [GET                 ]  /petshop/api/products/search
+  [GET POST            ]  /petshop/categories
+  [GET                 ]  /petshop/orders
+  [GET                 ]  /petshop/orders/<int:oid>
+  [POST                ]  /petshop/orders/<int:oid>/cancel
+  [POST                ]  /petshop/orders/create
+  [GET                 ]  /petshop/pos
+  [GET                 ]  /petshop/products
+  [GET POST            ]  /petshop/products/<int:pid>/edit
+  [POST                ]  /petshop/products/<int:pid>/stock
+  [GET POST            ]  /petshop/products/new
+  [GET                 ]  /petshop/reports
+
+Blueprint: petsy  (prefix: "/petsy")
+------------------------------------------------------------
+  [POST                ]  /petsy/chat
+  [GET                 ]  /petsy/embed
+  [GET                 ]  /petsy/widget.js
+
+Blueprint: pharmacy  (prefix: "/pharmacy")
+------------------------------------------------------------
+  [GET                 ]  /pharmacy/
+  [POST                ]  /pharmacy/dispense/<int:rx_id>
+  [GET                 ]  /pharmacy/history
+  [GET                 ]  /pharmacy/label/<int:rx_id>/<int:pi_id>
+  [GET                 ]  /pharmacy/prescription/<int:rx_id>
+
+Blueprint: procurement  (prefix: "/procurement")
+------------------------------------------------------------
+  [GET                 ]  /procurement/
+  [GET                 ]  /procurement/orders
+  [GET                 ]  /procurement/orders/<int:order_id>
+  [POST                ]  /procurement/orders/<int:order_id>/receive
+  [POST                ]  /procurement/orders/<int:order_id>/status
+  [GET                 ]  /procurement/orders/new
+  [POST                ]  /procurement/orders/new
+  [GET                 ]  /procurement/suppliers
+  [GET                 ]  /procurement/suppliers/<int:supplier_id>
+  [GET POST            ]  /procurement/suppliers/<int:supplier_id>/edit
+  [POST                ]  /procurement/suppliers/new
+
+Blueprint: public_api  (prefix: "/api/public")
+------------------------------------------------------------
+  [                    ]  /api/public/<path:p>
+  [POST                ]  /api/public/book
+  [POST                ]  /api/public/contact
+  [POST                ]  /api/public/emergency
+  [GET                 ]  /api/public/health
+  [GET                 ]  /api/public/services
+
+Blueprint: reports  (prefix: "/reports")
+------------------------------------------------------------
+  [GET                 ]  /reports/
+  [GET                 ]  /reports/builder
+  [POST                ]  /reports/builder/run
+  [POST                ]  /reports/builder/save
+  [GET                 ]  /reports/builder/saved/<int:rid>
+  [POST                ]  /reports/builder/saved/<int:rid>/delete
+  [GET                 ]  /reports/clinical
+  [GET                 ]  /reports/dashboard
+  [GET                 ]  /reports/doctor-revenue
+  [GET                 ]  /reports/export/csv
+  [GET                 ]  /reports/financial
+  [GET                 ]  /reports/financial/compare
+  [GET                 ]  /reports/inventory
+  [GET                 ]  /reports/inventory/export/xlsx
+
+Blueprint: settings  (prefix: "/settings")
+------------------------------------------------------------
+  [GET                 ]  /settings/
+  [POST                ]  /settings/lang
+  [POST                ]  /settings/theme
+
+Blueprint: system  (prefix: "/system")
+------------------------------------------------------------
+  [GET                 ]  /system/
+  [GET                 ]  /system/audit
+  [GET                 ]  /system/backup
+  [POST                ]  /system/backup/<filename>/restore
+  [POST                ]  /system/backup/run
+  [GET                 ]  /system/diagnostics
+  [GET                 ]  /system/monitor
+  [GET                 ]  /system/roles
+  [POST                ]  /system/roles/<int:role_id>/delete
+  [POST                ]  /system/roles/<int:role_id>/edit
+  [POST                ]  /system/roles/assign
+  [POST                ]  /system/roles/create
+  [GET POST            ]  /system/settings
+
+Blueprint: telemedicine  (prefix: "/telemedicine")
+------------------------------------------------------------
+  [GET                 ]  /telemedicine/
+  [GET                 ]  /telemedicine/<int:sid>
+  [POST                ]  /telemedicine/<int:sid>/cancel
+  [POST                ]  /telemedicine/<int:sid>/complete
+  [POST                ]  /telemedicine/<int:sid>/share
+  [POST                ]  /telemedicine/<int:sid>/start
+  [GET                 ]  /telemedicine/api/pets/<int:owner_id>
+  [GET POST            ]  /telemedicine/new
+
+Blueprint: uploads  (prefix: "/uploads")
+------------------------------------------------------------
+  [POST                ]  /uploads/delete/<int:att_id>
+  [GET                 ]  /uploads/file/<int:att_id>
+  [GET                 ]  /uploads/list/<entity_type>/<int:entity_id>
+  [POST                ]  /uploads/upload
+
+Blueprint: visits  (prefix: "/visits")
+------------------------------------------------------------
+  [GET                 ]  /visits/
+  [GET                 ]  /visits/<int:visit_id>
+  [POST                ]  /visits/<int:visit_id>/complete
+  [POST                ]  /visits/<int:visit_id>/diagnosis
+  [GET                 ]  /visits/<int:visit_id>/invoice
+  [POST                ]  /visits/<int:visit_id>/prescription
+  [GET                 ]  /visits/<int:visit_id>/print
+  [POST                ]  /visits/<int:visit_id>/soap
+  [POST                ]  /visits/<int:visit_id>/treatment
+  [GET                 ]  /visits/new
+  [POST                ]  /visits/new
+
+Blueprint: whatsapp  (prefix: "/whatsapp")
+------------------------------------------------------------
+  [GET                 ]  /whatsapp/
+  [GET                 ]  /whatsapp/api/campaigns
+  [POST                ]  /whatsapp/api/campaigns
+  [POST                ]  /whatsapp/api/campaigns/<cid>/copy
+  [GET PATCH           ]  /whatsapp/api/campaigns/<cid>/delay
+  [GET                 ]  /whatsapp/api/campaigns/<cid>/done
+  [PATCH               ]  /whatsapp/api/campaigns/<cid>/finish
+  [DELETE GET POST     ]  /whatsapp/api/campaigns/<cid>/messages
+  [POST                ]  /whatsapp/api/campaigns/<cid>/pause
+  [GET                 ]  /whatsapp/api/campaigns/<cid>/queue
+  [POST                ]  /whatsapp/api/campaigns/<cid>/reset-failed
+  [DELETE POST         ]  /whatsapp/api/campaigns/<cid>/schedule
+  [POST                ]  /whatsapp/api/campaigns/<cid>/start
+  [GET                 ]  /whatsapp/api/campaigns/<cid>/stats
+  [GET                 ]  /whatsapp/api/instance/details
+  [POST                ]  /whatsapp/api/instance/logout
+  [GET                 ]  /whatsapp/api/instance/qr
+  [GET PUT             ]  /whatsapp/api/instance/queue-settings
+  [POST                ]  /whatsapp/api/instance/restart
+  [GET                 ]  /whatsapp/api/instance/screenshot
+  [POST                ]  /whatsapp/api/instance/start
+  [GET                 ]  /whatsapp/api/instance/status
+  [POST                ]  /whatsapp/api/instance/troubleshoot
+  [GET                 ]  /whatsapp/api/lookup/lid/<lid>
+  [GET                 ]  /whatsapp/api/lookup/phone/<phone>
+  [GET                 ]  /whatsapp/api/messages
+  [GET                 ]  /whatsapp/api/messages/<msg_id>
+  [POST                ]  /whatsapp/api/messages/<msg_id>/retry
+  [POST                ]  /whatsapp/api/messages/retry-all
+  [POST                ]  /whatsapp/api/send/file
+  [POST                ]  /whatsapp/api/send/image
+  [POST                ]  /whatsapp/api/send/text
+  [POST                ]  /whatsapp/api/send/video
+  [GET                 ]  /whatsapp/api/templates
+  [GET                 ]  /whatsapp/campaigns
+  [GET                 ]  /whatsapp/campaigns/<campaign_id>
+  [GET POST            ]  /whatsapp/campaigns/new
+  [GET                 ]  /whatsapp/control
+  [GET                 ]  /whatsapp/log
+  [GET                 ]  /whatsapp/reminder-admin
+  [POST                ]  /whatsapp/reminder-admin/reminders/<int:rid>/cancel
+  [POST                ]  /whatsapp/reminder-admin/reminders/<int:rid>/send-now
+  [POST                ]  /whatsapp/reminder-admin/reminders/new
+  [POST                ]  /whatsapp/reminder-admin/trigger
+  [GET                 ]  /whatsapp/reminder-settings
+  [GET                 ]  /whatsapp/reminders
+  [POST                ]  /whatsapp/reminders/<int:rid>/mark-sent
+  [POST                ]  /whatsapp/reminders/<int:rid>/send
+  [GET                 ]  /whatsapp/scheduler
+  [POST                ]  /whatsapp/scheduler/clear-history
+  [POST                ]  /whatsapp/scheduler/run
+  [POST                ]  /whatsapp/send
+  [GET                 ]  /whatsapp/send-center
+  [GET POST            ]  /whatsapp/settings
+  [GET                 ]  /whatsapp/templates
+  [POST                ]  /whatsapp/templates/<int:tid>/delete
+  [GET POST            ]  /whatsapp/templates/<int:tid>/edit
+  [GET POST            ]  /whatsapp/templates/new
+
+================================================================================

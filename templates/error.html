@@ -1,179 +1,411 @@
-{% extends "base.html" %}
-{% block title %}{{ code }} — {{ t('Error', 'خطأ') }}{% endblock %}
-{% block page_title %}{% endblock %}
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ code }} — Aleefy</title>
+  <link rel="icon" type="image/png" href="/static/images/aleefy-logo.png">
 
-{% block content %}
-<style>
-.al-error-page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  text-align: center;
-  padding: 40px 20px;
-}
-.al-error-code-wrap {
-  position: relative;
-  margin-bottom: 24px;
-}
-.al-error-code {
-  font-size: clamp(6rem, 18vw, 10rem);
-  font-weight: 900;
-  line-height: 1;
-  background: linear-gradient(135deg, var(--al-primary) 0%, var(--al-primary-mid) 50%, var(--al-gold) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -4px;
-  user-select: none;
-}
-.al-error-icon {
-  font-size: 3rem;
-  margin-bottom: 16px;
-  animation: errorBounce .6s ease;
-}
-@keyframes errorBounce {
-  0%   { transform: scale(0.5); opacity: 0; }
-  60%  { transform: scale(1.15); }
-  100% { transform: scale(1);   opacity: 1; }
-}
-.al-error-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--al-text);
-  margin-bottom: 8px;
-}
-.al-error-msg {
-  font-size: 1rem;
-  color: var(--al-text-muted);
-  max-width: 420px;
-  line-height: 1.6;
-  margin-bottom: 28px;
-}
-.al-error-divider {
-  width: 60px;
-  height: 3px;
-  background: linear-gradient(90deg, var(--al-primary), var(--al-gold));
-  border-radius: 999px;
-  margin: 0 auto 24px;
-}
-.al-error-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.al-error-brand {
-  margin-top: 40px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  opacity: .45;
-  font-size: .8rem;
-  color: var(--al-text-muted);
-}
-.al-error-brand img {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-  border-radius: 6px;
-}
-/* Error-specific icons & colours */
-.err-404 .al-error-icon::after { content: '🔍'; }
-.err-403 .al-error-icon::after { content: '🔒'; }
-.err-413 .al-error-icon::after { content: '📦'; }
-.err-500 .al-error-icon::after { content: '⚡'; }
-.err-generic .al-error-icon::after { content: '🐾'; }
+  <!-- No-flash theme detection -->
+  <script>
+    (function(){
+      /* standalone page is always dark — force dark regardless of stored pref */
+      document.documentElement.setAttribute('data-theme','dark');
+    })();
+  </script>
 
-/* Tips panel */
-.al-error-tips {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-bottom: 28px;
-  max-width: 500px;
-}
-.al-error-tip {
-  background: var(--al-surface-2);
-  border: 1px solid var(--al-border);
-  border-radius: 999px;
-  padding: 5px 14px;
-  font-size: .78rem;
-  color: var(--al-text-muted);
-  cursor: pointer;
-  transition: all .2s;
-  text-decoration: none;
-}
-.al-error-tip:hover {
-  border-color: var(--al-primary);
-  color: var(--al-primary);
-  background: var(--al-primary-light);
-}
-</style>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-{% set err_class = 'err-' ~ code if code in (404, 403, 413, 500) else 'err-generic' %}
+  <style>
+    /* ─── RESET ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-<div class="al-error-page {{ err_class }}">
+    /* ─── BASE ──────────────────────────────────────────────────── */
+    html, body {
+      height: 100%;
+      font-family: 'Inter', 'Cairo', system-ui, sans-serif;
+      background: #0a1628;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
 
-  <div class="al-error-icon"></div>
+    /* ─── ANIMATED GRADIENT BACKGROUND ─────────────────────────── */
+    body {
+      background: linear-gradient(135deg, #0a1628 0%, #0f2847 40%, #0d3d4f 70%, #0a2a35 100%);
+      background-size: 400% 400%;
+      animation: bgShift 12s ease infinite;
+      position: relative;
+    }
+    @keyframes bgShift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
 
-  <div class="al-error-code-wrap">
-    <div class="al-error-code">{{ code }}</div>
-  </div>
+    /* ─── FLOATING PAW PRINTS (CSS only) ───────────────────────── */
+    .paw-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+    .paw {
+      position: absolute;
+      font-size: 1.6rem;
+      opacity: 0;
+      animation: floatPaw linear infinite;
+      user-select: none;
+      filter: blur(0.5px);
+    }
+    .paw:nth-child(1)  { left:  5%; animation-duration: 18s; animation-delay:  0s;   font-size: 1.2rem; }
+    .paw:nth-child(2)  { left: 12%; animation-duration: 22s; animation-delay: -4s;   font-size: 2rem;   }
+    .paw:nth-child(3)  { left: 20%; animation-duration: 16s; animation-delay: -8s;   font-size: 1rem;   }
+    .paw:nth-child(4)  { left: 30%; animation-duration: 25s; animation-delay: -2s;   font-size: 1.5rem; }
+    .paw:nth-child(5)  { left: 42%; animation-duration: 20s; animation-delay: -12s;  font-size: 1.8rem; }
+    .paw:nth-child(6)  { left: 55%; animation-duration: 15s; animation-delay: -6s;   font-size: 1.1rem; }
+    .paw:nth-child(7)  { left: 65%; animation-duration: 23s; animation-delay: -3s;   font-size: 2.2rem; }
+    .paw:nth-child(8)  { left: 75%; animation-duration: 19s; animation-delay: -9s;   font-size: 1.4rem; }
+    .paw:nth-child(9)  { left: 85%; animation-duration: 17s; animation-delay: -14s;  font-size: 0.9rem; }
+    .paw:nth-child(10) { left: 93%; animation-duration: 21s; animation-delay: -1s;   font-size: 1.7rem; }
 
-  <div class="al-error-divider"></div>
+    @keyframes floatPaw {
+      0%   { transform: translateY(110vh) rotate(0deg);   opacity: 0;    }
+      5%   { opacity: 0.07; }
+      90%  { opacity: 0.07; }
+      100% { transform: translateY(-15vh) rotate(25deg);  opacity: 0;    }
+    }
 
-  <div class="al-error-title">
-    {% if code == 404 %}
-      {{ t('Page not found', 'الصفحة غير موجودة') }}
-    {% elif code == 403 %}
-      {{ t('Access denied', 'الوصول مرفوض') }}
-    {% elif code == 413 %}
-      {{ t('File too large', 'الملف كبير جداً') }}
-    {% elif code == 500 %}
-      {{ t('Server error', 'خطأ في الخادم') }}
-    {% else %}
-      {{ t('Something went wrong', 'حدث خطأ ما') }}
-    {% endif %}
-  </div>
+    /* ─── LAYOUT ────────────────────────────────────────────────── */
+    .page-wrap {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      text-align: center;
+    }
 
-  <div class="al-error-msg">
-    {% if msg %}
-      {{ msg }}
-    {% elif code == 404 %}
-      {{ t("The page you're looking for doesn't exist or has been moved.", "الصفحة التي تبحث عنها غير موجودة أو تم نقلها.") }}
-    {% elif code == 403 %}
-      {{ t("You don't have permission to access this page. Contact your administrator if you think this is a mistake.", "ليس لديك صلاحية الوصول لهذه الصفحة. تواصل مع المسؤول إذا كان هذا خطأ.") }}
-    {% elif code == 413 %}
-      {{ t("The file you tried to upload is too large. Maximum allowed size is 16 MB.", "الملف الذي حاولت رفعه كبير جداً. الحجم الأقصى المسموح به هو 16 ميجابايت.") }}
-    {% else %}
-      {{ t("An unexpected error occurred. The team has been notified.", "حدث خطأ غير متوقع. تم إشعار الفريق.") }}
-    {% endif %}
-  </div>
+    /* ─── LOGO ──────────────────────────────────────────────────── */
+    .logo-area {
+      position: absolute;
+      top: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .logo-area img {
+      width: 38px;
+      height: 38px;
+      object-fit: contain;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+    .logo-wordmark {
+      font-family: 'Inter', sans-serif;
+      font-weight: 900;
+      font-size: 1.3rem;
+      color: #e2e8f0;
+      letter-spacing: -0.5px;
+    }
+    .logo-wordmark span { color: #C9A84C; }
 
-  <!-- Quick nav tips -->
-  <div class="al-error-tips">
-    <a href="/appointments/schedule" class="al-error-tip">📅 {{ t('Appointments', 'المواعيد') }}</a>
-    <a href="{{ url_for('crm.owners_list') }}" class="al-error-tip">👥 {{ t('Owners', 'الملاك') }}</a>
-    <a href="{{ url_for('finance.invoices_list') }}" class="al-error-tip">💰 {{ t('Finance', 'المالية') }}</a>
-    <a href="/inventory" class="al-error-tip">📦 {{ t('Inventory', 'المخزون') }}</a>
-  </div>
+    /* ─── VERSION BADGE ─────────────────────────────────────────── */
+    .version-badge {
+      position: absolute;
+      top: 34px;
+      right: 28px;
+      background: rgba(201,168,76,0.12);
+      border: 1px solid rgba(201,168,76,0.3);
+      color: #C9A84C;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+    }
 
-  <div class="al-error-actions">
-    <a href="{{ url_for('launcher.index') }}" class="al-btn al-btn-primary" style="min-width:160px">
-      🏠 {{ t('Back to Dashboard', 'العودة للوحة التحكم') }}
-    </a>
-    <button onclick="history.back()" class="al-btn al-btn-ghost" style="min-width:120px">
-      ← {{ t('Go Back', 'رجوع') }}
-    </button>
-  </div>
+    /* ─── CONTENT CARD ──────────────────────────────────────────── */
+    .error-card {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      padding: 56px 48px 48px;
+      max-width: 580px;
+      width: 100%;
+      box-shadow:
+        0 32px 80px rgba(0,0,0,0.4),
+        0 2px 0 rgba(255,255,255,0.06) inset;
+    }
 
-  <div class="al-error-brand">
-    <img src="{{ url_for('static', filename='images/aleefy-logo.png') }}" alt="Aleefy">
-    <span>{{ t(app_title, app_title_ar) }} · {{ app_tagline }}</span>
-  </div>
+    /* ─── ERROR ICON ────────────────────────────────────────────── */
+    .error-icon {
+      font-size: 3.6rem;
+      margin-bottom: 16px;
+      display: block;
+      animation: iconBounce 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    @keyframes iconBounce {
+      0%   { transform: scale(0.3) rotate(-15deg); opacity: 0; }
+      70%  { transform: scale(1.1) rotate(5deg); }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
 
+    /* ─── ERROR CODE ────────────────────────────────────────────── */
+    .error-code {
+      font-size: clamp(7rem, 20vw, 10rem);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -6px;
+      background: linear-gradient(135deg, #C9A84C 0%, #f0c060 40%, #ff7b54 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+      user-select: none;
+      animation: fadeSlideUp 0.6s ease both;
+      animation-delay: 0.1s;
+    }
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── DIVIDER ───────────────────────────────────────────────── */
+    .divider {
+      width: 60px;
+      height: 3px;
+      background: linear-gradient(90deg, #C9A84C, #ff7b54);
+      border-radius: 999px;
+      margin: 0 auto 20px;
+      animation: fadeSlideUp 0.6s ease both;
+      animation-delay: 0.2s;
+    }
+
+    /* ─── TITLE ─────────────────────────────────────────────────── */
+    .error-title-en {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 4px;
+      animation: fadeSlideUp 0.6s ease both;
+      animation-delay: 0.25s;
+    }
+    .error-title-ar {
+      font-family: 'Cairo', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: rgba(241,245,249,0.7);
+      direction: rtl;
+      margin-bottom: 20px;
+      animation: fadeSlideUp 0.6s ease both;
+      animation-delay: 0.3s;
+    }
+
+    /* ─── MESSAGE ───────────────────────────────────────────────── */
+    .error-msg {
+      font-size: 0.92rem;
+      color: rgba(203,213,225,0.75);
+      line-height: 1.65;
+      max-width: 420px;
+      margin: 0 auto 28px;
+      animation: fadeSlideUp 0.6s ease both;
+      animation-delay: 0.35s;
+    }
+
+    /* ─── ACTION BUTTONS ────────────────────────────────────────── */
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      animation: fadeSlideUp 0.6s ease both;
+      animation-delay: 0.45s;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      font-family: inherit;
+      line-height: 1;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #1a4a8a, #1a6a8a);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(26,74,138,0.4);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #1e5aa0, #1e7aa0);
+      box-shadow: 0 6px 20px rgba(26,74,138,0.5);
+    }
+    .btn-gold {
+      background: linear-gradient(135deg, rgba(201,168,76,0.15), rgba(201,168,76,0.1));
+      border: 1px solid rgba(201,168,76,0.35);
+      color: #C9A84C;
+    }
+    .btn-gold:hover {
+      background: linear-gradient(135deg, rgba(201,168,76,0.25), rgba(201,168,76,0.18));
+      border-color: rgba(201,168,76,0.6);
+    }
+    .btn-ghost {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #94a3b8;
+    }
+    .btn-ghost:hover {
+      background: rgba(255,255,255,0.09);
+      color: #cbd5e1;
+      border-color: rgba(255,255,255,0.2);
+    }
+
+    /* ─── BOTTOM BRAND ──────────────────────────────────────────── */
+    .brand-footer {
+      margin-top: 36px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0.35;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      animation: fadeSlideUp 0.6s ease both;
+      animation-delay: 0.55s;
+    }
+    .brand-footer img {
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      border-radius: 5px;
+    }
+
+    /* ─── RESPONSIVE ────────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .error-card {
+        padding: 40px 24px 36px;
+        border-radius: 16px;
+      }
+      .version-badge { display: none; }
+      .logo-area { top: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Floating paw prints (CSS animation only) -->
+<div class="paw-bg" aria-hidden="true">
+  <div class="paw">🐾</div>
+  <div class="paw">🐾</div>
+  <div class="paw">🐾</div>
+  <div class="paw">🐾</div>
+  <div class="paw">🐾</div>
+  <div class="paw">🐾</div>
+  <div class="paw">🐾</div>
+  <div class="paw">🐾</div>
+  <div class="paw">🐾</div>
+  <div class="paw">🐾</div>
 </div>
-{% endblock %}
+
+<div class="page-wrap">
+
+  <!-- Logo -->
+  <a href="/" class="logo-area" aria-label="Aleefy Home">
+    <img src="/static/images/aleefy-logo.png" alt="Aleefy">
+    <span class="logo-wordmark">Alee<span>fy</span></span>
+  </a>
+
+  <!-- Version badge -->
+  <div class="version-badge">Platform V3</div>
+
+  <!-- Main card -->
+  <div class="error-card">
+
+    <!-- Icon -->
+    <span class="error-icon" aria-hidden="true">
+      {% if code == 404 %}🐾
+      {% elif code == 403 %}🚫
+      {% elif code == 413 %}📦
+      {% elif code == 500 %}🏥
+      {% else %}⚠️
+      {% endif %}
+    </span>
+
+    <!-- Code -->
+    <div class="error-code">{{ code }}</div>
+
+    <div class="divider"></div>
+
+    <!-- Bilingual title -->
+    <div class="error-title-en">
+      {% if code == 404 %}This page ran away from the clinic...
+      {% elif code == 403 %}You don't have permission to enter this area
+      {% elif code == 413 %}File too large (max 16 MB)
+      {% elif code == 500 %}Something broke on our end
+      {% else %}{{ msg or 'An unexpected error occurred' }}
+      {% endif %}
+    </div>
+
+    <div class="error-title-ar">
+      {% if code == 404 %}الصفحة المطلوبة غير موجودة
+      {% elif code == 403 %}غير مصرح لك بالدخول
+      {% elif code == 413 %}الملف كبير جداً
+      {% elif code == 500 %}حدث خطأ في الخادم
+      {% else %}حدث خطأ غير متوقع
+      {% endif %}
+    </div>
+
+    <!-- Detail message -->
+    <p class="error-msg">
+      {% if code == 404 %}
+        The page you're looking for doesn't exist or has been moved. Check the URL or use the links below.
+      {% elif code == 403 %}
+        You don't have the required permissions to access this page. Contact your administrator if you believe this is a mistake.
+      {% elif code == 413 %}
+        The file you tried to upload exceeds the 16 MB limit. Please compress or split the file before uploading.
+      {% elif code == 500 %}
+        An internal server error occurred. The team has been notified. Please try again in a few moments.
+      {% else %}
+        {{ msg or 'Something went wrong. Please try again or return to the dashboard.' }}
+      {% endif %}
+    </p>
+
+    <!-- Quick-nav buttons -->
+    <div class="action-buttons">
+      <a href="/" class="btn btn-primary">🏠 Dashboard</a>
+      <a href="/appointments/" class="btn btn-gold">📅 Appointments</a>
+      <a href="/crm/pets" class="btn btn-gold">🐾 Pets</a>
+      <button onclick="history.back()" class="btn btn-ghost">← Back</button>
+    </div>
+
+  </div><!-- /.error-card -->
+
+  <!-- Bottom brand -->
+  <div class="brand-footer">
+    <img src="/static/images/aleefy-logo.png" alt="">
+    <span>Aleefy Premium Animal Hospital Platform · V3</span>
+  </div>
+
+</div><!-- /.page-wrap -->
+
+</body>
+</html>

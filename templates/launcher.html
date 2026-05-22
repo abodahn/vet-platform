@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
 {% block title %}{{ t('Dashboard', 'لوحة التحكم') }}{% endblock %}
-{% block page_title %}{{ t('Dashboard', 'لوحة التحكم') }}{% endblock %}
-{% block page_sub %}{{ t('Welcome back', 'أهلاً بعودتك') }}, {{ current_user.get('full_name') or current_user.get('username') }} 👋{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_sub %}{% endblock %}
 
 {% block topbar_actions %}
   <a href="/launcher/legacy/start" target="_blank" class="al-btn al-btn-primary al-btn-sm">
@@ -14,131 +14,557 @@
 {% endblock %}
 
 {% block content %}
+{% set hour = now.hour if now is defined else 10 %}
 
-<!-- ── Quick Stats ─────────────────────────────────────────── -->
-<div class="al-stat-grid" style="margin-bottom:24px">
+<style>
+/* ── V3 Page Header ───────────────────────────────────────────── */
+.v3-page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 16px;
+  margin-bottom: 28px;
+}
+.v3-page-title {
+  font-size: 1.6rem; font-weight: 800; color: var(--al-text);
+  margin: 0 0 4px 0; line-height: 1.2;
+}
+.v3-page-subtitle {
+  font-size: 0.9rem; color: var(--al-text-muted); margin: 0;
+}
+.v3-page-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.v3-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 20px; border-radius: 10px; font-size: .88rem;
+  font-weight: 600; text-decoration: none; transition: all .18s; border: 1.5px solid transparent;
+  cursor: pointer;
+}
+.v3-btn-primary {
+  background: var(--al-primary); color: #fff; border-color: var(--al-primary);
+}
+.v3-btn-primary:hover { background: var(--al-primary-dark, #155c4d); }
+.v3-btn-secondary {
+  background: var(--al-bg-card, var(--al-surface));
+  color: var(--al-text); border-color: var(--al-border);
+}
+.v3-btn-secondary:hover { border-color: var(--al-primary); color: var(--al-primary); }
 
-  <div class="al-stat-card">
-    <div class="al-stat-icon" style="background:linear-gradient(135deg,#1B6B5C,#2A9D8F)">📅</div>
-    <div class="al-stat-body">
-      <div class="al-stat-label">{{ t("Today's Appointments", 'مواعيد اليوم') }}</div>
-      <div class="al-stat-value">{{ stats.bookings_today }}</div>
-      <div class="al-stat-sub">{{ stats.visits_today }} {{ t('visit(s) in progress', 'زيارة جارية') }}</div>
-    </div>
+/* ── KPI Stat Cards ───────────────────────────────────────────── */
+.v3-kpi-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 20px; margin-bottom: 32px;
+}
+@media(max-width:1024px) { .v3-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media(max-width:600px)  { .v3-kpi-grid { grid-template-columns: 1fr; } }
+
+.v3-stat-card {
+  background: var(--al-bg-card, var(--al-surface));
+  border: 1px solid var(--al-border);
+  border-radius: 18px; padding: 22px 24px;
+  position: relative; overflow: hidden;
+  box-shadow: var(--al-shadow-sm, 0 1px 4px rgba(0,0,0,.06));
+  transition: all 0.22s ease;
+}
+.v3-stat-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent, var(--al-primary));
+  border-radius: 18px 18px 0 0;
+}
+.v3-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--al-shadow-md, 0 8px 24px rgba(0,0,0,.1));
+}
+.v3-stat-icon { font-size: 2rem; margin-bottom: 12px; }
+.v3-stat-value {
+  font-size: 2rem; font-weight: 800;
+  color: var(--al-text); line-height: 1;
+}
+.v3-stat-label {
+  font-size: 0.9rem; font-weight: 600;
+  color: var(--al-text-mid, var(--al-text-muted)); margin-top: 4px;
+}
+.v3-stat-sub {
+  font-size: 0.78rem; color: var(--al-text-muted); margin-top: 2px;
+}
+
+/* ── Quick Launch Grid ────────────────────────────────────────── */
+.v3-section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.v3-section-title {
+  font-size: 1.05rem; font-weight: 700; color: var(--al-text); margin: 0;
+}
+.v3-section-link {
+  font-size: .82rem; font-weight: 600; color: var(--al-primary); text-decoration: none;
+}
+.v3-section-link:hover { opacity: .75; }
+
+.v3-launcher-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 16px; margin-bottom: 32px;
+}
+@media(max-width:1024px) { .v3-launcher-grid { grid-template-columns: repeat(2, 1fr); } }
+@media(max-width:600px)  { .v3-launcher-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.v3-launcher-card {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 24px 16px;
+  background: var(--al-bg-card, var(--al-surface));
+  border: 1px solid var(--al-border); border-radius: 18px;
+  text-align: center; transition: all .22s;
+  text-decoration: none; color: var(--al-text);
+}
+.v3-launcher-card:hover {
+  background: var(--al-bg-hover, var(--al-surface-2));
+  border-color: var(--al-primary);
+  transform: translateY(-4px);
+  box-shadow: var(--al-shadow-md, 0 8px 24px rgba(0,0,0,.1));
+}
+.v3-launcher-icon {
+  width: 56px; height: 56px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; margin-bottom: 12px;
+}
+.v3-launcher-name { font-weight: 700; font-size: .95rem; }
+.v3-launcher-name-ar { font-size: .78rem; color: var(--al-text-muted); margin-top: 2px; }
+
+/* ── Two-column row ───────────────────────────────────────────── */
+.v3-two-col {
+  display: grid; grid-template-columns: 60fr 40fr;
+  gap: 20px; margin-bottom: 32px;
+}
+@media(max-width:900px) { .v3-two-col { grid-template-columns: 1fr; } }
+
+/* ── Appointments card ────────────────────────────────────────── */
+.v3-card {
+  background: var(--al-bg-card, var(--al-surface));
+  border: 1px solid var(--al-border); border-radius: 18px;
+  padding: 22px 24px;
+  box-shadow: var(--al-shadow-sm, 0 1px 4px rgba(0,0,0,.06));
+}
+.v3-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px;
+}
+.v3-card-title { font-size: .98rem; font-weight: 700; color: var(--al-text); margin: 0; }
+.v3-empty-state {
+  text-align: center; padding: 32px 16px;
+  color: var(--al-text-muted); font-size: .88rem; line-height: 1.6;
+}
+.v3-empty-icon { font-size: 2.4rem; margin-bottom: 10px; }
+.v3-appt-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.v3-appt-table th {
+  text-align: left; font-size: .72rem; font-weight: 700;
+  color: var(--al-text-muted); padding: 0 10px 10px 0;
+  text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--al-border);
+}
+.v3-appt-table td {
+  padding: 10px 10px 10px 0; color: var(--al-text);
+  border-bottom: 1px solid var(--al-border);
+  vertical-align: middle;
+}
+.v3-appt-table tr:last-child td { border-bottom: none; }
+.v3-status-badge {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: .7rem; font-weight: 600;
+}
+.v3-status-scheduled { background: rgba(46,134,193,.12); color: #2E86C1; }
+.v3-status-inprogress { background: rgba(46,204,113,.12); color: #27ae60; }
+.v3-status-done { background: rgba(155,89,182,.12); color: #8e44ad; }
+.v3-status-cancelled { background: rgba(231,76,60,.1); color: #c0392b; }
+
+/* ── Right panel sub-cards ────────────────────────────────────── */
+.v3-panel-stack { display: flex; flex-direction: column; gap: 14px; }
+.v3-sub-card {
+  background: var(--al-bg-card, var(--al-surface));
+  border: 1px solid var(--al-border); border-radius: 14px;
+  padding: 16px 18px; position: relative; overflow: hidden;
+}
+.v3-sub-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--sub-accent, var(--al-primary)); border-radius: 14px 14px 0 0;
+}
+.v3-sub-title {
+  font-size: .88rem; font-weight: 700; color: var(--al-text); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 7px;
+}
+.v3-sub-body { font-size: .82rem; color: var(--al-text-muted); line-height: 1.6; }
+.v3-sub-link {
+  display: inline-block; font-size: .78rem; font-weight: 600;
+  color: var(--al-primary); text-decoration: none; margin-top: 8px;
+}
+.v3-sub-link:hover { opacity: .75; }
+.v3-health-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: .82rem; color: var(--al-text-muted);
+}
+.v3-dot-green {
+  width: 8px; height: 8px; border-radius: 50%; background: #2ECC71; flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(46,204,113,.5); animation: v3Pulse 2.2s infinite;
+}
+@keyframes v3Pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(46,204,113,.45); }
+  70%  { box-shadow: 0 0 0 6px rgba(46,204,113,0); }
+  100% { box-shadow: 0 0 0 0 rgba(46,204,113,0); }
+}
+
+/* ── All Modules Section ──────────────────────────────────────── */
+.v3-modules-search {
+  display: flex; align-items: center; gap: 10px;
+}
+.v3-search-input {
+  background: var(--al-bg-card, var(--al-surface)); border: 1px solid var(--al-border);
+  border-radius: 10px; padding: 7px 14px; font-size: .85rem;
+  color: var(--al-text); outline: none; width: 220px; transition: border-color .18s;
+}
+.v3-search-input:focus { border-color: var(--al-primary); }
+.v3-search-input::placeholder { color: var(--al-text-muted); }
+
+.v3-all-modules-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 14px; margin-bottom: 32px;
+}
+@media(max-width:1024px) { .v3-all-modules-grid { grid-template-columns: repeat(2, 1fr); } }
+@media(max-width:600px)  { .v3-all-modules-grid { grid-template-columns: 1fr; } }
+
+/* ── Module cards (reuse existing al-module-card base, add v3 tweaks) */
+.al-module-card {
+  background: var(--al-surface);
+  border: 1px solid var(--al-border); border-radius: 14px;
+  padding: 16px; cursor: pointer;
+  transition: all .2s ease;
+  display: flex; flex-direction: column; gap: 8px;
+  position: relative; overflow: hidden;
+}
+.al-module-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--mod-accent, var(--al-primary)); opacity: 0; transition: opacity .2s;
+}
+.al-module-card:hover {
+  border-color: var(--mod-accent, var(--al-primary));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+}
+.al-module-card:hover::before { opacity: 1; }
+.al-module-card--disabled { opacity: .55; cursor: default; pointer-events: none; }
+.al-module-card-top { display: flex; align-items: center; gap: 10px; }
+.al-module-icon { font-size: 1.5rem; flex-shrink: 0; }
+.al-module-name { font-weight: 700; font-size: .9rem; color: var(--al-text); line-height: 1.3; }
+.al-module-name-sub { font-size: .72rem; color: var(--al-text-muted); }
+.al-module-desc { font-size: .78rem; color: var(--al-text-muted); line-height: 1.5; flex: 1; }
+.al-module-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.al-module-open {
+  font-size: .78rem; font-weight: 600;
+  color: var(--mod-accent, var(--al-primary)); text-decoration: none; transition: opacity .15s;
+}
+.al-module-open:hover { opacity: .7; }
+
+/* ── Badges ───────────────────────────────────────────────────── */
+.al-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px; font-size: .72rem; font-weight: 600;
+  background: var(--al-surface-2); color: var(--al-text-muted); border: 1px solid var(--al-border);
+}
+.al-badge-green { background: rgba(27,107,92,.1); color: #1B6B5C; border-color: rgba(27,107,92,.25); }
+.al-badge-teal  { background: rgba(42,157,143,.1); color: #2A9D8F; border-color: rgba(42,157,143,.25); }
+.al-badge-gold  { background: rgba(201,168,76,.1); color: #9a6f10; border-color: rgba(201,168,76,.3); }
+
+/* ── Live dot ─────────────────────────────────────────────────── */
+.al-live-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--al-primary); flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(27,107,92,.5); animation: livePulse 2s infinite;
+}
+@keyframes livePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(27,107,92,.5); }
+  70%  { box-shadow: 0 0 0 5px rgba(27,107,92,0); }
+  100% { box-shadow: 0 0 0 0 rgba(27,107,92,0); }
+}
+
+/* ── Btn gold ─────────────────────────────────────────────────── */
+.al-btn-gold { background: var(--al-gold); color: var(--al-navy); border-color: var(--al-gold); }
+.al-btn-gold:hover { background: #b8941e; border-color: #b8941e; }
+
+/* ── Section divider ──────────────────────────────────────────── */
+.v3-cat-header {
+  display: flex; align-items: center; gap: 10px;
+  margin: 28px 0 14px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--al-border);
+}
+.v3-cat-icon { font-size: 1.2rem; }
+.v3-cat-label { font-weight: 700; font-size: .98rem; color: var(--al-text); }
+
+/* ── Platform footer ──────────────────────────────────────────── */
+.v3-platform-footer {
+  text-align: center; padding: 20px 0 8px;
+  font-size: .76rem; color: var(--al-text-muted);
+  border-top: 1px solid var(--al-border); margin-top: 8px;
+}
+
+/* ── Skeleton loader ──────────────────────────────────────────── */
+.al-skeleton {
+  background: linear-gradient(90deg, var(--al-border) 25%, var(--al-surface-2, #f0f0f0) 50%, var(--al-border) 75%);
+  background-size: 200% 100%; animation: skelShimmer 1.4s infinite;
+}
+@keyframes skelShimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* ── Count animation ──────────────────────────────────────────── */
+.v3-stat-value[data-target] { transition: none; }
+
+/* ── Module search hide ───────────────────────────────────────── */
+.v3-mod-hidden { display: none !important; }
+</style>
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 1 · PAGE HEADER
+══════════════════════════════════════════════════════════════ -->
+<div class="v3-page-header">
+  <div>
+    <h1 class="v3-page-title">
+      Good {% if hour < 12 %}Morning{% elif hour < 17 %}Afternoon{% else %}Evening{% endif %},
+      {{ current_user.get('full_name', current_user.get('username','')) }} 👋
+    </h1>
+    <p class="v3-page-subtitle">{{ t("Here's what's happening at the clinic today", "إليك ما يجري في العيادة اليوم") }}</p>
+  </div>
+  <div class="v3-page-actions">
+    <a href="/appointments/new" class="v3-btn v3-btn-primary">+ {{ t('New Appointment', 'موعد جديد') }}</a>
+    <a href="/crm/pets/new" class="v3-btn v3-btn-secondary">+ {{ t('Add Pet', 'إضافة حيوان') }}</a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 2 · KPI STAT CARDS
+══════════════════════════════════════════════════════════════ -->
+<div class="v3-kpi-grid">
+
+  <div class="v3-stat-card" style="--accent:#2E86C1">
+    <div class="v3-stat-icon">📅</div>
+    <div class="v3-stat-value" data-target="{{ stats.bookings_today }}">{{ stats.bookings_today }}</div>
+    <div class="v3-stat-label">{{ t("Today's Appointments", "مواعيد اليوم") }}</div>
+    <div class="v3-stat-sub">{{ t("Scheduled for today", "مجدولة اليوم") }}</div>
   </div>
 
-  <div class="al-stat-card">
-    <div class="al-stat-icon" style="background:linear-gradient(135deg,#0369a1,#0ea5e9)">👥</div>
-    <div class="al-stat-body">
-      <div class="al-stat-label">{{ t('Owners & Pets', 'الملاك والحيوانات') }}</div>
-      <div class="al-stat-value">{{ stats.owners }}</div>
-      <div class="al-stat-sub">{{ stats.pets }} {{ t('registered pets', 'حيوان مسجل') }}</div>
-    </div>
+  <div class="v3-stat-card" style="--accent:#E8724A">
+    <div class="v3-stat-icon">🐾</div>
+    <div class="v3-stat-value" data-target="{{ stats.pets }}">{{ stats.pets }}</div>
+    <div class="v3-stat-label">{{ t("Total Pets", "إجمالي الحيوانات") }}</div>
+    <div class="v3-stat-sub">{{ t("Active patients", "مرضى نشطون") }}</div>
   </div>
 
-  <div class="al-stat-card">
-    <div class="al-stat-icon" style="background:linear-gradient(135deg,#C9A84C,#e6c56a)">💰</div>
-    <div class="al-stat-body">
-      <div class="al-stat-label">{{ t("Revenue Today", 'إيرادات اليوم') }}</div>
-      <div class="al-stat-value" style="font-size:1.4rem">{{ '{:,.0f}'.format(stats.revenue_today) }}</div>
-      <div class="al-stat-sub">{{ t('EGP collected', 'جنيه محصّل') }}</div>
-    </div>
+  <div class="v3-stat-card" style="--accent:#2ECC71">
+    <div class="v3-stat-icon">👥</div>
+    <div class="v3-stat-value" data-target="{{ stats.owners }}">{{ stats.owners }}</div>
+    <div class="v3-stat-label">{{ t("Pet Owners", "أصحاب الحيوانات") }}</div>
+    <div class="v3-stat-sub">{{ t("Registered clients", "عملاء مسجلون") }}</div>
   </div>
 
-  <div class="al-stat-card">
-    <div class="al-stat-icon" style="background:linear-gradient(135deg,#dc2626,#ef4444)">🧾</div>
-    <div class="al-stat-body">
-      <div class="al-stat-label">{{ t('Outstanding', 'المستحق') }}</div>
-      <div class="al-stat-value" style="font-size:1.4rem">{{ '{:,.0f}'.format(stats.outstanding) }}</div>
-      <div class="al-stat-sub">{{ stats.invoices_unpaid }} {{ t('unpaid invoice(s)', 'فاتورة غير مدفوعة') }}</div>
-    </div>
+  <div class="v3-stat-card" style="--accent:#9B59B6">
+    <div class="v3-stat-icon">🏥</div>
+    <div class="v3-stat-value" data-target="{{ stats.visits_today }}">{{ stats.visits_today }}</div>
+    <div class="v3-stat-label">{{ t("Visits Today", "زيارات اليوم") }}</div>
+    <div class="v3-stat-sub">{{ t("Clinical visits", "زيارات سريرية") }}</div>
+  </div>
+
+  <div class="v3-stat-card" style="--accent:#D4AC45">
+    <div class="v3-stat-icon">💰</div>
+    <div class="v3-stat-value" style="font-size:1.5rem">{{ '{:,.0f}'.format(stats.revenue_today|default(0)) }}</div>
+    <div class="v3-stat-label">{{ t("Revenue Today", "إيرادات اليوم") }}</div>
+    <div class="v3-stat-sub">{{ t("EGP collected today", "جنيه محصّل اليوم") }}</div>
+  </div>
+
+  <div class="v3-stat-card" style="--accent:#E74C3C">
+    <div class="v3-stat-icon">📋</div>
+    <div class="v3-stat-value" data-target="{{ stats.invoices_unpaid }}">{{ stats.invoices_unpaid }}</div>
+    <div class="v3-stat-label">{{ t("Unpaid Invoices", "فواتير غير مدفوعة") }}</div>
+    <div class="v3-stat-sub">{{ t("Pending payment", "في انتظار السداد") }}</div>
+  </div>
+
+  <div class="v3-stat-card" style="--accent:#1ABC9C">
+    <div class="v3-stat-icon">💬</div>
+    <div class="v3-stat-value" data-target="{{ stats.pending_reminders }}">{{ stats.pending_reminders }}</div>
+    <div class="v3-stat-label">{{ t("Reminders", "التذكيرات") }}</div>
+    <div class="v3-stat-sub">{{ t("WhatsApp pending", "واتساب معلّق") }}</div>
+  </div>
+
+  <div class="v3-stat-card" style="--accent:#F39C12">
+    <div class="v3-stat-icon">💵</div>
+    <div class="v3-stat-value" style="font-size:1.5rem">{{ '{:,.0f}'.format(stats.outstanding|default(0)) }}</div>
+    <div class="v3-stat-label">{{ t("Outstanding", "المستحق") }}</div>
+    <div class="v3-stat-sub">{{ t("EGP total receivable", "إجمالي المستحق بالجنيه") }}</div>
   </div>
 
 </div>
 
-<!-- ── AI Command Center ──────────────────────────────────── -->
-<div style="display:grid;grid-template-columns:1fr 320px;gap:18px;margin-bottom:24px" id="aiCommandRow">
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 3 · MODULE QUICK ACCESS
+══════════════════════════════════════════════════════════════ -->
+<div class="v3-section-header">
+  <h2 class="v3-section-title">⚡ {{ t('Quick Launch', 'إطلاق سريع') }}</h2>
+  <a href="#all-modules" class="v3-section-link">{{ t('View all modules', 'عرض كل الوحدات') }} →</a>
+</div>
 
-  <!-- AI Insights Panel — Aleefy teal theme -->
-  <div class="al-card" style="border-left:3px solid var(--al-primary);min-height:160px;position:relative;overflow:hidden">
-    <div style="position:absolute;top:-50px;right:-50px;width:180px;height:180px;
-                background:radial-gradient(circle,rgba(27,107,92,.12) 0%,transparent 70%);
-                border-radius:50%;pointer-events:none"></div>
-    <div class="al-card-header" style="margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="background:linear-gradient(135deg,var(--al-primary),var(--al-primary-mid));
-                    border-radius:10px;padding:7px 10px;font-size:1.1rem">🤖</div>
-        <div>
-          <div style="font-weight:700;font-size:.95rem;color:var(--al-text)">{{ t('AI Smart Insights', 'رؤى الذكاء الاصطناعي') }}</div>
-          <div style="color:var(--al-text-muted);font-size:.75rem" id="aiInsightsTime">{{ t('Loading...', 'جارٍ التحميل...') }}</div>
-        </div>
-      </div>
-      <button onclick="loadInsights(true)" id="refreshBtn" class="al-btn al-btn-ghost al-btn-sm" style="margin-left:auto">
-        ↺ {{ t('Refresh', 'تحديث') }}
-      </button>
-    </div>
-    <div id="aiInsightsList" style="display:grid;gap:8px">
-      <div class="al-skeleton" style="height:36px;border-radius:8px"></div>
-      <div class="al-skeleton" style="height:36px;border-radius:8px"></div>
-      <div class="al-skeleton" style="height:36px;border-radius:8px"></div>
-    </div>
-  </div>
+<div class="v3-launcher-grid">
 
-  <!-- Action Required Panel -->
-  <div class="al-card" style="border-left:3px solid #ef4444;position:relative;overflow:hidden">
-    <div style="position:absolute;top:-30px;right:-30px;width:100px;height:100px;
-                background:radial-gradient(circle,rgba(239,68,68,.08) 0%,transparent 70%);
-                border-radius:50%;pointer-events:none"></div>
-    <div class="al-card-header" style="margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="background:linear-gradient(135deg,#ef4444,#f97316);border-radius:8px;padding:6px 9px;font-size:.95rem">⚡</div>
-        <span style="font-weight:700;font-size:.9rem">{{ t('Action Required', 'إجراء مطلوب') }}</span>
-      </div>
-      <span id="alertBadge" style="margin-left:auto;background:#ef4444;color:#fff;
-            border-radius:999px;padding:1px 8px;font-size:.72rem;font-weight:700;display:none">0</span>
-    </div>
-    <div id="aiAlertsList" style="display:flex;flex-direction:column;gap:6px">
-      <div class="al-skeleton" style="height:28px;border-radius:6px"></div>
-      <div class="al-skeleton" style="height:28px;border-radius:6px"></div>
-      <div class="al-skeleton" style="height:28px;border-radius:6px"></div>
-    </div>
-  </div>
+  <a href="/appointments/" class="v3-launcher-card">
+    <div class="v3-launcher-icon" style="background:rgba(46,134,193,0.12);color:#2E86C1">📅</div>
+    <div class="v3-launcher-name">{{ t('Appointments', 'المواعيد') }}</div>
+    <div class="v3-launcher-name-ar">{% if (current_lang or 'en') == 'ar' %}Appointments{% else %}المواعيد{% endif %}</div>
+  </a>
+
+  <a href="/crm/pets/" class="v3-launcher-card">
+    <div class="v3-launcher-icon" style="background:rgba(232,114,74,0.12);color:#E8724A">🐾</div>
+    <div class="v3-launcher-name">{{ t('Pets & Owners', 'الحيوانات والملاك') }}</div>
+    <div class="v3-launcher-name-ar">{% if (current_lang or 'en') == 'ar' %}Pets & CRM{% else %}الحيوانات والعملاء{% endif %}</div>
+  </a>
+
+  <a href="/visits/" class="v3-launcher-card">
+    <div class="v3-launcher-icon" style="background:rgba(155,89,182,0.12);color:#9B59B6">🏥</div>
+    <div class="v3-launcher-name">{{ t('Clinical Visits', 'الزيارات السريرية') }}</div>
+    <div class="v3-launcher-name-ar">{% if (current_lang or 'en') == 'ar' %}Clinical Visits{% else %}الزيارات السريرية{% endif %}</div>
+  </a>
+
+  <a href="/finance/" class="v3-launcher-card">
+    <div class="v3-launcher-icon" style="background:rgba(212,172,69,0.12);color:#D4AC45">💰</div>
+    <div class="v3-launcher-name">{{ t('Finance', 'المالية') }}</div>
+    <div class="v3-launcher-name-ar">{% if (current_lang or 'en') == 'ar' %}Finance{% else %}المالية{% endif %}</div>
+  </a>
+
+  <a href="/inventory/" class="v3-launcher-card">
+    <div class="v3-launcher-icon" style="background:rgba(231,76,60,0.12);color:#E74C3C">📦</div>
+    <div class="v3-launcher-name">{{ t('Inventory', 'المخزون') }}</div>
+    <div class="v3-launcher-name-ar">{% if (current_lang or 'en') == 'ar' %}Inventory{% else %}المخزون{% endif %}</div>
+  </a>
+
+  <a href="/petshop/" class="v3-launcher-card">
+    <div class="v3-launcher-icon" style="background:rgba(26,188,156,0.12);color:#1ABC9C">🛒</div>
+    <div class="v3-launcher-name">{{ t('Pet Shop', 'متجر الحيوانات') }}</div>
+    <div class="v3-launcher-name-ar">{% if (current_lang or 'en') == 'ar' %}Pet Shop{% else %}متجر الحيوانات{% endif %}</div>
+  </a>
+
+  <a href="/ai/" class="v3-launcher-card">
+    <div class="v3-launcher-icon" style="background:rgba(27,107,92,0.12);color:var(--al-primary,#1B6B5C)">🤖</div>
+    <div class="v3-launcher-name">{{ t('AI Assistant', 'المساعد الذكي') }}</div>
+    <div class="v3-launcher-name-ar">{% if (current_lang or 'en') == 'ar' %}AI Assistant{% else %}المساعد الذكي{% endif %}</div>
+  </a>
+
+  <a href="/reports/" class="v3-launcher-card">
+    <div class="v3-launcher-icon" style="background:rgba(243,156,18,0.12);color:#F39C12">📊</div>
+    <div class="v3-launcher-name">{{ t('Reports', 'التقارير') }}</div>
+    <div class="v3-launcher-name-ar">{% if (current_lang or 'en') == 'ar' %}Reports{% else %}التقارير{% endif %}</div>
+  </a>
 
 </div>
 
-<!-- ── Outbreak Radar ───────────────────────────────────────── -->
-<div id="outbreakCard" class="al-card" style="border-left:3px solid var(--al-gold);margin-bottom:24px">
-  <div class="al-card-header" style="margin-bottom:12px">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="background:linear-gradient(135deg,#ef4444,#f97316);border-radius:8px;padding:6px 9px;font-size:.95rem">🦠</div>
-      <div>
-        <div style="font-weight:700;font-size:.9rem;color:var(--al-text)">{{ t('Outbreak Radar', 'رادار التفشيات') }}</div>
-        <div style="color:var(--al-text-muted);font-size:.72rem">{{ t('Last 7 days · auto-scan', 'آخر 7 أيام · مسح تلقائي') }}</div>
-      </div>
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 4 · TWO-COLUMN ROW (Today's Appointments + Clinic Health)
+══════════════════════════════════════════════════════════════ -->
+<div class="v3-two-col">
+
+  <!-- Left 60%: Today's Schedule -->
+  <div class="v3-card">
+    <div class="v3-card-header">
+      <h3 class="v3-card-title">📆 {{ t("Today's Schedule", "جدول اليوم") }}</h3>
+      <a href="/appointments/" class="v3-section-link">{{ t('View all', 'عرض الكل') }} →</a>
     </div>
-    <a href="/ai/outbreak-radar" target="_blank"
-       class="al-btn al-btn-ghost al-btn-sm" style="margin-left:auto;font-size:.72rem">
-      {{ t('Full report', 'تقرير كامل') }} →
-    </a>
+
+    {% if stats.bookings_today == 0 %}
+    <div class="v3-empty-state">
+      <div class="v3-empty-icon">🌿</div>
+      <div style="font-weight:600;color:var(--al-text);margin-bottom:6px">{{ t('No appointments today', 'لا مواعيد اليوم') }}</div>
+      <div>{{ t('The clinic is calm — no appointments scheduled for today.', 'العيادة هادئة، لا مواعيد مجدولة لهذا اليوم.') }}</div>
+      <a href="/appointments/new" class="v3-btn v3-btn-primary" style="margin-top:16px;display:inline-flex">
+        + {{ t('Schedule Appointment', 'جدولة موعد') }}
+      </a>
+    </div>
+    {% else %}
+    <div id="apptTableWrapper">
+      <div style="text-align:center;padding:20px;color:var(--al-text-muted);font-size:.82rem" id="apptLoading">
+        <div class="al-skeleton" style="height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="al-skeleton" style="height:28px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="al-skeleton" style="height:28px;border-radius:6px"></div>
+      </div>
+      <table class="v3-appt-table" id="apptTable" style="display:none">
+        <thead>
+          <tr>
+            <th>{{ t('Time', 'الوقت') }}</th>
+            <th>{{ t('Pet', 'الحيوان') }}</th>
+            <th>{{ t('Owner', 'المالك') }}</th>
+            <th>{{ t('Doctor', 'الطبيب') }}</th>
+            <th>{{ t('Status', 'الحالة') }}</th>
+          </tr>
+        </thead>
+        <tbody id="apptTbody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--al-border)">
+      <a href="/appointments/calendar" class="v3-section-link">📅 {{ t('View full calendar', 'عرض التقويم الكامل') }} →</a>
+    </div>
+    {% endif %}
   </div>
-  <div id="outbreakBody">
-    <div class="al-skeleton" style="height:22px;border-radius:5px;margin-bottom:6px"></div>
-    <div class="al-skeleton" style="height:22px;border-radius:5px"></div>
+
+  <!-- Right 40%: Clinic Health Panel -->
+  <div class="v3-panel-stack">
+
+    <!-- AI Insights -->
+    <div class="v3-sub-card" style="--sub-accent:#1ABC9C">
+      <div class="v3-sub-title">🤖 {{ t('AI Insights', 'رؤى الذكاء الاصطناعي') }}</div>
+      <div class="v3-sub-body" id="ai-insights-text">
+        <div class="al-skeleton" style="height:16px;border-radius:5px;margin-bottom:6px"></div>
+        <div class="al-skeleton" style="height:16px;border-radius:5px;width:80%"></div>
+      </div>
+      <a href="/ai/" class="v3-sub-link">{{ t('Open AI Assistant', 'فتح المساعد الذكي') }} →</a>
+    </div>
+
+    <!-- Inventory Alerts -->
+    <div class="v3-sub-card" style="--sub-accent:#E74C3C">
+      <div class="v3-sub-title">📦 {{ t('Stock Alerts', 'تنبيهات المخزون') }}</div>
+      <div class="v3-sub-body">
+        {% set low = stats.get('low_stock', 0) if stats is mapping else 0 %}
+        {% if low > 0 %}
+          <span style="color:#E74C3C;font-weight:700">{{ low }}</span> {{ t('items running low', 'عنصر على وشك النفاد') }}
+        {% else %}
+          ✅ {{ t('All stock levels are healthy', 'مستويات المخزون جيدة') }}
+        {% endif %}
+      </div>
+      <a href="/inventory/" class="v3-sub-link">{{ t('View inventory', 'عرض المخزون') }} →</a>
+    </div>
+
+    <!-- System Health -->
+    <div class="v3-sub-card" style="--sub-accent:#2ECC71">
+      <div class="v3-sub-title">🖥️ {{ t('System', 'النظام') }}</div>
+      <div class="v3-health-row" style="margin-bottom:6px">
+        <span class="v3-dot-green"></span>
+        <span>{{ t('All systems operational', 'جميع الأنظمة تعمل') }}</span>
+      </div>
+      <div class="v3-sub-body">{{ t('Last backup: today', 'آخر نسخ احتياطي: اليوم') }}</div>
+      <a href="/system/monitor" class="v3-sub-link">{{ t('System monitor', 'مراقبة النظام') }} →</a>
+    </div>
+
   </div>
 </div>
 
-<!-- ── Module Sections ─────────────────────────────────────── -->
-{% for cat_meta, cat_modules in grouped %}
-<div class="al-module-section" style="margin-bottom:28px">
-
-  <div class="al-section-header" style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--al-border)">
-    <span style="font-size:1.3rem">{{ cat_meta.icon }}</span>
-    <span style="font-weight:700;font-size:1rem;color:var(--al-text)">{{ t(cat_meta.label, cat_meta.label_ar) }}</span>
-    <span class="al-badge al-badge-teal" style="margin-left:4px">{{ cat_modules|length }}</span>
-    <div style="flex:1"></div>
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 5 · ALL PLATFORM MODULES
+══════════════════════════════════════════════════════════════ -->
+<div id="all-modules">
+  <div class="v3-section-header" style="flex-wrap:wrap;gap:12px">
+    <h2 class="v3-section-title">🗂 {{ t('All Platform Modules', 'جميع وحدات المنصة') }}</h2>
+    <div class="v3-modules-search">
+      <input type="text" class="v3-search-input" id="modSearch"
+             placeholder="{{ t('Search modules...', 'ابحث عن وحدة...') }}"
+             oninput="v3FilterModules(this.value)">
+    </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">
+  {% for cat_meta, cat_modules in grouped %}
+  <div class="v3-cat-header v3-mod-section" data-cat="{{ cat_meta.label|lower }}">
+    <span class="v3-cat-icon">{{ cat_meta.icon }}</span>
+    <span class="v3-cat-label">{{ t(cat_meta.label, cat_meta.label_ar) }}</span>
+    <span class="al-badge al-badge-teal" style="margin-left:6px">{{ cat_modules|length }}</span>
+  </div>
+
+  <div class="v3-all-modules-grid v3-mod-section" data-cat="{{ cat_meta.label|lower }}" style="margin-bottom:0">
     {% for mod in cat_modules %}
 
     {% set is_active = mod.status == 'active' %}
@@ -161,21 +587,24 @@
       {% set mod_target = '_self' %}
     {% endif %}
 
-    <div class="al-module-card {% if is_soon %}al-module-card--disabled{% endif %}"
+    <div class="al-module-card {% if is_soon %}al-module-card--disabled{% endif %} v3-mod-card"
          style="--mod-accent:{{ mod.color }}"
-         {% if not is_soon %}data-href="{{ mod_url }}" data-target="{{ mod_target }}" onclick="if(this.dataset.href!='#'){window.open(this.dataset.href,this.dataset.target)}"{% endif %}>
+         data-name="{{ mod.name|lower }} {{ mod.name_ar }}"
+         {% if not is_soon %}
+           data-href="{{ mod_url }}" data-target="{{ mod_target }}"
+           onclick="if(this.dataset.href!='#'){window.open(this.dataset.href,this.dataset.target)}"
+         {% endif %}>
 
       <div class="al-module-card-top">
         <div class="al-module-icon">{{ mod.icon }}</div>
         <div style="flex:1;min-width:0">
           <div class="al-module-name">{{ t(mod.name, mod.name_ar) }}</div>
           {% if (current_lang or 'en') == 'ar' %}
-          <div class="al-module-name-sub">{{ mod.name }}</div>
+            <div class="al-module-name-sub">{{ mod.name }}</div>
           {% else %}
-          <div class="al-module-name-sub" dir="rtl">{{ mod.name_ar }}</div>
+            <div class="al-module-name-sub" dir="rtl">{{ mod.name_ar }}</div>
           {% endif %}
         </div>
-        <!-- Status dot -->
         {% if is_active %}
           <span class="al-live-dot" title="{{ t('Live','نشط') }}"></span>
         {% elif is_beta %}
@@ -210,238 +639,138 @@
     </div>
     {% endfor %}
   </div>
-
-</div>
-{% endfor %}
-
-<!-- ── Platform Roadmap ──────────────────────────────── -->
-<div class="al-card" style="margin-top:8px;margin-bottom:8px">
-  <div class="al-card-header" style="margin-bottom:16px">
-    <div>
-      <div class="al-card-title">🗺 {{ t('Development Roadmap', 'خارطة طريق التطوير') }}</div>
-      <div class="al-card-sub">{{ t('Phased delivery plan for the full ERP platform', 'خطة تسليم مرحلية لمنصة ERP الكاملة') }}</div>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
-
-    {% set phases = [
-      ('Phase 1', 'المرحلة ١', 'Platform shell · Module launcher · Auth', 'واجهة المنصة · لوحة الوحدات · المصادقة', 'active'),
-      ('Phase 2', 'المرحلة ٢', 'Admin & HR · Role management · Staff', 'الإدارة والموارد البشرية · إدارة الأدوار', 'active'),
-      ('Phase 3', 'المرحلة ٣', 'Appointments · Reception · Doctor workspace', 'المواعيد · الاستقبال · مساحة الطبيب', 'active'),
-      ('Phase 4', 'المرحلة ٤', 'Inventory · Pharmacy · Procurement', 'المخزون · الصيدلية · المشتريات', 'active'),
-      ('Phase 5', 'المرحلة ٥', 'Finance · Invoicing · Payments · P&L', 'المالية · الفواتير · المدفوعات', 'active'),
-      ('Phase 6', 'المرحلة ٦', 'Lab · Vaccination · Grooming · Boarding', 'المختبر · التطعيمات · التجميل · الإيواء', 'active'),
-      ('Phase 7', 'المرحلة ٧', 'AI Assistant · Smart forecasting · Petsy', 'الذكاء الاصطناعي · التنبؤ الذكي', 'active'),
-      ('Phase 8', 'المرحلة ٨', 'Security · Production · Backup & Restore', 'الأمان · الإنتاج · النسخ الاحتياطي', 'beta'),
-    ] %}
-
-    {% for phase_en, phase_ar, desc_en, desc_ar, phase_status in phases %}
-    <div style="padding:12px;background:var(--al-surface-2);border:1px solid var(--al-border);border-radius:10px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:13px;font-weight:700;color:var(--al-text)">{{ t(phase_en, phase_ar) }}</span>
-        {% if phase_status == 'active' %}
-          <span class="al-badge al-badge-green" style="font-size:10px">✅ {{ t('Live','نشط') }}</span>
-        {% else %}
-          <span class="al-badge al-badge-gold" style="font-size:10px">🔧 {{ t('In Progress','قيد التنفيذ') }}</span>
-        {% endif %}
-      </div>
-      <div style="font-size:11.5px;color:var(--al-text-muted);line-height:1.5">{{ t(desc_en, desc_ar) }}</div>
-    </div>
-    {% endfor %}
-
-  </div>
+  {% endfor %}
 </div>
 
-<!-- ── Inline styles for module cards & AI panels ─────── -->
-<style>
-/* Module cards */
-.al-module-card {
-  background: var(--al-surface);
-  border: 1px solid var(--al-border);
-  border-radius: 14px;
-  padding: 16px;
-  cursor: pointer;
-  transition: all .2s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  position: relative;
-  overflow: hidden;
-}
-.al-module-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: var(--mod-accent, var(--al-primary));
-  opacity: 0;
-  transition: opacity .2s;
-}
-.al-module-card:hover { border-color: var(--mod-accent, var(--al-primary)); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); }
-.al-module-card:hover::before { opacity: 1; }
-.al-module-card--disabled { opacity: .55; cursor: default; pointer-events: none; }
-.al-module-card-top { display: flex; align-items: center; gap: 10px; }
-.al-module-icon { font-size: 1.5rem; flex-shrink: 0; }
-.al-module-name { font-weight: 700; font-size: .9rem; color: var(--al-text); line-height: 1.3; }
-.al-module-name-sub { font-size: .72rem; color: var(--al-text-muted); }
-.al-module-desc { font-size: .78rem; color: var(--al-text-muted); line-height: 1.5; flex: 1; }
-.al-module-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
-.al-module-open {
-  font-size: .78rem; font-weight: 600;
-  color: var(--mod-accent, var(--al-primary));
-  text-decoration: none;
-  transition: opacity .15s;
-}
-.al-module-open:hover { opacity: .7; }
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 6 · PLATFORM FOOTER
+══════════════════════════════════════════════════════════════ -->
+<div class="v3-platform-footer">
+  Platform v3 &middot;
+  {{ (clinic.name if clinic is defined and clinic.name else 'Aleefy') }} &middot;
+  {{ (clinic.doctor_name if clinic is defined and clinic.doctor_name else '') }}
+</div>
 
-/* AI insight items */
-.al-insight-item {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 8px 12px; border-radius: 8px; border: 1px solid;
-  font-size: .82rem; line-height: 1.4;
-  animation: alFadeIn .4s ease forwards; opacity: 0;
-}
-@keyframes alFadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-.al-insight-item.critical { background:rgba(239,68,68,.08); border-color:rgba(239,68,68,.25); color:#dc2626; }
-.al-insight-item.warning  { background:rgba(201,168,76,.08); border-color:rgba(201,168,76,.3);  color:#9a6f10; }
-.al-insight-item.success  { background:rgba(27,107,92,.08);  border-color:rgba(27,107,92,.25);  color:#1B6B5C; }
-.al-insight-item.info     { background:rgba(3,105,161,.06);  border-color:rgba(3,105,161,.2);   color:#0369a1; }
-.al-alert-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px 8px; border-radius: 6px;
-  font-size: .78rem; color: var(--al-text-muted);
-  cursor: pointer; transition: background .15s; text-decoration: none;
-}
-.al-alert-item:hover { background: var(--al-surface-2); }
-.al-alert-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
-.al-alert-item.critical .al-alert-dot { background:#ef4444; box-shadow:0 0 6px #ef4444; }
-.al-alert-item.warning  .al-alert-dot { background:#C9A84C; box-shadow:0 0 6px #C9A84C; }
-.al-alert-item.info     .al-alert-dot { background:#0369a1; box-shadow:0 0 4px #0369a1; }
-
-/* Badges */
-.al-badge { display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:600; background:var(--al-surface-2);color:var(--al-text-muted);border:1px solid var(--al-border); }
-.al-badge-green { background:rgba(27,107,92,.1); color:#1B6B5C; border-color:rgba(27,107,92,.25); }
-.al-badge-teal  { background:rgba(42,157,143,.1); color:#2A9D8F; border-color:rgba(42,157,143,.25); }
-.al-badge-gold  { background:rgba(201,168,76,.1); color:#9a6f10; border-color:rgba(201,168,76,.3); }
-
-/* Live dot */
-.al-live-dot {
-  display:inline-block;width:7px;height:7px;border-radius:50%;
-  background:var(--al-primary);flex-shrink:0;
-  box-shadow:0 0 0 0 rgba(27,107,92,.5);
-  animation:livePulse 2s infinite;
-}
-@keyframes livePulse {
-  0%   { box-shadow:0 0 0 0 rgba(27,107,92,.5); }
-  70%  { box-shadow:0 0 0 5px rgba(27,107,92,0); }
-  100% { box-shadow:0 0 0 0 rgba(27,107,92,0); }
-}
-
-/* Btn gold */
-.al-btn-gold { background:var(--al-gold); color:var(--al-navy); border-color:var(--al-gold); }
-.al-btn-gold:hover { background:#b8941e; border-color:#b8941e; }
-
-@media(max-width:900px){[id=aiCommandRow]{grid-template-columns:1fr}}
-</style>
-
+<!-- ══════════════════════════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════════════════════ -->
 <script>
-var _insightsLoaded = false;
-
-function loadInsights(force) {
-  if (_insightsLoaded && !force) return;
-  _insightsLoaded = true;
-  var btn = document.getElementById('refreshBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '...'; }
-
-  var csrf = (document.querySelector('meta[name=csrf-token]')||{}).content||'';
-
-  // Load insights
-  fetch('/ai/insights', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}})
-    .then(function(r){return r.json()})
-    .then(function(d){
-      var list = document.getElementById('aiInsightsList');
-      var ts   = document.getElementById('aiInsightsTime');
-      if (ts) ts.textContent = '{{ t("Generated", "تم التوليد") }} — ' + new Date().toLocaleTimeString();
-      if (!d.insights || !d.insights.length) {
-        list.innerHTML = '<div class="al-insight-item info"><span>🤖</span><span>{{ t("No insights available right now.","لا توجد رؤى متاحة الآن.") }}</span></div>';
-        return;
-      }
-      list.innerHTML = '';
-      d.insights.forEach(function(ins, i) {
-        var el = document.createElement('div');
-        el.className = 'al-insight-item ' + (ins.type || 'info');
-        el.style.animationDelay = (i * 0.1) + 's';
-        el.innerHTML = '<span style="font-size:1.1rem;flex-shrink:0">' + (ins.icon||'•') + '</span><span>' + ins.text + '</span>';
-        list.appendChild(el);
-      });
-    })
-    .catch(function(){
-      document.getElementById('aiInsightsList').innerHTML =
-        '<div class="al-insight-item warning"><span>⚠️</span><span>{{ t("Could not load AI insights.","تعذّر تحميل الرؤى.") }}</span></div>';
-    })
-    .finally(function(){
-      if (btn) { btn.disabled = false; btn.textContent = '↺ {{ t("Refresh","تحديث") }}'; }
-    });
-
-  // Load predictive alerts
-  fetch('/ai/health-alerts')
-    .then(function(r){return r.json()})
-    .then(function(d){
-      var list  = document.getElementById('aiAlertsList');
-      var badge = document.getElementById('alertBadge');
-      if (!d.alerts || !d.alerts.length) {
-        list.innerHTML = '<div style="color:var(--al-text-muted);font-size:.8rem;text-align:center;padding:8px">✅ {{ t("All clear — no urgent actions","كل شيء على ما يرام") }}</div>';
-        return;
-      }
-      if (badge) { badge.textContent = d.alerts.length; badge.style.display = ''; }
-      list.innerHTML = '';
-      d.alerts.slice(0, 6).forEach(function(a) {
-        var el = document.createElement('a');
-        el.className = 'al-alert-item ' + (a.type || 'info');
-        el.href = a.link || '#';
-        el.innerHTML = '<span class="al-alert-dot"></span>' +
-          '<span style="font-size:.9rem;flex-shrink:0">' + (a.icon||'•') + '</span>' +
-          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + a.text + '">' + a.text + '</span>';
-        list.appendChild(el);
-      });
-    })
-    .catch(function(){});
-
-  // Load Outbreak Radar
-  fetch('/ai/outbreak-radar')
-    .then(function(r){return r.json()})
-    .then(function(d){
-      var card = document.getElementById('outbreakCard');
-      var body = document.getElementById('outbreakBody');
-      if (!card || !body) return;
-      if (!d.outbreaks || !d.outbreaks.length) {
-        body.innerHTML = '<div style="color:var(--al-text-muted);font-size:.78rem;text-align:center;padding:8px">🟢 {{ t("No clusters detected in the last 7 days","لا توجد تجمعات خلال آخر 7 أيام") }}</div>';
-        return;
-      }
-      card.style.borderColor = d.alert_count > 0 ? '#ef4444' : 'var(--al-gold)';
-      body.innerHTML = '';
-      d.outbreaks.forEach(function(ob) {
-        var el = document.createElement('div');
-        el.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--al-border);font-size:.78rem;color:var(--al-text-muted)';
-        var dot = ob.level === 'alert' ? '#ef4444' : '#C9A84C';
-        el.innerHTML =
-          '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0;box-shadow:0 0 6px ' + dot + '"></span>' +
-          '<span style="flex:1"><strong>' + ob.diagnosis + '</strong></span>' +
-          '<span style="color:' + dot + ';font-weight:700">' + ob.pet_count + ' {{ t("pets","حيوان") }}</span>';
-        body.appendChild(el);
-      });
-      if (d.ai_comment) {
-        var cmt = document.createElement('div');
-        cmt.style.cssText = 'margin-top:8px;padding:8px;background:rgba(201,168,76,.08);border-radius:6px;font-size:.75rem;color:var(--al-text-muted);line-height:1.5;border:1px solid rgba(201,168,76,.2)';
-        cmt.textContent = '🤖 ' + d.ai_comment;
-        body.appendChild(cmt);
-      }
-    })
-    .catch(function(){});
+/* ── KPI count-up animation ──────────────────────────────────── */
+function v3AnimateCount(el) {
+  var target = parseInt(el.dataset.target, 10);
+  if (isNaN(target) || target === 0) return;
+  var start = 0;
+  var duration = 900;
+  var step = Math.ceil(target / (duration / 16));
+  var timer = setInterval(function() {
+    start = Math.min(start + step, target);
+    el.textContent = start.toLocaleString();
+    if (start >= target) clearInterval(timer);
+  }, 16);
 }
 
-document.addEventListener('DOMContentLoaded', function() { loadInsights(false); });
-setTimeout(function(){ loadInsights(true); }, 600000);
+/* ── AI Insights load ────────────────────────────────────────── */
+function v3LoadAIInsights() {
+  var el = document.getElementById('ai-insights-text');
+  if (!el) return;
+  var csrf = (document.querySelector('meta[name=csrf-token]') || {}).content || '{{ csrf_token() if csrf_token is defined else "" }}';
+  fetch('/ai/insights', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+    body: JSON.stringify({ topic: 'daily_summary' })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    el.textContent = d.insight || '{{ t("AI ready for queries.", "الذكاء الاصطناعي جاهز للاستفسارات.") }}';
+  })
+  .catch(function() {
+    el.innerHTML = '<a href="/ai/" style="color:var(--al-primary);font-weight:600">{{ t("Ask AI for clinic insights →", "اسأل الذكاء الاصطناعي عن رؤى العيادة ←") }}</a>';
+  });
+}
+
+/* ── Today's appointments fetch ──────────────────────────────── */
+function v3LoadTodayAppts() {
+  var tbody = document.getElementById('apptTbody');
+  if (!tbody) return;
+  fetch('/appointments/api/queue', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    var rows = d.appointments || d.queue || d || [];
+    document.getElementById('apptLoading').style.display = 'none';
+    var table = document.getElementById('apptTable');
+    if (!rows.length) {
+      table.style.display = 'none';
+      document.getElementById('apptTableWrapper').innerHTML =
+        '<div class="v3-empty-state"><div class="v3-empty-icon">📋</div>' +
+        '<div>{{ t("No appointments loaded.", "لم يتم تحميل مواعيد.") }}</div></div>';
+      return;
+    }
+    table.style.display = 'table';
+    tbody.innerHTML = '';
+    rows.slice(0, 8).forEach(function(a) {
+      var statusClass = {
+        'scheduled': 'v3-status-scheduled',
+        'in_progress': 'v3-status-inprogress',
+        'done': 'v3-status-done',
+        'cancelled': 'v3-status-cancelled'
+      }[a.status] || 'v3-status-scheduled';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + (a.time || a.appointment_time || '—') + '</td>' +
+        '<td>' + (a.pet_name || a.pet || '—') + '</td>' +
+        '<td>' + (a.owner_name || a.owner || '—') + '</td>' +
+        '<td>' + (a.doctor_name || a.doctor || '—') + '</td>' +
+        '<td><span class="v3-status-badge ' + statusClass + '">' + (a.status || 'scheduled') + '</span></td>';
+      tbody.appendChild(tr);
+    });
+  })
+  .catch(function() {
+    var w = document.getElementById('apptTableWrapper');
+    if (w) {
+      document.getElementById('apptLoading').style.display = 'none';
+      w.innerHTML += '<div style="text-align:center;padding:16px;color:var(--al-text-muted);font-size:.82rem">' +
+        '{{ t("Could not load appointments. ", "تعذّر تحميل المواعيد.") }}' +
+        '<a href="/appointments/" style="color:var(--al-primary)">{{ t("View calendar →", "عرض التقويم ←") }}</a></div>';
+    }
+  });
+}
+
+/* ── Module search filter ────────────────────────────────────── */
+function v3FilterModules(q) {
+  q = q.trim().toLowerCase();
+  var cards = document.querySelectorAll('.v3-mod-card');
+  var sections = document.querySelectorAll('.v3-mod-section');
+  if (!q) {
+    cards.forEach(function(c) { c.classList.remove('v3-mod-hidden'); });
+    sections.forEach(function(s) { s.classList.remove('v3-mod-hidden'); });
+    return;
+  }
+  cards.forEach(function(c) {
+    var name = (c.dataset.name || '').toLowerCase();
+    c.classList.toggle('v3-mod-hidden', name.indexOf(q) === -1);
+  });
+  sections.forEach(function(s) {
+    if (!s.classList.contains('v3-mod-card')) {
+      var cat = (s.dataset.cat || '').toLowerCase();
+      var visibleInCat = s.querySelectorAll && s.querySelectorAll('.v3-mod-card:not(.v3-mod-hidden)').length > 0;
+      s.classList.toggle('v3-mod-hidden', !visibleInCat && cat.indexOf(q) === -1);
+    }
+  });
+}
+
+/* ── Init on DOM ready ───────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+  // Animate KPI counters
+  document.querySelectorAll('.v3-stat-value[data-target]').forEach(function(el) {
+    v3AnimateCount(el);
+  });
+  // Load AI insights
+  v3LoadAIInsights();
+  // Load today's appointments (only if table exists)
+  if (document.getElementById('apptTbody')) {
+    v3LoadTodayAppts();
+  }
+});
 </script>
 
 {% endblock %}
