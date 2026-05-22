@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aleefy — Smart Veterinary Platform</title>
+<link rel="icon" type="image/png" href="/static/images/aleefy-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300&family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+/* ════════════════════════════════════════════════════
+   ALEEFY LANDING PAGE — Full animated experience
+════════════════════════════════════════════════════ */
+:root {
+  --p:   #1B6B5C;
+  --pm:  #2A9D8F;
+  --pl:  rgba(27,107,92,.12);
+  --pd:  #0E4035;
+  --g:   #C9A84C;
+  --gl:  rgba(201,168,76,.15);
+  --navy:#0D1B2A;
+  --bg:  #070E18;
+  --s1:  #0A1624;
+  --s2:  #0D1E2E;
+  --txt: #DDE6EE;
+  --mid: #7FA4B8;
+  --dim: #3A6070;
+  --border: rgba(42,157,143,.18);
+}
+
+/* ── Reset ───────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;overflow-x:hidden}
+body{
+  font-family:'Plus Jakarta Sans','Cairo',system-ui,sans-serif;
+  background:var(--bg);color:var(--txt);
+  overflow-x:hidden;cursor:none;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:none}
+
+/* ── Custom cursor ────────────────────────── */
+#cursor-dot {
+  position:fixed;width:8px;height:8px;
+  background:var(--g);border-radius:50%;
+  pointer-events:none;z-index:99999;
+  transform:translate(-50%,-50%);
+  transition:width .15s,height .15s,background .15s;
+  mix-blend-mode:normal;
+}
+#cursor-ring {
+  position:fixed;width:36px;height:36px;
+  border:1.5px solid rgba(201,168,76,.55);
+  border-radius:50%;pointer-events:none;z-index:99998;
+  transform:translate(-50%,-50%);
+  transition:transform .08s linear,width .25s,height .25s,border-color .25s,opacity .25s;
+}
+#cursor-glow {
+  position:fixed;width:200px;height:200px;
+  border-radius:50%;pointer-events:none;z-index:99996;
+  background:radial-gradient(circle,rgba(27,107,92,.12) 0%,transparent 70%);
+  transform:translate(-50%,-50%);
+  transition:transform .15s ease;
+}
+body.hovering #cursor-dot{width:14px;height:14px;background:var(--pm);}
+body.hovering #cursor-ring{width:52px;height:52px;border-color:rgba(42,157,143,.7);}
+body.clicking #cursor-dot{width:6px;height:6px;}
+body.clicking #cursor-ring{width:28px;height:28px;}
+
+/* ── Noise grain overlay ──────────────────── */
+body::before{
+  content:'';position:fixed;inset:0;z-index:1;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size:256px;pointer-events:none;opacity:.4;
+}
+
+/* ── Animated mesh background ────────────── */
+.mesh {
+  position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
+}
+.mesh-blob {
+  position:absolute;border-radius:50%;filter:blur(80px);opacity:.35;
+  animation:blobDrift 20s ease-in-out infinite alternate;
+}
+.mesh-blob:nth-child(1){width:600px;height:600px;background:radial-gradient(circle,#1B6B5C,transparent);top:-10%;left:-10%;animation-duration:18s;}
+.mesh-blob:nth-child(2){width:500px;height:500px;background:radial-gradient(circle,#0A3D34,transparent);bottom:-5%;right:-10%;animation-duration:22s;animation-delay:-8s;}
+.mesh-blob:nth-child(3){width:350px;height:350px;background:radial-gradient(circle,#C9A84C,transparent);top:40%;right:15%;opacity:.15;animation-duration:15s;animation-delay:-4s;}
+.mesh-blob:nth-child(4){width:280px;height:280px;background:radial-gradient(circle,#2A9D8F,transparent);bottom:20%;left:20%;opacity:.2;animation-duration:25s;animation-delay:-12s;}
+@keyframes blobDrift{
+  0%{transform:translate(0,0) scale(1);}
+  33%{transform:translate(30px,-20px) scale(1.05);}
+  66%{transform:translate(-20px,30px) scale(0.96);}
+  100%{transform:translate(20px,10px) scale(1.02);}
+}
+
+/* ── Wrapper ─────────────────────────────── */
+.wrap{position:relative;z-index:2}
+
+/* ════════════════════════════════════════════
+   NAV
+════════════════════════════════════════════ */
+nav {
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 40px;
+  background:rgba(7,14,24,.72);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--border);
+  transition:padding .4s,background .4s;
+}
+nav.scrolled{padding:10px 40px;background:rgba(7,14,24,.9);}
+.nav-brand{display:flex;align-items:center;gap:12px;}
+.nav-logo{width:38px;height:38px;border-radius:10px;object-fit:cover;box-shadow:0 0 0 1px rgba(255,255,255,.1);}
+.nav-name{font-size:1.25rem;font-weight:800;letter-spacing:-.02em;}
+.nav-name span{color:var(--g);}
+.nav-links{display:flex;gap:6px;align-items:center;}
+.nav-link{padding:8px 16px;border-radius:8px;font-size:.84rem;font-weight:500;color:var(--mid);transition:all .2s;}
+.nav-link:hover{color:var(--txt);background:rgba(255,255,255,.06);}
+.nav-cta{
+  padding:9px 20px;border-radius:10px;font-size:.84rem;font-weight:700;
+  background:linear-gradient(135deg,var(--p),var(--pm));
+  color:#fff;border:none;
+  box-shadow:0 0 20px rgba(27,107,92,.4);
+  transition:all .25s;
+}
+.nav-cta:hover{box-shadow:0 0 32px rgba(27,107,92,.65);transform:translateY(-1px);}
+
+/* ════════════════════════════════════════════
+   HERO
+════════════════════════════════════════════ */
+.hero {
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  text-align:center;padding:120px 24px 80px;
+  position:relative;overflow:hidden;
+}
+
+/* Animated rings */
+.hero-rings{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.ring{
+  position:absolute;border-radius:50%;border:1px solid;
+  left:50%;top:50%;transform:translate(-50%,-50%);
+  animation:ringExpand 8s ease-in-out infinite;
+}
+.ring:nth-child(1){width:300px;height:300px;border-color:rgba(27,107,92,.25);animation-delay:0s;}
+.ring:nth-child(2){width:500px;height:500px;border-color:rgba(27,107,92,.15);animation-delay:1.5s;}
+.ring:nth-child(3){width:700px;height:700px;border-color:rgba(27,107,92,.08);animation-delay:3s;}
+.ring:nth-child(4){width:900px;height:900px;border-color:rgba(201,168,76,.06);animation-delay:4.5s;}
+@keyframes ringExpand{
+  0%,100%{opacity:.8;transform:translate(-50%,-50%) scale(1);}
+  50%{opacity:.3;transform:translate(-50%,-50%) scale(1.06);}
+}
+
+/* Floating particles */
+.particles{position:absolute;inset:0;pointer-events:none;}
+.particle{
+  position:absolute;width:3px;height:3px;border-radius:50%;
+  background:var(--pm);opacity:0;
+  animation:particleFloat linear infinite;
+}
+@keyframes particleFloat{
+  0%{opacity:0;transform:translateY(0) scale(0);}
+  10%{opacity:.8;}
+  90%{opacity:.3;}
+  100%{opacity:0;transform:translateY(-200px) scale(1.5);}
+}
+
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 18px;border-radius:999px;
+  background:rgba(27,107,92,.12);
+  border:1px solid rgba(42,157,143,.3);
+  font-size:.78rem;font-weight:600;color:var(--pm);
+  margin-bottom:28px;
+  animation:fadeUp .8s ease .2s both;
+}
+.badge-dot{width:7px;height:7px;border-radius:50%;background:var(--pm);
+  box-shadow:0 0 8px var(--pm);animation:livePulse 2s infinite;}
+@keyframes livePulse{0%,100%{box-shadow:0 0 0 0 rgba(42,157,143,.5);}50%{box-shadow:0 0 0 6px rgba(42,157,143,0);}}
+
+.hero-title{
+  font-size:clamp(3rem,8vw,6.5rem);
+  font-weight:900;line-height:1.04;
+  letter-spacing:-.03em;
+  margin-bottom:20px;
+  animation:fadeUp .8s ease .35s both;
+}
+.hero-title .teal{
+  background:linear-gradient(135deg,var(--p) 0%,var(--pm) 50%,#4FC3B0 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.hero-title .gold{
+  background:linear-gradient(135deg,var(--g) 0%,#E8C96A 50%,#D4A43A 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.hero-sub{
+  font-size:clamp(1rem,2.5vw,1.3rem);color:var(--mid);
+  max-width:640px;line-height:1.7;margin-bottom:40px;
+  animation:fadeUp .8s ease .5s both;
+}
+.hero-actions{
+  display:flex;gap:14px;flex-wrap:wrap;justify-content:center;
+  animation:fadeUp .8s ease .65s both;
+}
+.btn-hero{
+  padding:14px 32px;border-radius:14px;font-size:1rem;font-weight:700;
+  border:none;display:inline-flex;align-items:center;gap:8px;
+  transition:all .25s;
+}
+.btn-hero.primary{
+  background:linear-gradient(135deg,var(--p),var(--pm));color:#fff;
+  box-shadow:0 6px 30px rgba(27,107,92,.45);
+}
+.btn-hero.primary:hover{box-shadow:0 10px 44px rgba(27,107,92,.65);transform:translateY(-2px)scale(1.02);}
+.btn-hero.secondary{
+  background:rgba(255,255,255,.06);color:var(--txt);
+  border:1px solid var(--border);backdrop-filter:blur(8px);
+}
+.btn-hero.secondary:hover{background:rgba(255,255,255,.1);border-color:rgba(42,157,143,.4);}
+
+/* Stats row */
+.hero-stats{
+  display:flex;gap:48px;justify-content:center;flex-wrap:wrap;
+  margin-top:60px;padding-top:40px;border-top:1px solid var(--border);
+  animation:fadeUp .8s ease .8s both;
+}
+.hero-stat-val{font-size:2.2rem;font-weight:900;color:var(--txt);letter-spacing:-.03em;}
+.hero-stat-val span{color:var(--g);}
+.hero-stat-lbl{font-size:.78rem;color:var(--dim);font-weight:500;margin-top:2px;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+
+/* ════════════════════════════════════════════
+   SECTION SHARED
+════════════════════════════════════════════ */
+section{padding:100px 24px;position:relative;}
+.section-inner{max-width:1200px;margin:0 auto;}
+.section-label{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--pm);margin-bottom:14px;
+}
+.section-label::before{content:'';display:block;width:24px;height:2px;background:var(--pm);border-radius:2px;}
+.section-title{font-size:clamp(1.8rem,4vw,3rem);font-weight:800;letter-spacing:-.02em;margin-bottom:14px;line-height:1.15;}
+.section-sub{font-size:1rem;color:var(--mid);max-width:560px;line-height:1.7;}
+
+/* Scroll reveal */
+.reveal{opacity:0;transform:translateY(40px);transition:opacity .7s ease,transform .7s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+.reveal-left{opacity:0;transform:translateX(-40px);transition:opacity .7s ease,transform .7s ease;}
+.reveal-left.visible{opacity:1;transform:translateX(0);}
+.reveal-right{opacity:0;transform:translateX(40px);transition:opacity .7s ease,transform .7s ease;}
+.reveal-right.visible{opacity:1;transform:translateX(0);}
+.reveal-scale{opacity:0;transform:scale(.92);transition:opacity .6s ease,transform .6s ease;}
+.reveal-scale.visible{opacity:1;transform:scale(1);}
+
+/* ════════════════════════════════════════════
+   MODULES SECTION
+════════════════════════════════════════════ */
+#modules{background:var(--s1);}
+#modules::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 800px 600px at 50% 0%,rgba(27,107,92,.06) 0%,transparent 70%);
+  pointer-events:none;
+}
+
+/* Category tabs */
+.cat-tabs{
+  display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px;
+  border-bottom:1px solid var(--border);padding-bottom:12px;
+}
+.cat-tab{
+  padding:8px 18px;border-radius:8px;font-size:.82rem;font-weight:600;
+  border:1px solid transparent;color:var(--mid);cursor:none;
+  transition:all .2s;background:transparent;
+}
+.cat-tab:hover{color:var(--txt);background:rgba(255,255,255,.05);border-color:var(--border);}
+.cat-tab.active{
+  background:rgba(27,107,92,.15);color:var(--pm);
+  border-color:rgba(42,157,143,.35);
+}
+
+/* Module accordion cards */
+.module-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+  gap:16px;
+}
+.mod-card{
+  background:rgba(13,22,36,.85);
+  border:1px solid var(--border);
+  border-radius:18px;overflow:hidden;
+  transition:border-color .3s,box-shadow .3s,transform .3s;
+  cursor:none;
+}
+.mod-card:hover{
+  border-color:rgba(42,157,143,.45);
+  box-shadow:0 8px 40px rgba(27,107,92,.18);
+  transform:translateY(-3px);
+}
+.mod-card.expanded{
+  border-color:rgba(42,157,143,.55);
+  box-shadow:0 12px 50px rgba(27,107,92,.25);
+}
+
+.mod-header{
+  display:flex;align-items:center;gap:14px;
+  padding:18px 20px;
+  background:linear-gradient(135deg,rgba(27,107,92,.08) 0%,transparent 100%);
+  position:relative;
+}
+.mod-header::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--border),transparent);
+}
+.mod-icon-wrap{
+  width:46px;height:46px;border-radius:13px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;flex-shrink:0;
+  background:rgba(27,107,92,.15);
+  border:1px solid rgba(42,157,143,.2);
+  transition:all .3s;
+}
+.mod-card:hover .mod-icon-wrap{
+  background:rgba(27,107,92,.25);
+  box-shadow:0 0 20px rgba(27,107,92,.3);
+}
+.mod-meta{flex:1;min-width:0;}
+.mod-name{font-weight:700;font-size:.95rem;color:var(--txt);}
+.mod-name-ar{font-size:.72rem;color:var(--dim);margin-top:1px;}
+.mod-chevron{
+  color:var(--dim);font-size:.85rem;transition:transform .35s ease;
+  flex-shrink:0;
+}
+.mod-card.expanded .mod-chevron{transform:rotate(180deg);color:var(--pm);}
+
+.mod-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 8px;border-radius:999px;font-size:.68rem;font-weight:700;
+  flex-shrink:0;
+}
+.mod-badge.live{background:rgba(27,107,92,.2);color:#4FC3B0;border:1px solid rgba(42,157,143,.3);}
+.mod-badge.beta{background:rgba(201,168,76,.15);color:var(--g);border:1px solid rgba(201,168,76,.3);}
+.mod-badge.soon{background:rgba(255,255,255,.06);color:var(--dim);border:1px solid rgba(255,255,255,.1);}
+
+.mod-body{
+  max-height:0;overflow:hidden;
+  transition:max-height .45s cubic-bezier(0.4,0,0.2,1),padding .3s;
+  padding:0 20px;
+}
+.mod-card.expanded .mod-body{max-height:300px;padding:16px 20px;}
+
+.mod-desc{font-size:.83rem;color:var(--mid);line-height:1.6;margin-bottom:12px;}
+.mod-features{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.mod-feat{
+  padding:4px 10px;border-radius:6px;font-size:.72rem;font-weight:500;
+  background:rgba(42,157,143,.08);color:var(--pm);
+  border:1px solid rgba(42,157,143,.15);
+}
+.mod-open-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 16px;border-radius:9px;font-size:.8rem;font-weight:700;
+  background:linear-gradient(135deg,var(--p),var(--pm));color:#fff;
+  border:none;transition:all .2s;
+  box-shadow:0 3px 12px rgba(27,107,92,.35);
+}
+.mod-open-btn:hover{box-shadow:0 5px 20px rgba(27,107,92,.5);transform:translateY(-1px);}
+.mod-open-btn.disabled{background:rgba(255,255,255,.07);color:var(--dim);box-shadow:none;cursor:default;}
+
+/* ════════════════════════════════════════════
+   FEATURES SECTION
+════════════════════════════════════════════ */
+#features{background:var(--bg);}
+.features-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:20px;margin-top:48px;
+}
+.feat-card{
+  padding:28px;border-radius:20px;
+  background:rgba(13,22,36,.8);
+  border:1px solid var(--border);
+  transition:all .3s;position:relative;overflow:hidden;
+}
+.feat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--p),var(--pm),transparent);
+  opacity:0;transition:opacity .3s;
+}
+.feat-card:hover{border-color:rgba(42,157,143,.4);transform:translateY(-4px);box-shadow:0 16px 50px rgba(27,107,92,.15);}
+.feat-card:hover::before{opacity:1;}
+.feat-icon{font-size:2rem;margin-bottom:14px;display:block;}
+.feat-title{font-size:1.05rem;font-weight:700;margin-bottom:8px;}
+.feat-desc{font-size:.83rem;color:var(--mid);line-height:1.6;}
+
+/* ════════════════════════════════════════════
+   NUMBERS / COUNTER SECTION
+════════════════════════════════════════════ */
+#numbers{
+  background:linear-gradient(135deg,#081C17 0%,#0A2820 50%,#061810 100%);
+  position:relative;overflow:hidden;
+}
+#numbers::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 600px 400px at 50% 50%,rgba(27,107,92,.12) 0%,transparent 70%);
+}
+.numbers-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:32px;text-align:center;position:relative;
+}
+.num-val{
+  font-size:3.5rem;font-weight:900;letter-spacing:-.04em;
+  background:linear-gradient(135deg,#fff 0%,var(--pm) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  display:block;
+}
+.num-suffix{color:var(--g);}
+.num-lbl{font-size:.85rem;color:var(--dim);margin-top:6px;font-weight:500;}
+
+/* ════════════════════════════════════════════
+   CTA SECTION
+════════════════════════════════════════════ */
+#cta{background:var(--s1);text-align:center;padding:120px 24px;}
+.cta-box{
+  max-width:700px;margin:0 auto;
+  padding:60px 48px;border-radius:28px;
+  background:linear-gradient(135deg,rgba(27,107,92,.12) 0%,rgba(201,168,76,.05) 100%);
+  border:1px solid rgba(42,157,143,.25);
+  position:relative;overflow:hidden;
+}
+.cta-box::before{
+  content:'';position:absolute;top:-60px;right:-60px;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(201,168,76,.12) 0%,transparent 70%);
+}
+.cta-box::after{
+  content:'';position:absolute;bottom:-60px;left:-60px;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(27,107,92,.12) 0%,transparent 70%);
+}
+
+/* ════════════════════════════════════════════
+   FOOTER
+════════════════════════════════════════════ */
+footer{
+  background:var(--bg);border-top:1px solid var(--border);
+  padding:32px 40px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:16px;font-size:.82rem;color:var(--dim);
+}
+
+/* ════════════════════════════════════════════
+   SCROLLBAR
+════════════════════════════════════════════ */
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:rgba(42,157,143,.3);border-radius:999px;}
+::-webkit-scrollbar-thumb:hover{background:rgba(42,157,143,.6);}
+
+/* ── Mobile ──────────────────────────────── */
+@media(max-width:768px){
+  nav{padding:12px 20px;}
+  .nav-links{display:none;}
+  .hero-stats{gap:28px;}
+  .mod-card:hover{transform:none;}
+  section{padding:64px 16px;}
+}
+</style>
+</head>
+<body>
+
+<!-- Custom cursor -->
+<div id="cursor-glow"></div>
+<div id="cursor-ring"></div>
+<div id="cursor-dot"></div>
+
+<!-- Animated mesh -->
+<div class="mesh">
+  <div class="mesh-blob"></div>
+  <div class="mesh-blob"></div>
+  <div class="mesh-blob"></div>
+  <div class="mesh-blob"></div>
+</div>
+
+<!-- ═══════════ NAV ═══════════ -->
+<nav id="nav">
+  <div class="nav-brand">
+    <img src="/static/images/aleefy-logo.png" alt="Aleefy" class="nav-logo">
+    <div class="nav-name">Alee<span>fy</span></div>
+  </div>
+  <div class="nav-links">
+    <a href="#modules" class="nav-link">Modules</a>
+    <a href="#features" class="nav-link">Features</a>
+    <a href="#numbers" class="nav-link">Stats</a>
+  </div>
+  <button class="nav-cta" onclick="window.location.href='/auth/login'">Sign In →</button>
+</nav>
+
+<!-- ═══════════ HERO ═══════════ -->
+<section class="hero wrap">
+  <div class="hero-rings">
+    <div class="ring"></div><div class="ring"></div>
+    <div class="ring"></div><div class="ring"></div>
+  </div>
+  <div class="particles" id="particles"></div>
+
+  <div class="hero-badge">
+    <span class="badge-dot"></span>
+    Platform V2 — Now Live
+  </div>
+
+  <h1 class="hero-title">
+    The Smartest<br>
+    <span class="teal">Veterinary</span><br>
+    <span class="gold">Platform</span>
+  </h1>
+
+  <p class="hero-sub">
+    32 integrated modules. AI-powered insights. Bilingual Arabic & English.
+    Built for modern animal hospitals that demand more.
+  </p>
+
+  <div class="hero-actions">
+    <button class="btn-hero primary" onclick="window.location.href='/auth/login'">
+      🚀 Launch Platform
+    </button>
+    <button class="btn-hero secondary" onclick="document.getElementById('modules').scrollIntoView({behavior:'smooth'})">
+      📋 Explore Modules
+    </button>
+  </div>
+
+  <div class="hero-stats">
+    <div>
+      <div class="hero-stat-val"><span class="count" data-target="32">0</span><span style="color:var(--g)">+</span></div>
+      <div class="hero-stat-lbl">Integrated Modules</div>
+    </div>
+    <div>
+      <div class="hero-stat-val"><span class="count" data-target="87">0</span><span style="color:var(--g)">+</span></div>
+      <div class="hero-stat-lbl">Database Tables</div>
+    </div>
+    <div>
+      <div class="hero-stat-val"><span class="count" data-target="320">0</span><span style="color:var(--g)">+</span></div>
+      <div class="hero-stat-lbl">API Routes</div>
+    </div>
+    <div>
+      <div class="hero-stat-val"><span class="count" data-target="148">0</span><span style="color:var(--g)">+</span></div>
+      <div class="hero-stat-lbl">UI Templates</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ MODULES ═══════════ -->
+<section id="modules" class="wrap">
+  <div class="section-inner">
+    <div class="reveal">
+      <div class="section-label">All Modules</div>
+      <h2 class="section-title">Everything your clinic needs</h2>
+      <p class="section-sub">Click any module to expand and explore its features. All modules are live and integrated.</p>
+    </div>
+
+    <!-- Category filter tabs -->
+    <div class="cat-tabs reveal" style="margin-top:32px" id="catTabs"></div>
+
+    <!-- Module grid -->
+    <div class="module-grid" id="moduleGrid"></div>
+  </div>
+</section>
+
+<!-- ═══════════ FEATURES ═══════════ -->
+<section id="features" class="wrap">
+  <div class="section-inner">
+    <div class="reveal">
+      <div class="section-label">Platform Capabilities</div>
+      <h2 class="section-title">Built different.<br>Built better.</h2>
+      <p class="section-sub">Every feature is designed from the ground up for veterinary excellence.</p>
+    </div>
+    <div class="features-grid">
+      {% set feats = [
+        ('🤖','AI-Powered Assistant','Petsy AI chatbot + smart clinical recommendations + outbreak radar + WhatsApp automation.'),
+        ('🌐','Fully Bilingual','Arabic RTL + English — every screen, every label, every report.'),
+        ('☁️','Cloud-Ready','Deploy to any server. PostgreSQL backend. Render.com + Neon.tech ready.'),
+        ('🔒','Bank-Level Security','CSRF protection, session timeouts, role-based access, encrypted backups.'),
+        ('📊','Live Analytics','Revenue charts, inventory reports, doctor performance, outbreak detection.'),
+        ('📱','WhatsApp Integration','Auto-send appointment reminders, vaccine alerts, invoices via Wapilot.'),
+        ('🏥','Complete Clinical Suite','Visits, diagnoses, prescriptions, lab, vaccination — all in one place.'),
+        ('💰','Full Finance Module','Invoicing, multi-payment, P&L, budgeting, payroll — zero gaps.'),
+        ('📦','Smart Inventory','Auto-reorder alerts, expiry tracking, pharmacy dispensing, procurement.'),
+        ('🎓','Grooming & Boarding','Full grooming appointments + inpatient boarding with daily care logs.'),
+        ('📡','Telemedicine','Built-in video consultation using Jitsi. No third-party app needed.'),
+        ('🔄','Legacy Migration','Seamless import from any existing clinic software. Zero data loss.'),
+      ] %}
+      {% for icon,title,desc in feats %}
+      <div class="feat-card reveal" style="transition-delay:{{ loop.index0 * 0.05 }}s">
+        <span class="feat-icon">{{ icon }}</span>
+        <div class="feat-title">{{ title }}</div>
+        <div class="feat-desc">{{ desc }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ NUMBERS ═══════════ -->
+<section id="numbers" class="wrap">
+  <div class="section-inner numbers-grid">
+    {% set nums = [
+      ('32','+','Modules'),('87','+','DB Tables'),
+      ('320','+','Routes'),('148','+','Templates'),
+      ('99','%','Uptime'),('0','sec','Deploy Time'),
+    ] %}
+    {% for val,sfx,lbl in nums %}
+    <div class="reveal" style="transition-delay:{{ loop.index0 * 0.1 }}s">
+      <span class="num-val">{{ val }}<span class="num-suffix">{{ sfx }}</span></span>
+      <div class="num-lbl">{{ lbl }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- ═══════════ CTA ═══════════ -->
+<section id="cta" class="wrap">
+  <div class="cta-box reveal-scale">
+    <div class="section-label" style="justify-content:center;margin-bottom:20px">Get Started</div>
+    <h2 class="section-title" style="margin-bottom:14px">Ready to transform<br>your clinic?</h2>
+    <p style="color:var(--mid);margin-bottom:36px;font-size:1rem;line-height:1.7">
+      Log in now and experience the most complete veterinary platform ever built.
+      All modules active, all data yours.
+    </p>
+    <button class="btn-hero primary" onclick="window.location.href='/auth/login'" style="margin:0 auto;display:inline-flex">
+      🚀 Launch Aleefy Now →
+    </button>
+  </div>
+</section>
+
+<!-- ═══════════ FOOTER ═══════════ -->
+<footer>
+  <div style="display:flex;align-items:center;gap:10px">
+    <img src="/static/images/aleefy-logo.png" style="width:28px;height:28px;border-radius:7px;object-fit:cover">
+    <span style="color:var(--txt);font-weight:700">Aleefy</span>
+    <span>·</span>
+    <span>Happy Pets, Healthy Lives</span>
+  </div>
+  <div>© 2026 Aleefy Veterinary Platform · All rights reserved</div>
+</footer>
+
+<script>
+// ════════════ MODULE DATA ════════════
+var MODULES = [
+  {cat:'Clinical',icon:'🩺',name:'Examinations',name_ar:'الفحوصات',status:'live',url:'/visits/',desc:'Complete clinical workflow — chief complaint, physical exam, diagnosis, treatment plan, and discharge.',feats:['Visit tracking','Diagnosis codes','Treatment plans','Discharge notes']},
+  {cat:'Clinical',icon:'📅',name:'Appointments',name_ar:'المواعيد',status:'live',url:'/appointments/schedule',desc:'Smart scheduling with slot blocking, doctor assignment, and waiting room display.',feats:['Slot blocking','Doctor filter','Calendar view','SMS/WhatsApp alerts']},
+  {cat:'Clinical',icon:'👨‍⚕️',name:'Doctor Workspace',name_ar:'مساحة الطبيب',status:'live',url:'/doctor/',desc:'Dedicated dashboard for doctors — today\'s queue, patient history, prescriptions.',feats:['My queue','Patient timeline','Rx pad','Lab results']},
+  {cat:'Clinical',icon:'🧪',name:'Lab & Vaccination',name_ar:'المختبر والتطعيم',status:'live',url:'/clinical/',desc:'Lab result entry, vaccination schedules, auto-reminders for overdue vaccines.',feats:['Lab panels','Vaccine cards','Auto-reminders','Herd tracking']},
+  {cat:'Clinical',icon:'🏨',name:'Inpatient',name_ar:'الرعاية المقيمة',status:'live',url:'/inpatient/',desc:'Inpatient ward management — bed assignment, daily rounds, IV logs, discharge.',feats:['Bed map','Daily rounds','IV tracking','Discharge summary']},
+  {cat:'Clinical',icon:'📹',name:'Telemedicine',name_ar:'الطب عن بُعد',status:'live',url:'/telemedicine/',desc:'Video consultations built-in via Jitsi. No app install needed for owners.',feats:['Jitsi video','Consultation notes','Owner link','Recording']},
+  {cat:'Patients & CRM',icon:'👥',name:'Owners & Pets',name_ar:'الملاك والحيوانات',status:'live',url:'/crm/owners',desc:'Complete owner CRM — pets, medical history, loyalty points, preferred doctor.',feats:['Owner profiles','Pet records','Loyalty points','VIP tagging']},
+  {cat:'Patients & CRM',icon:'💬',name:'WhatsApp',name_ar:'واتساب',status:'live',url:'/whatsapp/',desc:'Automated reminders, campaigns, templates — powered by Wapilot API.',feats:['Appointment reminders','Vaccine alerts','Campaigns','Custom templates']},
+  {cat:'Finance',icon:'💰',name:'Invoicing',name_ar:'الفواتير',status:'live',url:'/finance/invoices',desc:'Professional invoices with line items, discounts, multi-payment support, and PDF export.',feats:['Multi-payment','Discount codes','PDF/print','Tax support']},
+  {cat:'Finance',icon:'📊',name:'Accounting',name_ar:'المحاسبة',status:'live',url:'/accounting/',desc:'P&L dashboard, budget targets, expense tracking, and revenue trend charts.',feats:['P&L report','Budget editor','Revenue charts','Expense log']},
+  {cat:'Finance',icon:'💸',name:'Payroll',name_ar:'الرواتب',status:'live',url:'/payroll/',desc:'Staff salary management with attendance-linked deductions and overtime.',feats:['Salary slips','Attendance link','Overtime calc','Bulk generate']},
+  {cat:'Inventory',icon:'📦',name:'Inventory',name_ar:'المخزون',status:'live',url:'/inventory/',desc:'Full stock management — items, expiry tracking, auto-reorder alerts, and barcode support.',feats:['Stock levels','Expiry alerts','Auto-reorder','Barcode scan']},
+  {cat:'Inventory',icon:'💊',name:'Pharmacy',name_ar:'الصيدلية',status:'live',url:'/pharmacy/',desc:'Prescription dispensing linked to visit records, drug labels, and controlled substance tracking.',feats:['Dispensing workflow','Drug labels','Linked to Rx','Controlled log']},
+  {cat:'Inventory',icon:'🛒',name:'Procurement',name_ar:'المشتريات',status:'live',url:'/procurement/',desc:'Purchase orders, supplier management, GRN, and cost tracking.',feats:['Purchase orders','Supplier list','GRN entry','Cost tracking']},
+  {cat:'Inventory',icon:'🐾',name:'Pet Shop',name_ar:'متجر الحيوانات',status:'live',url:'/petshop/',desc:'Retail pet products catalog, inventory, and POS for clinic shop items.',feats:['Product catalog','POS sales','Stock sync','Categories']},
+  {cat:'HR & Staff',icon:'👔',name:'HR Module',name_ar:'الموارد البشرية',status:'live',url:'/hr/',desc:'Staff profiles, contracts, documents, role management, and org chart.',feats:['Staff profiles','Role management','Documents','Org chart']},
+  {cat:'HR & Staff',icon:'⏰',name:'Attendance',name_ar:'الحضور',status:'live',url:'/attendance/',desc:'Daily attendance, shift management, leave requests, and overtime tracking.',feats:['Daily log','Shifts','Leave requests','Reports']},
+  {cat:'Services',icon:'✂️',name:'Grooming',name_ar:'التجميل',status:'live',url:'/grooming/',desc:'Grooming appointment booking, service packages, groomer assignment, and history.',feats:['Booking','Packages','Groomer assign','History']},
+  {cat:'Services',icon:'🏠',name:'Boarding',name_ar:'الإيواء',status:'live',url:'/boarding/',desc:'Pet hotel — check-in/out, daily care logs, feeding schedules, and owner updates.',feats:['Check in/out','Daily logs','Feeding plans','Owner updates']},
+  {cat:'Platform',icon:'🤖',name:'AI Assistant',name_ar:'المساعد الذكي',status:'live',url:'/ai/',desc:'GPT-powered clinic assistant — insights, recommendations, WhatsApp drafts, and outbreak radar.',feats:['Smart insights','Outbreak radar','WA drafts','Clinical AI']},
+  {cat:'Platform',icon:'📈',name:'Reports',name_ar:'التقارير',status:'live',url:'/reports/',desc:'Comprehensive reporting — revenue, inventory, doctor performance, and custom date range.',feats:['Revenue report','Inventory report','Doctor revenue','Excel export']},
+  {cat:'Platform',icon:'🔔',name:'Notifications',name_ar:'الإشعارات',status:'live',url:'/notifications/',desc:'Real-time in-app notifications with read/unread tracking and role-based targeting.',feats:['Real-time','Role targeting','Read tracking','Push ready']},
+  {cat:'Platform',icon:'⚙️',name:'System',name_ar:'الإعدادات',status:'live',url:'/system/',desc:'Clinic settings, backup management, system health monitor, and migration tools.',feats:['Clinic settings','Backup/restore','Health monitor','Migrations']},
+  {cat:'Platform',icon:'🌐',name:'Public API',name_ar:'API العام',status:'live',url:'/api/public/',desc:'REST API endpoints for integration with external systems, websites, and mobile apps.',feats:['REST API','Auth tokens','Rate limiting','JSON responses']},
+];
+
+var ALL_CATS = ['All'];
+MODULES.forEach(function(m){if(ALL_CATS.indexOf(m.cat)<0)ALL_CATS.push(m.cat);});
+
+var activeCat = 'All';
+
+function renderTabs(){
+  var tabs = document.getElementById('catTabs');
+  tabs.innerHTML = ALL_CATS.map(function(c){
+    return '<button class="cat-tab'+(c===activeCat?' active':'')+'" onclick="setCat(\''+c+'\')">'+c+'</button>';
+  }).join('');
+}
+
+function renderModules(){
+  var grid = document.getElementById('moduleGrid');
+  var mods = activeCat==='All' ? MODULES : MODULES.filter(function(m){return m.cat===activeCat;});
+  grid.innerHTML = mods.map(function(m,i){
+    var statusCls = m.status==='live'?'live':m.status==='beta'?'beta':'soon';
+    var statusLbl = m.status==='live'?'✅ Live':m.status==='beta'?'β Beta':'⏳ Soon';
+    return '<div class="mod-card reveal" style="transition-delay:'+(i*0.04)+'s" onclick="toggleMod(this,\''+m.url+'\')" data-url="'+(m.url||'')+'">'+
+      '<div class="mod-header">'+
+        '<div class="mod-icon-wrap">'+m.icon+'</div>'+
+        '<div class="mod-meta">'+
+          '<div class="mod-name">'+m.name+'</div>'+
+          '<div class="mod-name-ar">'+m.name_ar+'</div>'+
+        '</div>'+
+        '<span class="mod-badge '+statusCls+'">'+statusLbl+'</span>'+
+        '<span class="mod-chevron">▾</span>'+
+      '</div>'+
+      '<div class="mod-body">'+
+        '<div class="mod-desc">'+m.desc+'</div>'+
+        '<div class="mod-features">'+
+          m.feats.map(function(f){return '<span class="mod-feat">'+f+'</span>';}).join('')+
+        '</div>'+
+        '<button class="mod-open-btn'+(m.status==='soon'?' disabled':'')+'" onclick="event.stopPropagation();if(\''+m.url+'\')window.location.href=\''+m.url+'\'">'+
+          (m.status==='soon'?'⏳ Coming soon':'Open module →')+
+        '</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  reObserve();
+}
+
+function setCat(cat){
+  activeCat = cat;
+  renderTabs();
+  renderModules();
+}
+
+function toggleMod(el, url){
+  var wasExpanded = el.classList.contains('expanded');
+  document.querySelectorAll('.mod-card.expanded').forEach(function(c){c.classList.remove('expanded');});
+  if(!wasExpanded) el.classList.add('expanded');
+}
+
+renderTabs();
+renderModules();
+
+// ════════════ SCROLL REVEAL ════════════
+var observer = new IntersectionObserver(function(entries){
+  entries.forEach(function(e){
+    if(e.isIntersecting) e.target.classList.add('visible');
+  });
+}, {threshold:0.08,rootMargin:'0px 0px -40px 0px'});
+
+function reObserve(){
+  document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.reveal-scale').forEach(function(el){
+    observer.observe(el);
+  });
+}
+reObserve();
+
+// ════════════ CUSTOM CURSOR ════════════
+var dot   = document.getElementById('cursor-dot');
+var ring  = document.getElementById('cursor-ring');
+var glow  = document.getElementById('cursor-glow');
+var mouseX=0,mouseY=0,ringX=0,ringY=0;
+
+document.addEventListener('mousemove',function(e){
+  mouseX=e.clientX; mouseY=e.clientY;
+  dot.style.left=mouseX+'px'; dot.style.top=mouseY+'px';
+  glow.style.left=mouseX+'px'; glow.style.top=mouseY+'px';
+});
+
+/* Ring lags behind for smooth feel */
+(function animRing(){
+  ringX += (mouseX-ringX) * 0.12;
+  ringY += (mouseY-ringY) * 0.12;
+  ring.style.left=ringX+'px'; ring.style.top=ringY+'px';
+  requestAnimationFrame(animRing);
+})();
+
+document.querySelectorAll('a,button,.mod-card,.feat-card,.cat-tab,.nav-cta').forEach(function(el){
+  el.addEventListener('mouseenter',function(){document.body.classList.add('hovering');});
+  el.addEventListener('mouseleave',function(){document.body.classList.remove('hovering');});
+});
+document.addEventListener('mousedown',function(){document.body.classList.add('clicking');});
+document.addEventListener('mouseup',function(){document.body.classList.remove('clicking');});
+
+// ════════════ FLOATING PARTICLES ════════════
+(function(){
+  var c = document.getElementById('particles');
+  var colors=['#2A9D8F','#1B6B5C','#C9A84C','#4FC3B0'];
+  for(var i=0;i<40;i++){
+    var p=document.createElement('div');
+    p.className='particle';
+    p.style.cssText='left:'+(Math.random()*100)+'%;bottom:'+(Math.random()*20)+'%;'+
+      'background:'+colors[Math.floor(Math.random()*colors.length)]+';'+
+      'width:'+(Math.random()*3+1)+'px;height:'+(Math.random()*3+1)+'px;'+
+      'animation-duration:'+(Math.random()*8+4)+'s;'+
+      'animation-delay:'+(Math.random()*6)+'s;';
+    c.appendChild(p);
+  }
+})();
+
+// ════════════ COUNTER ANIMATION ════════════
+var countersRun = false;
+var numSection  = document.getElementById('numbers');
+new IntersectionObserver(function(entries){
+  if(entries[0].isIntersecting && !countersRun){
+    countersRun=true;
+    document.querySelectorAll('.count').forEach(function(el){
+      var target=parseInt(el.dataset.target);
+      var start=0,dur=1800,startTime=null;
+      function tick(ts){
+        if(!startTime)startTime=ts;
+        var p=Math.min((ts-startTime)/dur,1);
+        var ease=1-Math.pow(1-p,3);
+        el.textContent=Math.floor(ease*target);
+        if(p<1)requestAnimationFrame(tick);
+        else el.textContent=target;
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+},{threshold:0.3}).observe(numSection);
+
+// ════════════ NAVBAR SCROLL ════════════
+window.addEventListener('scroll',function(){
+  document.getElementById('nav').classList.toggle('scrolled',window.scrollY>60);
+},{ passive:true });
+
+// ════════════ HOVER ON DYNAMIC ELEMENTS ════════════
+document.getElementById('moduleGrid').addEventListener('mouseover',function(e){
+  if(e.target.closest('.mod-card,.mod-open-btn,.cat-tab'))document.body.classList.add('hovering');
+});
+document.getElementById('moduleGrid').addEventListener('mouseout',function(){
+  document.body.classList.remove('hovering');
+});
+</script>
+</body>
+</html>

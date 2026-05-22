@@ -214,7 +214,7 @@ def create_app(cfg=None) -> Flask:
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "connect-src 'self'; "
-            "frame-src https://meet.jit.si;"
+            "frame-src 'self' https://meet.jit.si;"
         )
         # Remove server fingerprint
         response.headers["Server"] = "PAH-Platform"

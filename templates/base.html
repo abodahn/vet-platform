@@ -537,8 +537,9 @@
   </svg>
 </button>
 <div id="petsy-hint">🐾 {{ t("Hi! I'm Petsy — ask me anything!", "مرحباً! أنا بيتسي — اسألني أي شيء!") }}</div>
+<div id="petsy-backdrop" onclick="petsyToggle()" style="display:none;position:fixed;inset:0;z-index:8999;background:rgba(0,0,0,0);"></div>
 <div id="petsy-panel-global">
-  <button id="petsy-panel-close" onclick="petsyToggle()">&times;</button>
+  <button id="petsy-panel-close" onclick="petsyToggle()" title="Close">&times;</button>
   <iframe id="petsy-iframe" src="" title="Petsy AI Chat" allow="clipboard-write"></iframe>
 </div>
 <script>
@@ -561,14 +562,16 @@
     if(!panel)panel=document.getElementById('petsy-panel-global');
     open=!open;
     var h=document.getElementById('petsy-hint');if(h)h.style.display='none';
+    var bd=document.getElementById('petsy-backdrop');
     if(open){
       if(!loaded){document.getElementById('petsy-iframe').src='{{ url_for("petsy.embed") }}';loaded=true;}
       panel.classList.add('open');
-      /* Position panel near FAB */
+      if(bd)bd.style.display='block';
       _positionPanel();
-      if(fab){fab.style.opacity='0.4';fab.style.transform='scale(0.85)';}
+      if(fab){fab.style.opacity='0.55';fab.style.transform='scale(0.88)';}
     } else {
       panel.classList.remove('open');
+      if(bd)bd.style.display='none';
       if(fab){fab.style.opacity='';fab.style.transform='';}
     }
   };

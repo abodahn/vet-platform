@@ -41,6 +41,15 @@ def role_required(*roles):
 # ROUTES
 # ─────────────────────────────────────────────
 
+@auth_bp.route("/landing")
+@auth_bp.route("/")
+def landing():
+    """Public animated landing page — no login required."""
+    if session.get("user"):
+        return redirect(url_for("launcher.index"))
+    return render_template("landing.html")
+
+
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if session.get("user"):
