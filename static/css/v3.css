@@ -526,7 +526,11 @@ p { margin: 0 0 1em; color: var(--text-3); }
 
 /* Day/Night toggle button in sidebar */
 .v3-sidebar-theme-btn {
-  width: 32px; height: 32px;
+  width: auto; height: 32px;
+  padding: 0 10px;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
   border-radius: var(--r-md);
   border: 1px solid rgba(255,255,255,.13);
   background: rgba(255,255,255,.05);

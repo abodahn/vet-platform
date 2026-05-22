@@ -284,6 +284,7 @@
         </div>
         <button class="v3-sidebar-theme-btn" id="v3-sidebar-theme-btn" onclick="v3ToggleTheme()" title="{{ t('Toggle theme','تبديل الوضع') }}" aria-label="Toggle theme">
           <i class="bi bi-moon-stars" id="v3-sidebar-theme-icon"></i>
+          <span id="v3-sidebar-theme-label">{{ t('Night','ليلي') }}</span>
         </button>
         {% if current_user %}
         <a href="{{ url_for('auth.logout') }}" class="v3-logout-btn" title="{{ t('Logout','خروج') }}">

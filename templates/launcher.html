@@ -336,63 +336,90 @@
 <!-- ══════════════════════════════════════════════════════════════
      SECTION 2 · KPI STAT CARDS
 ══════════════════════════════════════════════════════════════ -->
+<style>
+/* Animal-inspired stat card icons */
+.v3-stat-icon {
+  width: 46px; height: 46px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.35rem; margin-bottom: 14px;
+  background: rgba(var(--accent-rgb,11,122,107),.12);
+  color: var(--accent, var(--al-primary));
+  border: 1.5px solid rgba(var(--accent-rgb,11,122,107),.18);
+  flex-shrink: 0;
+}
+.v3-stat-card { cursor: pointer; }
+.v3-stat-card:hover .v3-stat-icon { background: rgba(var(--accent-rgb,11,122,107),.22); }
+</style>
+
 <div class="v3-kpi-grid">
 
-  <div class="v3-stat-card" style="--accent:#2E86C1">
-    <div class="v3-stat-icon">📅</div>
-    <div class="v3-stat-value" data-target="{{ stats.bookings_today }}">{{ stats.bookings_today }}</div>
+  <!-- Appointments today -->
+  <a href="/appointments/" class="v3-stat-card" style="--accent:#2E86C1;text-decoration:none">
+    <div class="v3-stat-icon"><i class="bi bi-calendar2-heart"></i></div>
+    <div class="v3-stat-value" data-target="{{ stats.bookings_today | int }}">{{ stats.bookings_today | int }}</div>
     <div class="v3-stat-label">{{ t("Today's Appointments", "مواعيد اليوم") }}</div>
     <div class="v3-stat-sub">{{ t("Scheduled for today", "مجدولة اليوم") }}</div>
-  </div>
+  </a>
 
-  <div class="v3-stat-card" style="--accent:#E8724A">
-    <div class="v3-stat-icon">🐾</div>
-    <div class="v3-stat-value" data-target="{{ stats.pets }}">{{ stats.pets }}</div>
+  <!-- Total Pets -->
+  <a href="/crm/owners" class="v3-stat-card" style="--accent:#E8724A;text-decoration:none">
+    <div class="v3-stat-icon">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+        <path d="M4.5 11a2 2 0 100-4 2 2 0 000 4zm15 0a2 2 0 100-4 2 2 0 000 4zM1.5 17a3 3 0 116 0 3 3 0 01-6 0zm15 0a3 3 0 116 0 3 3 0 01-6 0zM8 8a4 4 0 118 0 4 4 0 01-8 0z"/>
+      </svg>
+    </div>
+    <div class="v3-stat-value" data-target="{{ stats.pets | int }}">{{ stats.pets | int }}</div>
     <div class="v3-stat-label">{{ t("Total Pets", "إجمالي الحيوانات") }}</div>
     <div class="v3-stat-sub">{{ t("Active patients", "مرضى نشطون") }}</div>
-  </div>
+  </a>
 
-  <div class="v3-stat-card" style="--accent:#2ECC71">
-    <div class="v3-stat-icon">👥</div>
-    <div class="v3-stat-value" data-target="{{ stats.owners }}">{{ stats.owners }}</div>
+  <!-- Pet Owners -->
+  <a href="/crm/owners" class="v3-stat-card" style="--accent:#2ECC71;text-decoration:none">
+    <div class="v3-stat-icon"><i class="bi bi-people-fill"></i></div>
+    <div class="v3-stat-value" data-target="{{ stats.owners | int }}">{{ stats.owners | int }}</div>
     <div class="v3-stat-label">{{ t("Pet Owners", "أصحاب الحيوانات") }}</div>
     <div class="v3-stat-sub">{{ t("Registered clients", "عملاء مسجلون") }}</div>
-  </div>
+  </a>
 
-  <div class="v3-stat-card" style="--accent:#9B59B6">
-    <div class="v3-stat-icon">🏥</div>
-    <div class="v3-stat-value" data-target="{{ stats.visits_today }}">{{ stats.visits_today }}</div>
+  <!-- Visits today -->
+  <a href="/visits/" class="v3-stat-card" style="--accent:#9B59B6;text-decoration:none">
+    <div class="v3-stat-icon"><i class="bi bi-clipboard2-pulse"></i></div>
+    <div class="v3-stat-value" data-target="{{ stats.visits_today | int }}">{{ stats.visits_today | int }}</div>
     <div class="v3-stat-label">{{ t("Visits Today", "زيارات اليوم") }}</div>
     <div class="v3-stat-sub">{{ t("Clinical visits", "زيارات سريرية") }}</div>
-  </div>
+  </a>
 
-  <div class="v3-stat-card" style="--accent:#D4AC45">
-    <div class="v3-stat-icon">💰</div>
-    <div class="v3-stat-value" style="font-size:1.5rem">{{ '{:,.0f}'.format(stats.revenue_today|default(0)) }}</div>
+  <!-- Revenue today -->
+  <a href="/finance/invoices" class="v3-stat-card" style="--accent:#D4AC45;text-decoration:none">
+    <div class="v3-stat-icon"><i class="bi bi-cash-coin"></i></div>
+    <div class="v3-stat-value" style="font-size:1.4rem">{{ '{:,.0f}'.format(stats.revenue_today | default(0) | float) }}</div>
     <div class="v3-stat-label">{{ t("Revenue Today", "إيرادات اليوم") }}</div>
     <div class="v3-stat-sub">{{ t("EGP collected today", "جنيه محصّل اليوم") }}</div>
-  </div>
+  </a>
 
-  <div class="v3-stat-card" style="--accent:#E74C3C">
-    <div class="v3-stat-icon">📋</div>
-    <div class="v3-stat-value" data-target="{{ stats.invoices_unpaid }}">{{ stats.invoices_unpaid }}</div>
+  <!-- Unpaid Invoices -->
+  <a href="/finance/invoices?status=Unpaid" class="v3-stat-card" style="--accent:#E74C3C;text-decoration:none">
+    <div class="v3-stat-icon"><i class="bi bi-receipt-cutoff"></i></div>
+    <div class="v3-stat-value" data-target="{{ stats.invoices_unpaid | int }}">{{ stats.invoices_unpaid | int }}</div>
     <div class="v3-stat-label">{{ t("Unpaid Invoices", "فواتير غير مدفوعة") }}</div>
     <div class="v3-stat-sub">{{ t("Pending payment", "في انتظار السداد") }}</div>
-  </div>
+  </a>
 
-  <div class="v3-stat-card" style="--accent:#1ABC9C">
-    <div class="v3-stat-icon">💬</div>
-    <div class="v3-stat-value" data-target="{{ stats.pending_reminders }}">{{ stats.pending_reminders }}</div>
+  <!-- Reminders -->
+  <a href="/whatsapp/control" class="v3-stat-card" style="--accent:#1ABC9C;text-decoration:none">
+    <div class="v3-stat-icon"><i class="bi bi-whatsapp"></i></div>
+    <div class="v3-stat-value" data-target="{{ stats.pending_reminders | int }}">{{ stats.pending_reminders | int }}</div>
     <div class="v3-stat-label">{{ t("Reminders", "التذكيرات") }}</div>
     <div class="v3-stat-sub">{{ t("WhatsApp pending", "واتساب معلّق") }}</div>
-  </div>
+  </a>
 
-  <div class="v3-stat-card" style="--accent:#F39C12">
-    <div class="v3-stat-icon">💵</div>
-    <div class="v3-stat-value" style="font-size:1.5rem">{{ '{:,.0f}'.format(stats.outstanding|default(0)) }}</div>
+  <!-- Outstanding -->
+  <a href="/finance/invoices?status=Unpaid" class="v3-stat-card" style="--accent:#F39C12;text-decoration:none">
+    <div class="v3-stat-icon"><i class="bi bi-bank2"></i></div>
+    <div class="v3-stat-value" style="font-size:1.4rem">{{ '{:,.0f}'.format(stats.outstanding | default(0) | float) }}</div>
     <div class="v3-stat-label">{{ t("Outstanding", "المستحق") }}</div>
     <div class="v3-stat-sub">{{ t("EGP total receivable", "إجمالي المستحق بالجنيه") }}</div>
-  </div>
+  </a>
 
 </div>
 
@@ -400,7 +427,7 @@
      SECTION 3 · MODULE QUICK ACCESS
 ══════════════════════════════════════════════════════════════ -->
 <div class="v3-section-header">
-  <h2 class="v3-section-title">⚡ {{ t('Quick Launch', 'إطلاق سريع') }}</h2>
+  <h2 class="v3-section-title"><i class="bi bi-lightning-charge-fill" style="color:#D4AC45"></i> {{ t('Quick Launch', 'إطلاق سريع') }}</h2>
   <a href="#all-modules" class="v3-section-link">{{ t('View all modules', 'عرض كل الوحدات') }} →</a>
 </div>
 

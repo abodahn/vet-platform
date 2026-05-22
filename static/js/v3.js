@@ -60,13 +60,22 @@
   }
 
   function _updateThemeIcons(theme) {
-    qsa('[data-v3-theme-icon]').forEach(function (el) {
-      el.textContent = theme === 'dark' ? '☀️' : '🌙';
-      el.setAttribute('title', theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode');
+    var isDark = theme === 'dark';
+    // Bootstrap Icon <i> elements — swap class names
+    var biIds = ['v3-topbar-theme-icon', 'v3-sidebar-theme-icon'];
+    biIds.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.className = isDark ? 'bi bi-sun' : 'bi bi-moon-stars';
+        el.setAttribute('title', isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode');
+      }
     });
-    // Also handle icon elements with class
-    qsa('.v3-theme-icon').forEach(function (el) {
-      el.textContent = theme === 'dark' ? '☀️' : '🌙';
+    // Sidebar label text (Day / Night)
+    var lbl = document.getElementById('v3-sidebar-theme-label');
+    if (lbl) lbl.textContent = isDark ? 'Day' : 'Night';
+    // Also handle legacy text-based icons
+    qsa('[data-v3-theme-icon], .v3-theme-icon').forEach(function (el) {
+      el.textContent = isDark ? '☀️' : '🌙';
     });
   }
 
@@ -326,8 +335,9 @@
       threshold: 6
     };
 
-    function _getFab()   { return fab   || (fab   = qs('#petsy-fab')); }
-    function _getPanel() { return panel || (panel = qs('#petsy-panel')); }
+    // Support both IDs: base.html uses -global suffix; fallback to bare IDs
+    function _getFab()   { return fab   || (fab   = qs('#petsy-fab-global') || qs('#petsy-fab')); }
+    function _getPanel() { return panel || (panel = qs('#petsy-panel-global') || qs('#petsy-panel')); }
     function _getIframe(){ return iframe || (iframe = qs('#petsy-iframe')); }
 
     function _loadIframe() {
@@ -717,6 +727,7 @@
   function _initActiveNav() {
     var current = window.location.pathname.replace(/\/$/, '') || '/';
     var navLinks = qsa('.v3-sidebar a[href], nav.v3-nav a[href]');
+    var activeGroup = null;
 
     navLinks.forEach(function (link) {
       try {
@@ -732,22 +743,88 @@
           link.classList.add('active');
           link.setAttribute('aria-current', 'page');
 
-          // Expand parent group if collapsed
-          var parent = link.closest('.v3-nav-group, .nav-group, [data-nav-group]');
-          if (parent) {
-            parent.classList.add('v3-nav-expanded', 'expanded');
-            var collapse = parent.querySelector('.v3-nav-collapse, .collapse');
-            if (collapse) {
-              collapse.classList.add('show');
-              collapse.style.display = '';
-            }
-          }
+          // Remember the parent group so accordion can expand it
+          var parent = link.closest('.v3-nav-group');
+          if (parent) activeGroup = parent;
         }
       } catch (e) { /* ignore malformed URLs */ }
     });
+
+    return activeGroup;
   }
 
-  document.addEventListener('DOMContentLoaded', _initActiveNav);
+  /* =========================================================
+   * 6b. NAV ACCORDION (collapse / expand groups)
+   * ======================================================= */
+
+  var NAV_STATE_KEY = 'v3-nav-groups';
+
+  function _initNavAccordion() {
+    var activeGroup = _initActiveNav();
+    var groups  = qsa('.v3-nav-group');
+    if (!groups.length) return;
+
+    // Restore saved state
+    var savedRaw = safeLocalGet(NAV_STATE_KEY, null);
+    var saved = {};
+    try { if (savedRaw) saved = JSON.parse(savedRaw); } catch (e) { /* */ }
+
+    groups.forEach(function (group) {
+      var key = group.getAttribute('data-group') || group.dataset.group || '';
+      var btn = group.querySelector('.v3-nav-toggle');
+
+      // Determine initial collapsed state:
+      // - active group is ALWAYS expanded
+      // - otherwise use saved state (default: expanded)
+      var isCollapsed = (group === activeGroup) ? false : (saved[key] === false);
+
+      if (isCollapsed) {
+        group.classList.add('collapsed');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      } else {
+        group.classList.remove('collapsed');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+      }
+
+      // Click handler
+      if (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var nowCollapsed = group.classList.toggle('collapsed');
+          btn.setAttribute('aria-expanded', nowCollapsed ? 'false' : 'true');
+
+          // Persist
+          try {
+            var st = {};
+            try { st = JSON.parse(safeLocalGet(NAV_STATE_KEY, '{}')) || {}; } catch (_) { /* */ }
+            st[key] = !nowCollapsed; // store 'true' = expanded
+            safeLocalSet(NAV_STATE_KEY, JSON.stringify(st));
+          } catch (_) { /* */ }
+        });
+      }
+    });
+
+    // Scroll sidebar to show active link
+    var activeLink = qs('.v3-nav-item.active');
+    if (activeLink) {
+      setTimeout(function () {
+        try { activeLink.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { /* */ }
+      }, 100);
+    }
+
+    // Save sidebar scroll position between page loads
+    var nav = qs('.v3-nav, #v3-nav');
+    if (nav) {
+      var scrollKey = 'v3-nav-scroll';
+      var savedScroll = parseInt(safeLocalGet(scrollKey, '0'), 10) || 0;
+      nav.scrollTop = savedScroll;
+      nav.addEventListener('scroll', debounce(function () {
+        safeLocalSet(scrollKey, nav.scrollTop);
+      }, 200));
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', _initNavAccordion);
 
   /* =========================================================
    * 7. PAGE TRANSITIONS

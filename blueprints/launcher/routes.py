@@ -501,17 +501,20 @@ def index():
     grouped = _grouped(modules)
     legacy_url = current_app.config.get("LEGACY_APP_URL", "http://localhost:5000")
 
-    # Live stats from platform DB
-    platform_stats = db.get_dashboard_stats()
+    # Live stats from platform DB (safe fallback on any DB error)
+    try:
+        platform_stats = db.get_dashboard_stats()
+    except Exception:
+        platform_stats = {}
     stats = {
-        "owners":            platform_stats.get("owners_total", 0),
-        "pets":              platform_stats.get("pets_total", 0),
-        "bookings_today":    platform_stats.get("appts_today", 0),
-        "pending_reminders": platform_stats.get("pending_reminders", 0),
-        "revenue_today":     platform_stats.get("revenue_today", 0),
-        "visits_today":      platform_stats.get("visits_today", 0),
-        "invoices_unpaid":   platform_stats.get("invoices_unpaid", 0),
-        "outstanding":       platform_stats.get("outstanding", 0),
+        "owners":            int(platform_stats.get("owners_total") or 0),
+        "pets":              int(platform_stats.get("pets_total") or 0),
+        "bookings_today":    int(platform_stats.get("appts_today") or 0),
+        "pending_reminders": int(platform_stats.get("pending_reminders") or 0),
+        "revenue_today":     float(platform_stats.get("revenue_today") or 0),
+        "visits_today":      int(platform_stats.get("visits_today") or 0),
+        "invoices_unpaid":   int(platform_stats.get("invoices_unpaid") or 0),
+        "outstanding":       float(platform_stats.get("outstanding") or 0),
     }
 
     return render_template(
