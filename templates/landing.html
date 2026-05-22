@@ -1,7 +1,6 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
-<script>(function(){var t=localStorage.getItem('al-theme');if(t==='light')document.documentElement.setAttribute('data-theme','light');})();</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aleefy — Smart Veterinary Platform | اليفي</title>
@@ -34,43 +33,53 @@
 
 /* ── Reset ───────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth;overflow-x:hidden}
+html{
+  scroll-behavior:smooth;overflow-x:hidden;
+  cursor:none !important;
+}
 body{
   font-family:'Plus Jakarta Sans','Cairo',system-ui,sans-serif;
   background:var(--bg);color:var(--txt);
-  overflow-x:hidden;cursor:none;
+  overflow-x:hidden;
+  cursor:none !important;
   -webkit-font-smoothing:antialiased;
 }
-a{color:inherit;text-decoration:none}
-button{font-family:inherit;cursor:none}
+a,button,input,select,textarea,label,[role="button"]{
+  cursor:none !important;
+  font-family:inherit;
+}
 
 /* ── Custom cursor ────────────────────────── */
 #cursor-dot {
-  position:fixed;width:8px;height:8px;
+  position:fixed;width:10px;height:10px;
   background:var(--g);border-radius:50%;
-  pointer-events:none;z-index:99999;
+  pointer-events:none !important;z-index:999999;
+  left:-50px;top:-50px;
   transform:translate(-50%,-50%);
-  transition:width .15s,height .15s,background .15s;
-  mix-blend-mode:normal;
+  transition:width .12s,height .12s,background .12s;
+  will-change:left,top;
 }
 #cursor-ring {
-  position:fixed;width:36px;height:36px;
-  border:1.5px solid rgba(201,168,76,.55);
-  border-radius:50%;pointer-events:none;z-index:99998;
+  position:fixed;width:38px;height:38px;
+  border:2px solid rgba(201,168,76,.6);
+  border-radius:50%;pointer-events:none !important;z-index:999998;
+  left:-50px;top:-50px;
   transform:translate(-50%,-50%);
-  transition:transform .08s linear,width .25s,height .25s,border-color .25s,opacity .25s;
+  transition:width .22s,height .22s,border-color .22s;
+  will-change:left,top;
 }
 #cursor-glow {
-  position:fixed;width:200px;height:200px;
-  border-radius:50%;pointer-events:none;z-index:99996;
-  background:radial-gradient(circle,rgba(27,107,92,.12) 0%,transparent 70%);
+  position:fixed;width:220px;height:220px;
+  border-radius:50%;pointer-events:none !important;z-index:999996;
+  background:radial-gradient(circle,rgba(27,107,92,.14) 0%,transparent 70%);
+  left:-110px;top:-110px;
   transform:translate(-50%,-50%);
-  transition:transform .15s ease;
+  will-change:left,top;
 }
-body.hovering #cursor-dot{width:14px;height:14px;background:var(--pm);}
-body.hovering #cursor-ring{width:52px;height:52px;border-color:rgba(42,157,143,.7);}
-body.clicking #cursor-dot{width:6px;height:6px;}
-body.clicking #cursor-ring{width:28px;height:28px;}
+body.hovering #cursor-dot{width:16px;height:16px;background:var(--pm);box-shadow:0 0 12px rgba(42,157,143,.6);}
+body.hovering #cursor-ring{width:56px;height:56px;border-color:rgba(42,157,143,.8);border-width:2px;}
+body.clicking #cursor-dot{width:5px;height:5px;background:var(--g);}
+body.clicking #cursor-ring{width:24px;height:24px;border-color:rgba(201,168,76,.9);}
 
 /* ── Noise grain overlay ──────────────────── */
 body::before{
@@ -840,31 +849,49 @@ function reObserve(){
 reObserve();
 
 // ════════════ CUSTOM CURSOR ════════════
-var dot   = document.getElementById('cursor-dot');
-var ring  = document.getElementById('cursor-ring');
-var glow  = document.getElementById('cursor-glow');
-var mouseX=0,mouseY=0,ringX=0,ringY=0;
+(function(){
+  var dot  = document.getElementById('cursor-dot');
+  var ring = document.getElementById('cursor-ring');
+  var glow = document.getElementById('cursor-glow');
+  if(!dot||!ring||!glow) return;
 
-document.addEventListener('mousemove',function(e){
-  mouseX=e.clientX; mouseY=e.clientY;
-  dot.style.left=mouseX+'px'; dot.style.top=mouseY+'px';
-  glow.style.left=mouseX+'px'; glow.style.top=mouseY+'px';
-});
+  var mx=window.innerWidth/2, my=window.innerHeight/2;
+  var rx=mx, ry=my;
+  var active=false;
 
-/* Ring lags behind for smooth feel */
-(function animRing(){
-  ringX += (mouseX-ringX) * 0.12;
-  ringY += (mouseY-ringY) * 0.12;
-  ring.style.left=ringX+'px'; ring.style.top=ringY+'px';
-  requestAnimationFrame(animRing);
+  /* Snap cursor to center until first mouse move */
+  function setDot(x,y){
+    dot.style.left  = x+'px';
+    dot.style.top   = y+'px';
+    glow.style.left = x+'px';
+    glow.style.top  = y+'px';
+  }
+  setDot(mx,my);
+
+  document.addEventListener('mousemove',function(e){
+    mx=e.clientX; my=e.clientY;
+    if(!active){ active=true; dot.style.opacity='1'; ring.style.opacity='1'; glow.style.opacity='1'; }
+    setDot(mx,my);
+  },{ passive:true });
+
+  /* Ring lags with lerp */
+  (function animRing(){
+    rx += (mx-rx) * 0.13;
+    ry += (my-ry) * 0.13;
+    ring.style.left = rx+'px';
+    ring.style.top  = ry+'px';
+    requestAnimationFrame(animRing);
+  })();
+
+  /* Hover state */
+  document.addEventListener('mouseover',function(e){
+    var t=e.target.closest('a,button,.mod-card,.feat-card,.cat-tab,.nav-cta,.qlink-card,.btn-hero');
+    if(t){ document.body.classList.add('hovering'); }
+    else  { document.body.classList.remove('hovering'); }
+  });
+  document.addEventListener('mousedown',function(){ document.body.classList.add('clicking'); });
+  document.addEventListener('mouseup',  function(){ document.body.classList.remove('clicking'); });
 })();
-
-document.querySelectorAll('a,button,.mod-card,.feat-card,.cat-tab,.nav-cta').forEach(function(el){
-  el.addEventListener('mouseenter',function(){document.body.classList.add('hovering');});
-  el.addEventListener('mouseleave',function(){document.body.classList.remove('hovering');});
-});
-document.addEventListener('mousedown',function(){document.body.classList.add('clicking');});
-document.addEventListener('mouseup',function(){document.body.classList.remove('clicking');});
 
 // ════════════ FLOATING PARTICLES ════════════
 (function(){
