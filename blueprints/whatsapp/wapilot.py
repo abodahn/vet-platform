@@ -1,5 +1,5 @@
 """
-wapilot.py — Wapilot v2 API client for the Premium Animal Hospital platform.
+wapilot.py — Wapilot v2 API client for the Aleefy platform.
 
 All methods return (data, error_string).
 data is the parsed JSON response on success, {} on failure.

@@ -1,5 +1,5 @@
 """
-Secure File Upload & Serving — Premium Animal Hospital Platform
+Secure File Upload & Serving — Aleefy Platform
 All files stored on filesystem, served only through authenticated routes.
 """
 import os

@@ -197,7 +197,7 @@
             {% for doc in doctors %}
             <option value="{{ doc.full_name }}">{{ doc.full_name }}</option>
             {% endfor %}
-            <option value="Dr. Hatem El Khateeb">Dr. Hatem El Khateeb</option>
+            {% if clinic and clinic.doctor_name %}<option value="{{ clinic.doctor_name }}">{{ clinic.doctor_name }}</option>{% endif %}
           </select>
         </div>
 

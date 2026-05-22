@@ -39,8 +39,8 @@
 
 <div class="header">
   <div>
-    <div class="clinic-name">Premium Animal Hospital</div>
-    <div class="clinic-sub">Dr. Hatem El Khateeb · Veterinary Medicine</div>
+    <div class="clinic-name">{{ clinic.name if clinic else 'Aleefy' }}</div>
+    <div class="clinic-sub">{{ clinic.doctor_name if clinic else 'Happy Pets, Healthy Lives' }}</div>
   </div>
   <div class="visit-badge">
     <div class="visit-num">VISIT #{{ visit.id }}</div>
@@ -170,7 +170,7 @@
 </div>
 
 <div class="footer">
-  <span>Premium Animal Hospital — Confidential Medical Record</span>
+  <span>{{ clinic.name if clinic else 'Aleefy' }} — Confidential Medical Record</span>
   <span>Printed: <script>document.write(new Date().toLocaleDateString())</script></span>
 </div>
 

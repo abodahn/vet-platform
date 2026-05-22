@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Waiting Room — Premium Animal Hospital</title>
+  <title>Waiting Room — Aleefy</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{
@@ -127,8 +127,8 @@
   <div class="wr-logo">
     <div class="wr-logo-icon">🐾</div>
     <div>
-      <div class="wr-clinic-name">{{ clinic.name if clinic else 'Premium Animal Hospital' }}</div>
-      <div class="wr-clinic-sub">{{ clinic.address if clinic else 'Dr. Hatem El Khateeb' }}</div>
+      <div class="wr-clinic-name">{{ clinic.name if clinic else app_title }}</div>
+      <div class="wr-clinic-sub">{{ clinic.address if clinic else app_tagline }}</div>
     </div>
   </div>
   <div class="wr-time-block">
@@ -235,7 +235,7 @@
 <!-- Marquee -->
 <div class="wr-marquee">
   <span>
-    🐾 Welcome to Premium Animal Hospital &nbsp;·&nbsp;
+    🐾 Welcome to {{ clinic.name if clinic else app_title }} &nbsp;·&nbsp;
     💉 Keep your pet's vaccinations up to date &nbsp;·&nbsp;
     🦷 Dental health is vital — annual cleanings recommended &nbsp;·&nbsp;
     🏃 Regular exercise keeps pets healthy and happy &nbsp;·&nbsp;

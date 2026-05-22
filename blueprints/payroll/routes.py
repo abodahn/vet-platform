@@ -1,5 +1,5 @@
 """
-Payroll / Salary Module — Premium Animal Hospital Platform
+Payroll / Salary Module — Aleefy Platform
 """
 
 from flask import render_template, request, redirect, url_for, session, flash, jsonify, send_file

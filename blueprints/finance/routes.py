@@ -1,5 +1,5 @@
 """
-Finance Blueprint — Premium Animal Hospital Platform
+Finance Blueprint — Aleefy Platform
 """
 
 from flask import (
@@ -540,7 +540,7 @@ def invoice_whatsapp(inv_id):
     for line in (invoice.get("lines") or []):
         lines_text += f"  • {line['description']}: {line['total']:.2f} EGP\n"
     message = (
-        f"🐾 *Premium Animal Hospital*\n"
+        f"🐾 *Aleefy*\n"
         f"Invoice: *{invoice['invoice_number']}*\n"
         f"Date: {invoice['issue_date']}\n\n"
         f"*Services:*\n{lines_text}\n"
@@ -554,8 +554,8 @@ def invoice_whatsapp(inv_id):
         f"*Total: {invoice.get('total',0):.2f} EGP*\n"
         f"Paid: {invoice.get('paid_amount',0):.2f} EGP\n"
         f"*Balance Due: {invoice.get('due_amount',0):.2f} EGP*\n\n"
-        f"Thank you for choosing Premium Animal Hospital 🐾\n"
-        f"Dr. Hatem El Khateeb"
+        f"Thank you for choosing Aleefy 🐾\n"
+        f"Happy Pets, Healthy Lives"
     )
     # Get owner phone
     phone = invoice.get("owner_phone", "")

@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>{{ invoice.invoice_number }} — Premium Animal Hospital</title>
+<title>{{ invoice.invoice_number }} — Aleefy</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#1a1a1a;background:#fff;padding:30px}
 .page{max-width:780px;margin:0 auto}
-.inv-header{display:flex;justify-content:space-between;align-items:flex-start;padding:24px 28px;background:linear-gradient(135deg,#1a3a6b,#0e2244);color:#fff;border-radius:10px 10px 0 0}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;padding:24px 28px;background:linear-gradient(135deg,#1B6B5C,#0D2B24);color:#fff;border-radius:10px 10px 0 0}
 .clinic-name{font-size:22px;font-weight:900}
 .clinic-sub{font-size:12px;opacity:.8;margin-top:3px}
 .inv-meta{text-align:right}
@@ -24,12 +24,12 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#1a1a1a;backgr
 .party-name{font-size:15px;font-weight:700;color:#1a3a6b}
 .party-info{font-size:12px;color:#64748b;margin-top:2px}
 table{width:100%;border-collapse:collapse}
-thead th{background:#f8fafc;padding:9px 12px;border-bottom:2px solid #1a3a6b;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b}
+thead th{background:#f8fafc;padding:9px 12px;border-bottom:2px solid #1B6B5C;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b}
 tbody td{padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:13px}
 tbody tr:last-child td{border-bottom:none}
 .totals{border:1px solid #e2e8f0;border-top:none;padding:20px 28px;background:#f8fafc;border-radius:0 0 10px 10px}
 .total-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px}
-.total-row.grand{border-top:2px solid #1a3a6b;margin-top:8px;padding-top:10px;font-size:17px;font-weight:800;color:#1a3a6b}
+.total-row.grand{border-top:2px solid #1B6B5C;margin-top:8px;padding-top:10px;font-size:17px;font-weight:800;color:#1B6B5C}
 .inv-footer{margin-top:28px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center}
 .no-print{margin-bottom:16px;text-align:right}
 @media print{.no-print{display:none} body{padding:0}}
@@ -38,15 +38,15 @@ tbody tr:last-child td{border-bottom:none}
 <body>
 <div class="page">
   <div class="no-print">
-    <button onclick="window.print()" style="background:#1a3a6b;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">🖨 Print</button>
+    <button onclick="window.print()" style="background:#1B6B5C;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">🖨 Print</button>
     <a href="/finance/invoices/{{ invoice.id }}/pdf" style="background:#16a34a;color:#fff;text-decoration:none;padding:10px 22px;border-radius:8px;font-size:14px;font-weight:700;margin-left:8px;display:inline-block">⬇ Download PDF</a>
     <button onclick="window.close()" style="background:#f1f5f9;color:#1a1a1a;border:none;padding:10px 18px;border-radius:8px;font-size:14px;margin-left:8px;cursor:pointer">✕ Close</button>
   </div>
 
   <div class="inv-header">
     <div>
-      <div class="clinic-name">🐾 {{ clinic.name if clinic else 'Premium Animal Hospital' }}</div>
-      <div class="clinic-sub">{{ clinic.doctor_name if clinic else 'Dr. Hatem El Khateeb' }}</div>
+      <div class="clinic-name">🐾 {{ clinic.name if clinic else app_title }}</div>
+      <div class="clinic-sub">{{ clinic.doctor_name if clinic else app_tagline }}</div>
       {% if clinic and clinic.phone %}<div class="clinic-sub">📞 {{ clinic.phone }}</div>{% endif %}
       {% if clinic and clinic.email %}<div class="clinic-sub">✉ {{ clinic.email }}</div>{% endif %}
     </div>
@@ -127,7 +127,7 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 
   <div class="inv-footer">
-    Thank you for choosing Premium Animal Hospital · Dr. Hatem El Khateeb
+    Thank you for choosing {{ clinic.name if clinic else app_title }}
     {% if clinic and clinic.phone %} · {{ clinic.phone }}{% endif %}
   </div>
 </div>

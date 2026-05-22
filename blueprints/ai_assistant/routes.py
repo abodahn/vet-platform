@@ -1,5 +1,5 @@
 """
-AI Assistant Blueprint — Premium Animal Hospital Platform
+AI Assistant Blueprint — Aleefy Platform
 Backend : freellmapi  (OpenAI-compatible proxy at localhost:3001)
 """
 
@@ -30,7 +30,7 @@ FREELLM_MODEL    = _os.environ.get("AI_MODEL",    "gemini-2.5-flash")
 
 def get_system_prompt(role: str) -> str:
     base = (
-        "You are the AI assistant for Premium Animal Hospital (Dr. Hatem El Khateeb). "
+        "You are the AI assistant for Aleefy (Happy Pets, Healthy Lives). "
         "You help veterinary staff with clinical and operational decisions. "
         "Always be professional, accurate, and include a disclaimer that AI suggestions "
         "should be reviewed by a licensed veterinarian.\n"
@@ -401,7 +401,7 @@ def insights():
     )
 
     prompt = (
-        f"You are the AI advisor for Premium Animal Hospital. Based on this clinic snapshot, "
+        f"You are the AI advisor for Aleefy. Based on this clinic snapshot, "
         f"generate exactly 4 concise actionable insights for the clinic manager.\n\n"
         f"{snapshot}\n\n"
         f"Rules:\n"
@@ -507,12 +507,12 @@ def draft_message():
 
     lang_instruction = "Write in Arabic." if lang == "ar" else "Write in English."
     prompt = (
-        f"You are writing a WhatsApp message on behalf of Premium Animal Hospital (Dr. Hatem El Khateeb). "
+        f"You are writing a WhatsApp message on behalf of Aleefy (Happy Pets, Healthy Lives). "
         f"{lang_instruction}\n\n"
         f"Context: {context}{owner_info}\n\n"
         f"Write a warm, professional message (2-4 sentences). "
         f"Use the client's name if available. Max 2 emojis. "
-        f"End with: Premium Animal Hospital."
+        f"End with: Aleefy."
     )
     reply, _, _ = call_ai([{"role": "user", "content": prompt}], "reception")
     return jsonify({"message": reply})
@@ -648,7 +648,7 @@ def analyze_photo():
             pass
 
     system_txt = (
-        "You are a veterinary clinical AI at Premium Animal Hospital. "
+        "You are a veterinary clinical AI at Aleefy. "
         "Analyze clinical images with professional accuracy. "
         "Always state this is AI-assisted analysis and requires veterinarian confirmation.\n"
     )

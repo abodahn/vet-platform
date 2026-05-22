@@ -328,7 +328,7 @@ def share_link(sid):
             f"Your video consultation is scheduled for {str(ts['scheduled_at'])[:16]}.\n\n"
             f"Join here:\n{ts['room_url']}\n\n"
             f"No app download needed — works in any browser.\n"
-            f"Premium Animal Hospital"
+            f"Aleefy"
         )
         _send_and_log(ts["whatsapp_phone"], msg,
                       owner_id=ts["owner_id"],

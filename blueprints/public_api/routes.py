@@ -33,7 +33,7 @@ def options_handler(p):
 
 @public_api_bp.route("/health", methods=["GET"])
 def health():
-    return jsonify({"ok": True, "service": "Premium Animal Hospital API"})
+    return jsonify({"ok": True, "service": "Aleefy API"})
 
 
 # ── GET /api/public/services ─────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-"""In-App Notification Center — Premium Animal Hospital Platform"""
+"""In-App Notification Center — Aleefy Platform"""
 from flask import render_template, request, redirect, url_for, session, jsonify
 from . import notifications_bp
 from blueprints.auth.routes import login_required

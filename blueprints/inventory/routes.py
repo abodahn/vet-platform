@@ -1,5 +1,5 @@
 """
-Inventory / Pharmacy Blueprint — Premium Animal Hospital Platform
+Inventory / Pharmacy Blueprint — Aleefy Platform
 """
 
 from flask import (

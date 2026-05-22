@@ -1,5 +1,5 @@
 """
-Production Security Layer — Premium Animal Hospital Platform
+Production Security Layer — Aleefy Platform
 Handles: rate limiting, CSRF tokens, session validation, bcrypt migration
 """
 import secrets

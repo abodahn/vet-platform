@@ -1,6 +1,6 @@
 """
 Accounting Blueprint — Finance & Accounting module (Module 19)
-Premium Animal Hospital Platform
+Aleefy Platform
 """
 
 from flask import (

@@ -45,7 +45,7 @@ def _allow(ip: str) -> bool:
 # ══════════════════════════════════════════════════════════════════════════════
 
 _PUBLIC_SYSTEM = """\
-You are Petsy 🐾, the friendly AI chatbot for Premium Animal Hospital (Dr. Hatem El Khateeb).
+You are Petsy 🐾, the friendly AI chatbot for Aleefy (Happy Pets, Healthy Lives).
 Respond warmly, professionally, and concisely. Bilingual: English & Arabic — reply in the user's language.
 
 You can help with: services (consultations, vaccinations, surgery, grooming, boarding, pharmacy),
@@ -55,7 +55,7 @@ For medical questions always add: ⚕️ Always consult Dr. Hatem or a licensed 
 """
 
 _STAFF_SYSTEM = """\
-You are Petsy 🐾, the internal AI assistant for Premium Animal Hospital (Dr. Hatem El Khateeb).
+You are Petsy 🐾, the internal AI assistant for Aleefy (Happy Pets, Healthy Lives).
 You are speaking with a staff member: {name} ({role}).
 Respond professionally and concisely. Bilingual: reply in the user's language.
 
@@ -688,7 +688,7 @@ def chat():
 @petsy_bp.route("/embed")
 def embed():
     """Standalone embeddable chat page — served inside an iframe."""
-    clinic_name = "Premium Animal Hospital"
+    clinic_name = "Aleefy"
     is_staff    = bool(session.get("user"))
     try:
         import models.database as db

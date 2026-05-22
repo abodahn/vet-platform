@@ -1,6 +1,6 @@
 """
 Clinical Blueprint — Lab Requests, Vaccinations, Surgeries
-Premium Animal Hospital Platform
+Aleefy Platform
 """
 
 from flask import (

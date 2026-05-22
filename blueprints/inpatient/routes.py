@@ -1,6 +1,6 @@
 """
 Inpatient / Hospitalisation Blueprint
-Premium Animal Hospital Platform
+Aleefy Platform
 
 Handles pets admitted for in-clinic medical stays: ICU, post-op recovery,
 IV therapy, isolation, etc.  Distinct from the boarding module (recreational

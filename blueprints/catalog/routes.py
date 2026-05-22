@@ -1,4 +1,4 @@
-"""Service / Price Catalog — Premium Animal Hospital Platform"""
+"""Service / Price Catalog — Aleefy Platform"""
 from flask import render_template, request, redirect, url_for, flash, session, jsonify
 from . import catalog_bp
 from blueprints.auth.routes import login_required

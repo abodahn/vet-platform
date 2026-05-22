@@ -1,5 +1,5 @@
 """
-Pharmacy Dispensing Queue — Premium Animal Hospital Platform
+Pharmacy Dispensing Queue — Aleefy Platform
 Closes the prescription → dispensing → FEFO stock deduction → audit loop.
 """
 from flask import render_template, request, redirect, url_for, flash, session, jsonify

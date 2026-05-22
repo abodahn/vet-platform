@@ -1,5 +1,5 @@
 """
-Doctor Workspace Blueprint — Premium Animal Hospital Platform
+Doctor Workspace Blueprint — Aleefy Platform
 Personal dashboard, queue, schedule, patients, and stats for doctors.
 """
 

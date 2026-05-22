@@ -1,6 +1,6 @@
 """
 Appointments Blueprint
-Premium Animal Hospital Platform
+Aleefy Platform
 """
 
 from flask import (

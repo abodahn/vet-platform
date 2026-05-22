@@ -1,5 +1,5 @@
 """
-Automated SQLite Backup System — Premium Animal Hospital Platform
+Automated SQLite Backup System — Aleefy Platform
 Daily timestamped backups, 30-day retention, integrity check, status tracking.
 """
 import os

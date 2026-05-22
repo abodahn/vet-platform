@@ -57,13 +57,13 @@ class _InvoicePDF(FPDF):
         self.set_xy(18, 9)
         self.set_font("Helvetica", "B", 14)
         self.set_text_color(*_WHITE)
-        cname = self._clinic.get("name") or "Premium Animal Hospital"
+        cname = self._clinic.get("name") or "Aleefy"
         self.cell(120, 7, cname, new_x=XPos.LEFT, new_y=YPos.NEXT)
 
         # Sub-line: doctor name + phone
         self.set_x(18)
         self.set_font("Helvetica", "", 9)
-        sub = self._clinic.get("doctor_name") or "Dr. Hatem El Khateeb"
+        sub = self._clinic.get("doctor_name") or "Lead Veterinarian"
         phone = self._clinic.get("phone", "")
         if phone:
             sub += f"    |    {phone}"
@@ -98,7 +98,7 @@ class _InvoicePDF(FPDF):
         self.set_y(-14)
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(*_MUTED)
-        cname = self._clinic.get("name") or "Premium Animal Hospital"
+        cname = self._clinic.get("name") or "Aleefy"
         self.cell(0, 5,
                   f"Thank you for choosing {cname}  ·  Page {self.page_no()}",
                   align="C")

@@ -1,6 +1,6 @@
 """
 CRM Blueprint — Owners & Pets
-Premium Animal Hospital Platform
+Aleefy Platform
 """
 
 from flask import render_template, request, redirect, url_for, flash, session, jsonify

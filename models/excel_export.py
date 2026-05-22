@@ -1,5 +1,5 @@
 """
-Excel export helper — Premium Animal Hospital Platform
+Excel export helper — Aleefy Platform
 Requires: pip install openpyxl
 """
 

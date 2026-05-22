@@ -1,5 +1,5 @@
 """
-Premium Animal Hospital — Complete Platform Database
+Aleefy — Complete Platform Database
 All 55 tables covering every module.  PostgreSQL backend.
 
 Connection strategy
@@ -352,12 +352,12 @@ _SCHEMA = """
 -- ── CORE ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS clinic (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL DEFAULT 'Premium Animal Hospital',
-    name_ar     TEXT DEFAULT 'مستشفى بريميوم للحيوانات',
+    name        TEXT NOT NULL DEFAULT 'Aleefy',
+    name_ar     TEXT DEFAULT 'اليفي',
     phone       TEXT, email TEXT, address TEXT, address_ar TEXT,
     website     TEXT, tax_number TEXT, license_number TEXT,
-    doctor_name TEXT DEFAULT 'Dr. Hatem El Khateeb',
-    tagline     TEXT DEFAULT 'Premium Veterinary Care',
+    doctor_name TEXT DEFAULT 'Lead Veterinarian',
+    tagline     TEXT DEFAULT 'Happy Pets, Healthy Lives',
     logo_data   TEXT,
     currency    TEXT DEFAULT 'EGP',
     timezone    TEXT DEFAULT 'Africa/Cairo',
@@ -1487,7 +1487,7 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
         if conn.execute("SELECT COUNT(*) FROM clinic").fetchone()[0] == 0:
             conn.execute(
                 "INSERT INTO clinic (name, name_ar, doctor_name) VALUES (?,?,?)",
-                ("Premium Animal Hospital","مستشفى بريميوم للحيوانات","Dr. Hatem El Khateeb"),
+                ("Aleefy","اليفي","Lead Veterinarian"),
             )
         # branches
         if conn.execute("SELECT COUNT(*) FROM branches").fetchone()[0] == 0:

@@ -163,7 +163,7 @@
         <div class="form-group">
           <label class="form-label">Preferred Doctor</label>
           <input type="text" name="preferred_doctor" class="form-control"
-                 value="{{ owner.get('preferred_doctor','') }}" placeholder="e.g. Dr. Hatem El Khateeb">
+                 value="{{ owner.get('preferred_doctor','') }}" placeholder="e.g. {{ clinic.doctor_name if clinic else 'Dr. Your Name' }}">
         </div>
       </div>
     </div>

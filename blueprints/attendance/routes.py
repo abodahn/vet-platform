@@ -1,5 +1,5 @@
 """
-Attendance & Leave Management — Premium Animal Hospital Platform
+Attendance & Leave Management — Aleefy Platform
 Full HR attendance: check-in/out, shifts, leaves, balances, reports.
 """
 from flask import render_template, request, redirect, url_for, flash, session, jsonify

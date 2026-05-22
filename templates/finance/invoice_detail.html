@@ -65,8 +65,8 @@
       <!-- Header -->
       <div class="inv-header">
         <div>
-          <div class="inv-logo">🐾 {{ clinic.name if clinic else 'Premium Animal Hospital' }}</div>
-          <div class="inv-logo-sub">{{ clinic.doctor_name if clinic else 'Dr. Hatem El Khateeb' }}</div>
+          <div class="inv-logo">🐾 {{ clinic.name if clinic else app_title }}</div>
+          <div class="inv-logo-sub">{{ clinic.doctor_name if clinic else app_tagline }}</div>
           {% if clinic and clinic.phone %}<div class="inv-logo-sub">{{ clinic.phone }}</div>{% endif %}
         </div>
         <div class="inv-meta">
