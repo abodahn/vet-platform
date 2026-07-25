@@ -1,7 +1,12 @@
 """
 Production Security Layer — Aleefy Platform
-Handles: rate limiting, CSRF tokens, session validation, IP extraction, password strength
+Handles: rate limiting, CSRF tokens, session validation, IP extraction,
+password strength, TOTP two-factor authentication
 """
+import base64
+import hashlib
+import io
+import logging
 import re
 import secrets
 import threading
@@ -9,6 +14,8 @@ import time
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import session, request, abort, g
+
+logger = logging.getLogger(__name__)
 
 # ── Rate Limiting (database-backed — survives restarts and multiple workers) ──
 #
@@ -251,3 +258,448 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
     if not re.search(r"[!@#$%^&*()\-_=+\[\]{}|;:'\",.<>?/\\`~]", password):
         return False, "Password must contain at least one special character."
     return True, ""
+
+
+# ── TOTP Two-Factor Authentication (RFC 6238) ────────────────────────────────
+#
+# Opt-in, per user. Nothing here changes behaviour for a user who has not
+# enrolled: totp_required() returns False and the login path is untouched.
+#
+# Optional dependencies. Both are in requirements.txt, but the app must still
+# boot and password login must still work if a deploy lands without them.
+
+try:
+    import pyotp
+except ImportError:                                     # pragma: no cover
+    pyotp = None
+    logger.warning(
+        "pyotp is not installed — two-factor authentication is DISABLED. "
+        "Fix with: pip install 'pyotp>=2.9.0'")
+
+try:
+    import qrcode
+except ImportError:                                     # pragma: no cover
+    qrcode = None
+    logger.warning(
+        "qrcode is not installed — 2FA enrolment will show the text secret "
+        "instead of a QR code. Fix with: pip install 'qrcode[pil]>=7.4'")
+
+BACKUP_CODE_COUNT = 10
+
+# bcrypt cost for backup codes. Lower than the rounds=12 used for passwords on
+# purpose: a backup code is 48 bits of CSPRNG output, not a human-chosen
+# password, so it has no dictionary to defend against — the cost only buys
+# protection the entropy already provides, and consume_backup_code() has to
+# hash against every unused row.
+# ponytail: rounds=10 with a linear scan over <=10 rows; if backup codes ever
+# grow to hundreds per user, index a non-secret prefix instead.
+_BACKUP_CODE_ROUNDS = 10
+
+
+# ── Secret at rest ───────────────────────────────────────────────────────────
+#
+# The TOTP secret is encrypted with a key derived from the app SECRET_KEY, so a
+# stolen database file / pg_dump / backup archive is not by itself a second
+# factor. The key deliberately introduces NO new operational burden: it is
+# derived from a value the deployment already has to set and already has to
+# protect (it signs the session cookie), so there is no new secret to rotate,
+# distribute, or lose.
+#
+# Residual risk, stated plainly:
+#   * Host compromise defeats this — the running process can decrypt.
+#   * Rotating PLATFORM_SECRET_KEY makes every enrolled secret undecryptable.
+#     Those users must be reset by an admin and re-enrol. Failure is loud
+#     (logged ERROR + login refused), never silent.
+#   * If `cryptography` is missing the secret falls back to plaintext with a
+#     "plain:" marker and a WARNING — visible, not silent.
+
+_TOTP_ENC_PREFIX = "enc1:"
+_TOTP_PLAIN_PREFIX = "plain:"
+_fernet_cache: dict = {}
+
+
+def _fernet():
+    """Fernet keyed off SECRET_KEY, or None when it cannot be built."""
+    from flask import current_app
+    try:
+        key_material = current_app.config.get("SECRET_KEY") or ""
+    except RuntimeError:
+        key_material = ""           # no application context
+    if not key_material:
+        return None
+    hit = _fernet_cache.get(key_material)
+    if hit is not None:
+        return hit
+    try:
+        from cryptography.fernet import Fernet
+    except ImportError:             # pragma: no cover
+        return None
+    key = base64.urlsafe_b64encode(
+        hashlib.sha256(("aleefy-totp-v1:" + key_material).encode()).digest())
+    f = Fernet(key)
+    _fernet_cache[key_material] = f
+    return f
+
+
+def _encrypt_secret(secret: str) -> str:
+    f = _fernet()
+    if f is None:
+        logger.warning(
+            "TOTP secret is being stored WITHOUT encryption — no SECRET_KEY or "
+            "`cryptography` is not installed. A database dump would expose the "
+            "second factor. Fix with: pip install 'cryptography>=42.0'")
+        return _TOTP_PLAIN_PREFIX + secret
+    return _TOTP_ENC_PREFIX + f.encrypt(secret.encode()).decode()
+
+
+def _decrypt_secret(stored):
+    """Plain base32 secret, or None if it cannot be recovered."""
+    if not stored:
+        return None
+    if stored.startswith(_TOTP_PLAIN_PREFIX):
+        return stored[len(_TOTP_PLAIN_PREFIX):]
+    if not stored.startswith(_TOTP_ENC_PREFIX):
+        # Unprefixed legacy value — treat as plaintext rather than lock the user out.
+        return stored
+    f = _fernet()
+    if f is None:
+        logger.error("Cannot decrypt a stored TOTP secret: no SECRET_KEY or "
+                     "`cryptography` is unavailable.")
+        return None
+    try:
+        return f.decrypt(stored[len(_TOTP_ENC_PREFIX):].encode()).decode()
+    except Exception as exc:
+        logger.error(
+            "Could not decrypt a stored TOTP secret (%s). PLATFORM_SECRET_KEY has "
+            "most likely changed. An admin must reset 2FA for this user so they "
+            "can re-enrol.", exc)
+        return None
+
+
+# ── Schema (lazy, portable across SQLite and PostgreSQL) ─────────────────────
+
+_totp_ready = False
+
+_TOTP_DDL = """CREATE TABLE IF NOT EXISTS totp_backup_codes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    code_hash  TEXT NOT NULL,
+    created_at TEXT,
+    used_at    TEXT
+)"""
+
+_TOTP_USER_COLUMNS = (
+    ("totp_secret",       "TEXT"),
+    ("totp_enabled",      "INTEGER DEFAULT 0"),
+    ("totp_confirmed_at", "TEXT"),
+    ("last_totp_counter", "INTEGER DEFAULT 0"),
+)
+
+
+def _ensure_totp_schema() -> None:
+    """Create the 2FA table and user columns on first use (idempotent).
+
+    models.database._fix_sql() rewrites `?` -> `%s` and
+    `INTEGER PRIMARY KEY AUTOINCREMENT` -> `SERIAL PRIMARY KEY`, so this one
+    body of SQLite-flavoured DDL is correct on PostgreSQL too.
+    """
+    global _totp_ready
+    if _totp_ready:
+        return
+    from models.database import get_db, _try_stmt
+    with _lock:
+        if _totp_ready:
+            return
+        conn = get_db()
+        try:
+            conn.execute(_TOTP_DDL)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_totp_backup_user "
+                         "ON totp_backup_codes(user_id)")
+            conn.commit()
+            # ADD COLUMN is expected to fail once already applied — _try_stmt
+            # takes a PostgreSQL savepoint so the failure cannot poison the
+            # surrounding transaction.
+            for col, coltype in _TOTP_USER_COLUMNS:
+                _try_stmt(conn, f"ALTER TABLE users ADD COLUMN {col} {coltype}")
+            conn.commit()
+        finally:
+            conn.close()
+        _totp_ready = True
+
+
+def _user_totp_row(user_id):
+    _ensure_totp_schema()
+    from models.database import get_db
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT totp_secret, totp_enabled, totp_confirmed_at, last_totp_counter "
+            "FROM users WHERE id=?", (user_id,)).fetchone()
+    finally:
+        conn.close()
+
+
+# ── State ────────────────────────────────────────────────────────────────────
+
+def totp_available() -> bool:
+    """True when this server can do TOTP at all."""
+    return pyotp is not None
+
+
+def totp_required(user_id) -> bool:
+    """True when `user_id` must pass a TOTP challenge to finish logging in."""
+    row = _user_totp_row(user_id)
+    enabled = bool(row and row["totp_enabled"] and row["totp_secret"])
+    if enabled and pyotp is None:
+        # ponytail: fail OPEN when the library is missing, so a bad deploy
+        # cannot lock a clinic out of its own patient records on a Monday
+        # morning. Ceiling: anyone who can uninstall a package can bypass 2FA
+        # — but they already own the host. Flip to fail-closed the day this
+        # runs somewhere the operator cannot reach the server.
+        logger.error(
+            "User id=%s has 2FA enabled but pyotp is not installed — allowing "
+            "password-only login. Install pyotp and restart.", user_id)
+        return False
+    return enabled
+
+
+def totp_status(user_id) -> dict:
+    """Enrolment state for the profile page."""
+    row = _user_totp_row(user_id)
+    return {
+        "available":        totp_available(),
+        "enabled":          bool(row and row["totp_enabled"]),
+        "pending":          bool(row and row["totp_secret"] and not row["totp_enabled"]),
+        "confirmed_at":     (row["totp_confirmed_at"] if row else None),
+        "backup_remaining": count_backup_codes(user_id),
+    }
+
+
+def get_pending_secret(user_id):
+    """The base32 secret of an UNCONFIRMED enrolment, else None.
+
+    Never returns a secret once 2FA is enabled: showing it again would let
+    anyone with a live session clone the authenticator.
+    """
+    row = _user_totp_row(user_id)
+    if not row or row["totp_enabled"] or not row["totp_secret"]:
+        return None
+    return _decrypt_secret(row["totp_secret"])
+
+
+# ── Verification ─────────────────────────────────────────────────────────────
+
+def _burn_counter(user_id, counter) -> bool:
+    """Record `counter` as consumed. False if another request got there first."""
+    from models.database import get_db
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "UPDATE users SET last_totp_counter=? "
+            "WHERE id=? AND (last_totp_counter IS NULL OR last_totp_counter < ?)",
+            (counter, user_id, counter))
+        conn.commit()
+        return cur.rowcount == 1
+    finally:
+        conn.close()
+
+
+def verify_totp_code(user_id, code: str) -> bool:
+    """Verify a 6-digit TOTP code and burn its time step.
+
+    Replay defence: every accepted code advances `users.last_totp_counter`, and
+    any step at or below that is refused. Without it a code shoulder-surfed at
+    second 1 of its window stays usable for the remaining 29 (plus the +/-1 step
+    drift window, so ~90 seconds in practice).
+    """
+    if pyotp is None:
+        return False
+    code = (code or "").strip().replace(" ", "").replace("-", "")
+    if not code.isdigit():
+        return False
+    row = _user_totp_row(user_id)
+    if not row:
+        return False
+    secret = _decrypt_secret(row["totp_secret"])
+    if not secret:
+        return False
+
+    totp = pyotp.TOTP(secret)
+    step = totp.interval
+    last = int(row["last_totp_counter"] or 0)
+    now = int(time.time())
+
+    # pyotp.verify(valid_window=1) checks exactly these three steps but does not
+    # report WHICH one matched — and the matched step is what replay defence
+    # needs. So walk the same window and let pyotp generate each code; the
+    # RFC 6238 maths stays in the library.
+    for offset in (0, -1, 1):
+        counter = (now + offset * step) // step
+        if counter <= last:
+            continue                        # already spent — replay
+        if secrets.compare_digest(totp.at(counter * step), code):
+            return _burn_counter(user_id, counter)
+    return False
+
+
+# ── Enrolment ────────────────────────────────────────────────────────────────
+
+def start_totp_enrolment(user_id):
+    """Generate and store a fresh UNCONFIRMED secret. Returns it, or None."""
+    if pyotp is None:
+        return None
+    _ensure_totp_schema()
+    from models.database import get_db
+    secret = pyotp.random_base32()
+    conn = get_db()
+    with conn:
+        conn.execute(
+            "UPDATE users SET totp_secret=?, totp_enabled=0, "
+            "totp_confirmed_at=NULL, last_totp_counter=0 WHERE id=?",
+            (_encrypt_secret(secret), user_id))
+        conn.execute("DELETE FROM totp_backup_codes WHERE user_id=?", (user_id,))
+    conn.close()
+    return secret
+
+
+def confirm_totp_enrolment(user_id, code: str) -> bool:
+    """Flip totp_enabled on, but only after ONE code from the new secret verifies.
+
+    Without this an enrolment typo would enable 2FA against a secret the user's
+    phone does not hold, locking them out at the next login.
+    """
+    if not verify_totp_code(user_id, code):
+        return False
+    from models.database import get_db
+    conn = get_db()
+    with conn:
+        conn.execute(
+            "UPDATE users SET totp_enabled=1, totp_confirmed_at=? WHERE id=?",
+            (datetime.utcnow().isoformat(timespec="seconds"), user_id))
+    conn.close()
+    return True
+
+
+def disable_totp(user_id) -> None:
+    """Turn 2FA off and destroy the secret and every backup code."""
+    _ensure_totp_schema()
+    from models.database import get_db
+    conn = get_db()
+    with conn:
+        conn.execute(
+            "UPDATE users SET totp_secret=NULL, totp_enabled=0, "
+            "totp_confirmed_at=NULL, last_totp_counter=0 WHERE id=?", (user_id,))
+        conn.execute("DELETE FROM totp_backup_codes WHERE user_id=?", (user_id,))
+    conn.close()
+
+
+def list_totp_users() -> list:
+    """Every active user with their 2FA state — for the admin reset screen."""
+    _ensure_totp_schema()
+    from models.database import get_db
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, username, full_name, role, totp_enabled, totp_confirmed_at "
+            "FROM users WHERE is_active=1 ORDER BY username").fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+# ── Backup codes ─────────────────────────────────────────────────────────────
+
+def generate_backup_codes(user_id) -> list:
+    """Replace this user's backup codes. Returns the plaintext ONCE."""
+    import bcrypt
+    _ensure_totp_schema()
+    from models.database import get_db
+    codes = [f"{secrets.token_hex(3)}-{secrets.token_hex(3)}"
+             for _ in range(BACKUP_CODE_COUNT)]
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    conn = get_db()
+    with conn:
+        conn.execute("DELETE FROM totp_backup_codes WHERE user_id=?", (user_id,))
+        for code in codes:
+            conn.execute(
+                "INSERT INTO totp_backup_codes(user_id, code_hash, created_at) "
+                "VALUES(?,?,?)",
+                (user_id,
+                 bcrypt.hashpw(code.encode(),
+                               bcrypt.gensalt(rounds=_BACKUP_CODE_ROUNDS)).decode(),
+                 now))
+    conn.close()
+    return codes
+
+
+def count_backup_codes(user_id) -> int:
+    _ensure_totp_schema()
+    from models.database import get_db
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM totp_backup_codes "
+            "WHERE user_id=? AND used_at IS NULL", (user_id,)).fetchone()
+        return int(row[0]) if row else 0
+    finally:
+        conn.close()
+
+
+def consume_backup_code(user_id, code: str) -> bool:
+    """Spend one backup code. Single use — the UPDATE is the atomic gate."""
+    import bcrypt
+    _ensure_totp_schema()
+    from models.database import get_db
+    code = (code or "").strip().lower().replace(" ", "")
+    if not code:
+        return False
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, code_hash FROM totp_backup_codes "
+            "WHERE user_id=? AND used_at IS NULL", (user_id,)).fetchall()
+        matched = None
+        for r in rows:
+            stored = r["code_hash"]
+            try:
+                calc = bcrypt.hashpw(code.encode(), stored.encode()).decode()
+            except (ValueError, TypeError) as exc:
+                logger.error("Malformed backup-code hash id=%s for user %s (%s) "
+                             "— skipping it", r["id"], user_id, exc)
+                continue
+            if secrets.compare_digest(calc, stored):
+                matched = r["id"]
+                break
+        if matched is None:
+            return False
+        # AND used_at IS NULL makes the spend atomic: two concurrent requests
+        # with the same code cannot both see rowcount == 1.
+        cur = conn.execute(
+            "UPDATE totp_backup_codes SET used_at=? WHERE id=? AND used_at IS NULL",
+            (datetime.utcnow().isoformat(timespec="seconds"), matched))
+        conn.commit()
+        return cur.rowcount == 1
+    finally:
+        conn.close()
+
+
+# ── Enrolment presentation ───────────────────────────────────────────────────
+
+def totp_provisioning_uri(secret: str, username: str, issuer: str = "Aleefy") -> str:
+    if pyotp is None or not secret:
+        return ""
+    return pyotp.TOTP(secret).provisioning_uri(name=username, issuer_name=issuer)
+
+
+def totp_qr_data_uri(uri: str) -> str:
+    """PNG data: URI for `uri`, or "" — callers always also show the text secret."""
+    if qrcode is None or not uri:
+        return ""
+    try:
+        buf = io.BytesIO()
+        qrcode.make(uri).save(buf, format="PNG")
+        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    except Exception as exc:
+        logger.warning("Could not render the TOTP QR code (%s) — the user can "
+                       "still type the secret in manually", exc)
+        return ""

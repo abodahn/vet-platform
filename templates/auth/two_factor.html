@@ -1,0 +1,101 @@
+{# Second-factor challenge. Standalone (not base.html) — the visitor has passed
+   the password step but is NOT logged in, so there is no nav, no user, no
+   module chrome to render. #}
+<!doctype html>
+<html lang="{{ current_lang or 'en' }}"
+      dir="{% if current_lang == 'ar' %}rtl{% else %}ltr{% endif %}"
+      data-theme="light">
+<head>
+  <script>(function(){var t=localStorage.getItem('al-theme')||'light';document.documentElement.setAttribute('data-theme',t);if(t==='dark')document.documentElement.style.background='#0D1B2A'})();</script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ t('Two-Step Verification', 'التحقق بخطوتين') }} — {{ app_title }}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/aleefy-logo.png') }}">
+<style>
+:root{
+  --bg:#F4F6F9; --bg-card:#FFFFFF; --primary:#1A5276; --primary-mid:#2E86C1;
+  --text:#1B2631; --text-mid:#4A6275; --text-muted:#7F96A8; --border:#D5DEE7;
+  --danger:#C0392B; --danger-bg:#FDEDEC;
+}
+[data-theme="dark"]{
+  --bg:#0D1B2A; --bg-card:#132437; --text:#D6E8F5; --text-mid:#7AACC8;
+  --text-muted:#4A7A9B; --border:rgba(46,134,193,.2); --danger-bg:rgba(192,57,43,.14);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:{% if current_lang == 'ar' %}'Cairo',{% endif %}'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;
+  display:flex;align-items:center;justify-content:center;padding:24px;
+}
+.tf-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  padding:32px 28px;width:100%;max-width:400px;
+  box-shadow:0 8px 28px rgba(26,82,118,.10);
+}
+.tf-icon{font-size:34px;text-align:center;display:block;margin-bottom:10px}
+.tf-title{font-size:20px;font-weight:700;text-align:center;color:var(--primary)}
+.tf-sub{font-size:13px;color:var(--text-mid);text-align:center;margin-top:8px;line-height:1.6}
+.tf-user{font-weight:600;color:var(--text)}
+.tf-label{display:block;font-size:12px;font-weight:600;color:var(--text-mid);
+  margin:22px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+.tf-input{
+  width:100%;padding:13px 14px;font-size:22px;letter-spacing:.32em;text-align:center;
+  font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  border:1.5px solid var(--border);border-radius:9px;background:var(--bg);
+  color:var(--text);transition:border-color .18s;
+}
+.tf-input:focus{outline:none;border-color:var(--primary-mid)}
+.tf-btn{
+  width:100%;margin-top:18px;padding:13px;font-size:15px;font-weight:600;
+  color:#fff;background:var(--primary);border:0;border-radius:9px;cursor:pointer;
+  transition:background .18s;
+}
+.tf-btn:hover{background:var(--primary-mid)}
+.tf-error{
+  display:flex;gap:9px;align-items:center;background:var(--danger-bg);
+  color:var(--danger);border:1px solid var(--danger);border-radius:9px;
+  padding:11px 13px;font-size:13px;margin-top:18px;
+}
+.tf-foot{margin-top:20px;text-align:center;font-size:12px;color:var(--text-muted);line-height:1.7}
+.tf-foot a{color:var(--primary-mid);text-decoration:none}
+.tf-foot a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+  <main class="tf-card">
+    <span class="tf-icon" aria-hidden="true">🔐</span>
+    <h1 class="tf-title">{{ t('Two-Step Verification', 'التحقق بخطوتين') }}</h1>
+    <p class="tf-sub">
+      {{ t('Open your authenticator app and enter the 6-digit code for',
+            'افتح تطبيق المصادقة وأدخل الرمز المكوّن من ٦ أرقام الخاص بـ') }}
+      <span class="tf-user">{{ username }}</span>.
+    </p>
+
+    {% if error %}
+    <div class="tf-error" role="alert"><span aria-hidden="true">⚠️</span><span>{{ error }}</span></div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('auth.two_factor') }}" novalidate>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+      <label class="tf-label" for="code">
+        {{ t('Authentication code', 'رمز المصادقة') }}
+      </label>
+      <input class="tf-input" id="code" name="code" type="text"
+             inputmode="numeric" autocomplete="one-time-code"
+             maxlength="13" required autofocus dir="ltr"
+             aria-describedby="tf-help" placeholder="000000">
+
+      <button class="tf-btn" type="submit">{{ t('Verify', 'التحقق') }}</button>
+    </form>
+
+    <p class="tf-foot" id="tf-help">
+      {{ t('Lost your phone? Enter one of your backup codes above instead.',
+            'فقدت هاتفك؟ أدخل أحد رموز الاحتياط بدلاً من ذلك.') }}<br>
+      {{ t('No backup codes left? Ask a clinic administrator to reset your two-step verification.',
+            'لم يتبقَّ لديك رموز احتياط؟ اطلب من مسؤول العيادة إعادة ضبط التحقق بخطوتين.') }}<br>
+      <a href="{{ url_for('auth.logout') }}">{{ t('Cancel and sign in again', 'الإلغاء وتسجيل الدخول مرة أخرى') }}</a>
+    </p>
+  </main>
+</body>
+</html>

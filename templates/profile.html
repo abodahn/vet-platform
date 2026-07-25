@@ -63,6 +63,112 @@
     </form>
   </div>
 
+  {# ── Two-step verification (opt-in, per user) ───────────────────────────── #}
+  <div class="pf-card" style="margin-top:16px">
+    <div class="pf-card-header">
+      <div>
+        <div class="pf-card-title">🔐 {{ t('Two-Step Verification', 'التحقق بخطوتين') }}</div>
+        <div class="pf-card-sub">
+          {{ t('Ask for a code from your phone as well as your password.',
+                'يطلب رمزاً من هاتفك بالإضافة إلى كلمة المرور.') }}
+        </div>
+      </div>
+    </div>
+
+    {% if backup_codes %}
+      {# Shown exactly once — these are never recoverable after this page. #}
+      <div style="border:1.5px solid var(--cl-warning,#B7791F);border-radius:var(--cl-radius-sm);padding:14px;margin-bottom:12px">
+        <strong style="display:block;margin-bottom:6px">
+          ⚠️ {{ t('Save these backup codes now', 'احفظ رموز الاحتياط هذه الآن') }}
+        </strong>
+        <div style="font-size:12px;color:var(--cl-text-muted);line-height:1.7;margin-bottom:10px">
+          {{ t('Each code works once, if you do not have your phone. They will not be shown again — print them or keep them somewhere safe and private.',
+                'يُستخدم كل رمز مرة واحدة، في حال عدم توفّر هاتفك. لن تظهر مرة أخرى — اطبعها أو احتفظ بها في مكان آمن وخاص.') }}
+        </div>
+        <div dir="ltr" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;
+                    display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;letter-spacing:.04em">
+          {% for code in backup_codes %}<span>{{ code }}</span>{% endfor %}
+        </div>
+      </div>
+
+    {% elif setup %}
+      <div style="font-size:13px;color:var(--cl-text-muted);line-height:1.8;margin-bottom:12px">
+        {{ t('1. Install an authenticator app (Google Authenticator, Microsoft Authenticator, or Authy).',
+              '١. ثبّت تطبيق مصادقة (Google Authenticator أو Microsoft Authenticator أو Authy).') }}<br>
+        {{ t('2. Scan this code with it.', '٢. امسح هذا الرمز به.') }}<br>
+        {{ t('3. Type the 6-digit number it shows, to prove it worked.',
+              '٣. أدخل الرقم المكوّن من ٦ أرقام الذي يعرضه، لإثبات نجاح الإعداد.') }}
+      </div>
+
+      {% if setup.qr %}
+      <div style="text-align:center;margin-bottom:12px">
+        <img src="{{ setup.qr }}" width="190" height="190" style="border-radius:8px"
+             alt="{{ t('Setup QR code', 'رمز الاستجابة السريعة للإعداد') }}">
+      </div>
+      {% endif %}
+
+      <div class="pf-form-group">
+        <label class="pf-label">{{ t('Or type this key in manually', 'أو أدخل هذا المفتاح يدوياً') }}</label>
+        <input class="pf-input" type="text" value="{{ setup.secret }}" readonly dir="ltr"
+               style="font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.08em"
+               onclick="this.select()">
+      </div>
+
+      <form method="post" action="{{ url_for('auth.profile') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="2fa_confirm">
+        <div class="pf-form-group">
+          <label class="pf-label">{{ t('Code from your app', 'الرمز من التطبيق') }}</label>
+          <input class="pf-input" type="text" name="code" inputmode="numeric" dir="ltr"
+                 autocomplete="one-time-code" maxlength="6" required placeholder="000000">
+        </div>
+        <button type="submit" class="pf-btn pf-btn-primary">
+          {{ t('Turn On Two-Step Verification', 'تفعيل التحقق بخطوتين') }}
+        </button>
+      </form>
+
+    {% elif totp and totp.enabled %}
+      <div style="font-size:13px;margin-bottom:12px">
+        <span style="color:var(--cl-success,#1E8449);font-weight:600">✅ {{ t('On', 'مفعّل') }}</span>
+        <span style="color:var(--cl-text-muted)">
+          · {{ totp.backup_remaining }} {{ t('backup codes left', 'رمز احتياط متبقٍّ') }}
+        </span>
+      </div>
+      <form method="post" action="{{ url_for('auth.profile') }}" style="margin-bottom:10px">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <div class="pf-form-group">
+          <label class="pf-label">{{ t('Confirm with your password', 'التأكيد بكلمة المرور') }}</label>
+          <input class="pf-input" type="password" name="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" name="action" value="2fa_regen_codes" class="pf-btn pf-btn-ghost pf-btn-sm">
+          {{ t('Generate New Backup Codes', 'إنشاء رموز احتياط جديدة') }}
+        </button>
+        <button type="submit" name="action" value="2fa_disable" class="pf-btn pf-btn-ghost pf-btn-sm"
+                style="color:var(--cl-danger)">
+          {{ t('Turn Off', 'الإيقاف') }}
+        </button>
+      </form>
+
+    {% elif totp and not totp.available %}
+      <div style="font-size:13px;color:var(--cl-text-muted)">
+        {{ t('Not available on this server yet. Ask your administrator.',
+              'غير متاح على هذا الخادم بعد. تواصل مع المسؤول.') }}
+      </div>
+
+    {% elif totp %}
+      <form method="post" action="{{ url_for('auth.profile') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="2fa_start">
+        <div style="font-size:13px;color:var(--cl-text-muted);margin-bottom:12px">
+          {{ t('Off. Your password alone signs you in.', 'غير مفعّل. كلمة المرور وحدها تسجّل دخولك.') }}
+        </div>
+        <button type="submit" class="pf-btn pf-btn-primary">
+          {{ t('Set Up Two-Step Verification', 'إعداد التحقق بخطوتين') }}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+
   <div class="pf-card" style="margin-top:16px">
     <div class="pf-card-header">
       <div class="pf-card-title">🔗 {{ t('Quick Links', 'روابط سريعة') }}</div>
@@ -70,6 +176,9 @@
     <div style="display:flex;flex-direction:column;gap:8px">
       <a href="{{ url_for('launcher.index') }}" class="pf-btn pf-btn-ghost pf-btn-sm">🚀 {{ t('Module Launcher', 'لوحة الوحدات') }}</a>
       <a href="/launcher/legacy/start" target="_blank" class="pf-btn pf-btn-ghost pf-btn-sm">🩺 {{ t('Examination Module', 'وحدة الفحص') }}</a>
+      {% if current_role in ('super_admin', 'clinic_owner') %}
+      <a href="{{ url_for('auth.two_factor_admin') }}" class="pf-btn pf-btn-ghost pf-btn-sm">🔐 {{ t('Staff Two-Step Verification', 'التحقق بخطوتين للموظفين') }}</a>
+      {% endif %}
       <a href="{{ url_for('auth.logout') }}" class="pf-btn pf-btn-ghost pf-btn-sm" style="color:var(--cl-danger)">🔓 {{ t('Logout', 'تسجيل الخروج') }}</a>
     </div>
   </div>

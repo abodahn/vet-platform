@@ -212,6 +212,53 @@ def permission_required(permission: str, *fallback_roles):
 
 
 # ─────────────────────────────────────────────
+# SESSION ESTABLISHMENT
+# ─────────────────────────────────────────────
+#
+# session["user"] is set in exactly ONE place — _establish_session below. Every
+# login_required / role_required / permission_required check in the codebase
+# tests session.get("user"), so gating that single assignment behind the TOTP
+# challenge gates the whole application without touching another blueprint.
+
+_PENDING_2FA = "_pending_2fa"
+
+# A vet at a busy front desk needs long enough to unlock a phone and read a
+# code, short enough that an abandoned browser is not a standing half-login.
+PENDING_2FA_TTL = 300  # seconds
+
+# Never let these reach session["user"] — the session cookie is signed, not
+# encrypted, so anything in it is readable by the browser (and anyone with it).
+_SESSION_STRIP = ("password_hash", "password", "pin",
+                  "totp_secret", "last_totp_counter")
+
+
+def _establish_session(user_row, theme, lang, ip, method="password") -> dict:
+    """Promote a verified user to a real logged-in session."""
+    db.touch_last_login(user_row["id"])
+    user = {k: v for k, v in dict(user_row).items() if k not in _SESSION_STRIP}
+    if not user.get("theme_preference"):
+        user["theme_preference"] = theme
+
+    session.pop(_PENDING_2FA, None)
+    session.permanent = True
+    session["user"]   = user
+    session["theme"]  = user.get("theme_preference", theme)
+    session["lang"]   = lang
+    sec.touch_session()
+
+    db.log_audit(
+        username=user.get("username", ""),
+        role=user.get("role", ""),
+        action="login",
+        module="auth",
+        details=f"login via {method}",
+        ip=ip,
+        user_agent=request.headers.get("User-Agent", ""),
+    )
+    return user
+
+
+# ─────────────────────────────────────────────
 # ROUTES
 # ─────────────────────────────────────────────
 
@@ -240,29 +287,30 @@ def login():
         user = db.verify_credentials(username, password)
         if user:
             sec.clear_rate_limit(ip, username)
-            db.touch_last_login(user["id"])
-            if not user.get("theme_preference"):
-                user["theme_preference"] = theme
 
-            # Strip sensitive fields before storing in session
-            user = {k: v for k, v in user.items()
-                    if k not in ("password_hash", "password", "pin")}
+            # Password was right, but that is only the FIRST factor. Do not
+            # populate session["user"] yet — park the half-login in a
+            # short-lived pending slot that only /auth/2fa can promote.
+            if sec.totp_required(user["id"]):
+                session[_PENDING_2FA] = {
+                    "user_id":    user["id"],
+                    "username":   user["username"],
+                    "theme":      theme,
+                    "lang":       lang,
+                    "next":       safe_redirect_target(request.args.get("next")),
+                    "expires_at": time.time() + PENDING_2FA_TTL,
+                }
+                # So the challenge page renders in the language just chosen on
+                # the login form. Carries no privilege on its own.
+                session["lang"] = lang
+                db.log_audit(
+                    username=username, role=user.get("role", ""),
+                    action="2fa_challenge", module="auth",
+                    details="password accepted, awaiting TOTP code",
+                    ip=ip, user_agent=request.headers.get("User-Agent", ""))
+                return redirect(url_for("auth.two_factor"))
 
-            session.permanent = True
-            session["user"]   = user
-            session["theme"]  = user.get("theme_preference", theme)
-            session["lang"]   = lang
-            sec.touch_session()
-
-            db.log_audit(
-                username=username,
-                role=user.get("role", ""),
-                action="login",
-                module="auth",
-                ip=ip,  # already uses get_real_ip above
-                user_agent=request.headers.get("User-Agent", ""),
-            )
-
+            _establish_session(user, theme, lang, ip)
             return redirect(safe_redirect_target(request.args.get("next")))
         else:
             locked_now = sec.record_failed_login(ip, username)
@@ -280,6 +328,76 @@ def login():
             )
 
     return render_template("login.html", error=error, username=username)
+
+
+@auth_bp.route("/2fa", methods=["GET", "POST"])
+def two_factor():
+    """Second factor. The ONLY route that promotes a pending login to a session.
+
+    Deliberately NOT in models.security._CSRF_EXEMPT — unlike /auth/login this
+    acts on an already-authenticated half-session, so a forged cross-site POST
+    here would be an attack worth mounting.
+    """
+    if session.get("user"):
+        return redirect(url_for("launcher.index"))
+
+    pending = session.get(_PENDING_2FA) or {}
+    if not pending or pending.get("expires_at", 0) <= time.time():
+        session.pop(_PENDING_2FA, None)
+        flash("Your sign-in request expired. Please log in again.", "warning")
+        return redirect(url_for("auth.login"))
+
+    ip       = sec.get_real_ip(request)
+    username = pending.get("username", "")
+    # Separate rate-limit key from the password step: 5 tries at a 6-digit code
+    # is the whole defence, since 10^6 is guessable at any real request rate.
+    rl_key   = f"2fa:{username}"
+    error    = None
+
+    if request.method == "POST":
+        locked, wait_secs = sec.is_rate_limited(ip, rl_key)
+        if locked:
+            return render_template(
+                "auth/two_factor.html", username=username,
+                error=f"Too many incorrect codes. Try again in "
+                      f"{wait_secs // 60 + 1} minute(s).")
+
+        code        = request.form.get("code", "")
+        user_id     = pending.get("user_id")
+        used_backup = False
+        ok = sec.verify_totp_code(user_id, code)
+        if not ok:
+            ok = used_backup = sec.consume_backup_code(user_id, code)
+
+        if ok:
+            # Re-read from the database rather than trusting the pending dict:
+            # the account may have been deactivated since the password step.
+            row = db.get_user(username)
+            if not row:
+                session.pop(_PENDING_2FA, None)
+                flash("That account is no longer active.", "danger")
+                return redirect(url_for("auth.login"))
+            sec.clear_rate_limit(ip, rl_key)
+            _establish_session(row, pending.get("theme", "medical"),
+                               pending.get("lang", "en"), ip,
+                               method="backup code" if used_backup else "TOTP")
+            if used_backup:
+                remaining = sec.count_backup_codes(user_id)
+                flash(f"Signed in with a backup code — {remaining} left. "
+                      "Generate new codes from your profile.", "warning")
+            return redirect(safe_redirect_target(pending.get("next")))
+
+        locked_now = sec.record_failed_login(ip, rl_key)
+        error = "Invalid authentication code."
+        if locked_now:
+            error = (f"Too many incorrect codes. Locked for "
+                     f"{sec.RATE_LIMIT_WINDOW // 60} minutes.")
+        db.log_audit(
+            username=username, role="", action="2fa_failed", module="auth",
+            details=f"Invalid 2FA code for '{username}' from {ip}",
+            ip=ip, user_agent=request.headers.get("User-Agent", ""))
+
+    return render_template("auth/two_factor.html", error=error, username=username)
 
 
 @auth_bp.route("/logout")
@@ -327,6 +445,61 @@ def profile():
                                  action="password_change", module="auth",
                                  ip=sec.get_real_ip(request))
                     flash("Password changed successfully.", "success")
+
+        elif action == "2fa_start":
+            # Generates a NEW secret every time this is pressed, so an
+            # abandoned half-enrolment cannot be resumed by someone else.
+            if not sec.start_totp_enrolment(user["id"]):
+                flash("Two-factor authentication is unavailable on this server. "
+                      "Ask your administrator to install it.", "error")
+                return redirect(url_for("auth.profile"))
+            return redirect(url_for("auth.profile", setup=1))
+
+        elif action == "2fa_confirm":
+            if sec.confirm_totp_enrolment(user["id"], request.form.get("code", "")):
+                codes = sec.generate_backup_codes(user["id"])
+                db.log_audit(username=user["username"], role=user.get("role", ""),
+                             action="2fa_enabled", module="auth",
+                             details="user enabled two-factor authentication",
+                             ip=sec.get_real_ip(request))
+                # Rendered, not redirected: this is the one and only time the
+                # backup codes exist in plaintext.
+                return render_template("profile.html", user=user,
+                                       totp=sec.totp_status(user["id"]),
+                                       setup=None, backup_codes=codes)
+            flash("That code was not accepted. Check your phone's clock is "
+                  "correct and try the current code.", "error")
+            return redirect(url_for("auth.profile", setup=1))
+
+        elif action == "2fa_regen_codes":
+            # Running out of backup codes is a real lockout path, so let people
+            # top up without an admin. Password-gated: the codes ARE credentials.
+            if not db.verify_credentials(user["username"],
+                                         request.form.get("password", "")):
+                flash("Current password is incorrect.", "error")
+                return redirect(url_for("auth.profile"))
+            codes = sec.generate_backup_codes(user["id"])
+            db.log_audit(username=user["username"], role=user.get("role", ""),
+                         action="2fa_backup_codes_regenerated", module="auth",
+                         details="user generated new backup codes",
+                         ip=sec.get_real_ip(request))
+            return render_template("profile.html", user=user,
+                                   totp=sec.totp_status(user["id"]),
+                                   setup=None, backup_codes=codes)
+
+        elif action == "2fa_disable":
+            if not db.verify_credentials(user["username"],
+                                         request.form.get("password", "")):
+                flash("Current password is incorrect.", "error")
+            else:
+                sec.disable_totp(user["id"])
+                db.log_audit(username=user["username"], role=user.get("role", ""),
+                             action="2fa_disabled", module="auth",
+                             details="user disabled their own two-factor authentication",
+                             ip=sec.get_real_ip(request))
+                flash("Two-factor authentication is now off.", "success")
+            return redirect(url_for("auth.profile"))
+
         else:
             theme = request.form.get("theme", user.get("theme_preference", "medical"))
             lang  = request.form.get("lang",  user.get("language", "en"))
@@ -338,4 +511,60 @@ def profile():
             session["lang"]  = lang
             flash("Profile updated.", "success")
         return redirect(url_for("auth.profile"))
-    return render_template("profile.html", user=user)
+
+    totp  = sec.totp_status(user["id"])
+    setup = None
+    if request.args.get("setup") and totp["pending"]:
+        secret = sec.get_pending_secret(user["id"])
+        if secret:
+            uri = sec.totp_provisioning_uri(
+                secret, user["username"],
+                issuer=current_app.config.get("APP_TITLE", "Aleefy"))
+            setup = {"secret": secret, "qr": sec.totp_qr_data_uri(uri)}
+    return render_template("profile.html", user=user, totp=totp, setup=setup)
+
+
+# ─────────────────────────────────────────────
+# ADMIN 2FA RESET
+# ─────────────────────────────────────────────
+#
+# A vet who loses their phone must not be locked out of patient records. Every
+# reset is audit-logged with who did it and to whom.
+#
+# Residual risk: one compromised owner/super_admin account can strip 2FA from
+# every other account, so this endpoint is exactly as strong as the strongest
+# admin's password. It is not a hole 2FA introduces — that account could
+# already change everyone's password via the user-admin screens — but it does
+# mean the admin accounts are the ones that most need to enrol first. The audit
+# trail is the detection control; there is no prevention control here short of
+# two-person approval, which a single-clinic deployment will not staff.
+# ponytail: audit-log as the only check. Add a second-approver flow if this
+# ever runs for a multi-branch group with untrusted branch owners.
+
+@auth_bp.route("/2fa/admin")
+@role_required("super_admin", "clinic_owner")
+def two_factor_admin():
+    return render_template("auth/2fa_admin.html", users=sec.list_totp_users())
+
+
+@auth_bp.route("/2fa/admin/reset/<int:user_id>", methods=["POST"])
+@role_required("super_admin", "clinic_owner")
+def two_factor_admin_reset(user_id):
+    admin  = session["user"]
+    target = next((u for u in sec.list_totp_users() if u["id"] == user_id), None)
+    if not target:
+        flash("No such active user.", "error")
+        return redirect(url_for("auth.two_factor_admin"))
+
+    sec.disable_totp(user_id)
+    db.log_audit(
+        username=admin["username"], role=admin.get("role", ""),
+        action="2fa_admin_reset", module="auth",
+        entity_type="user", entity_id=str(user_id),
+        details=(f"{admin['username']} reset two-factor authentication for "
+                 f"'{target['username']}' (id={user_id})"),
+        ip=sec.get_real_ip(request),
+        user_agent=request.headers.get("User-Agent", ""))
+    flash(f"Two-factor authentication reset for {target['username']}. "
+          "They can log in with their password and enrol again.", "success")
+    return redirect(url_for("auth.two_factor_admin"))

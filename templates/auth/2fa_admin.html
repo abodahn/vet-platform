@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Two-Step Verification', 'التحقق بخطوتين') }}{% endblock %}
+{% block page_title %}{{ t('Two-Step Verification', 'التحقق بخطوتين') }}{% endblock %}
+{% block page_sub %}{{ t('Who has it on, and resetting it for staff who lost their phone',
+                          'من قام بتفعيله، وإعادة ضبطه للموظفين الذين فقدوا هواتفهم') }}{% endblock %}
+
+{% block content %}
+<div style="max-width:820px">
+
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div>
+        <div class="pf-card-title">🔐 {{ t('Staff Two-Step Verification', 'التحقق بخطوتين للموظفين') }}</div>
+        <div class="pf-card-sub">
+          {{ t('Resetting turns it OFF for that person. They sign in with their password alone until they enrol again.',
+                'إعادة الضبط تُوقف التحقق لذلك الشخص. يسجّل الدخول بكلمة المرور وحدها حتى يقوم بالتسجيل من جديد.') }}
+        </div>
+      </div>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="text-align:{% if current_lang == 'ar' %}right{% else %}left{% endif %};color:var(--cl-text-muted)">
+          <th style="padding:8px 6px">{{ t('User', 'المستخدم') }}</th>
+          <th style="padding:8px 6px">{{ t('Role', 'الدور') }}</th>
+          <th style="padding:8px 6px">{{ t('Two-Step', 'خطوتان') }}</th>
+          <th style="padding:8px 6px">{{ t('Enabled On', 'تاريخ التفعيل') }}</th>
+          <th style="padding:8px 6px"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for u in users %}
+        <tr style="border-top:1px solid var(--cl-border)">
+          <td style="padding:10px 6px">
+            <strong>{{ u.username }}</strong>
+            {% if u.full_name %}<div style="color:var(--cl-text-muted);font-size:11px">{{ u.full_name }}</div>{% endif %}
+          </td>
+          <td style="padding:10px 6px">{{ (u.role or '').replace('_',' ') | title }}</td>
+          <td style="padding:10px 6px">
+            {% if u.totp_enabled %}
+              <span style="color:var(--cl-success,#1E8449);font-weight:600">✅ {{ t('On', 'مفعّل') }}</span>
+            {% else %}
+              <span style="color:var(--cl-text-muted)">— {{ t('Off', 'غير مفعّل') }}</span>
+            {% endif %}
+          </td>
+          <td style="padding:10px 6px;color:var(--cl-text-muted)">{{ u.totp_confirmed_at or '—' }}</td>
+          <td style="padding:10px 6px;text-align:{% if current_lang == 'ar' %}left{% else %}right{% endif %}">
+            {% if u.totp_enabled %}
+            <form method="post" action="{{ url_for('auth.two_factor_admin_reset', user_id=u.id) }}"
+                  onsubmit="return confirm('{{ t('Turn off two-step verification for this user?',
+                                                  'هل تريد إيقاف التحقق بخطوتين لهذا المستخدم؟') }}')">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="pf-btn pf-btn-ghost pf-btn-sm" style="color:var(--cl-danger)">
+                {{ t('Reset', 'إعادة الضبط') }}
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pf-card" style="margin-top:16px">
+    <div class="pf-card-title">📋 {{ t('Every reset is recorded', 'كل عملية إعادة ضبط مسجّلة') }}</div>
+    <div class="pf-card-sub" style="margin-top:6px">
+      {{ t('The audit log records who reset whom and when. Review it if a reset looks unexpected.',
+            'يسجّل سجل التدقيق من قام بإعادة الضبط ولمن ومتى. راجعه إذا بدت إحدى العمليات غير متوقّعة.') }}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -17,6 +17,18 @@ alembic>=1.13.0
 bcrypt>=4.0.0
 Flask-Limiter>=3.5.0
 
+# Two-factor authentication (TOTP, RFC 6238).
+#   pyotp        — code generation/verification. Without it the app still boots
+#                  and password login still works; 2FA is simply unavailable.
+#   qrcode[pil]  — enrolment QR. Without it the setup page shows the text key.
+#   cryptography — encrypts users.totp_secret at rest with a key derived from
+#                  PLATFORM_SECRET_KEY, so a stolen database dump is not itself
+#                  a second factor. Without it the secret is stored in plaintext
+#                  with a "plain:" marker and a logged WARNING.
+pyotp>=2.9.0
+qrcode[pil]>=7.4
+cryptography>=42.0
+
 # ── Background jobs ───────────────────────────────────────
 APScheduler>=3.10.0
 
