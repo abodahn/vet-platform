@@ -22,7 +22,7 @@ except ImportError:
 
 import os as _os
 _BASE_URL = _os.environ.get("AI_BASE_URL", "http://localhost:3001/v1")
-_API_KEY  = _os.environ.get("AI_API_KEY",  "freellmapi-4ddad5d50504e98e27a4001eb5422e23a89cc957233ea3d0")
+_API_KEY  = _os.environ.get("AI_API_KEY",  "")   # Must be set via env var — no hardcoded fallback
 _MODEL    = _os.environ.get("AI_MODEL",    "gemini-2.5-flash")
 
 # ── Rate limiter (public endpoint) ────────────────────────────────────────────
