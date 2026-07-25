@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_lang or 'en' }}"
+      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -532,11 +533,11 @@ footer{
     <div class="nav-name">Alee<span>fy</span></div>
   </div>
   <div class="nav-links">
-    <a href="#modules" class="nav-link">Modules</a>
-    <a href="#features" class="nav-link">Features</a>
-    <a href="#numbers" class="nav-link">Stats</a>
+    <a href="#modules" class="nav-link">{{ t('Modules', 'الوحدات') }}</a>
+    <a href="#features" class="nav-link">{{ t('Features', 'المزايا') }}</a>
+    <a href="#numbers" class="nav-link">{{ t('Stats', 'الإحصائيات') }}</a>
   </div>
-  <button class="nav-cta" onclick="window.location.href='/auth/login'">Sign In →</button>
+  <button class="nav-cta" onclick="window.location.href='/auth/login'">{{ t('Sign In →', 'تسجيل الدخول ←') }}</button>
 </nav>
 
 <!-- ═══════════ HERO ═══════════ -->
@@ -553,41 +554,42 @@ footer{
   </div>
 
   <h1 class="hero-title">
-    The Smartest<br>
-    <span class="teal">Veterinary</span><br>
-    <span class="gold">Platform</span>
+    {{ t('The Smartest', 'الأذكى') }}<br>
+    <span class="teal">{{ t('Veterinary', 'البيطرية') }}</span><br>
+    <span class="gold">{{ t('Platform', 'المنصة') }}</span>
   </h1>
 
   <p class="hero-sub">
-    32 integrated modules. AI-powered insights. Bilingual Arabic & English.
-    Built for modern animal hospitals that demand more.
+    {{ t('32 integrated modules. AI-powered insights. Bilingual Arabic & English.
+    Built for modern animal hospitals that demand more.', '32 وحدة متكاملة. رؤى مدعومة بالذكاء الاصطناعي. ثنائية اللغة عربي وإنجليزي.
+    مصممة لمستشفيات الحيوانات الحديثة التي تطلب المزيد.') }}
   </p>
 
   <div class="hero-actions">
     <button class="btn-hero primary" onclick="window.location.href='/auth/login'">
-      🚀 Enter Platform
+      {{ t('🚀 Enter Platform', '🚀 دخول المنصة') }}
     </button>
     <button class="btn-hero secondary" onclick="document.getElementById('quicklinks').scrollIntoView({behavior:'smooth'})">
-      📋 Explore Modules
+      {{ t('📋 Explore Modules', '📋 استكشف الوحدات') }}
     </button>
   </div>
 
   <div class="hero-stats">
     <div>
       <div class="hero-stat-val"><span class="count" data-target="32">0</span><span style="color:var(--g)">+</span></div>
-      <div class="hero-stat-lbl">Integrated Modules</div>
+      <div class="hero-stat-lbl">{{ t('Integrated Modules', 'وحدات متكاملة') }}</div>
     </div>
     <div>
       <div class="hero-stat-val"><span class="count" data-target="87">0</span><span style="color:var(--g)">+</span></div>
-      <div class="hero-stat-lbl">Database Tables</div>
+      <div class="hero-stat-lbl">{{ t('Database Tables', 'جداول قاعدة البيانات') }}</div>
     </div>
     <div>
       <div class="hero-stat-val"><span class="count" data-target="320">0</span><span style="color:var(--g)">+</span></div>
-      <div class="hero-stat-lbl">API Routes</div>
+      <div class="hero-stat-lbl">{{ t('API Routes', 'مسارات API') }}</div>
     </div>
     <div>
       <div class="hero-stat-val"><span class="count" data-target="148">0</span><span style="color:var(--g)">+</span></div>
-      <div class="hero-stat-lbl">UI Templates</div>
+      <div class="hero-stat-lbl">{{ t('UI Templates', 'قوالب الواجهة') }}</div>
     </div>
   </div>
 </section>
@@ -596,55 +598,55 @@ footer{
 <section id="quicklinks" class="wrap">
   <div class="section-inner">
     <div class="reveal">
-      <div class="section-label">Quick Access</div>
-      <h2 class="section-title">Jump directly to any module</h2>
-      <p class="section-sub">All modules are active. Sign in to access your clinic dashboard.</p>
+      <div class="section-label">{{ t('Quick Access', 'وصول سريع') }}</div>
+      <h2 class="section-title">{{ t('Jump directly to any module', 'انتقل مباشرة إلى أي وحدة') }}</h2>
+      <p class="section-sub">{{ t('All modules are active. Sign in to access your clinic dashboard.', 'جميع الوحدات نشطة. سجّل الدخول للوصول إلى لوحة عيادتك.') }}</p>
     </div>
     <div class="qlinks-grid reveal" style="margin-top:36px">
       <a href="/auth/login" class="qlink-card primary-card">
         <span class="qlink-icon">🏥</span>
-        <div class="qlink-name">Dashboard</div>
-        <div class="qlink-sub">Clinic overview & stats</div>
+        <div class="qlink-name">{{ t('Dashboard', 'لوحة التحكم') }}</div>
+        <div class="qlink-sub">{{ t('Clinic overview & stats', 'نظرة عامة على العيادة والإحصائيات') }}</div>
       </a>
       <a href="/auth/login" class="qlink-card">
         <span class="qlink-icon">📅</span>
-        <div class="qlink-name">Appointments</div>
-        <div class="qlink-sub">Schedule & calendar</div>
+        <div class="qlink-name">{{ t('Appointments', 'المواعيد') }}</div>
+        <div class="qlink-sub">{{ t('Schedule & calendar', 'الجدول والتقويم') }}</div>
       </a>
       <a href="/auth/login" class="qlink-card">
         <span class="qlink-icon">🐾</span>
-        <div class="qlink-name">Pets & Owners</div>
-        <div class="qlink-sub">Patient & CRM records</div>
+        <div class="qlink-name">{{ t('Pets & Owners', 'الملاك والحيوانات') }}</div>
+        <div class="qlink-sub">{{ t('Patient & CRM records', 'سجلات المرضى والعملاء') }}</div>
       </a>
       <a href="/auth/login" class="qlink-card">
         <span class="qlink-icon">🩺</span>
-        <div class="qlink-name">Examinations</div>
-        <div class="qlink-sub">Clinical visit workflow</div>
+        <div class="qlink-name">{{ t('Examinations', 'الفحوصات') }}</div>
+        <div class="qlink-sub">{{ t('Clinical visit workflow', 'مسار الزيارة السريرية') }}</div>
       </a>
       <a href="/auth/login" class="qlink-card">
         <span class="qlink-icon">💰</span>
-        <div class="qlink-name">Invoices</div>
-        <div class="qlink-sub">Billing & payments</div>
+        <div class="qlink-name">{{ t('Invoices', 'الفواتير') }}</div>
+        <div class="qlink-sub">{{ t('Billing & payments', 'الفوترة والمدفوعات') }}</div>
       </a>
       <a href="/auth/login" class="qlink-card">
         <span class="qlink-icon">📦</span>
-        <div class="qlink-name">Inventory</div>
-        <div class="qlink-sub">Stock & pharmacy</div>
+        <div class="qlink-name">{{ t('Inventory', 'المخزون') }}</div>
+        <div class="qlink-sub">{{ t('Stock & pharmacy', 'المخزون والصيدلية') }}</div>
       </a>
       <a href="/auth/login" class="qlink-card">
         <span class="qlink-icon">📊</span>
-        <div class="qlink-name">Reports</div>
-        <div class="qlink-sub">Analytics & exports</div>
+        <div class="qlink-name">{{ t('Reports', 'التقارير') }}</div>
+        <div class="qlink-sub">{{ t('Analytics & exports', 'التحليلات والتصدير') }}</div>
       </a>
       <a href="/auth/login" class="qlink-card">
         <span class="qlink-icon">💬</span>
-        <div class="qlink-name">WhatsApp</div>
-        <div class="qlink-sub">Reminders & campaigns</div>
+        <div class="qlink-name">{{ t('WhatsApp', 'واتساب') }}</div>
+        <div class="qlink-sub">{{ t('Reminders & campaigns', 'التذكيرات والحملات') }}</div>
       </a>
     </div>
     <div style="text-align:center;margin-top:28px">
       <button class="btn-hero primary" style="display:inline-flex" onclick="window.location.href='/auth/login'">
-        🔐 Sign In to Access All Modules
+        {{ t('🔐 Sign In to Access All Modules', '🔐 سجّل الدخول للوصول إلى كل الوحدات') }}
       </button>
     </div>
   </div>
@@ -654,9 +656,9 @@ footer{
 <section id="modules" class="wrap">
   <div class="section-inner">
     <div class="reveal">
-      <div class="section-label">All 24 Modules</div>
-      <h2 class="section-title">Everything your clinic needs</h2>
-      <p class="section-sub">Click any module to expand and explore its features. All modules are live and fully integrated.</p>
+      <div class="section-label">{{ t('All 24 Modules', 'جميع الوحدات الـ24') }}</div>
+      <h2 class="section-title">{{ t('Everything your clinic needs', 'كل ما تحتاجه عيادتك') }}</h2>
+      <p class="section-sub">{{ t('Click any module to expand and explore its features. All modules are live and fully integrated.', 'اضغط على أي وحدة لعرض مزاياها. جميع الوحدات فعّالة ومتكاملة بالكامل.') }}</p>
     </div>
 
     <!-- Category filter tabs -->
@@ -671,9 +673,9 @@ footer{
 <section id="features" class="wrap">
   <div class="section-inner">
     <div class="reveal">
-      <div class="section-label">Platform Capabilities</div>
-      <h2 class="section-title">Built different.<br>Built better.</h2>
-      <p class="section-sub">Every feature is designed from the ground up for veterinary excellence.</p>
+      <div class="section-label">{{ t('Platform Capabilities', 'إمكانيات المنصة') }}</div>
+      <h2 class="section-title">{{ t('Built different.', 'بُنيت بشكل مختلف.') }}<br>{{ t('Built better.', 'بُنيت بشكل أفضل.') }}</h2>
+      <p class="section-sub">{{ t('Every feature is designed from the ground up for veterinary excellence.', 'كل ميزة مصممة من الأساس للتميز البيطري.') }}</p>
     </div>
     <div class="features-grid">
       {% set feats = [
@@ -721,11 +723,12 @@ footer{
 <!-- ═══════════ CTA ═══════════ -->
 <section id="cta" class="wrap">
   <div class="cta-box reveal-scale">
-    <div class="section-label" style="justify-content:center;margin-bottom:20px">Get Started</div>
-    <h2 class="section-title" style="margin-bottom:14px">Ready to transform<br>your clinic?</h2>
+    <div class="section-label" style="justify-content:center;margin-bottom:20px">{{ t('Get Started', 'ابدأ الآن') }}</div>
+    <h2 class="section-title" style="margin-bottom:14px">{{ t('Ready to transform', 'جاهز لتطوير') }}<br>{{ t('your clinic?', 'عيادتك؟') }}</h2>
     <p style="color:var(--mid);margin-bottom:36px;font-size:1rem;line-height:1.7">
-      Log in now and experience the most complete veterinary platform ever built.
-      All modules active, all data yours.
+      {{ t('Log in now and experience the most complete veterinary platform ever built.
+      All modules active, all data yours.', 'سجّل الدخول الآن وجرّب أكمل منصة بيطرية على الإطلاق.
+      جميع الوحدات نشطة، وكل البيانات ملكك.') }}
     </p>
     <button class="btn-hero primary" onclick="window.location.href='/auth/login'" style="margin:0 auto;display:inline-flex">
       🚀 Launch Aleefy Now →
@@ -739,7 +742,7 @@ footer{
     <img src="/static/images/aleefy-logo.png" style="width:28px;height:28px;border-radius:7px;object-fit:cover">
     <span style="color:var(--txt);font-weight:700">Aleefy</span>
     <span>·</span>
-    <span>Happy Pets, Healthy Lives</span>
+    <span>{{ t('Happy Pets, Healthy Lives', 'حيوانات سعيدة، حياة صحية') }}</span>
   </div>
   <div>© 2026 Aleefy Veterinary Platform · All rights reserved</div>
 </footer>

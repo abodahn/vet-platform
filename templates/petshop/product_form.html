@@ -54,7 +54,7 @@
         <div class="form-group">
           <label class="form-label">Barcode</label>
           <input type="text" name="barcode" class="form-control"
-                 value="{{ product.barcode if product else '' }}" placeholder="Optional">
+                 value="{{ product.barcode if product else '' }}" placeholder="{{ t('Optional', 'اختياري') }}">
         </div>
       </div>
       <div class="form-grid" style="margin-top:14px">
@@ -64,7 +64,7 @@
                  value="{{ product.brand if product else '' }}" placeholder="e.g. Royal Canin">
         </div>
         <div class="form-group">
-          <label class="form-label">Category</label>
+          <label class="form-label">{{ t('Category', 'الفئة') }}</label>
           <select name="category_id" class="form-control">
             <option value="">— No Category —</option>
             {% for c in categories %}
@@ -75,7 +75,7 @@
         </div>
       </div>
       <div class="form-group" style="margin-top:14px">
-        <label class="form-label">Description</label>
+        <label class="form-label">{{ t('Description', 'الوصف') }}</label>
         <textarea name="description" class="form-control" rows="2"
                   placeholder="Optional product description…">{{ product.description if product else '' }}</textarea>
       </div>
@@ -96,7 +96,7 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Unit</label>
+          <label class="form-label">{{ t('Unit', 'الوحدة') }}</label>
           <select name="unit" class="form-control">
             {% for u in ['unit','bag','bottle','box','pack','kg','gram','litre','ml','piece','pair','set'] %}
             <option value="{{ u }}" {% if product and product.unit == u %}selected{% elif not product and u == 'unit' %}selected{% endif %}>
@@ -123,7 +123,7 @@
                  value="{{ product.sell_price if product else '0' }}">
         </div>
         <div class="form-group">
-          <label class="form-label">Tax Rate (%)</label>
+          <label class="form-label">{{ t('Tax Rate (%)', 'نسبة الضريبة (%)') }}</label>
           <input type="number" name="tax_rate" class="form-control" step="0.1" min="0" max="100"
                  value="{{ product.tax_rate if product else '0' }}">
           <span class="form-hint">0 = tax-free</span>
@@ -157,7 +157,7 @@
       <a href="{{ url_for('petshop.products') }}"
          style="padding:12px 20px;border-radius:10px;border:1.5px solid var(--cl-border);
                 background:var(--cl-surface);color:var(--cl-text);font-size:13px;font-weight:600;text-decoration:none">
-        Cancel
+        {{ t('Cancel', 'إلغاء') }}
       </a>
     </div>
   </form>

@@ -2,16 +2,16 @@
 
 {% block title %}{{ page_title }}{% endblock %}
 {% block page_title %}{{ page_title }}{% endblock %}
-{% block page_sub %}{% if is_edit %}Update owner information{% else %}Register a new client{% endif %}{% endblock %}
+{% block page_sub %}{% if is_edit %}{{ t('Update owner information','تحديث بيانات المالك') }}{% else %}{{ t('Register a new client','تسجيل عميل جديد') }}{% endif %}{% endblock %}
 
 {% block topbar_actions %}
   {% if is_edit %}
   <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);">
-    ← Back to Profile
+    {{ t('← Back to Profile','← العودة إلى الملف') }}
   </a>
   {% else %}
   <a href="{{ url_for('crm.owners_list') }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);">
-    ← Owners List
+    {{ t('← Owners List','← قائمة الملاك') }}
   </a>
   {% endif %}
 {% endblock %}
@@ -147,23 +147,23 @@
 
   <!-- ── Basic Info ──────────────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">👤 Basic Information</div>
+    <div class="form-card-header">👤 {{ t('Basic Information','البيانات الأساسية') }}</div>
     <div class="form-card-body">
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">Full Name (English) <span class="req">*</span></label>
+          <label class="form-label">{{ t('Full Name (English)','الاسم الكامل (إنجليزي)') }} <span class="req">*</span></label>
           <input type="text" name="full_name" class="form-control"
-                 value="{{ owner.get('full_name','') }}" required placeholder="e.g. Ahmed Hassan">
+                 value="{{ owner.get('full_name','') }}" required placeholder="{{ t('e.g. Ahmed Hassan','مثال: أحمد حسن') }}">
         </div>
         <div class="form-group">
-          <label class="form-label">Full Name (Arabic)</label>
+          <label class="form-label">{{ t('Full Name (Arabic)','الاسم الكامل (عربي)') }}</label>
           <input type="text" name="full_name_ar" class="form-control" dir="rtl"
                  value="{{ owner.get('full_name_ar','') }}" placeholder="الاسم بالعربية">
         </div>
         <div class="form-group">
-          <label class="form-label">Preferred Doctor</label>
+          <label class="form-label">{{ t('Preferred Doctor','الطبيب المفضل') }}</label>
           <input type="text" name="preferred_doctor" class="form-control"
-                 value="{{ owner.get('preferred_doctor','') }}" placeholder="e.g. {{ clinic.doctor_name if clinic else 'Dr. Your Name' }}">
+                 value="{{ owner.get('preferred_doctor','') }}" placeholder="{{ t('e.g.','مثال:') }} {{ clinic.doctor_name if clinic else 'Dr. Your Name' }}">
         </div>
       </div>
     </div>
@@ -171,42 +171,42 @@
 
   <!-- ── Contact ──────────────────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">📞 Contact Details</div>
+    <div class="form-card-header">📞 {{ t('Contact Details','بيانات التواصل') }}</div>
     <div class="form-card-body">
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">Phone</label>
+          <label class="form-label">{{ t('Phone','الهاتف') }}</label>
           <input type="tel" name="phone" class="form-control"
                  value="{{ owner.get('phone','') }}" placeholder="+20 10X XXX XXXX">
         </div>
         <div class="form-group">
-          <label class="form-label">WhatsApp Number</label>
+          <label class="form-label">{{ t('WhatsApp Number','رقم واتساب') }}</label>
           <input type="tel" name="whatsapp_phone" class="form-control"
                  value="{{ owner.get('whatsapp_phone','') }}" placeholder="+20 10X XXX XXXX">
-          <span class="hint">Leave blank if same as phone</span>
+          <span class="hint">{{ t('Leave blank if same as phone','اتركه فارغاً إذا كان نفس رقم الهاتف') }}</span>
         </div>
         <div class="form-group">
-          <label class="form-label">Email Address</label>
+          <label class="form-label">{{ t('Email Address','البريد الإلكتروني') }}</label>
           <input type="email" name="email" class="form-control"
                  value="{{ owner.get('email','') }}" placeholder="owner@example.com">
         </div>
         <div class="form-group">
-          <label class="form-label">Preferred Contact Method</label>
+          <label class="form-label">{{ t('Preferred Contact Method','وسيلة التواصل المفضلة') }}</label>
           <select name="preferred_contact" class="form-control">
             {% for opt in ['WhatsApp', 'Phone', 'Email'] %}
             <option value="{{ opt }}" {% if owner.get('preferred_contact','WhatsApp') == opt %}selected{% endif %}>
-              {{ opt }}
+              {{ t(opt, {'WhatsApp':'واتساب','Phone':'الهاتف','Email':'البريد الإلكتروني'}.get(opt,'')) }}
             </option>
             {% endfor %}
           </select>
         </div>
         <div class="form-group form-grid-full">
-          <label class="form-label">Address (English)</label>
+          <label class="form-label">{{ t('Address (English)','العنوان (إنجليزي)') }}</label>
           <input type="text" name="address" class="form-control"
-                 value="{{ owner.get('address','') }}" placeholder="Street, Area, City">
+                 value="{{ owner.get('address','') }}" placeholder="{{ t('Street, Area, City','الشارع، المنطقة، المدينة') }}">
         </div>
         <div class="form-group form-grid-full">
-          <label class="form-label">Address (Arabic)</label>
+          <label class="form-label">{{ t('Address (Arabic)','العنوان (عربي)') }}</label>
           <input type="text" name="address_ar" class="form-control" dir="rtl"
                  value="{{ owner.get('address_ar','') }}" placeholder="العنوان بالعربية">
         </div>
@@ -216,29 +216,29 @@
 
   <!-- ── Preferences ─────────────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">⚙️ Preferences & Notes</div>
+    <div class="form-card-header">⚙️ {{ t('Preferences & Notes','التفضيلات والملاحظات') }}</div>
     <div class="form-card-body">
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">VIP Status</label>
+          <label class="form-label">{{ t('VIP Status','حالة العميل المميز') }}</label>
           <div class="checkbox-row">
             <input type="checkbox" id="vip_flag" name="vip_flag" value="1"
                    {% if owner.get('vip_flag') %}checked{% endif %}>
-            <label for="vip_flag">Mark as VIP Client <span class="badge-vip-check">⭐ VIP</span></label>
+            <label for="vip_flag">{{ t('Mark as VIP Client','تعيين كعميل مميز') }} <span class="badge-vip-check">⭐ {{ t('VIP','مميز') }}</span></label>
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Marketing Consent</label>
+          <label class="form-label">{{ t('Marketing Consent','الموافقة التسويقية') }}</label>
           <div class="checkbox-row">
             <input type="checkbox" id="marketing_consent" name="marketing_consent" value="1"
                    {% if owner.get('marketing_consent', 1) %}checked{% endif %}>
-            <label for="marketing_consent">Consent to receive reminders & offers</label>
+            <label for="marketing_consent">{{ t('Consent to receive reminders & offers','الموافقة على استقبال التذكيرات والعروض') }}</label>
           </div>
         </div>
         <div class="form-group form-grid-full">
-          <label class="form-label">Internal Notes</label>
+          <label class="form-label">{{ t('Internal Notes','ملاحظات داخلية') }}</label>
           <textarea name="notes" class="form-control"
-                    placeholder="Any special notes about this client…">{{ owner.get('notes','') }}</textarea>
+                    placeholder="{{ t('Any special notes about this client…','أي ملاحظات خاصة عن هذا العميل…') }}">{{ owner.get('notes','') }}</textarea>
         </div>
       </div>
     </div>
@@ -248,12 +248,12 @@
   <div class="form-card">
     <div class="form-actions">
       <button type="submit" class="btn-save">
-        {% if is_edit %}💾 Save Changes{% else %}✅ Create Owner{% endif %}
+        {% if is_edit %}💾 {{ t('Save Changes','حفظ التغييرات') }}{% else %}✅ {{ t('Create Owner','إنشاء مالك') }}{% endif %}
       </button>
       {% if is_edit %}
-      <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn-cancel">Cancel</a>
+      <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn-cancel">{{ t('Cancel','إلغاء') }}</a>
       {% else %}
-      <a href="{{ url_for('crm.owners_list') }}" class="btn-cancel">Cancel</a>
+      <a href="{{ url_for('crm.owners_list') }}" class="btn-cancel">{{ t('Cancel','إلغاء') }}</a>
       {% endif %}
     </div>
   </div>

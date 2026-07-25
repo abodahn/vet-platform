@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}New Appointment{% endblock %}
-{% block page_title %}New Appointment{% endblock %}
-{% block page_sub %}Book a visit for a patient{% endblock %}
+{% block title %}{{ t('New Appointment', 'موعد جديد') }}{% endblock %}
+{% block page_title %}{{ t('New Appointment', 'موعد جديد') }}{% endblock %}
+{% block page_sub %}{{ t('Book a visit for a patient', 'حجز زيارة لمريض') }}{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('appointments.schedule') }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);">
-    ← Schedule
+    {{ t('← Schedule', '← الجدول') }}
   </a>
 {% endblock %}
 
@@ -154,14 +154,14 @@
 
   <!-- ── Patient Section ─────────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">🐾 Patient</div>
+    <div class="form-card-header">{{ t('🐾 Patient', '🐾 المريض') }}</div>
     <div class="form-card-body">
       <div class="form-grid">
 
         <div class="form-group">
-          <label class="form-label">Owner <span class="req">*</span></label>
+          <label class="form-label">{{ t('Owner', 'المالك') }} <span class="req">*</span></label>
           <select name="owner_id" id="owner-select" class="form-control" required>
-            <option value="">— Select Owner —</option>
+            <option value="">{{ t('— Select Owner —', '— اختر المالك —') }}</option>
             {% for owner in owners %}
             <option value="{{ owner.id }}"
               {% if owner.id | string == prefill_owner_id %}selected{% endif %}>
@@ -169,13 +169,13 @@
             </option>
             {% endfor %}
           </select>
-          <span class="hint">Start typing to filter, then select</span>
+          <span class="hint">{{ t('Start typing to filter, then select', 'ابدأ الكتابة للتصفية ثم اختر') }}</span>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Pet <span class="req">*</span></label>
+          <label class="form-label">{{ t('Pet', 'الحيوان') }} <span class="req">*</span></label>
           <select name="pet_id" id="pet-select" class="form-control" required>
-            <option value="">— Select Pet —</option>
+            <option value="">{{ t('— Select Pet —', '— اختر الحيوان —') }}</option>
             {% for pet in pets %}
             <option value="{{ pet.id }}"
               {% if pet.id | string == prefill_pet_id %}selected{% endif %}>
@@ -184,16 +184,16 @@
             {% endfor %}
           </select>
           {% if not pets and prefill_owner_id %}
-          <span class="pet-hint">ℹ️ No pets found for this owner. <a href="{{ url_for('crm.pet_new', owner_id=prefill_owner_id) }}">Add a pet first →</a></span>
+          <span class="pet-hint">{{ t('ℹ️ No pets found for this owner.', 'ℹ️ لا توجد حيوانات لهذا المالك.') }} <a href="{{ url_for('crm.pet_new', owner_id=prefill_owner_id) }}">{{ t('Add a pet first →', 'أضف حيواناً أولاً ←') }}</a></span>
           {% elif not prefill_owner_id %}
-          <span class="hint">Select an owner first — pet list will reload</span>
+          <span class="hint">{{ t('Select an owner first — pet list will reload', 'اختر المالك أولاً — ستُحدَّث قائمة الحيوانات') }}</span>
           {% endif %}
         </div>
 
         <div class="form-group">
-          <label class="form-label">Doctor / Vet</label>
+          <label class="form-label">{{ t('Doctor / Vet', 'الطبيب البيطري') }}</label>
           <select name="doctor_name" id="doctor-select" class="form-control">
-            <option value="">— Assign Doctor —</option>
+            <option value="">{{ t('— Assign Doctor —', '— تعيين طبيب —') }}</option>
             {% for doc in doctors %}
             <option value="{{ doc.full_name }}">{{ doc.full_name }}</option>
             {% endfor %}
@@ -207,50 +207,50 @@
 
   <!-- ── Appointment Details ─────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">📋 Appointment Details</div>
+    <div class="form-card-header">{{ t('📋 Appointment Details', '📋 تفاصيل الموعد') }}</div>
     <div class="form-card-body">
       <div class="form-grid">
 
         <div class="form-group form-grid-full">
-          <label class="form-label">Type <span class="req">*</span></label>
+          <label class="form-label">{{ t('Type', 'النوع') }} <span class="req">*</span></label>
           <div class="type-grid">
             {% set type_icons = {'Consultation':'🩺','Vaccination':'💉','Surgery':'🔧','Grooming':'✂️','Lab':'🔬','Follow-up':'📋','Emergency':'🚨'} %}
-            {% for t in appt_types %}
+            {% for opt in appt_types %}
             <span>
-              <input type="radio" name="appointment_type" id="type_{{ t }}" value="{{ t }}"
-                     class="type-opt" {% if t == 'Consultation' %}checked{% endif %}>
-              <label for="type_{{ t }}" class="type-label">{{ type_icons.get(t,'') }} {{ t }}</label>
+              <input type="radio" name="appointment_type" id="type_{{ opt }}" value="{{ opt }}"
+                     class="type-opt" {% if opt == 'Consultation' %}checked{% endif %}>
+              <label for="type_{{ opt }}" class="type-label">{{ type_icons.get(opt,'') }} {{ opt }}</label>
             </span>
             {% endfor %}
           </div>
         </div>
 
         <div class="form-group form-grid-full">
-          <label class="form-label">Priority</label>
+          <label class="form-label">{{ t('Priority', 'الأولوية') }}</label>
           <div class="priority-grid">
             <span>
               <input type="radio" name="priority" id="prio_Normal" value="Normal" class="prio-opt" checked>
-              <label for="prio_Normal" class="prio-label normal">✅ Normal</label>
+              <label for="prio_Normal" class="prio-label normal">{{ t('✅ Normal', '✅ عادي') }}</label>
             </span>
             <span>
               <input type="radio" name="priority" id="prio_Urgent" value="Urgent" class="prio-opt">
-              <label for="prio_Urgent" class="prio-label urgent">⚡ Urgent</label>
+              <label for="prio_Urgent" class="prio-label urgent">{{ t('⚡ Urgent', '⚡ عاجل') }}</label>
             </span>
             <span>
               <input type="radio" name="priority" id="prio_Emergency" value="Emergency" class="prio-opt">
-              <label for="prio_Emergency" class="prio-label emergency">🚨 Emergency</label>
+              <label for="prio_Emergency" class="prio-label emergency">{{ t('🚨 Emergency', '🚨 طوارئ') }}</label>
             </span>
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Date <span class="req">*</span></label>
+          <label class="form-label">{{ t('Date', 'التاريخ') }} <span class="req">*</span></label>
           <input type="date" name="appt_date" id="appt-date" class="form-control"
                  value="{{ prefill_date }}" required min="{{ today_str if today_str else '' }}">
         </div>
 
         <div class="form-group">
-          <label class="form-label">Duration</label>
+          <label class="form-label">{{ t('Duration', 'المدة') }}</label>
           <select name="duration_min" class="form-control">
             {% for mins, label in [(15,'15 min'),(30,'30 min'),(45,'45 min'),(60,'1 hour'),(90,'1.5 hours'),(120,'2 hours')] %}
             <option value="{{ mins }}" {% if mins == 30 %}selected{% endif %}>{{ label }}</option>
@@ -259,7 +259,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Channel</label>
+          <label class="form-label">{{ t('Channel', 'القناة') }}</label>
           <select name="channel" class="form-control">
             {% set ch_icons = {'Walk-in':'🚶','WhatsApp':'💬','Phone':'📞','Online':'🌐'} %}
             {% for ch in channels %}
@@ -272,43 +272,43 @@
 
       <!-- Time slot picker -->
       <div class="form-group" style="margin-top: 20px;">
-        <label class="form-label">Start Time <span class="req">*</span></label>
+        <label class="form-label">{{ t('Start Time', 'وقت البدء') }} <span class="req">*</span></label>
         <div class="slots-grid" id="slots-grid">
           {% for hour in range(8, 20) %}
             {% for minute in [0, 30] %}
-            {% set t = "%02d:%02d" | format(hour, minute) %}
+            {% set opt = "%02d:%02d" | format(hour, minute) %}
             <span>
-              <input type="radio" name="appt_start" id="slot_{{ t }}" value="{{ t }}" class="slot-opt"
-                     {% if t == '09:00' %}checked{% endif %}>
-              <label for="slot_{{ t }}" class="slot-label">{{ t }}</label>
+              <input type="radio" name="appt_start" id="slot_{{ opt }}" value="{{ opt }}" class="slot-opt"
+                     {% if opt == '09:00' %}checked{% endif %}>
+              <label for="slot_{{ opt }}" class="slot-label">{{ opt }}</label>
             </span>
             {% endfor %}
           {% endfor %}
         </div>
-        <span class="hint" style="margin-top:8px;">Grey slots are unavailable for the selected date/doctor</span>
+        <span class="hint" style="margin-top:8px;">{{ t('Grey slots are unavailable for the selected date/doctor', 'الفترات الرمادية غير متاحة للتاريخ/الطبيب المحدد') }}</span>
       </div>
     </div>
   </div>
 
   <!-- ── Notes ──────────────────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">📝 Reason & Notes</div>
+    <div class="form-card-header">{{ t('📝 Reason & Notes', '📝 السبب والملاحظات') }}</div>
     <div class="form-card-body">
       <div class="form-grid">
         <div class="form-group form-grid-full">
-          <label class="form-label">Reason for Visit</label>
+          <label class="form-label">{{ t('Reason for Visit', 'سبب الزيارة') }}</label>
           <input type="text" name="reason" class="form-control"
-                 placeholder="e.g. Annual checkup, limping, vaccination due…">
+                 placeholder="{{ t('e.g. Annual checkup, limping, vaccination due…', 'مثال: فحص سنوي، عرج، موعد تطعيم…') }}">
         </div>
         <div class="form-group form-grid-full">
-          <label class="form-label">Symptoms (if any)</label>
+          <label class="form-label">{{ t('Symptoms (if any)', 'الأعراض (إن وجدت)') }}</label>
           <textarea name="symptoms" class="form-control"
-                    placeholder="Describe observed symptoms…"></textarea>
+                    placeholder="{{ t('Describe observed symptoms…', 'صف الأعراض الملاحظة…') }}"></textarea>
         </div>
         <div class="form-group form-grid-full">
-          <label class="form-label">Internal Notes</label>
+          <label class="form-label">{{ t('Internal Notes', 'ملاحظات داخلية') }}</label>
           <textarea name="notes" class="form-control"
-                    placeholder="Notes for the clinical team…"></textarea>
+                    placeholder="{{ t('Notes for the clinical team…', 'ملاحظات للفريق السريري…') }}"></textarea>
         </div>
       </div>
     </div>
@@ -317,8 +317,8 @@
   <!-- ── Actions ────────────────────────────────────────── -->
   <div class="form-card">
     <div class="form-actions">
-      <button type="submit" class="btn-save">✅ Book Appointment</button>
-      <a href="{{ url_for('appointments.schedule') }}" class="btn-cancel">Cancel</a>
+      <button type="submit" class="btn-save">{{ t('✅ Book Appointment', '✅ حجز الموعد') }}</button>
+      <a href="{{ url_for('appointments.schedule') }}" class="btn-cancel">{{ t('Cancel', 'إلغاء') }}</a>
     </div>
   </div>
 

@@ -3,27 +3,27 @@
 {% block page_title %}New Video Consultation{% endblock %}
 {% block page_sub %}Schedule a telemedicine session{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('telemedicine.dashboard') }}" class="pf-btn pf-btn-ghost">← Dashboard</a>
+<a href="{{ url_for('telemedicine.dashboard') }}" class="pf-btn pf-btn-ghost">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
 <form method="post" action="{{ url_for('telemedicine.new_session') }}" style="max-width:700px">
   <div class="pf-card" style="margin-bottom:1.5rem">
-    <div class="pf-card-header"><h3 class="pf-card-title">Patient</h3></div>
+    <div class="pf-card-header"><h3 class="pf-card-title">{{ t('Patient', 'المريض') }}</h3></div>
     <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
       <div>
-        <label class="pf-label">Owner *</label>
+        <label class="pf-label">{{ t('Owner *', 'المالك *') }}</label>
         <select name="owner_id" id="ownerSel" class="pf-input" required data-searchable onchange="loadPets(this.value)">
-          <option value="">— Select Owner —</option>
+          <option value="">{{ t('— Select Owner —', '— اختر المالك —') }}</option>
           {% for o in owners %}
           <option value="{{ o.id }}">{{ o.full_name }} · {{ o.phone }}</option>
           {% endfor %}
         </select>
       </div>
       <div>
-        <label class="pf-label">Pet</label>
+        <label class="pf-label">{{ t('Pet', 'الحيوان') }}</label>
         <select name="pet_id" id="petSel" class="pf-input">
-          <option value="">— Select owner first —</option>
+          <option value="">{{ t('— Select owner first —', '— اختر المالك أولاً —') }}</option>
         </select>
       </div>
     </div>
@@ -37,7 +37,7 @@
         <input type="text" name="doctor_name" class="pf-input" value="{{ default_doctor }}" placeholder="Dr. ...">
       </div>
       <div>
-        <label class="pf-label">Duration</label>
+        <label class="pf-label">{{ t('Duration', 'المدة') }}</label>
         <select name="duration_min" class="pf-input">
           <option value="15">15 minutes</option>
           <option value="30" selected>30 minutes</option>
@@ -70,7 +70,7 @@
 
   <div style="display:flex;gap:1rem">
     <button type="submit" class="pf-btn pf-btn-primary">🎥 Create Session</button>
-    <a href="{{ url_for('telemedicine.dashboard') }}" class="pf-btn pf-btn-ghost">Cancel</a>
+    <a href="{{ url_for('telemedicine.dashboard') }}" class="pf-btn pf-btn-ghost">{{ t('Cancel', 'إلغاء') }}</a>
   </div>
 </form>
 

@@ -245,12 +245,12 @@
         {{ module_icon }} {{ module_name }}
       </h2>
       <p class="v3-page-subtitle" style="margin-bottom:0">
-        Module overview &amp; development status
+        {{ t('Module overview &amp; development status', 'نظرة عامة على الوحدة وحالة التطوير') }}
       </p>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <span style="background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.3);color:#f97316;font-size:0.75rem;font-weight:700;padding:4px 12px;border-radius:999px;letter-spacing:0.4px;">
-        Coming Soon
+        {{ t('Coming Soon', 'قريباً') }}
       </span>
       {% if eta %}
       <span style="background:var(--al-surface-2);border:1px solid var(--al-border);color:var(--al-text-muted);font-size:0.75rem;font-weight:600;padding:4px 12px;border-radius:999px;">
@@ -267,7 +267,7 @@
 
     <span class="cs-status-badge">
       <span class="cs-status-dot"></span>
-      In Development
+      {{ t('In Development', 'قيد التطوير') }}
     </span>
 
     <span class="cs-module-icon" aria-hidden="true">{{ module_icon }}</span>
@@ -281,20 +281,20 @@
   <!-- ── PROGRESS INDICATOR ── -->
   <div class="cs-progress-wrap">
     <div class="cs-progress-label">
-      <span>⚙️ Development Progress</span>
+      <span>{{ t('⚙️ Development Progress', '⚙️ تقدم التطوير') }}</span>
       <span style="font-weight:700;color:var(--al-text)">42%</span>
     </div>
     <div class="cs-progress-track">
       <div class="cs-progress-fill"></div>
     </div>
     <div class="cs-progress-note">
-      Active development underway — core architecture and database schema are complete.
+      {{ t('Active development underway — core architecture and database schema are complete.', 'التطوير جارٍ — اكتملت البنية الأساسية ومخطط قاعدة البيانات.') }}
     </div>
   </div>
 
   <!-- ── WHAT'S COMING ── -->
   {% if expected_features %}
-  <div class="cs-section-title">✨ What's Coming</div>
+  <div class="cs-section-title">{{ t("✨ What's Coming", '✨ ما هو قادم') }}</div>
   <div class="cs-features-grid">
     {% for feature in expected_features %}
     <div class="cs-feature-card">
@@ -308,14 +308,14 @@
   {% endif %}
 
   <!-- ── TIMELINE / ETA ── -->
-  <div class="cs-section-title">🗓 Timeline</div>
+  <div class="cs-section-title">{{ t('🗓 Timeline', '🗓 الجدول الزمني') }}</div>
   <div class="cs-eta-card">
     <div class="cs-eta-icon-wrap">📅</div>
     <div class="cs-eta-content">
-      <div class="cs-eta-label">Expected Release</div>
+      <div class="cs-eta-label">{{ t('Expected Release', 'الإصدار المتوقع') }}</div>
       <div class="cs-eta-value">{{ eta or 'Q3 2026' }}</div>
       <div class="cs-eta-note">
-        Our engineering team is actively building this module. Release schedule may shift slightly as we perfect the experience.
+        {{ t('Our engineering team is actively building this module. Release schedule may shift slightly as we perfect the experience.', 'فريق الهندسة يعمل على بناء هذه الوحدة. قد يتغير موعد الإصدار قليلاً حتى نصل بالتجربة إلى أفضل صورة.') }}
       </div>
     </div>
     <div style="text-align:center;padding:12px 16px;background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);border-radius:12px;min-width:120px;">
@@ -326,16 +326,16 @@
 
   <!-- ── MICROCOPY ── -->
   <p class="cs-microcopy">
-    Our developers are working hard — even on weekends! 🐶
+    {{ t('Our developers are working hard — even on weekends! 🐶', 'مطورونا يعملون بجد — حتى في عطلة نهاية الأسبوع! 🐶') }}
   </p>
 
   <!-- ── CTA ── -->
   <div class="cs-cta">
     <a href="{{ url_for('launcher.index') }}" class="al-btn al-btn-primary">
-      🏠 Back to Dashboard
+      {{ t('🏠 Back to Dashboard', '🏠 العودة إلى لوحة التحكم') }}
     </a>
     <button onclick="history.back()" class="al-btn al-btn-ghost">
-      ← Go Back
+      {{ t('← Go Back', '← رجوع') }}
     </button>
   </div>
 

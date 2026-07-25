@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="{{ current_lang or 'en' }}" dir="ltr" data-theme="light">
+<html lang="{{ current_lang or 'en' }}"
+      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}" data-theme="light">
 <head>
   <script>(function(){var t=localStorage.getItem('al-theme')||'light';document.documentElement.setAttribute('data-theme',t);if(t==='dark')document.documentElement.style.background='#0D1B2A'})();</script>
   <meta charset="utf-8">
@@ -596,12 +597,12 @@ body {
 
     <!-- Tagline -->
     <div class="hero-tagline">
-      Smart Veterinary<br>
-      <span class="gold">Clinic Platform</span>
+      {{ t('Smart Veterinary', 'منصة بيطرية ذكية') }}<br>
+      <span class="gold">{{ t('Clinic Platform', 'لإدارة العيادات') }}</span>
     </div>
     <div class="hero-subtitle">
-      The complete operating system for modern animal hospitals.<br>
-      AI-powered · Bilingual · Fully integrated.
+      {{ t('The complete operating system for modern animal hospitals.', 'نظام التشغيل المتكامل لمستشفيات الحيوانات الحديثة.') }}<br>
+      {{ t('AI-powered · Bilingual · Fully integrated.', 'مدعومة بالذكاء الاصطناعي · ثنائية اللغة · متكاملة بالكامل.') }}
     </div>
 
     <!-- Feature highlights -->
@@ -609,47 +610,47 @@ body {
       <div class="hero-feature-card">
         <span class="hero-feature-icon">🐾</span>
         <div>
-          <div class="hero-feature-name">Pets &amp; Medical Records</div>
-          <div class="hero-feature-sub">Full EMR &amp; clinical history</div>
+          <div class="hero-feature-name">{{ t('Pets &amp; Medical Records', 'الحيوانات والسجلات الطبية') }}</div>
+          <div class="hero-feature-sub">{{ t('Full EMR &amp; clinical history', 'سجل طبي إلكتروني كامل وتاريخ سريري') }}</div>
         </div>
       </div>
       <div class="hero-feature-card">
         <span class="hero-feature-icon">📅</span>
         <div>
-          <div class="hero-feature-name">Smart Appointments</div>
-          <div class="hero-feature-sub">Scheduling &amp; reminders</div>
+          <div class="hero-feature-name">{{ t('Smart Appointments', 'مواعيد ذكية') }}</div>
+          <div class="hero-feature-sub">{{ t('Scheduling &amp; reminders', 'الجدولة والتذكيرات') }}</div>
         </div>
       </div>
       <div class="hero-feature-card">
         <span class="hero-feature-icon">💰</span>
         <div>
-          <div class="hero-feature-name">Finance &amp; Inventory</div>
-          <div class="hero-feature-sub">Billing, P&amp;L &amp; stock</div>
+          <div class="hero-feature-name">{{ t('Finance &amp; Inventory', 'المالية والمخزون') }}</div>
+          <div class="hero-feature-sub">{{ t('Billing, P&amp;L &amp; stock', 'الفوترة والأرباح والخسائر والمخزون') }}</div>
         </div>
       </div>
       <div class="hero-feature-card">
         <span class="hero-feature-icon">🤖</span>
         <div>
-          <div class="hero-feature-name">AI-Powered Insights</div>
-          <div class="hero-feature-sub">Copilot for every role</div>
+          <div class="hero-feature-name">{{ t('AI-Powered Insights', 'رؤى مدعومة بالذكاء الاصطناعي') }}</div>
+          <div class="hero-feature-sub">{{ t('Copilot for every role', 'مساعد ذكي لكل دور') }}</div>
         </div>
       </div>
     </div>
 
     <!-- Module pills -->
     <div class="hero-pills">
-      <span class="hero-pill">Appointments</span>
-      <span class="hero-pill">Pharmacy</span>
-      <span class="hero-pill">Lab</span>
-      <span class="hero-pill">Grooming</span>
-      <span class="hero-pill">Boarding</span>
-      <span class="hero-pill">Telemedicine</span>
+      <span class="hero-pill">{{ t('Appointments', 'المواعيد') }}</span>
+      <span class="hero-pill">{{ t('Pharmacy', 'الصيدلية') }}</span>
+      <span class="hero-pill">{{ t('Lab', 'المختبر') }}</span>
+      <span class="hero-pill">{{ t('Grooming', 'التجميل') }}</span>
+      <span class="hero-pill">{{ t('Boarding', 'الإيواء') }}</span>
+      <span class="hero-pill">{{ t('Telemedicine', 'الاستشارة عن بُعد') }}</span>
       <span class="hero-pill">HR</span>
-      <span class="hero-pill">Reports</span>
+      <span class="hero-pill">{{ t('Reports', 'التقارير') }}</span>
     </div>
 
     <!-- Trusted footer -->
-    <div class="hero-trusted">Trusted by veterinary teams.</div>
+    <div class="hero-trusted">{{ t('Trusted by veterinary teams.', 'موثوقة من الفرق البيطرية.') }}</div>
 
   </div>
 </div>
@@ -658,7 +659,7 @@ body {
 <div class="form-panel">
 
   <!-- Theme toggle -->
-  <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle dark/light mode">
+  <button class="theme-toggle" id="theme-toggle" title="{{ t('Toggle theme', 'تبديل الوضع') }}" aria-label="{{ t('Toggle dark/light mode', 'تبديل الوضع الليلي/النهاري') }}">
     🌙
   </button>
 
@@ -667,11 +668,11 @@ body {
     <!-- Header -->
     <div class="secure-badge">
       <span class="secure-badge-dot"></span>
-      Secure Clinic Access
+      {{ t('Secure Clinic Access', 'دخول آمن للعيادة') }}
     </div>
 
-    <h1 class="form-heading">Welcome back 👋</h1>
-    <p class="form-subheading">Sign in to your Aleefy dashboard.</p>
+    <h1 class="form-heading">{{ t('Welcome back 👋', 'مرحباً بعودتك 👋') }}</h1>
+    <p class="form-subheading">{{ t('Sign in to your Aleefy dashboard.', 'سجّل الدخول إلى لوحة Aleefy.') }}</p>
 
     <!-- Error -->
     {% if error %}
@@ -690,7 +691,7 @@ body {
 
       <!-- Username -->
       <div class="form-field">
-        <label class="form-label" for="username">Username</label>
+        <label class="form-label" for="username">{{ t('Username', 'اسم المستخدم') }}</label>
         <div class="input-wrap">
           <span class="input-prefix-icon">👤</span>
           <input
@@ -701,7 +702,7 @@ body {
             value="{{ username or '' }}"
             required
             autocomplete="username"
-            placeholder="Enter your username"
+            placeholder="{{ t('Enter your username', 'أدخل اسم المستخدم') }}"
             autofocus
           >
         </div>
@@ -709,7 +710,7 @@ body {
 
       <!-- Password -->
       <div class="form-field">
-        <label class="form-label" for="password">Password</label>
+        <label class="form-label" for="password">{{ t('Password', 'كلمة المرور') }}</label>
         <div class="input-wrap">
           <span class="input-prefix-icon">🔑</span>
           <input
@@ -719,16 +720,16 @@ body {
             name="password"
             required
             autocomplete="current-password"
-            placeholder="Enter your password"
+            placeholder="{{ t('Enter your password', 'أدخل كلمة المرور') }}"
             style="padding-right: 42px;"
           >
-          <button type="button" class="pw-show-btn" id="pw-toggle" aria-label="Show or hide password">👁️</button>
+          <button type="button" class="pw-show-btn" id="pw-toggle" aria-label="{{ t('Show or hide password', 'إظهار أو إخفاء كلمة المرور') }}">👁️</button>
         </div>
       </div>
 
       <!-- Submit -->
       <button type="submit" class="submit-btn" id="submit-btn">
-        <span class="btn-label">Sign In</span>
+        <span class="btn-label">{{ t('Sign In', 'تسجيل الدخول') }}</span>
         <span class="btn-arrow">→</span>
         <span class="btn-spinner"></span>
       </button>
@@ -742,10 +743,10 @@ body {
 
     <!-- Footer -->
     <div class="form-footer">
-      <strong>Aleefy</strong> — Veterinary Clinic Management Platform<br>
+      <strong>Aleefy</strong> {{ t('— Veterinary Clinic Management Platform', '— منصة إدارة العيادات البيطرية') }}<br>
       <span class="form-footer-ar">رعاية أذكى · Happy Pets, Healthy Lives</span>
       <br>
-      <a href="/" class="back-link">← Back to Platform Overview</a>
+      <a href="/" class="back-link">{{ t('← Back to Platform Overview', '← العودة إلى نظرة عامة على المنصة') }}</a>
     </div>
 
   </div>

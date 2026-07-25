@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Performance Review — {{ review.staff_name }}{% endblock %}
-{% block page_title %}Performance Review{% endblock %}
-{% block page_sub %}{{ review.staff_name }} — Period: {{ review.period }}{% endblock %}
+{% block title %}{{ t('Performance Review','تقييم الأداء') }} — {{ review.staff_name }}{% endblock %}
+{% block page_title %}{{ t('Performance Review','تقييم الأداء') }}{% endblock %}
+{% block page_sub %}{{ review.staff_name }} — {{ t('Period:','الفترة:') }} {{ review.period }}{% endblock %}
 
 {% block topbar_actions %}
 {% if review.status != 'Acknowledged' %}
-<a href="{{ url_for('hr.performance_edit', rev_id=review.id) }}" class="pf-btn pf-btn-primary">Edit</a>
+<a href="{{ url_for('hr.performance_edit', rev_id=review.id) }}" class="pf-btn pf-btn-primary">{{ t('Edit','تعديل') }}</a>
 {% endif %}
-<a href="{{ url_for('hr.performance_list') }}" class="pf-btn pf-btn-secondary">← Back</a>
+<a href="{{ url_for('hr.performance_list') }}" class="pf-btn pf-btn-secondary">{{ t('← Back','← رجوع') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -36,7 +36,7 @@
   <!-- Left: Review Content -->
   <div>
     <div class="rev-card">
-      <div class="rev-title">Overall Rating</div>
+      <div class="rev-title">{{ t('Overall Rating','التقييم العام') }}</div>
       {% if review.rating %}
       <div class="stars-big">
         {% for i in range(1,6) %}
@@ -45,34 +45,34 @@
       </div>
       <span style="font-size:1.4rem;font-weight:700;margin-left:10px;color:var(--cl-text)">{{ review.rating }}/5</span>
       {% else %}
-      <p style="color:var(--cl-muted)">No rating given yet.</p>
+      <p style="color:var(--cl-muted)">{{ t('No rating given yet.','لم يتم إعطاء تقييم بعد.') }}</p>
       {% endif %}
     </div>
 
     {% if review.strengths %}
     <div class="rev-card">
-      <div class="rev-title">Strengths</div>
+      <div class="rev-title">{{ t('Strengths','نقاط القوة') }}</div>
       <div class="rev-field-value" style="white-space:pre-line">{{ review.strengths }}</div>
     </div>
     {% endif %}
 
     {% if review.improvements %}
     <div class="rev-card">
-      <div class="rev-title">Areas for Improvement</div>
+      <div class="rev-title">{{ t('Areas for Improvement','مجالات التحسين') }}</div>
       <div class="rev-field-value" style="white-space:pre-line">{{ review.improvements }}</div>
     </div>
     {% endif %}
 
     {% if review.goals %}
     <div class="rev-card">
-      <div class="rev-title">Goals for Next Period</div>
+      <div class="rev-title">{{ t('Goals for Next Period','أهداف الفترة القادمة') }}</div>
       <div class="rev-field-value" style="white-space:pre-line">{{ review.goals }}</div>
     </div>
     {% endif %}
 
     {% if review.comments %}
     <div class="rev-card">
-      <div class="rev-title">Additional Comments</div>
+      <div class="rev-title">{{ t('Additional Comments','ملاحظات إضافية') }}</div>
       <div class="rev-field-value" style="white-space:pre-line">{{ review.comments }}</div>
     </div>
     {% endif %}
@@ -81,10 +81,10 @@
   <!-- Right: Sidebar -->
   <div>
     <div class="rev-card">
-      <div class="rev-title">Review Info</div>
+      <div class="rev-title">{{ t('Review Info','بيانات التقييم') }}</div>
 
       <div class="rev-field">
-        <div class="rev-field-label">Staff</div>
+        <div class="rev-field-label">{{ t('Staff','الموظف') }}</div>
         <div class="rev-field-value">
           <a href="{{ url_for('hr.staff_detail', user_id=review.user_id) }}" style="color:var(--cl-primary)">
             {{ review.staff_name or '—' }}
@@ -93,35 +93,35 @@
       </div>
 
       <div class="rev-field">
-        <div class="rev-field-label">Period</div>
+        <div class="rev-field-label">{{ t('Period','الفترة') }}</div>
         <div class="rev-field-value" style="font-weight:700">{{ review.period }}</div>
       </div>
 
       <div class="rev-field">
-        <div class="rev-field-label">Reviewer</div>
+        <div class="rev-field-label">{{ t('Reviewer','المقيّم') }}</div>
         <div class="rev-field-value">{{ review.reviewer_name or '—' }}</div>
       </div>
 
       <div class="rev-field">
-        <div class="rev-field-label">Review Date</div>
+        <div class="rev-field-label">{{ t('Review Date','تاريخ التقييم') }}</div>
         <div class="rev-field-value">{{ review.reviewed_at or '—' }}</div>
       </div>
 
       <div class="rev-field">
-        <div class="rev-field-label">Status</div>
+        <div class="rev-field-label">{{ t('Status','الحالة') }}</div>
         <div>
           {% if review.status == 'Draft' %}
-            <span class="status-chip chip-draft">Draft</span>
+            <span class="status-chip chip-draft">{{ t('Draft','مسودة') }}</span>
           {% elif review.status == 'Submitted' %}
-            <span class="status-chip chip-submitted">Submitted</span>
+            <span class="status-chip chip-submitted">{{ t('Submitted','مُرسل') }}</span>
           {% elif review.status == 'Acknowledged' %}
-            <span class="status-chip chip-acknowledged">Acknowledged</span>
+            <span class="status-chip chip-acknowledged">{{ t('Acknowledged','مُعتمد') }}</span>
           {% endif %}
         </div>
       </div>
 
       <div class="rev-field">
-        <div class="rev-field-label">Created</div>
+        <div class="rev-field-label">{{ t('Created','تاريخ الإنشاء') }}</div>
         <div class="rev-field-value" style="font-size:12px;color:var(--cl-muted)">
           {{ review.created_at[:10] if review.created_at else '—' }}
         </div>
@@ -130,15 +130,15 @@
 
     {% if review.status == 'Submitted' %}
     <div class="rev-card">
-      <div class="rev-title">Acknowledge</div>
+      <div class="rev-title">{{ t('Acknowledge','الاعتماد') }}</div>
       <p style="font-size:13px;color:var(--cl-muted);margin-bottom:12px">
-        Has the employee reviewed and acknowledged this evaluation?
+        {{ t('Has the employee reviewed and acknowledged this evaluation?','هل اطلع الموظف على هذا التقييم واعتمده؟') }}
       </p>
       <div class="ack-form">
         <form method="post" action="{{ url_for('hr.performance_acknowledge', rev_id=review.id) }}"
-              onsubmit="return confirm('Mark this review as acknowledged by the employee?')">
+              onsubmit="return confirm('{{ t('Mark this review as acknowledged by the employee?','تعليم هذا التقييم كمعتمد من الموظف؟') }}')">
           <button type="submit" class="pf-btn pf-btn-primary" style="width:100%">
-            Mark as Acknowledged
+            {{ t('Mark as Acknowledged','تعليم كمعتمد') }}
           </button>
         </form>
       </div>
@@ -148,8 +148,8 @@
     {% if review.status != 'Acknowledged' %}
     <div class="rev-card">
       <div style="display:flex;flex-direction:column;gap:8px">
-        <a href="{{ url_for('hr.performance_edit', rev_id=review.id) }}" class="pf-btn pf-btn-primary" style="text-align:center">Edit Review</a>
-        <a href="{{ url_for('hr.performance_new') }}" class="pf-btn pf-btn-secondary" style="text-align:center">New Review</a>
+        <a href="{{ url_for('hr.performance_edit', rev_id=review.id) }}" class="pf-btn pf-btn-primary" style="text-align:center">{{ t('Edit Review','تعديل التقييم') }}</a>
+        <a href="{{ url_for('hr.performance_new') }}" class="pf-btn pf-btn-secondary" style="text-align:center">{{ t('New Review','تقييم جديد') }}</a>
       </div>
     </div>
     {% endif %}

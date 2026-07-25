@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Attendance Dashboard{% endblock %}
-{% block page_title %}Attendance & Leave{% endblock %}
+{% block title %}{{ t('Attendance Dashboard', 'لوحة الحضور') }}{% endblock %}
+{% block page_title %}{{ t('Attendance & Leave', 'الحضور والإجازات') }}{% endblock %}
 {% block page_sub %}Today: {{ today }} — {{ total_staff }} active staff{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('attendance.checkin') }}" class="pf-btn pf-btn-primary pf-btn-sm">⏱ Check In / Out</a>
-  <a href="{{ url_for('attendance.leave_new') }}" class="pf-btn pf-btn-accent pf-btn-sm">📋 Request Leave</a>
+  <a href="{{ url_for('attendance.checkin') }}" class="pf-btn pf-btn-primary pf-btn-sm">{{ t('⏱ Check In / Out', '⏱ الدخول / الخروج') }}</a>
+  <a href="{{ url_for('attendance.leave_new') }}" class="pf-btn pf-btn-accent pf-btn-sm">{{ t('📋 Request Leave', '📋 طلب إجازة') }}</a>
   {% if is_manager %}
-  <a href="{{ url_for('attendance.report') }}" class="pf-btn pf-btn-sm">📊 Monthly Report</a>
+  <a href="{{ url_for('attendance.report') }}" class="pf-btn pf-btn-sm">{{ t('📊 Monthly Report', '📊 التقرير الشهري') }}</a>
   {% endif %}
 {% endblock %}
 
@@ -17,28 +17,28 @@
 <div class="pf-stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:24px">
   <div class="pf-stat-card" style="--stat-color:#10b981">
     <span class="pf-stat-icon">✅</span>
-    <div class="pf-stat-label">Present</div>
+    <div class="pf-stat-label">{{ t('Present', 'حاضر') }}</div>
     <div class="pf-stat-value">{{ present }}</div>
   </div>
   <div class="pf-stat-card" style="--stat-color:#3b82f6">
     <span class="pf-stat-icon">⏱</span>
-    <div class="pf-stat-label">Checked In</div>
+    <div class="pf-stat-label">{{ t('Checked In', 'تم الوصول') }}</div>
     <div class="pf-stat-value">{{ checked_in }}</div>
-    <div class="pf-stat-sub">still working</div>
+    <div class="pf-stat-sub">{{ t('still working', 'ما زال يعمل') }}</div>
   </div>
   <div class="pf-stat-card" style="--stat-color:#f59e0b">
     <span class="pf-stat-icon">🏖</span>
-    <div class="pf-stat-label">On Leave</div>
+    <div class="pf-stat-label">{{ t('On Leave', 'في إجازة') }}</div>
     <div class="pf-stat-value">{{ on_leave }}</div>
   </div>
   <div class="pf-stat-card" style="--stat-color:#ef4444">
     <span class="pf-stat-icon">❌</span>
-    <div class="pf-stat-label">Absent</div>
+    <div class="pf-stat-label">{{ t('Absent', 'غائب') }}</div>
     <div class="pf-stat-value">{{ absent }}</div>
   </div>
   <div class="pf-stat-card" style="--stat-color:#6366f1">
     <span class="pf-stat-icon">👥</span>
-    <div class="pf-stat-label">Total Staff</div>
+    <div class="pf-stat-label">{{ t('Total Staff', 'إجمالي الموظفين') }}</div>
     <div class="pf-stat-value">{{ total_staff }}</div>
   </div>
 </div>
@@ -49,14 +49,14 @@
   <div class="pf-card">
     <div class="pf-card-header">
       <div>
-        <div class="pf-card-title">📅 Today's Attendance</div>
+        <div class="pf-card-title">{{ t("📅 Today's Attendance", '📅 حضور اليوم') }}</div>
         <div class="pf-card-sub">{{ today }}</div>
       </div>
-      <a href="{{ url_for('attendance.records_list') }}" class="pf-btn pf-btn-sm">View All</a>
+      <a href="{{ url_for('attendance.records_list') }}" class="pf-btn pf-btn-sm">{{ t('View All', 'عرض الكل') }}</a>
     </div>
     {% if today_records %}
     <table class="pf-table">
-      <thead><tr><th>Staff</th><th>In</th><th>Out</th><th>Hours</th><th>Status</th></tr></thead>
+      <thead><tr><th>{{ t('Staff', 'الموظف') }}</th><th>{{ t('In', 'دخول') }}</th><th>{{ t('Out', 'خروج') }}</th><th>{{ t('Hours', 'الساعات') }}</th><th>{{ t('Status', 'الحالة') }}</th></tr></thead>
       <tbody>
         {% for r in today_records %}
         <tr>
@@ -68,10 +68,10 @@
           <td>{{ r.check_out or '—' }}</td>
           <td>{{ '%.1f'|format(r.hours_worked or 0) }}h</td>
           <td>
-            {% if r.status == 'Present' %}<span class="pf-badge active">Present</span>
-            {% elif r.status == 'Late' %}<span class="pf-badge" style="background:#fef3c7;color:#92400e">Late</span>
-            {% elif r.status == 'Absent' %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b">Absent</span>
-            {% elif r.status == 'Leave' %}<span class="pf-badge beta">Leave</span>
+            {% if r.status == 'Present' %}<span class="pf-badge active">{{ t('Present', 'حاضر') }}</span>
+            {% elif r.status == 'Late' %}<span class="pf-badge" style="background:#fef3c7;color:#92400e">{{ t('Late', 'متأخر') }}</span>
+            {% elif r.status == 'Absent' %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b">{{ t('Absent', 'غائب') }}</span>
+            {% elif r.status == 'Leave' %}<span class="pf-badge beta">{{ t('Leave', 'إجازة') }}</span>
             {% else %}<span class="pf-badge">{{ r.status }}</span>{% endif %}
           </td>
         </tr>
@@ -79,7 +79,7 @@
       </tbody>
     </table>
     {% else %}
-    <div style="padding:32px;text-align:center;color:var(--cl-text-muted)">No attendance records for today yet.</div>
+    <div style="padding:32px;text-align:center;color:var(--cl-text-muted)">{{ t('No attendance records for today yet.', 'لا توجد سجلات حضور لليوم بعد.') }}</div>
     {% endif %}
   </div>
 
@@ -90,9 +90,9 @@
       <div class="pf-card-header">
         <div>
           <div class="pf-card-title">🏖 My Leave Balances — {{ year }}</div>
-          <div class="pf-card-sub">Remaining days by leave type</div>
+          <div class="pf-card-sub">{{ t('Remaining days by leave type', 'الأيام المتبقية حسب نوع الإجازة') }}</div>
         </div>
-        <a href="{{ url_for('attendance.leave_new') }}" class="pf-btn pf-btn-accent pf-btn-sm">+ Request</a>
+        <a href="{{ url_for('attendance.leave_new') }}" class="pf-btn pf-btn-accent pf-btn-sm">{{ t('+ Request', '+ طلب') }}</a>
       </div>
       {% if my_balances %}
       <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
@@ -117,12 +117,12 @@
     <!-- My Recent Leaves -->
     <div class="pf-card">
       <div class="pf-card-header">
-        <div class="pf-card-title">📋 My Recent Requests</div>
-        <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">View All</a>
+        <div class="pf-card-title">{{ t('📋 My Recent Requests', '📋 طلباتي الأخيرة') }}</div>
+        <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">{{ t('View All', 'عرض الكل') }}</a>
       </div>
       {% if my_pending %}
       <table class="pf-table">
-        <thead><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th></tr></thead>
+        <thead><tr><th>{{ t('Type', 'النوع') }}</th><th>{{ t('Dates', 'التواريخ') }}</th><th>{{ t('Days', 'الأيام') }}</th><th>{{ t('Status', 'الحالة') }}</th></tr></thead>
         <tbody>
           {% for lr in my_pending %}
           <tr>
@@ -130,16 +130,16 @@
             <td style="font-size:12px">{{ lr.start_date }} → {{ lr.end_date }}</td>
             <td>{{ lr.days_requested }}</td>
             <td>
-              {% if lr.status == 'Approved' %}<span class="pf-badge active">Approved</span>
-              {% elif lr.status == 'Pending' %}<span class="pf-badge soon">Pending</span>
-              {% else %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b">Rejected</span>{% endif %}
+              {% if lr.status == 'Approved' %}<span class="pf-badge active">{{ t('Approved', 'معتمد') }}</span>
+              {% elif lr.status == 'Pending' %}<span class="pf-badge soon">{{ t('Pending', 'قيد الانتظار') }}</span>
+              {% else %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b">{{ t('Rejected', 'مرفوض') }}</span>{% endif %}
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
       {% else %}
-      <div style="padding:16px;text-align:center;color:var(--cl-text-muted);font-size:13px">No leave requests yet.</div>
+      <div style="padding:16px;text-align:center;color:var(--cl-text-muted);font-size:13px">{{ t('No leave requests yet.', 'لا توجد طلبات إجازة بعد.') }}</div>
       {% endif %}
     </div>
 
@@ -151,12 +151,12 @@
 <div class="pf-card" style="margin-top:20px">
   <div class="pf-card-header">
     <div>
-      <div class="pf-card-title">⏳ Pending Leave Approvals</div>
+      <div class="pf-card-title">{{ t('⏳ Pending Leave Approvals', '⏳ طلبات إجازة بانتظار الاعتماد') }}</div>
       <div class="pf-card-sub">{{ pending_leaves|length }} request{{ 's' if pending_leaves|length != 1 }} awaiting review</div>
     </div>
   </div>
   <table class="pf-table">
-    <thead><tr><th>Staff</th><th>Type</th><th>Period</th><th>Days</th><th>Reason</th><th>Submitted</th><th></th></tr></thead>
+    <thead><tr><th>{{ t('Staff', 'الموظف') }}</th><th>{{ t('Type', 'النوع') }}</th><th>{{ t('Period', 'الفترة') }}</th><th>{{ t('Days', 'الأيام') }}</th><th>{{ t('Reason', 'السبب') }}</th><th>{{ t('Submitted', 'مُرسل') }}</th><th></th></tr></thead>
     <tbody>
       {% for lr in pending_leaves %}
       <tr>
@@ -167,7 +167,7 @@
         <td style="font-size:12px;max-width:150px">{{ (lr.reason or '')[:60] }}{% if (lr.reason or '')|length > 60 %}…{% endif %}</td>
         <td style="font-size:12px">{{ lr.created_at[:10] }}</td>
         <td>
-          <a href="{{ url_for('attendance.leave_detail', req_id=lr.id) }}" class="pf-btn pf-btn-sm">Review</a>
+          <a href="{{ url_for('attendance.leave_detail', req_id=lr.id) }}" class="pf-btn pf-btn-sm">{{ t('Review', 'مراجعة') }}</a>
         </td>
       </tr>
       {% endfor %}
@@ -182,25 +182,25 @@
   <a href="{{ url_for('attendance.records_list') }}" class="pf-module-card" style="--module-accent:#3b82f6;text-decoration:none">
     <div class="pf-module-card-header">
       <div class="pf-module-icon-wrap">📋</div>
-      <div class="pf-module-card-meta"><div class="pf-module-card-name">Attendance Records</div></div>
+      <div class="pf-module-card-meta"><div class="pf-module-card-name">{{ t('Attendance Records', 'سجلات الحضور') }}</div></div>
     </div>
   </a>
   <a href="{{ url_for('attendance.leaves_list') }}" class="pf-module-card" style="--module-accent:#f59e0b;text-decoration:none">
     <div class="pf-module-card-header">
       <div class="pf-module-icon-wrap">🏖</div>
-      <div class="pf-module-card-meta"><div class="pf-module-card-name">Leave Requests</div></div>
+      <div class="pf-module-card-meta"><div class="pf-module-card-name">{{ t('Leave Requests', 'طلبات الإجازة') }}</div></div>
     </div>
   </a>
   <a href="{{ url_for('attendance.balances') }}" class="pf-module-card" style="--module-accent:#10b981;text-decoration:none">
     <div class="pf-module-card-header">
       <div class="pf-module-icon-wrap">⚖️</div>
-      <div class="pf-module-card-meta"><div class="pf-module-card-name">Leave Balances</div></div>
+      <div class="pf-module-card-meta"><div class="pf-module-card-name">{{ t('Leave Balances', 'أرصدة الإجازات') }}</div></div>
     </div>
   </a>
   <a href="{{ url_for('attendance.shifts_list') }}" class="pf-module-card" style="--module-accent:#6366f1;text-decoration:none">
     <div class="pf-module-card-header">
       <div class="pf-module-icon-wrap">🕐</div>
-      <div class="pf-module-card-meta"><div class="pf-module-card-name">Shifts</div></div>
+      <div class="pf-module-card-meta"><div class="pf-module-card-name">{{ t('Shifts', 'المناوبات') }}</div></div>
     </div>
   </a>
 </div>

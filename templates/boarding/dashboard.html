@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Boarding{% endblock %}
-{% block page_title %}Boarding{% endblock %}
+{% block title %}{{ t('Boarding', 'الإيواء') }}{% endblock %}
+{% block page_title %}{{ t('Boarding', 'الإيواء') }}{% endblock %}
 {% block page_sub %}Pet hotel rooms & stay management{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('boarding.booking_new_form') }}" class="pf-btn pf-btn-primary">+ New Booking</a>
+<a href="{{ url_for('boarding.booking_new_form') }}" class="pf-btn pf-btn-primary">{{ t('+ New Booking', '+ حجز جديد') }}</a>
 <a href="{{ url_for('boarding.rooms_list') }}" class="pf-btn pf-btn-secondary">Manage Rooms</a>
 {% endblock %}
 
@@ -16,11 +16,11 @@
   </div>
   <div class="pf-card" style="text-align:center;padding:1.25rem">
     <div style="font-size:2rem;font-weight:800;color:#ef4444">{{ occupied }}</div>
-    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Occupied</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">{{ t('Occupied', 'مشغول') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1.25rem">
     <div style="font-size:2rem;font-weight:800;color:#10b981">{{ available }}</div>
-    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Available</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">{{ t('Available', 'متاح') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1.25rem">
     <div style="font-size:2rem;font-weight:800;color:#f59e0b">{{ checkout_today }}</div>

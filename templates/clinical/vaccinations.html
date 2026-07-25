@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Vaccinations{% endblock %}
-{% block page_title %}Vaccinations{% endblock %}
-{% block page_sub %}Vaccination records and upcoming due dates{% endblock %}
+{% block title %}{{ t('Vaccinations', 'التطعيمات') }}{% endblock %}
+{% block page_title %}{{ t('Vaccinations', 'التطعيمات') }}{% endblock %}
+{% block page_sub %}{{ t('Vaccination records and upcoming due dates', 'سجلات التطعيم والمواعيد القادمة') }}{% endblock %}
 
 {% block topbar_actions %}
 <a href="{{ url_for('clinical.vaccination_new') }}" class="pf-btn pf-btn-primary">
-  ＋ Record Vaccination
+  {{ t('＋ Record Vaccination', '＋ تسجيل تطعيم') }}
 </a>
 {% endblock %}
 
@@ -76,7 +76,7 @@
     <span class="due-date-badge">Due {{ v.next_due_at }}</span>
     <a href="{{ url_for('clinical.vaccination_new') }}?pet_id={{ v.pet_id }}"
        class="pf-btn pf-btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.65rem">
-      Record
+      {{ t('Record', 'تسجيل') }}
     </a>
   </div>
   {% endfor %}
@@ -84,7 +84,7 @@
 {% else %}
 <div class="pf-card" style="margin-bottom:1.25rem;border-left:4px solid #22c55e">
   <div class="pf-card-body" style="padding:0.85rem 1.25rem;color:#166534;font-weight:600">
-    ✅ No vaccinations due in the next 30 days.
+    {{ t('✅ No vaccinations due in the next 30 days.', '✅ لا توجد تطعيمات مستحقة خلال 30 يوماً.') }}
   </div>
 </div>
 {% endif %}
@@ -92,7 +92,7 @@
 <!-- All vaccinations table -->
 <div class="pf-card">
   <div class="pf-card-header">
-    <span>💉 All Vaccination Records</span>
+    <span>{{ t('💉 All Vaccination Records', '💉 جميع سجلات التطعيم') }}</span>
     <span style="font-size:0.82rem;color:var(--text-muted)">{{ all_vacs|length }} records</span>
   </div>
   {% if all_vacs %}
@@ -100,14 +100,14 @@
     <table class="pf-table">
       <thead>
         <tr>
-          <th>Pet</th>
-          <th>Vaccine</th>
-          <th>Brand / Batch</th>
-          <th>Date Given</th>
-          <th>Next Due</th>
-          <th>Administered By</th>
-          <th>Site</th>
-          <th>Certificate</th>
+          <th>{{ t('Pet', 'الحيوان') }}</th>
+          <th>{{ t('Vaccine', 'اللقاح') }}</th>
+          <th>{{ t('Brand / Batch', 'الماركة / الدفعة') }}</th>
+          <th>{{ t('Date Given', 'تاريخ الإعطاء') }}</th>
+          <th>{{ t('Next Due', 'الجرعة التالية') }}</th>
+          <th>{{ t('Administered By', 'أعطاه') }}</th>
+          <th>{{ t('Site', 'الموضع') }}</th>
+          <th>{{ t('Certificate', 'الشهادة') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -143,7 +143,7 @@
             <a href="{{ url_for('clinical.vaccination_certificate', vacc_id=v.id) }}"
                class="pf-btn pf-btn-secondary"
                style="font-size:0.75rem;padding:0.2rem 0.55rem;white-space:nowrap"
-               title="Download PDF Certificate">
+               title="{{ t('Download PDF Certificate', 'تحميل الشهادة PDF') }}">
               PDF
             </a>
           </td>
@@ -154,7 +154,7 @@
   </div>
   {% else %}
   <div class="pf-card-body" style="text-align:center;color:var(--text-muted);padding:2rem">
-    No vaccination records found. <a href="{{ url_for('clinical.vaccination_new') }}">Record the first one →</a>
+    {{ t('No vaccination records found.', 'لا توجد سجلات تطعيم.') }} <a href="{{ url_for('clinical.vaccination_new') }}">{{ t('Record the first one →', 'سجّل أول واحد ←') }}</a>
   </div>
   {% endif %}
 </div>

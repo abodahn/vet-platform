@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Attendance Records{% endblock %}
-{% block page_title %}Attendance Records{% endblock %}
+{% block title %}{{ t('Attendance Records', 'سجلات الحضور') }}{% endblock %}
+{% block page_title %}{{ t('Attendance Records', 'سجلات الحضور') }}{% endblock %}
 {% block page_sub %}{{ date_from }} to {{ date_to }} — {{ records|length }} records{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('attendance.checkin') }}" class="pf-btn pf-btn-primary pf-btn-sm">Check In/Out</a>
-  <a href="{{ url_for('attendance.export_xlsx') }}?date_from={{ date_from }}&date_to={{ date_to }}{% if request.args.get('user_id') %}&user_id={{ request.args.get('user_id') }}{% endif %}" class="pf-btn pf-btn-secondary pf-btn-sm">Export Excel</a>
-  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+  <a href="{{ url_for('attendance.checkin') }}" class="pf-btn pf-btn-primary pf-btn-sm">{{ t('Check In/Out', 'الدخول/الخروج') }}</a>
+  <a href="{{ url_for('attendance.export_xlsx') }}?date_from={{ date_from }}&date_to={{ date_to }}{% if request.args.get('user_id') %}&user_id={{ request.args.get('user_id') }}{% endif %}" class="pf-btn pf-btn-secondary pf-btn-sm">{{ t('Export Excel', 'تصدير Excel') }}</a>
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -15,18 +15,18 @@
 <div class="pf-card" style="margin-bottom:16px">
   <form method="GET" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
     <div class="pf-form-group" style="margin:0;min-width:140px">
-      <label class="pf-form-label">From</label>
+      <label class="pf-form-label">{{ t('From', 'من') }}</label>
       <input type="date" name="date_from" class="pf-form-control" value="{{ date_from }}">
     </div>
     <div class="pf-form-group" style="margin:0;min-width:140px">
-      <label class="pf-form-label">To</label>
+      <label class="pf-form-label">{{ t('To', 'إلى') }}</label>
       <input type="date" name="date_to" class="pf-form-control" value="{{ date_to }}">
     </div>
     {% if is_manager %}
     <div class="pf-form-group" style="margin:0;min-width:180px">
-      <label class="pf-form-label">Staff</label>
+      <label class="pf-form-label">{{ t('Staff', 'الموظف') }}</label>
       <select name="user_id" class="pf-form-control">
-        <option value="">All Staff</option>
+        <option value="">{{ t('All Staff', 'جميع الموظفين') }}</option>
         {% for s in staff_list %}
         <option value="{{ s.id }}" {% if user_filter == s.id|string %}selected{% endif %}>{{ s.full_name }}</option>
         {% endfor %}
@@ -34,16 +34,16 @@
     </div>
     {% endif %}
     <div class="pf-form-group" style="margin:0;min-width:140px">
-      <label class="pf-form-label">Status</label>
+      <label class="pf-form-label">{{ t('Status', 'الحالة') }}</label>
       <select name="status" class="pf-form-control">
-        <option value="">All</option>
+        <option value="">{{ t('All', 'الكل') }}</option>
         {% for st in ['Present','Late','Absent','Leave','Holiday'] %}
         <option value="{{ st }}" {% if status_f == st %}selected{% endif %}>{{ st }}</option>
         {% endfor %}
       </select>
     </div>
-    <button type="submit" class="pf-btn pf-btn-primary">Filter</button>
-    <a href="{{ url_for('attendance.records_list') }}" class="pf-btn pf-btn-sm">Reset</a>
+    <button type="submit" class="pf-btn pf-btn-primary">{{ t('Filter', 'تصفية') }}</button>
+    <a href="{{ url_for('attendance.records_list') }}" class="pf-btn pf-btn-sm">{{ t('Reset', 'إعادة تعيين') }}</a>
   </form>
 </div>
 
@@ -51,22 +51,22 @@
 <div class="pf-stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
   <div class="pf-stat-card" style="--stat-color:#10b981">
     <span class="pf-stat-icon">✅</span>
-    <div class="pf-stat-label">Present</div>
+    <div class="pf-stat-label">{{ t('Present', 'حاضر') }}</div>
     <div class="pf-stat-value">{{ present }}</div>
   </div>
   <div class="pf-stat-card" style="--stat-color:#f59e0b">
     <span class="pf-stat-icon">⏰</span>
-    <div class="pf-stat-label">Late</div>
+    <div class="pf-stat-label">{{ t('Late', 'متأخر') }}</div>
     <div class="pf-stat-value">{{ late }}</div>
   </div>
   <div class="pf-stat-card" style="--stat-color:#6366f1">
     <span class="pf-stat-icon">📅</span>
-    <div class="pf-stat-label">Total Records</div>
+    <div class="pf-stat-label">{{ t('Total Records', 'إجمالي السجلات') }}</div>
     <div class="pf-stat-value">{{ total_days }}</div>
   </div>
   <div class="pf-stat-card" style="--stat-color:#3b82f6">
     <span class="pf-stat-icon">⏱</span>
-    <div class="pf-stat-label">Total Hours</div>
+    <div class="pf-stat-label">{{ t('Total Hours', 'إجمالي الساعات') }}</div>
     <div class="pf-stat-value">{{ '%.1f'|format(total_hours) }}</div>
   </div>
 </div>
@@ -77,14 +77,14 @@
   <table class="pf-table">
     <thead>
       <tr>
-        {% if is_manager %}<th>Staff</th>{% endif %}
-        <th>Date</th>
-        <th>Check In</th>
-        <th>Check Out</th>
-        <th>Break</th>
-        <th>Hours</th>
-        <th>Status</th>
-        <th>Notes</th>
+        {% if is_manager %}<th>{{ t('Staff', 'الموظف') }}</th>{% endif %}
+        <th>{{ t('Date', 'التاريخ') }}</th>
+        <th>{{ t('Check In', 'تسجيل وصول') }}</th>
+        <th>{{ t('Check Out', 'الخروج') }}</th>
+        <th>{{ t('Break', 'الاستراحة') }}</th>
+        <th>{{ t('Hours', 'الساعات') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
+        <th>{{ t('Notes', 'ملاحظات') }}</th>
         {% if is_manager %}<th></th>{% endif %}
       </tr>
     </thead>
@@ -103,17 +103,17 @@
         <td>{{ r.break_minutes or 0 }}m</td>
         <td style="font-weight:600">{{ '%.1f'|format(r.hours_worked or 0) }}h</td>
         <td>
-          {% if r.status == 'Present' %}<span class="pf-badge active">Present</span>
-          {% elif r.status == 'Late' %}<span class="pf-badge" style="background:#fef3c7;color:#92400e">Late</span>
-          {% elif r.status == 'Absent' %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b">Absent</span>
-          {% elif r.status == 'Leave' %}<span class="pf-badge beta">Leave</span>
-          {% elif r.status == 'Holiday' %}<span class="pf-badge soon">Holiday</span>
+          {% if r.status == 'Present' %}<span class="pf-badge active">{{ t('Present', 'حاضر') }}</span>
+          {% elif r.status == 'Late' %}<span class="pf-badge" style="background:#fef3c7;color:#92400e">{{ t('Late', 'متأخر') }}</span>
+          {% elif r.status == 'Absent' %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b">{{ t('Absent', 'غائب') }}</span>
+          {% elif r.status == 'Leave' %}<span class="pf-badge beta">{{ t('Leave', 'إجازة') }}</span>
+          {% elif r.status == 'Holiday' %}<span class="pf-badge soon">{{ t('Holiday', 'عطلة') }}</span>
           {% else %}<span class="pf-badge">{{ r.status }}</span>{% endif %}
         </td>
         <td style="font-size:12px;color:var(--cl-text-muted)">{{ r.notes or '' }}</td>
         {% if is_manager %}
         <td>
-          <a href="{{ url_for('attendance.record_edit', rec_id=r.id) }}" class="pf-btn pf-btn-sm">Edit</a>
+          <a href="{{ url_for('attendance.record_edit', rec_id=r.id) }}" class="pf-btn pf-btn-sm">{{ t('Edit', 'تعديل') }}</a>
         </td>
         {% endif %}
       </tr>
@@ -122,7 +122,7 @@
   </table>
   {% else %}
   <div style="padding:48px;text-align:center;color:var(--cl-text-muted)">
-    No attendance records found for the selected filters.
+    {{ t('No attendance records found for the selected filters.', 'لا توجد سجلات حضور للتصفية المحددة.') }}
   </div>
   {% endif %}
 </div>

@@ -2,10 +2,10 @@
 
 {% block title %}Lab Request — {{ lab.test_name }}{% endblock %}
 {% block page_title %}{{ lab.test_name }}{% endblock %}
-{% block page_sub %}Lab request detail and results entry{% endblock %}
+{% block page_sub %}{{ t('Lab request detail and results entry', 'تفاصيل طلب المختبر وإدخال النتائج') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('clinical.lab_list') }}" class="pf-btn pf-btn-secondary">← Back to Lab Requests</a>
+<a href="{{ url_for('clinical.lab_list') }}" class="pf-btn pf-btn-secondary">{{ t('← Back to Lab Requests', '← العودة إلى طلبات المختبر') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -77,7 +77,7 @@
 <!-- Request info card -->
 <div class="pf-card" style="margin-bottom:1.25rem">
   <div class="pf-card-header">
-    <span>🧪 Request Information</span>
+    <span>{{ t('🧪 Request Information', '🧪 بيانات الطلب') }}</span>
     <div style="display:flex;gap:0.5rem;align-items:center">
       <span class="priority-badge priority-{{ lab.priority }}">{{ lab.priority }}</span>
       <span class="status-badge status-{{ lab.status|replace(' ','-') }}">{{ lab.status }}</span>
@@ -86,44 +86,44 @@
   <div class="pf-card-body">
     <div class="lab-info-grid">
       <div class="lab-info-item">
-        <label>Test Name</label>
+        <label>{{ t('Test Name', 'اسم الفحص') }}</label>
         <div class="val">{{ lab.test_name }}</div>
       </div>
       {% if lab.test_code %}
       <div class="lab-info-item">
-        <label>Test Code</label>
+        <label>{{ t('Test Code', 'كود الفحص') }}</label>
         <div class="val">{{ lab.test_code }}</div>
       </div>
       {% endif %}
       <div class="lab-info-item">
-        <label>Patient</label>
+        <label>{{ t('Patient', 'المريض') }}</label>
         <div class="val">{{ lab.pet_name }}</div>
         <div style="font-size:0.8rem;color:var(--text-muted)">{{ lab.species }}</div>
       </div>
       <div class="lab-info-item">
-        <label>Owner</label>
+        <label>{{ t('Owner', 'المالك') }}</label>
         <div class="val">{{ lab.owner_name }}</div>
       </div>
       {% if lab.doctor_name %}
       <div class="lab-info-item">
-        <label>Requesting Doctor</label>
+        <label>{{ t('Requesting Doctor', 'الطبيب الطالب') }}</label>
         <div class="val">{{ lab.doctor_name }}</div>
       </div>
       {% endif %}
       {% if lab.sample_type %}
       <div class="lab-info-item">
-        <label>Sample Type</label>
+        <label>{{ t('Sample Type', 'نوع العينة') }}</label>
         <div class="val">{{ lab.sample_type }}</div>
       </div>
       {% endif %}
       <div class="lab-info-item">
-        <label>Requested</label>
+        <label>{{ t('Requested', 'تاريخ الطلب') }}</label>
         <div class="val">{{ lab.created_at[:16] }}</div>
       </div>
     </div>
     {% if lab.notes %}
     <div style="border-top:1px solid var(--border);padding-top:0.85rem;margin-top:0.25rem">
-      <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:0.35rem">NOTES</div>
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:0.35rem">{{ t('NOTES', 'ملاحظات') }}</div>
       <p style="margin:0;font-size:0.9rem;color:var(--text)">{{ lab.notes }}</p>
     </div>
     {% endif %}
@@ -141,8 +141,8 @@
     <div class="result-card {% if r.is_abnormal %}abnormal{% endif %}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem">
         <div>
-          <span style="font-weight:600;font-size:0.95rem">Result entered</span>
-          {% if r.is_abnormal %}<span class="result-abnormal-badge">⚠ ABNORMAL</span>{% endif %}
+          <span style="font-weight:600;font-size:0.95rem">{{ t('Result entered', 'أُدخلت النتيجة') }}</span>
+          {% if r.is_abnormal %}<span class="result-abnormal-badge">{{ t('⚠ ABNORMAL', '⚠ غير طبيعي') }}</span>{% endif %}
         </div>
         <div style="font-size:0.78rem;color:var(--text-muted)">
           {{ r.reviewed_by or '' }}{% if r.reviewed_at %} · {{ r.reviewed_at[:16] }}{% endif %}
@@ -150,7 +150,7 @@
       </div>
       {% if r.result_value is not none %}
       <div style="margin-bottom:0.4rem">
-        <strong>Value:</strong> {{ r.result_value }} {{ r.unit or '' }}
+        <strong>{{ t('Value:', 'القيمة:') }}</strong> {{ r.result_value }} {{ r.unit or '' }}
         {% if r.reference_range %} &nbsp;|&nbsp; <span style="color:var(--text-muted)">Ref: {{ r.reference_range }}</span>{% endif %}
       </div>
       {% endif %}
@@ -167,49 +167,49 @@
 {% if lab.status != 'Completed' %}
 <div class="pf-card">
   <div class="pf-card-header">
-    <span>✏️ Enter Results</span>
+    <span>{{ t('✏️ Enter Results', '✏️ إدخال النتائج') }}</span>
   </div>
   <div class="pf-card-body">
     <form method="post" action="{{ url_for('clinical.lab_results', lab_id=lab.id) }}">
       <div class="pf-form-grid">
 
         <div class="pf-field" style="grid-column:1/-1">
-          <label class="pf-label" for="result_text">Result Text / Report</label>
+          <label class="pf-label" for="result_text">{{ t('Result Text / Report', 'نص النتيجة / التقرير') }}</label>
           <textarea id="result_text" name="result_text" class="pf-input" rows="5"
-                    placeholder="Enter full result report, findings, or interpretation…"></textarea>
+                    placeholder="{{ t('Enter full result report, findings, or interpretation…', 'أدخل تقرير النتيجة الكامل أو النتائج أو التفسير…') }}"></textarea>
         </div>
 
         <div class="pf-field">
-          <label class="pf-label" for="result_value">Numeric Value</label>
+          <label class="pf-label" for="result_value">{{ t('Numeric Value', 'القيمة الرقمية') }}</label>
           <input type="number" step="any" id="result_value" name="result_value"
                  class="pf-input" placeholder="e.g. 6.5">
         </div>
 
         <div class="pf-field">
-          <label class="pf-label" for="unit">Unit</label>
+          <label class="pf-label" for="unit">{{ t('Unit', 'الوحدة') }}</label>
           <input type="text" id="unit" name="unit" class="pf-input"
-                 placeholder="e.g. g/dL, cells/µL">
+                 placeholder="{{ t('e.g. g/dL, cells/µL', 'مثال: g/dL، cells/µL') }}">
         </div>
 
         <div class="pf-field">
-          <label class="pf-label" for="reference_range">Reference Range</label>
+          <label class="pf-label" for="reference_range">{{ t('Reference Range', 'المدى المرجعي') }}</label>
           <input type="text" id="reference_range" name="reference_range"
-                 class="pf-input" placeholder="e.g. 4.0–5.5 g/dL">
+                 class="pf-input" placeholder="{{ t('e.g. 4.0–5.5 g/dL', 'مثال: 4.0–5.5 g/dL') }}">
         </div>
 
         <div class="pf-field" style="display:flex;align-items:center;gap:0.65rem;padding-top:1.5rem">
           <input type="checkbox" id="is_abnormal" name="is_abnormal" value="1"
                  style="width:18px;height:18px;accent-color:var(--danger)">
           <label for="is_abnormal" style="font-weight:600;color:var(--danger);cursor:pointer">
-            Mark as Abnormal
+            {{ t('Mark as Abnormal', 'تعليم كغير طبيعي') }}
           </label>
         </div>
 
       </div>
 
       <div style="margin-top:1.5rem;display:flex;gap:0.75rem">
-        <button type="submit" class="pf-btn pf-btn-primary">Save Results &amp; Mark Complete</button>
-        <a href="{{ url_for('clinical.lab_list') }}" class="pf-btn pf-btn-secondary">Cancel</a>
+        <button type="submit" class="pf-btn pf-btn-primary">{{ t('Save Results &amp; Mark Complete', 'حفظ النتائج وإنهاء الطلب') }}</button>
+        <a href="{{ url_for('clinical.lab_list') }}" class="pf-btn pf-btn-secondary">{{ t('Cancel', 'إلغاء') }}</a>
       </div>
     </form>
   </div>
@@ -217,7 +217,7 @@
 {% else %}
 <div class="pf-card" style="border-left:4px solid #22c55e">
   <div class="pf-card-body" style="padding:1rem 1.25rem;color:#166534;font-weight:600">
-    ✅ This lab request is complete. Results have been recorded above.
+    {{ t('✅ This lab request is complete. Results have been recorded above.', '✅ اكتمل طلب المختبر. سُجّلت النتائج أعلاه.') }}
   </div>
 </div>
 {% endif %}

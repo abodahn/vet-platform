@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}My Patients{% endblock %}
-{% block page_title %}My Patients{% endblock %}
+{% block title %}{{ t('My Patients', 'مرضاي') }}{% endblock %}
+{% block page_title %}{{ t('My Patients', 'مرضاي') }}{% endblock %}
 {% block page_sub %}All patients seen by Dr. {{ doctor_name }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('doctor.workspace') }}" class="pf-btn pf-btn-secondary">← Workspace</a>
+<a href="{{ url_for('doctor.workspace') }}" class="pf-btn pf-btn-secondary">{{ t('← Workspace', '← مساحة العمل') }}</a>
 {% endblock %}
 
 {% block content %}
 <div style="margin-bottom:1.25rem">
-  <input type="text" id="searchInput" class="pf-input" style="max-width:380px" placeholder="🔍 Search pet name or owner..." oninput="filterCards()">
+  <input type="text" id="searchInput" class="pf-input" style="max-width:380px" placeholder="{{ t('🔍 Search pet name or owner...', '🔍 ابحث باسم الحيوان أو المالك...') }}" oninput="filterCards()">
   <span style="color:var(--pf-muted);font-size:.85rem;margin-left:.75rem">{{ patients|length }} patient(s) found</span>
 </div>
 
@@ -36,16 +36,16 @@
       <div style="font-size:.78rem;color:var(--pf-muted)">Last visit: {{ (p.last_visit or '')[:10] }}</div>
       {% endif %}
       <div style="margin-top:1rem;display:flex;gap:.5rem">
-        <a href="{{ url_for('visits.visits_list') }}" class="pf-btn pf-btn-primary" style="flex:1;text-align:center;font-size:.8rem;padding:5px 8px">📋 Visits</a>
-        <a href="{{ url_for('crm.owner_detail', owner_id=p.id) }}" class="pf-btn pf-btn-ghost" style="font-size:.8rem;padding:5px 8px">Profile</a>
+        <a href="{{ url_for('visits.visits_list') }}" class="pf-btn pf-btn-primary" style="flex:1;text-align:center;font-size:.8rem;padding:5px 8px">{{ t('📋 Visits', '📋 الزيارات') }}</a>
+        <a href="{{ url_for('crm.owner_detail', owner_id=p.id) }}" class="pf-btn pf-btn-ghost" style="font-size:.8rem;padding:5px 8px">{{ t('Profile', 'الملف') }}</a>
       </div>
     </div>
   </div>
   {% else %}
   <div style="grid-column:span 4;text-align:center;padding:3rem;color:var(--pf-muted)">
     <div style="font-size:2rem;margin-bottom:.5rem">🐾</div>
-    <strong>No patients found yet.</strong><br>
-    <small>Patients appear here after you complete visits.</small>
+    <strong>{{ t('No patients found yet.', 'لا يوجد مرضى بعد.') }}</strong><br>
+    <small>{{ t('Patients appear here after you complete visits.', 'يظهر المرضى هنا بعد إتمام الزيارات.') }}</small>
   </div>
   {% endfor %}
 </div>

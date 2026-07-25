@@ -5,11 +5,11 @@
 {% block page_sub %}Supplier profile and purchase history{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('procurement.suppliers_list') }}" class="pf-btn pf-btn-ghost">← Suppliers</a>
+  <a href="{{ url_for('procurement.suppliers_list') }}" class="pf-btn pf-btn-ghost">{{ t('← Suppliers', '← الموردون') }}</a>
   {% if supplier %}
-  <a href="{{ url_for('procurement.supplier_edit', supplier_id=supplier['id']) }}" class="pf-btn pf-btn-secondary">✏️ Edit Supplier</a>
+  <a href="{{ url_for('procurement.supplier_edit', supplier_id=supplier['id']) }}" class="pf-btn pf-btn-secondary">{{ t('✏️ Edit Supplier', '✏️ تعديل المورد') }}</a>
   {% endif %}
-  <a href="{{ url_for('procurement.order_new_form') }}" class="pf-btn pf-btn-primary">+ New Order</a>
+  <a href="{{ url_for('procurement.order_new_form') }}" class="pf-btn pf-btn-primary">{{ t('+ New Order', '+ طلب جديد') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -19,44 +19,44 @@
 <!-- Supplier Info Card -->
 <div class="pf-card" style="margin-bottom:1.5rem;">
   <div class="pf-card-header">
-    <div class="pf-card-title">Supplier Information</div>
+    <div class="pf-card-title">{{ t('Supplier Information', 'بيانات المورد') }}</div>
     {% if supplier['is_active'] %}
-      <span class="pf-badge success">Active</span>
+      <span class="pf-badge success">{{ t('Active', 'نشط') }}</span>
     {% else %}
-      <span class="pf-badge error">Inactive</span>
+      <span class="pf-badge error">{{ t('Inactive', 'غير نشط') }}</span>
     {% endif %}
   </div>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;padding:.5rem 0;">
     <div>
-      <div class="pf-label">Contact Person</div>
+      <div class="pf-label">{{ t('Contact Person', 'مسؤول التواصل') }}</div>
       <div style="font-weight:500;">{{ supplier['contact_person'] or '—' }}</div>
     </div>
     <div>
-      <div class="pf-label">Phone</div>
+      <div class="pf-label">{{ t('Phone', 'الهاتف') }}</div>
       <div style="font-weight:500;">{{ supplier['phone'] or '—' }}</div>
     </div>
     <div>
-      <div class="pf-label">Email</div>
+      <div class="pf-label">{{ t('Email', 'البريد الإلكتروني') }}</div>
       <div style="font-weight:500;">{{ supplier['email'] or '—' }}</div>
     </div>
     <div>
-      <div class="pf-label">Payment Terms</div>
+      <div class="pf-label">{{ t('Payment Terms', 'شروط الدفع') }}</div>
       <div style="font-weight:500;">{{ supplier['payment_terms'] or '—' }}</div>
     </div>
     <div>
-      <div class="pf-label">Address</div>
+      <div class="pf-label">{{ t('Address', 'العنوان') }}</div>
       <div style="font-weight:500;">{{ supplier['address'] or '—' }}</div>
     </div>
     <div>
-      <div class="pf-label">Member Since</div>
+      <div class="pf-label">{{ t('Member Since', 'مورد منذ') }}</div>
       <div style="font-weight:500;">{{ supplier['created_at'][:10] if supplier['created_at'] else '—' }}</div>
     </div>
   </div>
 
   {% if supplier['notes'] %}
   <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--pf-border);">
-    <div class="pf-label">Notes</div>
+    <div class="pf-label">{{ t('Notes', 'ملاحظات') }}</div>
     <div style="margin-top:.25rem;color:var(--pf-text-muted);">{{ supplier['notes'] }}</div>
   </div>
   {% endif %}
@@ -66,7 +66,7 @@
 <div class="pf-card">
   <div class="pf-card-header">
     <div class="pf-card-title">Purchase Orders ({{ pos|length }})</div>
-    <a href="{{ url_for('procurement.order_new_form') }}" class="pf-btn pf-btn-primary" style="font-size:.85rem;">+ New Order</a>
+    <a href="{{ url_for('procurement.order_new_form') }}" class="pf-btn pf-btn-primary" style="font-size:.85rem;">{{ t('+ New Order', '+ طلب جديد') }}</a>
   </div>
 
   {% if pos %}
@@ -74,12 +74,12 @@
     <table class="pf-table">
       <thead>
         <tr>
-          <th>PO #</th>
-          <th>Order Date</th>
-          <th>Expected Date</th>
-          <th>Status</th>
-          <th>Total (EGP)</th>
-          <th>Notes</th>
+          <th>{{ t('PO #', 'أمر شراء') }}</th>
+          <th>{{ t('Order Date', 'تاريخ الطلب') }}</th>
+          <th>{{ t('Expected Date', 'التاريخ المتوقع') }}</th>
+          <th>{{ t('Status', 'الحالة') }}</th>
+          <th>{{ t('Total (EGP)', 'الإجمالي (جنيه)') }}</th>
+          <th>{{ t('Notes', 'ملاحظات') }}</th>
           <th></th>
         </tr>
       </thead>
@@ -91,20 +91,20 @@
           <td>{{ po['expected_date'] or '—' }}</td>
           <td>
             {% if po['status'] == 'Received' %}
-              <span class="pf-badge success">Received</span>
+              <span class="pf-badge success">{{ t('Received', 'مستلم') }}</span>
             {% elif po['status'] == 'Sent' %}
-              <span class="pf-badge warning">Sent</span>
+              <span class="pf-badge warning">{{ t('Sent', 'مُرسل') }}</span>
             {% elif po['status'] == 'Cancelled' %}
-              <span class="pf-badge error">Cancelled</span>
+              <span class="pf-badge error">{{ t('Cancelled', 'ملغى') }}</span>
             {% else %}
-              <span class="pf-badge">Draft</span>
+              <span class="pf-badge">{{ t('Draft', 'مسودة') }}</span>
             {% endif %}
           </td>
           <td>{{ "%.2f"|format(po['total_amount'] or 0) }}</td>
           <td style="color:var(--pf-text-muted);font-size:.85rem;">{{ po['notes'] or '—' }}</td>
           <td>
             <a href="{{ url_for('procurement.order_detail', order_id=po['id']) }}"
-               class="pf-btn pf-btn-ghost" style="font-size:.8rem;">View</a>
+               class="pf-btn pf-btn-ghost" style="font-size:.8rem;">{{ t('View', 'عرض') }}</a>
           </td>
         </tr>
         {% endfor %}
@@ -113,7 +113,7 @@
   </div>
   {% else %}
   <div style="padding:2rem;text-align:center;color:var(--pf-text-muted);">
-    No purchase orders for this supplier yet.
+    {{ t('No purchase orders for this supplier yet.', 'لا توجد أوامر شراء لهذا المورد بعد.') }}
   </div>
   {% endif %}
 </div>

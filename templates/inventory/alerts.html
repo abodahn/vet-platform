@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Stock Alerts{% endblock %}
-{% block page_title %}Stock Alerts{% endblock %}
-{% block page_sub %}Low stock and expiry warnings{% endblock %}
+{% block title %}{{ t('Stock Alerts', 'تنبيهات المخزون') }}{% endblock %}
+{% block page_title %}{{ t('Stock Alerts', 'تنبيهات المخزون') }}{% endblock %}
+{% block page_sub %}{{ t('Low stock and expiry warnings', 'تنبيهات نقص المخزون وقرب الانتهاء') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('inventory.dashboard') }}" class="btn btn-secondary">← Dashboard</a>
-<a href="{{ url_for('inventory.items_list') }}" class="btn btn-primary">View All Items</a>
+<a href="{{ url_for('inventory.dashboard') }}" class="btn btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
+<a href="{{ url_for('inventory.items_list') }}" class="btn btn-primary">{{ t('View All Items', 'عرض كل الأصناف') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -44,12 +44,12 @@
       <div class="alert-meta">{{ item.category_name or 'Uncategorized' }} · {{ item.unit or 'unit' }}</div>
       <div class="stock-bar-wrap"><div class="stock-bar danger" style="width:{{ pct }}%"></div></div>
       <div class="stock-nums">
-        <span>Current: <strong>{{ item.current_stock|int }}</strong></span>
+        <span>{{ t('Current:', 'الحالي:') }} <strong>{{ item.current_stock|int }}</strong></span>
         <span>Reorder at: {{ item.reorder_level|int }}</span>
       </div>
       <div style="margin-top:12px;">
         <a href="{{ url_for('inventory.item_detail', item_id=item.id) }}"
-           style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">View Item →</a>
+           style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">{{ t('View Item →', 'عرض الصنف ←') }}</a>
       </div>
     </div>
     {% endfor %}
@@ -57,7 +57,7 @@
   {% else %}
   <div class="empty-state">
     <div class="empty-state-icon">✅</div>
-    <div>No low stock items. All inventory levels are healthy.</div>
+    <div>{{ t('No low stock items. All inventory levels are healthy.', 'لا توجد أصناف منخفضة. مستويات المخزون جيدة.') }}</div>
   </div>
   {% endif %}
 </div>
@@ -69,12 +69,12 @@
     <table style="width:100%; border-collapse:collapse;">
       <thead>
         <tr style="background:var(--cl-primary); color:#fff;">
-          <th style="padding:12px 16px; text-align:left; font-size:13px;">Item</th>
-          <th style="padding:12px 16px; text-align:left; font-size:13px;">Batch</th>
-          <th style="padding:12px 16px; text-align:left; font-size:13px;">Expiry Date</th>
-          <th style="padding:12px 16px; text-align:right; font-size:13px;">Qty</th>
-          <th style="padding:12px 16px; text-align:center; font-size:13px;">Status</th>
-          <th style="padding:12px 16px; text-align:center; font-size:13px;">Action</th>
+          <th style="padding:12px 16px; text-align:left; font-size:13px;">{{ t('Item', 'الصنف') }}</th>
+          <th style="padding:12px 16px; text-align:left; font-size:13px;">{{ t('Batch', 'الدفعة') }}</th>
+          <th style="padding:12px 16px; text-align:left; font-size:13px;">{{ t('Expiry Date', 'تاريخ الانتهاء') }}</th>
+          <th style="padding:12px 16px; text-align:right; font-size:13px;">{{ t('Qty', 'الكمية') }}</th>
+          <th style="padding:12px 16px; text-align:center; font-size:13px;">{{ t('Status', 'الحالة') }}</th>
+          <th style="padding:12px 16px; text-align:center; font-size:13px;">{{ t('Action', 'الإجراء') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -90,16 +90,16 @@
           <td style="padding:12px 16px; text-align:right; font-weight:600;">{{ b.quantity|int }}</td>
           <td style="padding:12px 16px; text-align:center;">
             {% if b.expiry_date and b.expiry_date <= today %}
-              <span class="badge-exp badge-expired">Expired</span>
+              <span class="badge-exp badge-expired">{{ t('Expired', 'منتهية') }}</span>
             {% elif b in expiry_7 %}
-              <span class="badge-exp badge-critical">Critical</span>
+              <span class="badge-exp badge-critical">{{ t('Critical', 'حرج') }}</span>
             {% else %}
-              <span class="badge-exp badge-warning">Warning</span>
+              <span class="badge-exp badge-warning">{{ t('Warning', 'تحذير') }}</span>
             {% endif %}
           </td>
           <td style="padding:12px 16px; text-align:center;">
             <a href="{{ url_for('inventory.item_detail', item_id=b.item_id) }}"
-               style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">View →</a>
+               style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">{{ t('View →', 'عرض ←') }}</a>
           </td>
         </tr>
         {% endfor %}
@@ -109,7 +109,7 @@
   {% else %}
   <div class="empty-state">
     <div class="empty-state-icon">✅</div>
-    <div>No items expiring within the next 30 days.</div>
+    <div>{{ t('No items expiring within the next 30 days.', 'لا توجد أصناف تنتهي خلال 30 يوماً.') }}</div>
   </div>
   {% endif %}
 </div>

@@ -4,9 +4,9 @@
 {% block page_sub %}{{ appt.appt_date }} · {{ appt.appt_start }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('appointments.schedule', date=appt.appt_date) }}" class="pf-btn pf-btn-secondary">← Schedule</a>
+<a href="{{ url_for('appointments.schedule', date=appt.appt_date) }}" class="pf-btn pf-btn-secondary">{{ t('← Schedule', '← الجدول') }}</a>
 {% if appt.status not in ('Completed','Cancelled') %}
-<a href="{{ url_for('appointments.appt_edit', appt_id=appt.id) }}" class="pf-btn pf-btn-primary">✏️ Reschedule</a>
+<a href="{{ url_for('appointments.appt_edit', appt_id=appt.id) }}" class="pf-btn pf-btn-primary">{{ t('✏️ Reschedule', '✏️ إعادة جدولة') }}</a>
 {% endif %}
 {% endblock %}
 
@@ -40,7 +40,7 @@
   <!-- Left: Appointment details -->
   <div>
     <div class="card priority-{{ appt.priority or 'Normal' }}" style="margin-bottom:20px">
-      <div class="card-header">Appointment Details</div>
+      <div class="card-header">{{ t('Appointment Details', 'تفاصيل الموعد') }}</div>
 
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
         {% set sc = {'Scheduled':'badge-blue','Confirmed':'badge-teal','Checked-in':'badge-purple','CheckedIn':'badge-purple','Completed':'badge-green','Cancelled':'badge-red','No-Show':'badge-gray','NoShow':'badge-gray'} %}
@@ -54,31 +54,31 @@
         <!-- No-Show Risk Badge -->
         {% if appt.status in ('Scheduled','Confirmed') and appt.owner_id %}
         <span id="riskBadge" style="display:none;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer"
-              onclick="toggleRiskDetail()" title="Click to see details">Loading risk...</span>
+              onclick="toggleRiskDetail()" title="{{ t('Click to see details', 'اضغط لعرض التفاصيل') }}">{{ t('Loading risk...', 'جارٍ حساب المخاطرة...') }}</span>
         {% endif %}
       </div>
 
-      <div class="info-row"><span class="info-label">Date</span><span class="info-val">{{ appt.appt_date }}</span></div>
-      <div class="info-row"><span class="info-label">Time</span><span class="info-val">{{ appt.appt_start }}{% if appt.appt_end %} – {{ appt.appt_end }}{% endif %} ({{ appt.duration_min or 30 }} min)</span></div>
-      <div class="info-row"><span class="info-label">Doctor</span><span class="info-val">{{ appt.doctor_name or '—' }}</span></div>
-      <div class="info-row"><span class="info-label">Channel</span><span class="info-val">{{ appt.channel or 'Walk-in' }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Date', 'التاريخ') }}</span><span class="info-val">{{ appt.appt_date }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Time', 'الوقت') }}</span><span class="info-val">{{ appt.appt_start }}{% if appt.appt_end %} – {{ appt.appt_end }}{% endif %} ({{ appt.duration_min or 30 }} min)</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Doctor', 'الطبيب') }}</span><span class="info-val">{{ appt.doctor_name or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Channel', 'القناة') }}</span><span class="info-val">{{ appt.channel or 'Walk-in' }}</span></div>
       {% if appt.reason %}
-      <div class="info-row"><span class="info-label">Reason</span><span class="info-val">{{ appt.reason }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Reason', 'السبب') }}</span><span class="info-val">{{ appt.reason }}</span></div>
       {% endif %}
       {% if appt.symptoms %}
-      <div class="info-row"><span class="info-label">Symptoms</span><span class="info-val">{{ appt.symptoms }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Symptoms', 'الأعراض') }}</span><span class="info-val">{{ appt.symptoms }}</span></div>
       {% endif %}
       {% if appt.notes %}
-      <div class="info-row"><span class="info-label">Notes</span><span class="info-val">{{ appt.notes }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Notes', 'ملاحظات') }}</span><span class="info-val">{{ appt.notes }}</span></div>
       {% endif %}
       {% if appt.checked_in_at %}
-      <div class="info-row"><span class="info-label">Checked In</span><span class="info-val">{{ appt.checked_in_at }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Checked In', 'تم الوصول') }}</span><span class="info-val">{{ appt.checked_in_at }}</span></div>
       {% endif %}
     </div>
 
     <!-- Status Update -->
     <div class="card">
-      <div class="card-header">Update Status</div>
+      <div class="card-header">{{ t('Update Status', 'تحديث الحالة') }}</div>
       <form method="post" action="{{ url_for('appointments.appt_status', appt_id=appt.id) }}">
         <input type="hidden" name="next" value="{{ request.url }}">
         <div class="status-btns">
@@ -97,7 +97,7 @@
   <div>
     {% if owner %}
     <div class="card" style="margin-bottom:20px">
-      <div class="card-header">Owner</div>
+      <div class="card-header">{{ t('Owner', 'المالك') }}</div>
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
         <div style="width:44px;height:44px;border-radius:50%;background:var(--cl-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;">
           {{ (owner.full_name or 'U')[:2]|upper }}
@@ -107,29 +107,29 @@
           <div style="font-size:13px;color:var(--cl-muted);">{{ owner.phone or '' }}</div>
         </div>
       </div>
-      <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn btn-secondary" style="width:100%;text-align:center;">View Profile</a>
+      <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn btn-secondary" style="width:100%;text-align:center;">{{ t('View Profile', 'عرض الملف') }}</a>
     </div>
     {% endif %}
 
     {% if pet %}
     <div class="card" style="margin-bottom:20px">
-      <div class="card-header">Patient</div>
+      <div class="card-header">{{ t('Patient', 'المريض') }}</div>
       <div style="font-size:28px; text-align:center; margin-bottom:8px;">
         {% if pet.species == 'Dog' %}🐕{% elif pet.species == 'Cat' %}🐈{% elif pet.species == 'Bird' %}🐦{% elif pet.species == 'Rabbit' %}🐰{% else %}🐾{% endif %}
       </div>
-      <div class="info-row"><span class="info-label">Name</span><span class="info-val">{{ pet.pet_name }}</span></div>
-      <div class="info-row"><span class="info-label">Species</span><span class="info-val">{{ pet.species or '—' }}</span></div>
-      <div class="info-row"><span class="info-label">Breed</span><span class="info-val">{{ pet.breed or '—' }}</span></div>
-      <div class="info-row"><span class="info-label">Sex</span><span class="info-val">{{ pet.sex or '—' }}</span></div>
-      <a href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}" class="btn btn-secondary" style="width:100%;text-align:center;margin-top:8px;">View Medical Record</a>
+      <div class="info-row"><span class="info-label">{{ t('Name', 'الاسم') }}</span><span class="info-val">{{ pet.pet_name }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Species', 'النوع') }}</span><span class="info-val">{{ pet.species or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Breed', 'السلالة') }}</span><span class="info-val">{{ pet.breed or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Sex', 'الجنس') }}</span><span class="info-val">{{ pet.sex or '—' }}</span></div>
+      <a href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}" class="btn btn-secondary" style="width:100%;text-align:center;margin-top:8px;">{{ t('View Medical Record', 'عرض السجل الطبي') }}</a>
     </div>
     {% endif %}
 
     <div class="card">
-      <div class="card-header">Quick Actions</div>
+      <div class="card-header">{{ t('Quick Actions', 'إجراءات سريعة') }}</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
-        <a href="{{ url_for('appointments.appt_new') }}?owner_id={{ appt.owner_id }}&pet_id={{ appt.pet_id }}&date={{ appt.appt_date }}" class="btn btn-primary" style="text-align:center;">New Appointment</a>
-        <a href="{{ url_for('appointments.schedule', date=appt.appt_date) }}" class="btn btn-secondary" style="text-align:center;">Back to Schedule</a>
+        <a href="{{ url_for('appointments.appt_new') }}?owner_id={{ appt.owner_id }}&pet_id={{ appt.pet_id }}&date={{ appt.appt_date }}" class="btn btn-primary" style="text-align:center;">{{ t('New Appointment', 'موعد جديد') }}</a>
+        <a href="{{ url_for('appointments.schedule', date=appt.appt_date) }}" class="btn btn-secondary" style="text-align:center;">{{ t('Back to Schedule', 'العودة إلى الجدول') }}</a>
       </div>
     </div>
   </div>
@@ -140,11 +140,11 @@
 <div id="riskDetail" style="display:none;position:fixed;bottom:24px;right:24px;
      background:#0f172a;border:1px solid rgba(139,92,246,.4);border-radius:12px;
      padding:16px 20px;max-width:320px;z-index:999;box-shadow:0 8px 30px rgba(0,0,0,.4)">
-  <div style="color:#e2e8f0;font-weight:700;font-size:.9rem;margin-bottom:8px">📊 No-Show Risk Factors</div>
+  <div style="color:#e2e8f0;font-weight:700;font-size:.9rem;margin-bottom:8px">{{ t('📊 No-Show Risk Factors', '📊 عوامل خطر عدم الحضور') }}</div>
   <div id="riskReasons" style="font-size:.8rem;color:#94a3b8;line-height:1.7"></div>
   <button onclick="document.getElementById('riskDetail').style.display='none'"
           style="margin-top:10px;background:rgba(255,255,255,.08);border:none;color:#94a3b8;
-                 border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.75rem">Dismiss</button>
+                 border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.75rem">{{ t('Dismiss', 'تجاهل') }}</button>
 </div>
 
 {% block scripts %}

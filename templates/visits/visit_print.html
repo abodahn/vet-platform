@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_lang or 'en' }}"
+      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -62,14 +63,14 @@
   <div class="section-title">Patient Information</div>
   <div class="info-grid">
     <div class="info-item"><label>Pet Name</label><span>{{ visit.pet_name }}</span></div>
-    <div class="info-item"><label>Species</label><span>{{ visit.species }}</span></div>
-    <div class="info-item"><label>Breed</label><span>{{ visit.breed or '—' }}</span></div>
-    <div class="info-item"><label>Sex</label><span>{{ visit.sex or '—' }}</span></div>
+    <div class="info-item"><label>{{ t('Species', 'النوع') }}</label><span>{{ visit.species }}</span></div>
+    <div class="info-item"><label>{{ t('Breed', 'السلالة') }}</label><span>{{ visit.breed or '—' }}</span></div>
+    <div class="info-item"><label>{{ t('Sex', 'الجنس') }}</label><span>{{ visit.sex or '—' }}</span></div>
     <div class="info-item"><label>Date of Birth</label><span>{{ visit.pet_dob or '—' }}</span></div>
-    <div class="info-item"><label>Owner</label><span>{{ visit.owner_name }}</span></div>
-    <div class="info-item"><label>Phone</label><span>{{ visit.owner_phone }}</span></div>
+    <div class="info-item"><label>{{ t('Owner', 'المالك') }}</label><span>{{ visit.owner_name }}</span></div>
+    <div class="info-item"><label>{{ t('Phone', 'الهاتف') }}</label><span>{{ visit.owner_phone }}</span></div>
     <div class="info-item"><label>Visit Type</label><span>{{ visit.visit_type }}</span></div>
-    <div class="info-item"><label>Doctor</label><span>{{ visit.doctor_name or '—' }}</span></div>
+    <div class="info-item"><label>{{ t('Doctor', 'الطبيب') }}</label><span>{{ visit.doctor_name or '—' }}</span></div>
   </div>
 </div>
 
@@ -79,13 +80,13 @@
   <div class="info-grid">
     <div class="info-item"><label>Weight</label><span>{{ visit.weight_kg or '—' }} {% if visit.weight_kg %}kg{% endif %}</span></div>
     <div class="info-item"><label>Temperature</label><span>{{ visit.temp_c or '—' }} {% if visit.temp_c %}°C{% endif %}</span></div>
-    <div class="info-item"><label>Heart Rate</label><span>{{ visit.heart_rate or '—' }} {% if visit.heart_rate %}bpm{% endif %}</span></div>
+    <div class="info-item"><label>{{ t('Heart Rate', 'معدل النبض') }}</label><span>{{ visit.heart_rate or '—' }} {% if visit.heart_rate %}bpm{% endif %}</span></div>
   </div>
   {% if visit.chief_complaint %}
-  <div style="margin-top:10px"><label style="font-size:10px;color:#888;text-transform:uppercase">Chief Complaint</label><div style="margin-top:3px;font-weight:600">{{ visit.chief_complaint }}</div></div>
+  <div style="margin-top:10px"><label style="font-size:10px;color:#888;text-transform:uppercase">{{ t('Chief Complaint', 'الشكوى الرئيسية') }}</label><div style="margin-top:3px;font-weight:600">{{ visit.chief_complaint }}</div></div>
   {% endif %}
   {% if visit.symptoms %}
-  <div style="margin-top:8px"><label style="font-size:10px;color:#888;text-transform:uppercase">Symptoms</label><div style="margin-top:3px">{{ visit.symptoms }}</div></div>
+  <div style="margin-top:8px"><label style="font-size:10px;color:#888;text-transform:uppercase">{{ t('Symptoms', 'الأعراض') }}</label><div style="margin-top:3px">{{ visit.symptoms }}</div></div>
   {% endif %}
 </div>
 
@@ -95,7 +96,7 @@
   <div class="section-title">Diagnoses</div>
   <table>
     <thead>
-      <tr><th>#</th><th>Diagnosis</th><th>Severity</th><th>Notes</th></tr>
+      <tr><th>#</th><th>{{ t('Diagnosis', 'التشخيص') }}</th><th>Severity</th><th>{{ t('Notes', 'ملاحظات') }}</th></tr>
     </thead>
     <tbody>
       {% for d in diagnoses %}
@@ -116,11 +117,11 @@
 <!-- Treatment Plan -->
 {% if treatment %}
 <div class="section">
-  <div class="section-title">Treatment Plan</div>
+  <div class="section-title">{{ t('Treatment Plan', 'خطة العلاج') }}</div>
   <div class="treatment-box">
-    {% if treatment.plan_text %}<div style="margin-bottom:6px"><strong>Plan:</strong> {{ treatment.plan_text }}</div>{% endif %}
+    {% if treatment.plan_text %}<div style="margin-bottom:6px"><strong>{{ t('Plan:', 'الخطة:') }}</strong> {{ treatment.plan_text }}</div>{% endif %}
     {% if treatment.goals %}<div style="margin-bottom:6px"><strong>Goals:</strong> {{ treatment.goals }}</div>{% endif %}
-    {% if treatment.duration %}<div style="margin-bottom:6px"><strong>Duration:</strong> {{ treatment.duration }}</div>{% endif %}
+    {% if treatment.duration %}<div style="margin-bottom:6px"><strong>{{ t('Duration:', 'المدة:') }}</strong> {{ treatment.duration }}</div>{% endif %}
     {% if treatment.followup_in %}<div><strong>Follow-up:</strong> {{ treatment.followup_in }} {{ treatment.followup_unit or 'days' }}</div>{% endif %}
   </div>
 </div>
@@ -134,7 +135,7 @@
   {% if items %}
   <table>
     <thead>
-      <tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Duration</th><th>Route</th><th>Qty</th><th>Instructions</th></tr>
+      <tr><th>{{ t('Medication', 'دواء') }}</th><th>Dosage</th><th>{{ t('Frequency', 'التكرار') }}</th><th>{{ t('Duration', 'المدة') }}</th><th>{{ t('Route', 'طريقة الإعطاء') }}</th><th>{{ t('Qty', 'الكمية') }}</th><th>{{ t('Instructions', 'التعليمات') }}</th></tr>
     </thead>
     <tbody>
       {% for item in items %}

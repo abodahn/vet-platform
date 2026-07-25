@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}HR Dashboard{% endblock %}
-{% block page_title %}HR Dashboard{% endblock %}
-{% block page_sub %}People, attendance, payroll & performance overview{% endblock %}
+{% block title %}{{ t('HR Dashboard','لوحة الموارد البشرية') }}{% endblock %}
+{% block page_title %}{{ t('HR Dashboard','لوحة الموارد البشرية') }}{% endblock %}
+{% block page_sub %}{{ t('People, attendance, payroll & performance overview','نظرة عامة على الموظفين والحضور والرواتب والأداء') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.staff_new') }}" class="pf-btn pf-btn-primary">+ New Staff</a>
-<a href="{{ url_for('hr.hr_attendance') }}" class="pf-btn pf-btn-secondary">Attendance</a>
-<a href="{{ url_for('hr.roster') }}" class="pf-btn pf-btn-secondary">Weekly Roster</a>
-<a href="{{ url_for('hr.overtime_list') }}" class="pf-btn pf-btn-secondary">Overtime</a>
+<a href="{{ url_for('hr.staff_new') }}" class="pf-btn pf-btn-primary">+ {{ t('New Staff','موظف جديد') }}</a>
+<a href="{{ url_for('hr.hr_attendance') }}" class="pf-btn pf-btn-secondary">{{ t('Attendance','الحضور') }}</a>
+<a href="{{ url_for('hr.roster') }}" class="pf-btn pf-btn-secondary">{{ t('Weekly Roster','جدول المناوبات الأسبوعي') }}</a>
+<a href="{{ url_for('hr.overtime_list') }}" class="pf-btn pf-btn-secondary">{{ t('Overtime','العمل الإضافي') }}</a>
 <a href="{{ url_for('hr.certifications_list') }}" class="pf-btn pf-btn-secondary">Certifications</a>
 <a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">Staff List</a>
 {% endblock %}
@@ -63,47 +63,47 @@
 {# ── KPI cards ──────────────────────────────────────────────────────────── #}
 <div class="hr-kpi-grid">
   <div class="kpi-card green">
-    <div class="kpi-lbl">Active Staff</div>
+    <div class="kpi-lbl">{{ t('Active Staff','الموظفون النشطون') }}</div>
     <div class="kpi-num" style="color:#16a34a">{{ total_staff }}</div>
-    <div class="kpi-sub">{{ total_inactive }} inactive</div>
+    <div class="kpi-sub">{{ total_inactive }} {{ t('inactive','غير نشط') }}</div>
   </div>
   <div class="kpi-card green">
-    <div class="kpi-lbl">Present Today</div>
+    <div class="kpi-lbl">{{ t('Present Today','الحاضرون اليوم') }}</div>
     <div class="kpi-num" style="color:#16a34a">{{ present_today }}</div>
-    <div class="kpi-sub">{{ late_today }} late</div>
+    <div class="kpi-sub">{{ late_today }} {{ t('late','متأخر') }}</div>
   </div>
   <div class="kpi-card amber">
-    <div class="kpi-lbl">On Leave</div>
+    <div class="kpi-lbl">{{ t('On Leave','في إجازة') }}</div>
     <div class="kpi-num" style="color:#d97706">{{ on_leave_today }}</div>
-    <div class="kpi-sub">today</div>
+    <div class="kpi-sub">{{ t('today','اليوم') }}</div>
   </div>
   <div class="kpi-card red">
-    <div class="kpi-lbl">Leave Requests</div>
+    <div class="kpi-lbl">{{ t('Leave Requests','طلبات الإجازة') }}</div>
     <div class="kpi-num" style="color:#dc2626">{{ pending_leaves }}</div>
-    <div class="kpi-sub">pending approval</div>
+    <div class="kpi-sub">{{ t('pending approval','بانتظار الاعتماد') }}</div>
   </div>
   <div class="kpi-card purple">
-    <div class="kpi-lbl">Reviews Pending</div>
+    <div class="kpi-lbl">{{ t('Reviews Pending','تقييمات معلقة') }}</div>
     <div class="kpi-num" style="color:#7c3aed">{{ pending_reviews }}</div>
-    <div class="kpi-sub">draft reviews</div>
+    <div class="kpi-sub">{{ t('draft reviews','تقييمات مسودة') }}</div>
   </div>
   <div class="kpi-card blue">
-    <div class="kpi-lbl">No Shift Assigned</div>
+    <div class="kpi-lbl">{{ t('No Shift Assigned','بدون مناوبة') }}</div>
     <div class="kpi-num" style="color:#1d4ed8">{{ unassigned_shifts }}</div>
-    <div class="kpi-sub">staff members</div>
+    <div class="kpi-sub">{{ t('staff members','موظف') }}</div>
   </div>
   {% if payroll_stats %}
   <div class="kpi-card teal">
-    <div class="kpi-lbl">Payroll This Month</div>
+    <div class="kpi-lbl">{{ t('Payroll This Month','رواتب هذا الشهر') }}</div>
     <div class="kpi-num" style="color:#0d9488;font-size:1.4rem">{{ "EGP {:,.0f}".format(payroll_stats.total_net or 0) }}</div>
-    <div class="kpi-sub">{{ payroll_stats.paid_cnt or 0 }}/{{ payroll_stats.tot or 0 }} paid</div>
+    <div class="kpi-sub">{{ payroll_stats.paid_cnt or 0 }}/{{ payroll_stats.tot or 0 }} {{ t('paid','مدفوع') }}</div>
   </div>
   {% endif %}
   {% if pending_overtime is defined and pending_overtime > 0 %}
   <div class="kpi-card amber">
-    <div class="kpi-lbl">Overtime Pending</div>
+    <div class="kpi-lbl">{{ t('Overtime Pending','عمل إضافي معلق') }}</div>
     <div class="kpi-num" style="color:#d97706">{{ pending_overtime }}</div>
-    <div class="kpi-sub">awaiting approval</div>
+    <div class="kpi-sub">{{ t('awaiting approval','بانتظار الاعتماد') }}</div>
   </div>
   {% endif %}
 </div>
@@ -112,21 +112,21 @@
 {% if pending_leaves > 0 %}
 <a href="{{ url_for('attendance.leaves_list', status='Pending') }}" style="text-decoration:none">
   <div class="alert-badge alert-warn">
-    ⚠ {{ pending_leaves }} leave request{{ 's' if pending_leaves != 1 }} awaiting approval — click to review
+    ⚠ {{ pending_leaves }} {{ t('leave request','طلب إجازة') }}{% if current_lang != 'ar' %}{{ 's' if pending_leaves != 1 }}{% endif %} {{ t('awaiting approval — click to review','بانتظار الاعتماد — اضغط للمراجعة') }}
   </div>
 </a>
 {% endif %}
 {% if unassigned_shifts > 0 %}
 <a href="{{ url_for('hr.staff_list') }}" style="text-decoration:none">
   <div class="alert-badge alert-info">
-    📅 {{ unassigned_shifts }} staff member{{ 's' if unassigned_shifts != 1 }} have no shift assigned
+    📅 {{ unassigned_shifts }} {{ t('staff member','موظف') }}{% if current_lang != 'ar' %}{{ 's' if unassigned_shifts != 1 }}{% endif %} {{ t('have no shift assigned','بدون مناوبة معينة') }}
   </div>
 </a>
 {% endif %}
 {% if pending_overtime is defined and pending_overtime > 0 %}
 <a href="{{ url_for('hr.overtime_list', status='Pending') }}" style="text-decoration:none">
   <div class="alert-badge alert-warn">
-    ⏱ {{ pending_overtime }} overtime entr{{ 'ies' if pending_overtime != 1 else 'y' }} awaiting approval — click to review
+    ⏱ {{ pending_overtime }} {{ t('overtime entr','سجل عمل إضافي') }}{% if current_lang != 'ar' %}{{ 'ies' if pending_overtime != 1 else 'y' }}{% endif %} {{ t('awaiting approval — click to review','بانتظار الاعتماد — اضغط للمراجعة') }}
   </div>
 </a>
 {% endif %}
@@ -135,7 +135,7 @@
 
   {# ── Headcount by Role ───────────────────────────────────────────────── #}
   <div class="hr-card">
-    <div class="hr-card-title">Headcount by Role</div>
+    <div class="hr-card-title">{{ t('Headcount by Role','عدد الموظفين حسب الدور') }}</div>
     {% if by_role %}
       {% set max_cnt = by_role[0].cnt %}
       {% set color_map = {
@@ -156,13 +156,13 @@
       </div>
       {% endfor %}
     {% else %}
-      <p style="color:var(--cl-muted);text-align:center;padding:20px 0">No staff yet.</p>
+      <p style="color:var(--cl-muted);text-align:center;padding:20px 0">{{ t('No staff yet.','لا يوجد موظفون بعد.') }}</p>
     {% endif %}
   </div>
 
   {# ── Contract Type Split ──────────────────────────────────────────────── #}
   <div class="hr-card">
-    <div class="hr-card-title">Contract Types</div>
+    <div class="hr-card-title">{{ t('Contract Types','أنواع العقود') }}</div>
     {% set contract_colors = {'Full-time':'#16a34a','Part-time':'#0891b2','Contract':'#d97706','Probation':'#dc2626','Intern':'#7c3aed'} %}
     {% if by_contract %}
       {% set max_ct = by_contract[0].cnt %}
@@ -170,7 +170,7 @@
       {% set pct = (c.cnt / max_ct * 100)|int if max_ct > 0 else 0 %}
       {% set cc = contract_colors.get(c.ctype, '#6b7280') %}
       <div class="role-bar-row">
-        <div class="role-bar-label" style="color:{{ cc }}">{{ c.ctype }}</div>
+        <div class="role-bar-label" style="color:{{ cc }}">{{ t(c.ctype, {'Full-time':'دوام كامل','Part-time':'دوام جزئي','Contract':'عقد','Probation':'تحت التجربة','Intern':'متدرب'}.get(c.ctype,'')) }}</div>
         <div class="role-bar-track">
           <div class="role-bar-fill" style="width:{{ pct }}%;background:{{ cc }}"></div>
         </div>
@@ -178,16 +178,16 @@
       </div>
       {% endfor %}
     {% else %}
-      <p style="color:var(--cl-muted);text-align:center;padding:20px 0">No data yet.</p>
+      <p style="color:var(--cl-muted);text-align:center;padding:20px 0">{{ t('No data yet.','لا توجد بيانات بعد.') }}</p>
     {% endif %}
 
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--cl-border)">
-      <div class="hr-card-title" style="margin-bottom:10px">Quick Links</div>
+      <div class="hr-card-title" style="margin-bottom:10px">{{ t('Quick Links','روابط سريعة') }}</div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-secondary" style="text-align:center">Attendance Dashboard</a>
-        <a href="{{ url_for('payroll.dashboard') }}" class="pf-btn pf-btn-secondary" style="text-align:center">Payroll Dashboard</a>
-        <a href="{{ url_for('attendance.shifts_list') }}" class="pf-btn pf-btn-secondary" style="text-align:center">Manage Shifts</a>
-        <a href="{{ url_for('hr.performance_list') }}" class="pf-btn pf-btn-secondary" style="text-align:center">Performance Reviews</a>
+        <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-secondary" style="text-align:center">{{ t('Attendance Dashboard','لوحة الحضور') }}</a>
+        <a href="{{ url_for('payroll.dashboard') }}" class="pf-btn pf-btn-secondary" style="text-align:center">{{ t('Payroll Dashboard','لوحة الرواتب') }}</a>
+        <a href="{{ url_for('attendance.shifts_list') }}" class="pf-btn pf-btn-secondary" style="text-align:center">{{ t('Manage Shifts','إدارة المناوبات') }}</a>
+        <a href="{{ url_for('hr.performance_list') }}" class="pf-btn pf-btn-secondary" style="text-align:center">{{ t('Performance Reviews','تقييمات الأداء') }}</a>
       </div>
     </div>
   </div>
@@ -197,7 +197,7 @@
 {# ── Recent Hires ────────────────────────────────────────────────────────── #}
 {% if recent_hires %}
 <div class="hr-card" style="margin-bottom:20px">
-  <div class="hr-card-title">Recent Hires (Last 90 Days)</div>
+  <div class="hr-card-title">{{ t('Recent Hires (Last 90 Days)','التعيينات الحديثة (آخر 90 يوماً)') }}</div>
   {% for h in recent_hires %}
   {% set rc = color_map.get(h.role, '#6b7280') %}
   <div class="hire-row">
@@ -210,7 +210,7 @@
     </div>
     <div style="text-align:right">
       <span style="font-size:0.8rem;background:#dcfce7;color:#166534;padding:2px 9px;border-radius:20px;font-weight:600">
-        Joined {{ h.hire_date or 'recently' }}
+        {{ t('Joined','التحق في') }} {{ h.hire_date or t('recently','مؤخراً') }}
       </span>
     </div>
   </div>
@@ -223,7 +223,7 @@
 
   {# Birthdays this month #}
   <div class="hr-card">
-    <div class="hr-card-title">🎂 Birthdays This Month</div>
+    <div class="hr-card-title">🎂 {{ t('Birthdays This Month','أعياد الميلاد هذا الشهر') }}</div>
     {% if birthdays_this_month %}
       {% for b in birthdays_this_month %}
       {% set rc = color_map.get(b.role, '#6b7280') %}
@@ -236,18 +236,18 @@
           <div class="hire-meta">{{ b.role.replace('_',' ').title() }}</div>
         </div>
         <span style="font-size:0.8rem;background:#fce7f3;color:#9d174d;padding:2px 9px;border-radius:20px;font-weight:600">
-          Day {{ b.bday|int }}
+          {{ t('Day','يوم') }} {{ b.bday|int }}
         </span>
       </div>
       {% endfor %}
     {% else %}
-      <p style="color:var(--cl-muted);text-align:center;padding:18px 0;font-size:13px">No birthdays this month.</p>
+      <p style="color:var(--cl-muted);text-align:center;padding:18px 0;font-size:13px">{{ t('No birthdays this month.','لا أعياد ميلاد هذا الشهر.') }}</p>
     {% endif %}
   </div>
 
   {# Work Anniversaries this month #}
   <div class="hr-card">
-    <div class="hr-card-title">🎉 Anniversaries This Month</div>
+    <div class="hr-card-title">🎉 {{ t('Anniversaries This Month','ذكرى الالتحاق هذا الشهر') }}</div>
     {% if anniversaries_this_month %}
       {% for a in anniversaries_this_month %}
       {% set rc = color_map.get(a.role, '#6b7280') %}
@@ -260,20 +260,20 @@
           <div class="hire-meta">{{ a.hire_date }}</div>
         </div>
         <span style="font-size:0.8rem;background:#ede9fe;color:#5b21b6;padding:2px 9px;border-radius:20px;font-weight:600">
-          {{ a.years }}yr
+          {{ a.years }}{{ t('yr','سنة') }}
         </span>
       </div>
       {% endfor %}
     {% else %}
-      <p style="color:var(--cl-muted);text-align:center;padding:18px 0;font-size:13px">No anniversaries this month.</p>
+      <p style="color:var(--cl-muted);text-align:center;padding:18px 0;font-size:13px">{{ t('No anniversaries this month.','لا ذكرى التحاق هذا الشهر.') }}</p>
     {% endif %}
   </div>
 
   {# Expiring Certifications #}
   <div class="hr-card">
     <div class="hr-card-title">
-      ⚠ Expiring Certifications
-      <a href="{{ url_for('hr.certifications_list') }}" style="float:right;font-size:12px;color:var(--cl-primary);font-weight:500">All →</a>
+      ⚠ {{ t('Expiring Certifications','شهادات على وشك الانتهاء') }}
+      <a href="{{ url_for('hr.certifications_list') }}" style="float:right;font-size:12px;color:var(--cl-primary);font-weight:500">{{ t('All →','الكل ←') }}</a>
     </div>
     {% if expiring_certs %}
       {% for c in expiring_certs %}
@@ -285,12 +285,12 @@
           <div class="hire-meta">{{ c.cert_name }}</div>
         </div>
         <span style="font-size:0.8rem;background:{% if c.days_left <= 7 %}#fee2e2;color:#991b1b{% else %}#fef3c7;color:#92400e{% endif %};padding:2px 9px;border-radius:20px;font-weight:600">
-          {{ c.days_left }}d left
+          {{ c.days_left }}{{ t('d left','ي متبقٍ') }}
         </span>
       </div>
       {% endfor %}
     {% else %}
-      <p style="color:var(--cl-muted);text-align:center;padding:18px 0;font-size:13px">No certs expiring soon.</p>
+      <p style="color:var(--cl-muted);text-align:center;padding:18px 0;font-size:13px">{{ t('No certs expiring soon.','لا شهادات تنتهي قريباً.') }}</p>
     {% endif %}
   </div>
 
@@ -299,14 +299,14 @@
 {# ── Recent Warnings ─────────────────────────────────────────────────────── #}
 {% if recent_warnings %}
 <div class="hr-card" style="margin-bottom:20px">
-  <div class="hr-card-title">Recent Disciplinary Actions</div>
+  <div class="hr-card-title">{{ t('Recent Disciplinary Actions','الإجراءات التأديبية الأخيرة') }}</div>
   {% set wt_colors = {'Verbal':'#92400e','Written':'#9a3412','Final Warning':'#991b1b','Suspension':'#7f1d1d'} %}
   {% set wt_bg     = {'Verbal':'#fef3c7','Written':'#fed7aa','Final Warning':'#fee2e2','Suspension':'#fca5a5'} %}
   {% for w in recent_warnings %}
   <div class="hire-row">
     <div>
       <span style="display:inline-block;padding:2px 9px;border-radius:4px;font-size:11px;font-weight:700;background:{{ wt_bg.get(w.warning_type,'#fef3c7') }};color:{{ wt_colors.get(w.warning_type,'#92400e') }}">
-        {{ w.warning_type }}
+        {{ t(w.warning_type, {'Verbal':'شفهي','Written':'كتابي','Final Warning':'إنذار نهائي','Suspension':'إيقاف'}.get(w.warning_type,'')) }}
       </span>
     </div>
     <div style="flex:1">

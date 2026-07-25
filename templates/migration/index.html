@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Legacy Data Migration{% endblock %}
-{% block page_title %}Legacy Data Migration{% endblock %}
+{% block title %}{{ t('Legacy Data Migration', 'ترحيل البيانات القديمة') }}{% endblock %}
+{% block page_title %}{{ t('Legacy Data Migration', 'ترحيل البيانات القديمة') }}{% endblock %}
 {% block page_sub %}Import owners, pets, and examination records from the legacy Excel-based app{% endblock %}
 
 {% block topbar_actions %}
@@ -115,7 +115,7 @@
   <div class="mig-title">📋 Migration History (Last 50 actions)</div>
   <div style="overflow-x:auto">
     <table class="hist-table">
-      <thead><tr><th>Time</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+      <thead><tr><th>{{ t('Time', 'الوقت') }}</th><th>{{ t('Action', 'الإجراء') }}</th><th>{{ t('Entity', 'الكيان') }}</th><th>{{ t('Details', 'التفاصيل') }}</th></tr></thead>
       <tbody>
         {% for h in history %}
         <tr>

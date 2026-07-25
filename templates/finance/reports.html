@@ -7,7 +7,7 @@
 <a href="{{ url_for('finance.dashboard') }}" class="btn btn-secondary">← {{ t('Dashboard', 'لوحة التحكم') }}</a>
 <a href="{{ url_for('finance.reports_export_xlsx', date_from=date_from, date_to=date_to) }}"
    class="pf-btn pf-btn-secondary" style="background:#16a34a;color:#fff;border:none">
-  📊 Export Excel
+  {{ t('📊 Export Excel', '📊 تصدير Excel') }}
 </a>
 {% endblock %}
 

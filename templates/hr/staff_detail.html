@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}{{ staff.full_name or staff.username }} — Staff Detail{% endblock %}
+{% block title %}{{ staff.full_name or staff.username }} — {{ t('Staff Detail','بيانات الموظف') }}{% endblock %}
 
 {% block page_title %}{{ staff.full_name or staff.username }}{% endblock %}
-{% block page_sub %}Staff profile, performance, attendance & payroll{% endblock %}
+{% block page_sub %}{{ t('Staff profile, performance, attendance & payroll','ملف الموظف والأداء والحضور والرواتب') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.staff_edit', user_id=staff.id) }}" class="pf-btn pf-btn-primary">Edit</a>
-<a href="{{ url_for('hr.performance_new') }}" class="pf-btn pf-btn-secondary">+ Review</a>
-<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">← Back</a>
+<a href="{{ url_for('hr.staff_edit', user_id=staff.id) }}" class="pf-btn pf-btn-primary">{{ t('Edit','تعديل') }}</a>
+<a href="{{ url_for('hr.performance_new') }}" class="pf-btn pf-btn-secondary">+ {{ t('Review','تقييم') }}</a>
+<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">{{ t('← Back','← رجوع') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -100,38 +100,38 @@
       {% endif %}
       <span class="profile-badge" style="background:{{ role_color }}">{{ staff.role.replace('_',' ').title() }}</span>
 
-      <div class="info-row"><span class="info-label">Username</span><code style="background:var(--cl-bg);padding:1px 6px;border-radius:4px;font-size:12px">{{ staff.username }}</code></div>
-      <div class="info-row"><span class="info-label">Status</span>
-        {% if staff.is_active %}<span style="color:#166534;font-weight:600">Active</span>
-        {% else %}<span style="color:#991b1b;font-weight:600">Inactive</span>{% endif %}
+      <div class="info-row"><span class="info-label">{{ t('Username','اسم المستخدم') }}</span><code style="background:var(--cl-bg);padding:1px 6px;border-radius:4px;font-size:12px">{{ staff.username }}</code></div>
+      <div class="info-row"><span class="info-label">{{ t('Status','الحالة') }}</span>
+        {% if staff.is_active %}<span style="color:#166534;font-weight:600">{{ t('Active','نشط') }}</span>
+        {% else %}<span style="color:#991b1b;font-weight:600">{{ t('Inactive','غير نشط') }}</span>{% endif %}
       </div>
-      {% if staff.job_title %}<div class="info-row"><span class="info-label">Job Title</span><span class="info-val">{{ staff.job_title }}</span></div>{% endif %}
-      {% if staff.contract_type %}<div class="info-row"><span class="info-label">Contract</span><span class="info-val">{{ staff.contract_type }}</span></div>{% endif %}
-      {% if staff.hire_date %}<div class="info-row"><span class="info-label">Hired</span><span class="info-val">{{ staff.hire_date }}</span></div>{% endif %}
-      {% if staff.gender %}<div class="info-row"><span class="info-label">Gender</span><span class="info-val">{{ staff.gender }}</span></div>{% endif %}
-      {% if staff.dob %}<div class="info-row"><span class="info-label">Date of Birth</span><span class="info-val">{{ staff.dob }}</span></div>{% endif %}
-      {% if staff.email %}<div class="info-row"><span class="info-label">Email</span><span class="info-val">{{ staff.email }}</span></div>{% endif %}
-      {% if staff.phone %}<div class="info-row"><span class="info-label">Phone</span><span class="info-val">{{ staff.phone }}</span></div>{% endif %}
-      {% if staff.national_id %}<div class="info-row"><span class="info-label">National ID</span><span class="info-val">{{ staff.national_id }}</span></div>{% endif %}
-      {% if staff.emergency_contact %}<div class="info-row"><span class="info-label">Emergency</span><span class="info-val">{{ staff.emergency_contact }}{% if staff.emergency_phone %} · {{ staff.emergency_phone }}{% endif %}</span></div>{% endif %}
-      <div class="info-row"><span class="info-label">Branch</span><span class="info-val">{{ staff.branch_name or '—' }}</span></div>
-      <div class="info-row"><span class="info-label">Last Login</span><span class="info-val" style="color:var(--cl-muted);font-size:12px">{{ staff.last_login_at[:16] if staff.last_login_at else 'Never' }}</span></div>
-      <div class="info-row"><span class="info-label">Created</span><span class="info-val" style="color:var(--cl-muted);font-size:12px">{{ staff.created_at[:10] if staff.created_at else '—' }}</span></div>
+      {% if staff.job_title %}<div class="info-row"><span class="info-label">{{ t('Job Title','المسمى الوظيفي') }}</span><span class="info-val">{{ staff.job_title }}</span></div>{% endif %}
+      {% if staff.contract_type %}<div class="info-row"><span class="info-label">{{ t('Contract','العقد') }}</span><span class="info-val">{{ staff.contract_type }}</span></div>{% endif %}
+      {% if staff.hire_date %}<div class="info-row"><span class="info-label">{{ t('Hired','تاريخ التعيين') }}</span><span class="info-val">{{ staff.hire_date }}</span></div>{% endif %}
+      {% if staff.gender %}<div class="info-row"><span class="info-label">{{ t('Gender','النوع') }}</span><span class="info-val">{{ staff.gender }}</span></div>{% endif %}
+      {% if staff.dob %}<div class="info-row"><span class="info-label">{{ t('Date of Birth','تاريخ الميلاد') }}</span><span class="info-val">{{ staff.dob }}</span></div>{% endif %}
+      {% if staff.email %}<div class="info-row"><span class="info-label">{{ t('Email','البريد الإلكتروني') }}</span><span class="info-val">{{ staff.email }}</span></div>{% endif %}
+      {% if staff.phone %}<div class="info-row"><span class="info-label">{{ t('Phone','الهاتف') }}</span><span class="info-val">{{ staff.phone }}</span></div>{% endif %}
+      {% if staff.national_id %}<div class="info-row"><span class="info-label">{{ t('National ID','الرقم القومي') }}</span><span class="info-val">{{ staff.national_id }}</span></div>{% endif %}
+      {% if staff.emergency_contact %}<div class="info-row"><span class="info-label">{{ t('Emergency','الطوارئ') }}</span><span class="info-val">{{ staff.emergency_contact }}{% if staff.emergency_phone %} · {{ staff.emergency_phone }}{% endif %}</span></div>{% endif %}
+      <div class="info-row"><span class="info-label">{{ t('Branch','الفرع') }}</span><span class="info-val">{{ staff.branch_name or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Last Login','آخر دخول') }}</span><span class="info-val" style="color:var(--cl-muted);font-size:12px">{{ staff.last_login_at[:16] if staff.last_login_at else t('Never','لم يسجل دخول') }}</span></div>
+      <div class="info-row"><span class="info-label">{{ t('Created','تاريخ الإنشاء') }}</span><span class="info-val" style="color:var(--cl-muted);font-size:12px">{{ staff.created_at[:10] if staff.created_at else '—' }}</span></div>
 
       <!-- Reset Password -->
       <div class="reset-pw-form">
-        <h4>Reset Password</h4>
+        <h4>{{ t('Reset Password','إعادة تعيين كلمة المرور') }}</h4>
         <form method="post" action="{{ url_for('hr.staff_reset_password', user_id=staff.id) }}"
               onsubmit="return confirm('Reset password for {{ staff.username }}?')">
-          <input type="password" name="new_password" placeholder="New password (min 6 chars)" required minlength="6">
-          <button type="submit">Reset Password</button>
+          <input type="password" name="new_password" placeholder="{{ t('New password (min 6 chars)','كلمة مرور جديدة (6 أحرف على الأقل)') }}" required minlength="6">
+          <button type="submit">{{ t('Reset Password','إعادة تعيين كلمة المرور') }}</button>
         </form>
       </div>
     </div>
 
     <!-- Work Shift Card -->
     <div class="d-card">
-      <div class="d-card-title">Work Shift</div>
+      <div class="d-card-title">{{ t('Work Shift','المناوبة') }}</div>
       {% if shift_info %}
       <div class="shift-info-box">
         <div style="font-weight:700;font-size:15px">{{ shift_info.name }}</div>
@@ -142,7 +142,7 @@
         {% if shift_info.days_of_week %}<div style="font-size:12px;margin-top:4px;color:var(--cl-muted)">{{ shift_info.days_of_week }}</div>{% endif %}
       </div>
       {% else %}
-      <p style="color:var(--cl-muted);font-size:13px;margin-bottom:12px">No shift assigned.</p>
+      <p style="color:var(--cl-muted);font-size:13px;margin-bottom:12px">{{ t('No shift assigned.','لا توجد مناوبة معينة.') }}</p>
       {% endif %}
 
       <form method="post" action="{{ url_for('hr.staff_assign_shift', user_id=staff.id) }}">
@@ -155,8 +155,8 @@
             </option>
             {% endfor %}
           </select>
-          <input type="date" name="effective_from" style="padding:8px 10px;border:1.5px solid var(--cl-border);border-radius:8px;background:var(--cl-bg);color:var(--cl-text);font-size:13px" placeholder="Effective from">
-          <button type="submit" class="pf-btn pf-btn-primary" style="font-size:13px">Update Shift</button>
+          <input type="date" name="effective_from" style="padding:8px 10px;border:1.5px solid var(--cl-border);border-radius:8px;background:var(--cl-bg);color:var(--cl-text);font-size:13px" placeholder="{{ t('Effective from','ساري من') }}">
+          <button type="submit" class="pf-btn pf-btn-primary" style="font-size:13px">{{ t('Update Shift','تحديث المناوبة') }}</button>
         </div>
       </form>
     </div>
@@ -169,27 +169,27 @@
     <!-- This Month Attendance -->
     {% if att_summary %}
     <div class="d-card">
-      <div class="d-card-title">Attendance This Month</div>
+      <div class="d-card-title">{{ t('Attendance This Month','حضور هذا الشهر') }}</div>
       <div class="kpi-row">
         <div class="kpi-mini">
           <div class="kpi-mini-num" style="color:#16a34a">{{ att_summary.present or 0 }}</div>
-          <div class="kpi-mini-lbl">Present</div>
+          <div class="kpi-mini-lbl">{{ t('Present','حاضر') }}</div>
         </div>
         <div class="kpi-mini">
           <div class="kpi-mini-num" style="color:#d97706">{{ att_summary.late or 0 }}</div>
-          <div class="kpi-mini-lbl">Late</div>
+          <div class="kpi-mini-lbl">{{ t('Late','متأخر') }}</div>
         </div>
         <div class="kpi-mini">
           <div class="kpi-mini-num" style="color:#dc2626">{{ att_summary.absent or 0 }}</div>
-          <div class="kpi-mini-lbl">Absent</div>
+          <div class="kpi-mini-lbl">{{ t('Absent','غائب') }}</div>
         </div>
         <div class="kpi-mini">
           <div class="kpi-mini-num" style="color:#0891b2">{{ '%.1f'|format(att_summary.total_hours or 0) }}</div>
-          <div class="kpi-mini-lbl">Hours</div>
+          <div class="kpi-mini-lbl">{{ t('Hours','الساعات') }}</div>
         </div>
       </div>
       <div style="margin-top:10px;text-align:right">
-        <a href="{{ url_for('attendance.records_list', user_id=staff.id) }}" style="font-size:12px;color:var(--cl-primary)">Full attendance history →</a>
+        <a href="{{ url_for('attendance.records_list', user_id=staff.id) }}" style="font-size:12px;color:var(--cl-primary)">{{ t('Full attendance history →','سجل الحضور الكامل ←') }}</a>
       </div>
     </div>
     {% endif %}
@@ -197,24 +197,24 @@
     <!-- Leave Balances -->
     {% if leave_balances %}
     <div class="d-card">
-      <div class="d-card-title">Leave Balances (This Year)</div>
+      <div class="d-card-title">{{ t('Leave Balances (This Year)','أرصدة الإجازات (هذا العام)') }}</div>
       {% for lb in leave_balances %}
       <div class="leave-row">
-        <div style="flex:1;font-weight:600">{{ lb.name or 'Annual' }}</div>
+        <div style="flex:1;font-weight:600">{{ lb.name or t('Annual','سنوية') }}</div>
         <div>
           <span style="font-weight:700;color:var(--cl-primary)">{{ lb.used or 0 }}</span>
-          <span style="color:var(--cl-muted)"> / {{ lb.allocated or 0 }} days used</span>
+          <span style="color:var(--cl-muted)"> / {{ lb.allocated or 0 }} {{ t('days used','يوم مستخدم') }}</span>
         </div>
         <div>
           {% set remaining = (lb.allocated or 0) - (lb.used or 0) %}
           <span class="mini-badge" style="background:{{ '#dcfce7' if remaining > 0 else '#fee2e2' }};color:{{ '#166534' if remaining > 0 else '#991b1b' }}">
-            {{ remaining }} left
+            {{ remaining }} {{ t('left','متبقٍ') }}
           </span>
         </div>
       </div>
       {% endfor %}
       <div style="margin-top:10px;text-align:right">
-        <a href="{{ url_for('attendance.leaves_list', user_id=staff.id) }}" style="font-size:12px;color:var(--cl-primary)">View leave requests →</a>
+        <a href="{{ url_for('attendance.leaves_list', user_id=staff.id) }}" style="font-size:12px;color:var(--cl-primary)">{{ t('View leave requests →','عرض طلبات الإجازة ←') }}</a>
       </div>
     </div>
     {% endif %}
@@ -222,8 +222,8 @@
     <!-- Performance Reviews -->
     <div class="d-card">
       <div class="d-card-title">
-        Performance Reviews
-        <a href="{{ url_for('hr.performance_new') }}" style="float:right;font-size:12px;color:var(--cl-primary);font-weight:500">+ Add</a>
+        {{ t('Performance Reviews','تقييمات الأداء') }}
+        <a href="{{ url_for('hr.performance_new') }}" style="float:right;font-size:12px;color:var(--cl-primary);font-weight:500">+ {{ t('Add','إضافة') }}</a>
       </div>
       {% if reviews %}
       {% for r in reviews %}
@@ -237,29 +237,29 @@
           {% for i in range(1,6) %}
           <span class="{{ 'star-f' if i <= r.rating else 'star-e' }}">&#9733;</span>
           {% endfor %}
-          {% else %}<span style="color:var(--cl-muted);font-size:12px">No rating</span>{% endif %}
+          {% else %}<span style="color:var(--cl-muted);font-size:12px">{{ t('No rating','بدون تقييم') }}</span>{% endif %}
         </div>
         <div>
-          {% if r.status == 'Draft' %}<span class="mini-badge" style="background:#f3f4f6;color:#374151">Draft</span>
-          {% elif r.status == 'Submitted' %}<span class="mini-badge" style="background:#dbeafe;color:#1e40af">Submitted</span>
-          {% elif r.status == 'Acknowledged' %}<span class="mini-badge" style="background:#dcfce7;color:#166534">Acknowledged</span>
+          {% if r.status == 'Draft' %}<span class="mini-badge" style="background:#f3f4f6;color:#374151">{{ t('Draft','مسودة') }}</span>
+          {% elif r.status == 'Submitted' %}<span class="mini-badge" style="background:#dbeafe;color:#1e40af">{{ t('Submitted','مُرسل') }}</span>
+          {% elif r.status == 'Acknowledged' %}<span class="mini-badge" style="background:#dcfce7;color:#166534">{{ t('Acknowledged','مُعتمد') }}</span>
           {% endif %}
         </div>
-        <a href="{{ url_for('hr.performance_detail', rev_id=r.id) }}" class="pf-btn pf-btn-sm" style="font-size:11px">View</a>
+        <a href="{{ url_for('hr.performance_detail', rev_id=r.id) }}" class="pf-btn pf-btn-sm" style="font-size:11px">{{ t('View', 'عرض') }}</a>
       </div>
       {% endfor %}
       <div style="margin-top:10px;text-align:right">
-        <a href="{{ url_for('hr.performance_list', user_id=staff.id) }}" style="font-size:12px;color:var(--cl-primary)">All reviews →</a>
+        <a href="{{ url_for('hr.performance_list', user_id=staff.id) }}" style="font-size:12px;color:var(--cl-primary)">{{ t('All reviews →','كل التقييمات ←') }}</a>
       </div>
       {% else %}
-      <p style="color:var(--cl-muted);text-align:center;padding:20px 0;font-size:13px">No performance reviews yet.</p>
+      <p style="color:var(--cl-muted);text-align:center;padding:20px 0;font-size:13px">{{ t('No performance reviews yet.','لا توجد تقييمات أداء بعد.') }}</p>
       {% endif %}
     </div>
 
     <!-- Salary History -->
     {% if salary_history %}
     <div class="d-card">
-      <div class="d-card-title">Salary History (Last 6 Months)</div>
+      <div class="d-card-title">{{ t('Salary History (Last 6 Months)','سجل الرواتب (آخر 6 أشهر)') }}</div>
       {% for s in salary_history %}
       {% set sc = {'Paid':'#16a34a','Approved':'#0891b2','Draft':'#6b7280'} %}
       <div class="sal-row">
@@ -267,11 +267,11 @@
           <div style="font-weight:600">{{ s.period_year }}-{{ '%02d'|format(s.period_month) }}</div>
         </div>
         <div style="font-size:13px">
-          <span style="color:#dc2626">Basic: EGP {{ '{:,.0f}'.format(s.basic_salary or 0) }}</span>
+          <span style="color:#dc2626">{{ t('Basic:','الأساسي:') }} {{ t('EGP','جنيه') }} {{ '{:,.0f}'.format(s.basic_salary or 0) }}</span>
         </div>
-        <div style="font-size:13px;font-weight:700;color:#16a34a">EGP {{ '{:,.0f}'.format(s.net or 0) }}</div>
+        <div style="font-size:13px;font-weight:700;color:#16a34a">{{ t('EGP','جنيه') }} {{ '{:,.0f}'.format(s.net or 0) }}</div>
         <span class="mini-badge" style="background:{{ sc.get(s.status,'#6b7280') }}22;color:{{ sc.get(s.status,'#6b7280') }}">{{ s.status }}</span>
-        <a href="{{ url_for('payroll.salary_detail', sid=s.id) }}" class="pf-btn pf-btn-sm" style="font-size:11px">View</a>
+        <a href="{{ url_for('payroll.salary_detail', sid=s.id) }}" class="pf-btn pf-btn-sm" style="font-size:11px">{{ t('View', 'عرض') }}</a>
       </div>
       {% endfor %}
     </div>
@@ -280,8 +280,8 @@
     <!-- Warnings / Disciplinary -->
     <div class="d-card">
       <div class="d-card-title">
-        Disciplinary Record
-        {% if warnings %}<span style="float:right;font-size:12px;color:{% if warnings|length > 2 %}#dc2626{% else %}#d97706{% endif %}">{{ warnings|length }} on record</span>{% endif %}
+        {{ t('Disciplinary Record','السجل التأديبي') }}
+        {% if warnings %}<span style="float:right;font-size:12px;color:{% if warnings|length > 2 %}#dc2626{% else %}#d97706{% endif %}">{{ warnings|length }} {{ t('on record','بالسجل') }}</span>{% endif %}
       </div>
 
       {% set wt_cls = {'Verbal':'wt-verbal','Written':'wt-written','Final Warning':'wt-final','Suspension':'wt-suspension'} %}
@@ -294,40 +294,40 @@
           <div style="flex:1">
             <div style="font-weight:600;font-size:13px">{{ w.reason or '—' }}</div>
             {% if w.action_taken %}<div style="font-size:11px;color:var(--cl-muted)">Action: {{ w.action_taken }}</div>{% endif %}
-            <div style="font-size:11px;color:var(--cl-muted)">{{ w.issued_date }} · by {{ w.issued_by_name or 'Manager' }}{% if w.acknowledged %} · <span style="color:#166534">Acknowledged</span>{% endif %}</div>
+            <div style="font-size:11px;color:var(--cl-muted)">{{ w.issued_date }} · {{ t('by','بواسطة') }} {{ w.issued_by_name or t('Manager','المدير') }}{% if w.acknowledged %} · <span style="color:#166534">{{ t('Acknowledged','مُعتمد') }}</span>{% endif %}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:4px">
             {% if not w.acknowledged %}
             <form method="post" action="{{ url_for('hr.acknowledge_warning', user_id=staff.id, warn_id=w.id) }}">
-              <button type="submit" class="pf-btn pf-btn-sm" style="font-size:10px;padding:3px 8px">Ack</button>
+              <button type="submit" class="pf-btn pf-btn-sm" style="font-size:10px;padding:3px 8px">{{ t('Ack','اعتماد') }}</button>
             </form>
             {% endif %}
             <form method="post" action="{{ url_for('hr.delete_warning', user_id=staff.id, warn_id=w.id) }}"
                   onsubmit="return confirm('Delete this warning?')">
-              <button type="submit" class="pf-btn pf-btn-sm" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#991b1b">Del</button>
+              <button type="submit" class="pf-btn pf-btn-sm" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#991b1b">{{ t('Del','حذف') }}</button>
             </form>
           </div>
         </div>
         {% endfor %}
       {% else %}
-        <p style="color:var(--cl-muted);font-size:13px;text-align:center;padding:10px 0">No disciplinary records.</p>
+        <p style="color:var(--cl-muted);font-size:13px;text-align:center;padding:10px 0">{{ t('No disciplinary records.','لا توجد سجلات تأديبية.') }}</p>
       {% endif %}
 
       <div class="add-form-panel">
-        <h5>Issue Warning</h5>
+        <h5>{{ t('Issue Warning','إصدار إنذار') }}</h5>
         <form method="post" action="{{ url_for('hr.add_warning', user_id=staff.id) }}">
           <select name="warning_type">
             {% for wt in ['Verbal','Written','Final Warning','Suspension'] %}
             <option value="{{ wt }}">{{ wt }}</option>
             {% endfor %}
           </select>
-          <textarea name="reason" placeholder="Reason for warning…" required></textarea>
-          <input type="text" name="action_taken" placeholder="Action taken (optional)">
+          <textarea name="reason" placeholder="{{ t('Reason for warning…','سبب الإنذار…') }}" required></textarea>
+          <input type="text" name="action_taken" placeholder="{{ t('Action taken (optional)','الإجراء المتخذ (اختياري)') }}">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <input type="date" name="issued_date" placeholder="Issue date">
-            <input type="date" name="expiry_date" placeholder="Expiry date (optional)">
+            <input type="date" name="issued_date" placeholder="{{ t('Issue date','تاريخ الإصدار') }}">
+            <input type="date" name="expiry_date" placeholder="{{ t('Expiry date (optional)','تاريخ الانتهاء (اختياري)') }}">
           </div>
-          <button type="submit">Issue Warning</button>
+          <button type="submit">{{ t('Issue Warning','إصدار إنذار') }}</button>
         </form>
       </div>
     </div>
@@ -336,7 +336,7 @@
     <div class="d-card">
       <div class="d-card-title">
         Certifications & Training
-        <a href="{{ url_for('hr.certifications_list') }}" style="float:right;font-size:12px;color:var(--cl-primary)">All staff →</a>
+        <a href="{{ url_for('hr.certifications_list') }}" style="float:right;font-size:12px;color:var(--cl-primary)">{{ t('All staff →','كل الموظفين ←') }}</a>
       </div>
 
       {% if certifications %}
@@ -356,7 +356,7 @@
                 Exp: {{ c.expiry_date }}
               </div>
             {% else %}
-              <div style="font-size:11px;color:var(--cl-muted)">No expiry</div>
+              <div style="font-size:11px;color:var(--cl-muted)">{{ t('No expiry','بدون انتهاء') }}</div>
             {% endif %}
             <span class="mini-badge" style="background:{% if c.status=='Active' %}#dcfce7{% elif c.status=='Expired' %}#fee2e2{% else %}#f3f4f6{% endif %};color:{% if c.status=='Active' %}#166534{% elif c.status=='Expired' %}#991b1b{% else %}#374151{% endif %}">{{ c.status }}</span>
           </div>
@@ -367,35 +367,35 @@
         </div>
         {% endfor %}
       {% else %}
-        <p style="color:var(--cl-muted);font-size:13px;text-align:center;padding:10px 0">No certifications added yet.</p>
+        <p style="color:var(--cl-muted);font-size:13px;text-align:center;padding:10px 0">{{ t('No certifications added yet.','لم تُضف شهادات بعد.') }}</p>
       {% endif %}
 
       <div class="add-form-panel">
-        <h5>Add Certification / Training</h5>
+        <h5>{{ t('Add Certification / Training','إضافة شهادة / تدريب') }}</h5>
         <form method="post" action="{{ url_for('hr.add_certification', user_id=staff.id) }}">
-          <input type="text" name="cert_name" placeholder="Certification / course name *" required>
+          <input type="text" name="cert_name" placeholder="{{ t('Certification / course name *','اسم الشهادة / الدورة *') }}" required>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <input type="text" name="issued_by" placeholder="Issuing body">
-            <input type="text" name="cert_number" placeholder="Certificate number">
+            <input type="text" name="issued_by" placeholder="{{ t('Issuing body','الجهة المانحة') }}">
+            <input type="text" name="cert_number" placeholder="{{ t('Certificate number','رقم الشهادة') }}">
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <input type="date" name="issue_date" placeholder="Issue date">
-            <input type="date" name="expiry_date" placeholder="Expiry date">
+            <input type="date" name="issue_date" placeholder="{{ t('Issue date','تاريخ الإصدار') }}">
+            <input type="date" name="expiry_date" placeholder="{{ t('Expiry date','تاريخ الانتهاء') }}">
           </div>
           <select name="status">
-            <option value="Active">Active</option>
-            <option value="Pending">Pending</option>
-            <option value="Expired">Expired</option>
+            <option value="Active">{{ t('Active','سارية') }}</option>
+            <option value="Pending">{{ t('Pending','قيد الانتظار') }}</option>
+            <option value="Expired">{{ t('Expired','منتهية') }}</option>
           </select>
-          <input type="text" name="notes" placeholder="Notes (optional)">
-          <button type="submit">Add Certification</button>
+          <input type="text" name="notes" placeholder="{{ t('Notes (optional)','ملاحظات (اختياري)') }}">
+          <button type="submit">{{ t('Add Certification','إضافة شهادة') }}</button>
         </form>
       </div>
     </div>
 
     <!-- HR Notes (Private) -->
     <div class="d-card">
-      <div class="d-card-title">HR Notes <span style="font-size:11px;color:var(--cl-muted);font-weight:400">(private — managers only)</span></div>
+      <div class="d-card-title">{{ t('HR Notes','ملاحظات الموارد البشرية') }} <span style="font-size:11px;color:var(--cl-muted);font-weight:400">{{ t('(private — managers only)','(خاصة — للمديرين فقط)') }}</span></div>
 
       {% if hr_notes %}
         {% for n in hr_notes %}
@@ -405,20 +405,20 @@
             <span style="font-size:11px;color:var(--cl-muted)">{{ n.author_name or 'Manager' }} · {{ n.created_at[:16] if n.created_at else '' }}</span>
             <form method="post" action="{{ url_for('hr.delete_note', user_id=staff.id, note_id=n.id) }}"
                   onsubmit="return confirm('Delete this note?')">
-              <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--cl-muted);font-size:12px;padding:0">Delete</button>
+              <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--cl-muted);font-size:12px;padding:0">{{ t('Delete','حذف') }}</button>
             </form>
           </div>
         </div>
         {% endfor %}
       {% else %}
-        <p style="color:var(--cl-muted);font-size:13px;text-align:center;padding:10px 0">No notes yet.</p>
+        <p style="color:var(--cl-muted);font-size:13px;text-align:center;padding:10px 0">{{ t('No notes yet.','لا توجد ملاحظات بعد.') }}</p>
       {% endif %}
 
       <div class="add-form-panel">
-        <h5>Add Note</h5>
+        <h5>{{ t('Add Note','إضافة ملاحظة') }}</h5>
         <form method="post" action="{{ url_for('hr.add_note', user_id=staff.id) }}">
-          <textarea name="note" placeholder="Add a private HR note about this employee…" required></textarea>
-          <button type="submit">Save Note</button>
+          <textarea name="note" placeholder="{{ t('Add a private HR note about this employee…','أضف ملاحظة خاصة عن هذا الموظف…') }}" required></textarea>
+          <button type="submit">{{ t('Save Note','حفظ الملاحظة') }}</button>
         </form>
       </div>
     </div>
@@ -427,7 +427,7 @@
     <div class="d-card">
       <div class="d-card-title">
         Overtime / Extra Hours
-        <a href="{{ url_for('hr.overtime_list') }}?user_id={{ staff.id }}" style="float:right;font-size:12px;color:var(--cl-primary)">View All</a>
+        <a href="{{ url_for('hr.overtime_list') }}?user_id={{ staff.id }}" style="float:right;font-size:12px;color:var(--cl-primary)">{{ t('View All','عرض الكل') }}</a>
       </div>
 
       {% set staff_ot = [] %}
@@ -437,10 +437,10 @@
       <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px">
         <thead>
           <tr style="background:var(--cl-bg)">
-            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">Date</th>
-            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">Hours</th>
-            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">Reason</th>
-            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">Status</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">{{ t('Date','التاريخ') }}</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">{{ t('Hours','الساعات') }}</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">{{ t('Reason','السبب') }}</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">{{ t('Status','الحالة') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -451,11 +451,11 @@
           <td style="padding:7px 10px;color:var(--cl-muted)">{{ ot.reason or '—' }}</td>
           <td style="padding:7px 10px">
             {% if ot.status == 'Approved' %}
-              <span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Approved</span>
+              <span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">{{ t('Approved','معتمد') }}</span>
             {% elif ot.status == 'Rejected' %}
-              <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Rejected</span>
+              <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">{{ t('Rejected','مرفوض') }}</span>
             {% else %}
-              <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Pending</span>
+              <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">{{ t('Pending','قيد الانتظار') }}</span>
             {% endif %}
           </td>
         </tr>
@@ -465,28 +465,28 @@
       {% endif %}
 
       <div class="add-form-panel">
-        <h5>Log Overtime</h5>
+        <h5>{{ t('Log Overtime','تسجيل عمل إضافي') }}</h5>
         <form method="post" action="{{ url_for('hr.add_overtime', user_id=staff.id) }}">
           <input type="date" name="work_date" value="{{ today.isoformat() if today else '' }}" required>
-          <input type="number" name="hours" step="0.5" min="0.5" max="24" placeholder="Hours (e.g. 2.5)" required>
-          <input type="text" name="reason" placeholder="Reason / project / event">
-          <button type="submit">Log Overtime</button>
+          <input type="number" name="hours" step="0.5" min="0.5" max="24" placeholder="{{ t('Hours (e.g. 2.5)','الساعات (مثال: 2.5)') }}" required>
+          <input type="text" name="reason" placeholder="{{ t('Reason / project / event','السبب / المشروع / الحدث') }}">
+          <button type="submit">{{ t('Log Overtime','تسجيل عمل إضافي') }}</button>
         </form>
       </div>
     </div>
 
     <!-- Activity Log -->
     <div class="d-card">
-      <div class="d-card-title">Recent Activity (Last 30 Events)</div>
+      <div class="d-card-title">{{ t('Recent Activity (Last 30 Events)','النشاط الأخير (آخر 30 حدثاً)') }}</div>
       {% if audit %}
       <div style="overflow-x:auto">
         <table class="audit-table">
           <thead>
             <tr>
-              <th>Time</th>
-              <th>Action</th>
-              <th>Module</th>
-              <th>Details</th>
+              <th>{{ t('Time','الوقت') }}</th>
+              <th>{{ t('Action','الإجراء') }}</th>
+              <th>{{ t('Module','الوحدة') }}</th>
+              <th>{{ t('Details','التفاصيل') }}</th>
               <th>IP</th>
             </tr>
           </thead>
@@ -510,7 +510,7 @@
       {% else %}
       <div style="text-align:center;padding:40px;color:var(--cl-muted)">
         <div style="font-size:32px;margin-bottom:8px">📭</div>
-        No activity recorded yet.
+        {{ t('No activity recorded yet.','لا يوجد نشاط مسجل بعد.') }}
       </div>
       {% endif %}
     </div>

@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Medical Imaging{% endblock %}
-{% block page_title %}🩻 Medical Imaging{% endblock %}
-{% block page_sub %}X-Ray · Ultrasound · MRI · Endoscopy — all imaging studies{% endblock %}
+{% block title %}{{ t('Medical Imaging', 'التصوير الطبي') }}{% endblock %}
+{% block page_title %}{{ t('🩻 Medical Imaging', '🩻 التصوير الطبي') }}{% endblock %}
+{% block page_sub %}{{ t('X-Ray · Ultrasound · MRI · Endoscopy — all imaging studies', 'أشعة سينية · موجات فوق صوتية · رنين مغناطيسي · منظار — جميع دراسات التصوير') }}{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('imaging.analyzer') }}" class="pf-btn pf-btn-primary"
      style="background:linear-gradient(135deg,#f43f5e,#a855f7);border:none;">
-    🔬 AI Photo Analyzer
+    {{ t('🔬 AI Photo Analyzer', '🔬 محلل الصور AI') }}
   </a>
   <a href="{{ url_for('imaging.upload') }}" class="pf-btn pf-btn-primary" style="margin-left:8px;">
-    ➕ Upload Study
+    {{ t('➕ Upload Study', '➕ رفع دراسة') }}
   </a>
 {% endblock %}
 
@@ -18,7 +18,7 @@
   <table class="v3-table">
     <thead>
       <tr>
-        <th>Study</th><th>Pet</th><th>Type</th><th>Region</th><th>AI Analysis</th><th>Date</th><th></th>
+        <th>{{ t('Study', 'الدراسة') }}</th><th>{{ t('Pet', 'الحيوان') }}</th><th>{{ t('Type', 'النوع') }}</th><th>{{ t('Region', 'المنطقة') }}</th><th>{{ t('AI Analysis', 'تحليل AI') }}</th><th>{{ t('Date', 'التاريخ') }}</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -42,20 +42,20 @@
       <td>{{ s.body_region or '—' }}</td>
       <td>
         {% if s.ai_analysis %}
-          <span style="color:#16a34a;font-weight:600;">✓ AI assessed</span>
+          <span style="color:#16a34a;font-weight:600;">{{ t('✓ AI assessed', '✓ تم التقييم بالذكاء الاصطناعي') }}</span>
         {% else %}
           <span style="color:var(--cl-muted);">—</span>
         {% endif %}
       </td>
       <td style="color:var(--cl-muted);font-size:.85rem;">{{ s.created_at[:10] if s.created_at else '—' }}</td>
       <td>
-        <a href="{{ url_for('imaging.study_detail', study_id=s.id) }}" class="pf-btn" style="padding:5px 12px;font-size:.82rem;">View</a>
+        <a href="{{ url_for('imaging.study_detail', study_id=s.id) }}" class="pf-btn" style="padding:5px 12px;font-size:.82rem;">{{ t('View', 'عرض') }}</a>
       </td>
     </tr>
     {% else %}
     <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--cl-muted);">
-      No imaging studies yet.<br>
-      <a href="{{ url_for('imaging.upload') }}" style="color:var(--cl-primary);">Upload the first study →</a>
+      {{ t('No imaging studies yet.', 'لا توجد دراسات تصوير بعد.') }}<br>
+      <a href="{{ url_for('imaging.upload') }}" style="color:var(--cl-primary);">{{ t('Upload the first study →', 'ارفع أول دراسة ←') }}</a>
     </td></tr>
     {% endfor %}
     </tbody>

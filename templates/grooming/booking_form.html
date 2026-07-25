@@ -1,26 +1,26 @@
 {% extends "base.html" %}
-{% block title %}New Grooming Booking{% endblock %}
-{% block page_title %}New Grooming Booking{% endblock %}
+{% block title %}{{ t('New Grooming Booking', 'حجز تجميل جديد') }}{% endblock %}
+{% block page_title %}{{ t('New Grooming Booking', 'حجز تجميل جديد') }}{% endblock %}
 {% block page_sub %}Schedule a pet grooming appointment{% endblock %}
 
 {% block content %}
 <form method="post" action="{{ url_for('grooming.booking_new_submit') }}" style="max-width:700px">
   <div class="pf-card" style="margin-bottom:1.5rem">
-    <div class="pf-card-header"><h3 class="pf-card-title">Patient</h3></div>
+    <div class="pf-card-header"><h3 class="pf-card-title">{{ t('Patient', 'المريض') }}</h3></div>
     <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
       <div>
-        <label class="pf-label">Owner *</label>
+        <label class="pf-label">{{ t('Owner *', 'المالك *') }}</label>
         <select name="owner_id" id="ownerSel" class="pf-input" required onchange="loadPets(this.value)">
-          <option value="">— Select Owner —</option>
+          <option value="">{{ t('— Select Owner —', '— اختر المالك —') }}</option>
           {% for o in owners %}
           <option value="{{ o.id }}">{{ o.full_name }} · {{ o.phone }}</option>
           {% endfor %}
         </select>
       </div>
       <div>
-        <label class="pf-label">Pet *</label>
+        <label class="pf-label">{{ t('Pet *', 'الحيوان *') }}</label>
         <select name="pet_id" id="petSel" class="pf-input" required>
-          <option value="">— Select owner first —</option>
+          <option value="">{{ t('— Select owner first —', '— اختر المالك أولاً —') }}</option>
         </select>
       </div>
     </div>
@@ -30,16 +30,16 @@
     <div class="pf-card-header"><h3 class="pf-card-title">Booking Details</h3></div>
     <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
       <div>
-        <label class="pf-label">Service</label>
+        <label class="pf-label">{{ t('Service', 'الخدمة') }}</label>
         <select name="service_id" class="pf-input">
-          <option value="">— No specific service —</option>
+          <option value="">{{ t('— No specific service —', '— بدون خدمة محددة —') }}</option>
           {% for s in services %}
           <option value="{{ s.id }}">{{ s.name }} ({{ s.species }}) · {{ s.duration_min }}min · {{ "%.0f"|format(s.price|float) }} EGP</option>
           {% endfor %}
         </select>
       </div>
       <div>
-        <label class="pf-label">Groomer Name</label>
+        <label class="pf-label">{{ t('Groomer Name', 'اسم المُجمِّل') }}</label>
         <input type="text" name="groomer_name" class="pf-input" placeholder="Groomer's name">
       </div>
       <div>
@@ -47,23 +47,23 @@
         <input type="datetime-local" name="booking_date" class="pf-input" required>
       </div>
       <div>
-        <label class="pf-label">Status</label>
+        <label class="pf-label">{{ t('Status', 'الحالة') }}</label>
         <select name="status" class="pf-input">
-          <option>Scheduled</option>
-          <option>In Progress</option>
-          <option>Completed</option>
+          <option>{{ t('Scheduled', 'مجدول') }}</option>
+          <option>{{ t('In Progress', 'جارٍ') }}</option>
+          <option>{{ t('Completed', 'مكتمل') }}</option>
         </select>
       </div>
       <div style="grid-column:span 2">
-        <label class="pf-label">Notes</label>
+        <label class="pf-label">{{ t('Notes', 'ملاحظات') }}</label>
         <textarea name="notes" class="pf-input" rows="3" placeholder="Special instructions, coat condition, owner requests..."></textarea>
       </div>
     </div>
   </div>
 
   <div style="display:flex;gap:1rem">
-    <button type="submit" class="pf-btn pf-btn-primary">Create Booking</button>
-    <a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost">Cancel</a>
+    <button type="submit" class="pf-btn pf-btn-primary">{{ t('Create Booking', 'إنشاء حجز') }}</button>
+    <a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost">{{ t('Cancel', 'إلغاء') }}</a>
   </div>
 </form>
 

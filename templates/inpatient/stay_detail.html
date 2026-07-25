@@ -10,10 +10,10 @@
     <p class="pf-page-sub">{{ stay.species }}{% if stay.breed %} · {{ stay.breed }}{% endif %} · {{ stay.owner_name }}</p>
   </div>
   <div class="pf-topbar-actions">
-    <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">← Ward</a>
+    <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('← Ward', '← العنبر') }}</a>
     {% if stay.status != 'Discharged' %}
     <button onclick="document.getElementById('dischargeModal').style.display='flex'"
-            class="pf-btn" style="background:#16a34a;color:#fff">✔ Discharge</button>
+            class="pf-btn" style="background:#16a34a;color:#fff">{{ t('✔ Discharge', '✔ خروج') }}</button>
     {% endif %}
   </div>
 </div>
@@ -25,7 +25,7 @@
     <span style="margin-left:1rem;font-size:.85rem;color:var(--cl-muted)">
       Admitted {{ stay.admitted_at[:10] }} · Ward: <strong>{{ stay.ward }}</strong>
       {% if stay.cage_number %} · Cage: <strong>{{ stay.cage_number }}</strong>{% endif %}
-      · <strong>{{ nights }}</strong> night(s) · Est. cost: <strong>{{ "%.2f"|format(estimated_cost) }} EGP</strong>
+      · <strong>{{ nights }}</strong> {{ t('night(s) · Est. cost:', 'ليلة · التكلفة التقديرية:') }} <strong>{{ "%.2f"|format(estimated_cost) }} EGP</strong>
     </span>
   </div>
   {% if stay.status != 'Discharged' %}
@@ -36,30 +36,30 @@
       <option value="{{ s }}" {% if stay.status==s %}selected{% endif %}>{{ s }}</option>
       {% endif %}{% endfor %}
     </select>
-    <button class="pf-btn pf-btn-primary" style="font-size:.8rem;padding:5px 12px">Update</button>
+    <button class="pf-btn pf-btn-primary" style="font-size:.8rem;padding:5px 12px">{{ t('Update', 'تحديث') }}</button>
   </form>
   {% endif %}
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
   <div class="pf-card">
-    <h3 style="font-size:.95rem;font-weight:700;margin-bottom:.75rem;color:var(--cl-primary)">🐾 Patient</h3>
+    <h3 style="font-size:.95rem;font-weight:700;margin-bottom:.75rem;color:var(--cl-primary)">{{ t('🐾 Patient', '🐾 المريض') }}</h3>
     <table style="width:100%;font-size:.85rem;border-collapse:collapse">
-      <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">Allergies</td>
+      <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">{{ t('Allergies', 'الحساسية') }}</td>
           <td style="color:#dc2626;font-weight:600">{{ stay.allergies or '—' }}</td></tr>
-      <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">Chronic</td>
+      <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">{{ t('Chronic', 'مزمن') }}</td>
           <td>{{ stay.chronic_conditions or '—' }}</td></tr>
-      <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">Owner</td>
+      <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">{{ t('Owner', 'المالك') }}</td>
           <td>{{ stay.owner_name }} · {{ stay.owner_phone }}</td></tr>
-      <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">Admitted by</td>
+      <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">{{ t('Admitted by', 'نوّمه') }}</td>
           <td>{{ stay.admitted_by_name }}</td></tr>
     </table>
   </div>
   <div class="pf-card">
-    <h3 style="font-size:.95rem;font-weight:700;margin-bottom:.75rem;color:var(--cl-primary)">📋 Clinical</h3>
-    <div style="font-size:.85rem"><strong>Reason:</strong> {{ stay.reason }}</div>
-    {% if stay.diagnosis %}<div style="font-size:.85rem;margin-top:.4rem"><strong>Diagnosis:</strong> {{ stay.diagnosis }}</div>{% endif %}
-    {% if stay.treatment_plan %}<div style="font-size:.85rem;margin-top:.4rem;white-space:pre-line"><strong>Plan:</strong> {{ stay.treatment_plan }}</div>{% endif %}
+    <h3 style="font-size:.95rem;font-weight:700;margin-bottom:.75rem;color:var(--cl-primary)">{{ t('📋 Clinical', '📋 سريري') }}</h3>
+    <div style="font-size:.85rem"><strong>{{ t('Reason:', 'السبب:') }}</strong> {{ stay.reason }}</div>
+    {% if stay.diagnosis %}<div style="font-size:.85rem;margin-top:.4rem"><strong>{{ t('Diagnosis:', 'التشخيص:') }}</strong> {{ stay.diagnosis }}</div>{% endif %}
+    {% if stay.treatment_plan %}<div style="font-size:.85rem;margin-top:.4rem;white-space:pre-line"><strong>{{ t('Plan:', 'الخطة:') }}</strong> {{ stay.treatment_plan }}</div>{% endif %}
   </div>
 </div>
 
@@ -68,13 +68,13 @@
     <h3 style="font-size:.95rem;font-weight:700;color:var(--cl-primary)">📊 Clinical Rounds ({{ rounds|length }})</h3>
     {% if stay.status != 'Discharged' %}
     <button onclick="document.getElementById('roundModal').style.display='flex'"
-            class="pf-btn pf-btn-primary" style="font-size:.8rem;padding:5px 12px">+ Add Round</button>
+            class="pf-btn pf-btn-primary" style="font-size:.8rem;padding:5px 12px">{{ t('+ Add Round', '+ إضافة جولة') }}</button>
     {% endif %}
   </div>
   {% if rounds %}
   <div style="overflow-x:auto">
     <table class="pf-table">
-      <thead><tr><th>Time</th><th>Temp</th><th>HR</th><th>RR</th><th>Pain</th><th>Food</th><th>Fluids I/O</th><th>Observations</th><th>By</th></tr></thead>
+      <thead><tr><th>{{ t('Time', 'الوقت') }}</th><th>{{ t('Temp', 'الحرارة') }}</th><th>HR</th><th>RR</th><th>{{ t('Pain', 'الألم') }}</th><th>{{ t('Food', 'الطعام') }}</th><th>{{ t('Fluids I/O', 'السوائل داخل/خارج') }}</th><th>{{ t('Observations', 'الملاحظات') }}</th><th>{{ t('By', 'بواسطة') }}</th></tr></thead>
       <tbody>
         {% for r in rounds %}
         <tr>
@@ -93,7 +93,7 @@
     </table>
   </div>
   {% else %}
-  <p style="color:var(--cl-muted);font-size:.85rem">No rounds recorded yet.</p>
+  <p style="color:var(--cl-muted);font-size:.85rem">{{ t('No rounds recorded yet.', 'لا توجد جولات مسجلة بعد.') }}</p>
   {% endif %}
 </div>
 
@@ -102,12 +102,12 @@
     <h3 style="font-size:.95rem;font-weight:700;color:var(--cl-primary)">💊 Medication Administration ({{ meds|length }})</h3>
     {% if stay.status != 'Discharged' %}
     <button onclick="document.getElementById('medModal').style.display='flex'"
-            class="pf-btn" style="background:#7c3aed;color:#fff;font-size:.8rem;padding:5px 12px">+ Give Med</button>
+            class="pf-btn" style="background:#7c3aed;color:#fff;font-size:.8rem;padding:5px 12px">{{ t('+ Give Med', '+ إعطاء دواء') }}</button>
     {% endif %}
   </div>
   {% if meds %}
   <table class="pf-table">
-    <thead><tr><th>Time</th><th>Medication</th><th>Dose</th><th>Route</th><th>Given By</th><th>Notes</th></tr></thead>
+    <thead><tr><th>{{ t('Time', 'الوقت') }}</th><th>{{ t('Medication', 'دواء') }}</th><th>{{ t('Dose', 'الجرعة') }}</th><th>{{ t('Route', 'طريقة الإعطاء') }}</th><th>{{ t('Given By', 'أعطاه') }}</th><th>{{ t('Notes', 'ملاحظات') }}</th></tr></thead>
     <tbody>
       {% for m in meds %}
       <tr>
@@ -122,41 +122,41 @@
     </tbody>
   </table>
   {% else %}
-  <p style="color:var(--cl-muted);font-size:.85rem">No medications recorded yet.</p>
+  <p style="color:var(--cl-muted);font-size:.85rem">{{ t('No medications recorded yet.', 'لا توجد أدوية مسجلة بعد.') }}</p>
   {% endif %}
 </div>
 
 {# Round modal #}
 <div id="roundModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
   <div class="pf-card" style="width:620px;max-width:95vw;max-height:90vh;overflow-y:auto">
-    <h3 style="margin-bottom:1rem">📊 Record Clinical Round</h3>
+    <h3 style="margin-bottom:1rem">{{ t('📊 Record Clinical Round', '📊 تسجيل جولة سريرية') }}</h3>
     <form method="post" action="{{ url_for('inpatient.add_round', stay_id=stay.id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="pf-form-grid">
-        <div class="pf-form-group"><label class="pf-label">Temp (°C)</label>
+        <div class="pf-form-group"><label class="pf-label">{{ t('Temp (°C)', 'الحرارة (°م)') }}</label>
           <input type="number" step="0.1" name="temp_c" class="pf-input" placeholder="38.5"></div>
-        <div class="pf-form-group"><label class="pf-label">Heart Rate</label>
+        <div class="pf-form-group"><label class="pf-label">{{ t('Heart Rate', 'معدل النبض') }}</label>
           <input type="number" name="heart_rate" class="pf-input"></div>
-        <div class="pf-form-group"><label class="pf-label">Resp Rate</label>
+        <div class="pf-form-group"><label class="pf-label">{{ t('Resp Rate', 'معدل التنفس') }}</label>
           <input type="number" name="resp_rate" class="pf-input"></div>
-        <div class="pf-form-group"><label class="pf-label">Weight (kg)</label>
+        <div class="pf-form-group"><label class="pf-label">{{ t('Weight (kg)', 'الوزن (كجم)') }}</label>
           <input type="number" step="0.1" name="weight_kg" class="pf-input"></div>
-        <div class="pf-form-group"><label class="pf-label">Pain Score (0-10)</label>
+        <div class="pf-form-group"><label class="pf-label">{{ t('Pain Score (0-10)', 'درجة الألم (0-10)') }}</label>
           <input type="number" min="0" max="10" name="pain_score" class="pf-input"></div>
-        <div class="pf-form-group"><label class="pf-label">Food Intake</label>
-          <input type="text" name="food_intake" class="pf-input" placeholder="Full / Half / Refused"></div>
-        <div class="pf-form-group"><label class="pf-label">Fluid In (mL)</label>
+        <div class="pf-form-group"><label class="pf-label">{{ t('Food Intake', 'كمية الطعام') }}</label>
+          <input type="text" name="food_intake" class="pf-input" placeholder="{{ t('Full / Half / Refused', 'كامل / نصف / رفض') }}"></div>
+        <div class="pf-form-group"><label class="pf-label">{{ t('Fluid In (mL)', 'السوائل الداخلة (مل)') }}</label>
           <input type="number" step="1" name="fluid_input" class="pf-input"></div>
-        <div class="pf-form-group"><label class="pf-label">Fluid Out (mL)</label>
+        <div class="pf-form-group"><label class="pf-label">{{ t('Fluid Out (mL)', 'السوائل الخارجة (مل)') }}</label>
           <input type="number" step="1" name="fluid_output" class="pf-input"></div>
-        <div class="pf-form-group" style="grid-column:1/-1"><label class="pf-label">Observations</label>
+        <div class="pf-form-group" style="grid-column:1/-1"><label class="pf-label">{{ t('Observations', 'الملاحظات') }}</label>
           <textarea name="observations" class="pf-input" rows="3"></textarea></div>
-        <div class="pf-form-group" style="grid-column:1/-1"><label class="pf-label">Treatment Given</label>
+        <div class="pf-form-group" style="grid-column:1/-1"><label class="pf-label">{{ t('Treatment Given', 'العلاج المُعطى') }}</label>
           <textarea name="treatment_given" class="pf-input" rows="2"></textarea></div>
       </div>
       <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
-        <button type="button" onclick="document.getElementById('roundModal').style.display='none'" class="pf-btn pf-btn-secondary">Cancel</button>
-        <button type="submit" class="pf-btn pf-btn-primary">Save Round</button>
+        <button type="button" onclick="document.getElementById('roundModal').style.display='none'" class="pf-btn pf-btn-secondary">{{ t('Cancel', 'إلغاء') }}</button>
+        <button type="submit" class="pf-btn pf-btn-primary">{{ t('Save Round', 'حفظ الجولة') }}</button>
       </div>
     </form>
   </div>
@@ -165,24 +165,24 @@
 {# Med modal #}
 <div id="medModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
   <div class="pf-card" style="width:480px;max-width:95vw">
-    <h3 style="margin-bottom:1rem">💊 Record Medication</h3>
+    <h3 style="margin-bottom:1rem">{{ t('💊 Record Medication', '💊 تسجيل دواء') }}</h3>
     <form method="post" action="{{ url_for('inpatient.add_med', stay_id=stay.id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="pf-form-grid">
-        <div class="pf-form-group" style="grid-column:1/-1"><label class="pf-label">Medication *</label>
+        <div class="pf-form-group" style="grid-column:1/-1"><label class="pf-label">{{ t('Medication *', 'الدواء *') }}</label>
           <input type="text" name="medication" class="pf-input" required></div>
-        <div class="pf-form-group"><label class="pf-label">Dose</label>
+        <div class="pf-form-group"><label class="pf-label">{{ t('Dose', 'الجرعة') }}</label>
           <input type="text" name="dose" class="pf-input" placeholder="10mg/kg"></div>
-        <div class="pf-form-group"><label class="pf-label">Route</label>
+        <div class="pf-form-group"><label class="pf-label">{{ t('Route', 'طريقة الإعطاء') }}</label>
           <select name="route" class="pf-input">
             {% for r in routes_list %}<option>{{ r }}</option>{% endfor %}
           </select></div>
-        <div class="pf-form-group" style="grid-column:1/-1"><label class="pf-label">Notes</label>
+        <div class="pf-form-group" style="grid-column:1/-1"><label class="pf-label">{{ t('Notes', 'ملاحظات') }}</label>
           <input type="text" name="notes" class="pf-input"></div>
       </div>
       <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
-        <button type="button" onclick="document.getElementById('medModal').style.display='none'" class="pf-btn pf-btn-secondary">Cancel</button>
-        <button type="submit" class="pf-btn" style="background:#7c3aed;color:#fff">Record</button>
+        <button type="button" onclick="document.getElementById('medModal').style.display='none'" class="pf-btn pf-btn-secondary">{{ t('Cancel', 'إلغاء') }}</button>
+        <button type="submit" class="pf-btn" style="background:#7c3aed;color:#fff">{{ t('Record', 'تسجيل') }}</button>
       </div>
     </form>
   </div>
@@ -191,17 +191,17 @@
 {# Discharge modal #}
 <div id="dischargeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
   <div class="pf-card" style="width:500px;max-width:95vw">
-    <h3 style="margin-bottom:1rem;color:#16a34a">✔ Discharge Patient</h3>
+    <h3 style="margin-bottom:1rem;color:#16a34a">{{ t('✔ Discharge Patient', '✔ تخريج المريض') }}</h3>
     <p style="font-size:.9rem;color:var(--cl-muted);margin-bottom:1rem">
-      This will mark the stay as Discharged. Billing can then be generated from Finance.
+      {{ t('This will mark the stay as Discharged. Billing can then be generated from Finance.', 'سيتم تعليم الإقامة كمنتهية. يمكن بعدها إصدار الفاتورة من وحدة المالية.') }}
     </p>
     <form method="post" action="{{ url_for('inpatient.discharge', stay_id=stay.id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label class="pf-label">Discharge Notes / Owner Instructions</label>
-      <textarea name="discharge_notes" class="pf-input" rows="4" placeholder="Follow-up date, medications to continue, diet, activity restrictions…"></textarea>
+      <label class="pf-label">{{ t('Discharge Notes / Owner Instructions', 'ملاحظات الخروج / تعليمات المالك') }}</label>
+      <textarea name="discharge_notes" class="pf-input" rows="4" placeholder="{{ t('Follow-up date, medications to continue, diet, activity restrictions…', 'تاريخ المتابعة، الأدوية المستمرة، النظام الغذائي، قيود النشاط…') }}"></textarea>
       <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
-        <button type="button" onclick="document.getElementById('dischargeModal').style.display='none'" class="pf-btn pf-btn-secondary">Cancel</button>
-        <button type="submit" class="pf-btn" style="background:#16a34a;color:#fff">Confirm Discharge</button>
+        <button type="button" onclick="document.getElementById('dischargeModal').style.display='none'" class="pf-btn pf-btn-secondary">{{ t('Cancel', 'إلغاء') }}</button>
+        <button type="submit" class="pf-btn" style="background:#16a34a;color:#fff">{{ t('Confirm Discharge', 'تأكيد الخروج') }}</button>
       </div>
     </form>
   </div>

@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
 {% block title %}Schedule — {{ day_str }}{% endblock %}
-{% block page_title %}📅 Daily Schedule{% endblock %}
+{% block page_title %}{{ t('📅 Daily Schedule', '📅 الجدول اليومي') }}{% endblock %}
 {% block page_sub %}{{ day.strftime('%A, %d %B %Y') }}{% if day_str == today_str %} — Today{% endif %}{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('appointments.appt_new', date=day_str) }}" class="pf-btn pf-btn-primary">
-    ➕ New Appointment
+    {{ t('➕ New Appointment', '➕ موعد جديد') }}
   </a>
   <a href="{{ url_for('appointments.calendar') }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">
-    📆 Week View
+    {{ t('📆 Week View', '📆 عرض الأسبوع') }}
   </a>
 {% endblock %}
 
@@ -161,15 +161,15 @@
 
 <!-- Day navigation -->
 <div class="day-nav">
-  <a href="{{ url_for('appointments.schedule', date=prev_day) }}" class="day-nav-btn">← Prev</a>
+  <a href="{{ url_for('appointments.schedule', date=prev_day) }}" class="day-nav-btn">{{ t('← Prev', '← السابق') }}</a>
   <div class="day-nav-date">
     {{ day.strftime('%A, %d %B %Y') }}
-    {% if day_str == today_str %}<span class="today-badge">Today</span>{% endif %}
+    {% if day_str == today_str %}<span class="today-badge">{{ t('Today', 'اليوم') }}</span>{% endif %}
   </div>
   <form method="get" action="{{ url_for('appointments.schedule') }}" class="today-input-wrap">
     <input type="date" name="date" value="{{ day_str }}" onchange="this.form.submit()">
   </form>
-  <a href="{{ url_for('appointments.schedule', date=next_day) }}" class="day-nav-btn">Next →</a>
+  <a href="{{ url_for('appointments.schedule', date=next_day) }}" class="day-nav-btn">{{ t('Next →', 'التالي ←') }}</a>
 </div>
 
 <!-- Stats -->
@@ -177,22 +177,22 @@
   <div class="stat-card">
     <div class="stat-icon">📋</div>
     <div class="stat-value">{{ total }}</div>
-    <div class="stat-label">Total</div>
+    <div class="stat-label">{{ t('Total', 'الإجمالي') }}</div>
   </div>
   <div class="stat-card s-pending">
     <div class="stat-icon">🕐</div>
     <div class="stat-value">{{ pending }}</div>
-    <div class="stat-label">Pending</div>
+    <div class="stat-label">{{ t('Pending', 'قيد الانتظار') }}</div>
   </div>
   <div class="stat-card s-checkin">
     <div class="stat-icon">🏥</div>
     <div class="stat-value">{{ checked_in }}</div>
-    <div class="stat-label">Checked In</div>
+    <div class="stat-label">{{ t('Checked In', 'تم الوصول') }}</div>
   </div>
   <div class="stat-card s-complete">
     <div class="stat-icon">✅</div>
     <div class="stat-value">{{ completed }}</div>
-    <div class="stat-label">Completed</div>
+    <div class="stat-label">{{ t('Completed', 'مكتمل') }}</div>
   </div>
 </div>
 
@@ -212,8 +212,8 @@
           <div class="appt-block-top">
             <span class="appt-time">{{ appt.appt_start[:5] }}{% if appt.appt_end %} – {{ appt.appt_end[:5] }}{% endif %}</span>
             <span class="appt-type">{{ appt.appointment_type }}</span>
-            {% if appt.priority == 'Urgent' %}<span class="priority-urgent">⚡ Urgent</span>{% endif %}
-            {% if appt.priority == 'Emergency' %}<span class="priority-emergency">🚨 Emergency</span>{% endif %}
+            {% if appt.priority == 'Urgent' %}<span class="priority-urgent">{{ t('⚡ Urgent', '⚡ عاجل') }}</span>{% endif %}
+            {% if appt.priority == 'Emergency' %}<span class="priority-emergency">{{ t('🚨 Emergency', '🚨 طوارئ') }}</span>{% endif %}
             <span class="status-badge st-{{ sc }}">{{ appt.status }}</span>
           </div>
           <div class="appt-meta">
@@ -234,7 +234,7 @@
       {% endfor %}
     </div>
     {% else %}
-    <div class="slot-empty">No appointments</div>
+    <div class="slot-empty">{{ t('No appointments', 'لا توجد مواعيد') }}</div>
     {% endif %}
   </div>
   {% endfor %}
@@ -247,7 +247,7 @@
     <p>No appointments scheduled for {{ day.strftime('%d %B %Y') }}</p>
     <a href="{{ url_for('appointments.appt_new', date=day_str) }}"
        class="pf-btn pf-btn-primary" style="margin-top:14px;display:inline-block;">
-      ➕ Book Appointment
+      {{ t('➕ Book Appointment', '➕ حجز موعد') }}
     </a>
   </div>
 </div>

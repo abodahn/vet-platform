@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}Inventory Reports{% endblock %}
-{% block page_title %}Inventory Reports{% endblock %}
+{% block title %}{{ t('Inventory Reports', 'تقارير المخزون') }}{% endblock %}
+{% block page_title %}{{ t('Inventory Reports', 'تقارير المخزون') }}{% endblock %}
 {% block page_sub %}Stock value, low stock alerts, and expiry tracking{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('reports.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
-<a href="{{ url_for('reports.financial') }}" class="pf-btn pf-btn-secondary">💰 Financial</a>
+<a href="{{ url_for('reports.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
+<a href="{{ url_for('reports.financial') }}" class="pf-btn pf-btn-secondary">{{ t('💰 Financial', '💰 مالي') }}</a>
 <a href="{{ url_for('reports.inventory_export_xlsx') }}"
-   class="pf-btn" style="background:#16a34a;color:#fff">📊 Export Excel</a>
+   class="pf-btn" style="background:#16a34a;color:#fff">{{ t('📊 Export Excel', '📊 تصدير Excel') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -46,8 +46,8 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>Category</th>
-          <th>Items</th>
+          <th>{{ t('Category', 'الفئة') }}</th>
+          <th>{{ t('Items', 'الأصناف') }}</th>
           <th>Value (EGP)</th>
         </tr>
       </thead>
@@ -78,9 +78,9 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Item</th>
-            <th>Category</th>
-            <th>Stock</th>
+            <th>{{ t('Item', 'الصنف') }}</th>
+            <th>{{ t('Category', 'الفئة') }}</th>
+            <th>{{ t('Stock', 'المخزون') }}</th>
             <th>Reorder</th>
           </tr>
         </thead>
@@ -111,10 +111,10 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>Item</th>
+          <th>{{ t('Item', 'الصنف') }}</th>
           <th>Batch #</th>
-          <th>Qty</th>
-          <th>Expiry Date</th>
+          <th>{{ t('Qty', 'الكمية') }}</th>
+          <th>{{ t('Expiry Date', 'تاريخ الانتهاء') }}</th>
           <th>Urgency</th>
         </tr>
       </thead>

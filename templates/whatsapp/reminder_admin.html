@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Reminder Admin{% endblock %}
-{% block page_title %}Reminder Admin{% endblock %}
-{% block page_sub %}View, create, and manually trigger WhatsApp reminders{% endblock %}
+{% block title %}{{ t('Reminder Admin', 'إدارة التذكيرات') }}{% endblock %}
+{% block page_title %}{{ t('Reminder Admin', 'إدارة التذكيرات') }}{% endblock %}
+{% block page_sub %}{{ t('View, create, and manually trigger WhatsApp reminders', 'عرض وإنشاء وتشغيل تذكيرات واتساب يدوياً') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">← Control Center</a>
+<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">{{ t('← Control Center', '← مركز التحكم') }}</a>
 <form method="post" action="{{ url_for('whatsapp.reminder_trigger') }}" style="display:inline">
   <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
   <button type="submit" class="pf-btn pf-btn-primary"
           onclick="return confirm('Run the reminder job now?')">
-    ▶ Run Reminder Job Now
+    {{ t('▶ Run Reminder Job Now', '▶ تشغيل مهمة التذكير الآن') }}
   </button>
 </form>
 {% endblock %}
@@ -58,54 +58,54 @@ textarea { min-height:70px; resize:vertical; }
 <div class="ra-stats">
   <div class="ra-stat pending">
     <div class="num">{{ pending_count }}</div>
-    <div class="lbl">⏳ Pending</div>
+    <div class="lbl">{{ t('⏳ Pending', '⏳ قيد الانتظار') }}</div>
   </div>
   <div class="ra-stat sent">
     <div class="num">{{ sent_count }}</div>
-    <div class="lbl">✅ Sent</div>
+    <div class="lbl">{{ t('✅ Sent', '✅ أُرسلت') }}</div>
   </div>
   <div class="ra-stat failed">
     <div class="num">{{ failed_count }}</div>
-    <div class="lbl">❌ Failed</div>
+    <div class="lbl">{{ t('❌ Failed', '❌ فشلت') }}</div>
   </div>
 </div>
 
 <!-- Create New Reminder -->
 <div class="new-rem-form">
-  <h3>➕ Create Manual Reminder</h3>
+  <h3>{{ t('➕ Create Manual Reminder', '➕ إنشاء تذكير يدوي') }}</h3>
   <form method="post" action="{{ url_for('whatsapp.reminder_create') }}">
     <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
     <div class="form-row">
       <div>
-        <label>Owner ID *</label>
-        <input type="number" name="owner_id" required placeholder="Owner ID">
+        <label>{{ t('Owner ID *', 'رقم المالك *') }}</label>
+        <input type="number" name="owner_id" required placeholder="{{ t('Owner ID', 'رقم المالك') }}">
       </div>
       <div>
-        <label>Pet ID (optional)</label>
-        <input type="number" name="pet_id" placeholder="Pet ID">
+        <label>{{ t('Pet ID (optional)', 'رقم الحيوان (اختياري)') }}</label>
+        <input type="number" name="pet_id" placeholder="{{ t('Pet ID', 'رقم الحيوان') }}">
       </div>
       <div>
-        <label>Reminder Type</label>
+        <label>{{ t('Reminder Type', 'نوع التذكير') }}</label>
         <select name="reminder_type">
-          <option value="appointment">Appointment</option>
-          <option value="vaccine">Vaccine</option>
-          <option value="followup">Follow-up</option>
-          <option value="medication">Medication</option>
-          <option value="custom" selected>Custom</option>
+          <option value="appointment">{{ t('Appointment', 'موعد') }}</option>
+          <option value="vaccine">{{ t('Vaccine', 'اللقاح') }}</option>
+          <option value="followup">{{ t('Follow-up', 'المتابعة') }}</option>
+          <option value="medication">{{ t('Medication', 'دواء') }}</option>
+          <option value="custom" selected>{{ t('Custom', 'مخصص') }}</option>
         </select>
       </div>
     </div>
     <div class="form-row-wide">
       <div>
-        <label>Scheduled For *</label>
+        <label>{{ t('Scheduled For *', 'مجدول لـ *') }}</label>
         <input type="datetime-local" name="scheduled_for" required>
       </div>
       <div>
-        <label>Message *</label>
+        <label>{{ t('Message *', 'الرسالة *') }}</label>
         <textarea name="message" required placeholder="Dear {name}, your appointment is tomorrow…"></textarea>
       </div>
     </div>
-    <button type="submit" class="pf-btn pf-btn-primary" style="margin-top:14px">💾 Create Reminder</button>
+    <button type="submit" class="pf-btn pf-btn-primary" style="margin-top:14px">{{ t('💾 Create Reminder', '💾 إنشاء تذكير') }}</button>
   </form>
 </div>
 
@@ -114,7 +114,7 @@ textarea { min-height:70px; resize:vertical; }
 <div class="section-title" style="color:#dc2626">🔴 Overdue Reminders ({{ overdue|length }})</div>
 <div style="overflow-x:auto;margin-bottom:24px">
   <table class="rem-table">
-    <thead><tr><th>Scheduled</th><th>Owner</th><th>Pet</th><th>Type</th><th>Message</th><th>Actions</th></tr></thead>
+    <thead><tr><th>{{ t('Scheduled', 'مجدول') }}</th><th>{{ t('Owner', 'المالك') }}</th><th>{{ t('Pet', 'الحيوان') }}</th><th>{{ t('Type', 'النوع') }}</th><th>{{ t('Message', 'الرسالة') }}</th><th>{{ t('Actions', 'إجراءات') }}</th></tr></thead>
     <tbody>
       {% for r in overdue %}
       <tr class="overdue-row">
@@ -130,7 +130,7 @@ textarea { min-height:70px; resize:vertical; }
           <div style="display:flex;gap:6px">
             <form method="post" action="{{ url_for('whatsapp.reminder_send_now', rid=r.id) }}" style="display:inline">
               <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
-              <button class="btn-sm btn-send-now" type="submit">📱 Send Now</button>
+              <button class="btn-sm btn-send-now" type="submit">{{ t('📱 Send Now', '📱 إرسال الآن') }}</button>
             </form>
             <form method="post" action="{{ url_for('whatsapp.reminder_cancel', rid=r.id) }}" style="display:inline">
               <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
@@ -150,7 +150,7 @@ textarea { min-height:70px; resize:vertical; }
 {% if upcoming %}
 <div style="overflow-x:auto;margin-bottom:24px">
   <table class="rem-table">
-    <thead><tr><th>Scheduled</th><th>Owner</th><th>Pet</th><th>Type</th><th>Message</th><th>Actions</th></tr></thead>
+    <thead><tr><th>{{ t('Scheduled', 'مجدول') }}</th><th>{{ t('Owner', 'المالك') }}</th><th>{{ t('Pet', 'الحيوان') }}</th><th>{{ t('Type', 'النوع') }}</th><th>{{ t('Message', 'الرسالة') }}</th><th>{{ t('Actions', 'إجراءات') }}</th></tr></thead>
     <tbody>
       {% for r in upcoming %}
       <tr>
@@ -166,7 +166,7 @@ textarea { min-height:70px; resize:vertical; }
           <div style="display:flex;gap:6px">
             <form method="post" action="{{ url_for('whatsapp.reminder_send_now', rid=r.id) }}" style="display:inline">
               <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
-              <button class="btn-sm btn-send-now" type="submit">📱 Send Now</button>
+              <button class="btn-sm btn-send-now" type="submit">{{ t('📱 Send Now', '📱 إرسال الآن') }}</button>
             </form>
             <form method="post" action="{{ url_for('whatsapp.reminder_cancel', rid=r.id) }}" style="display:inline">
               <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
@@ -181,12 +181,12 @@ textarea { min-height:70px; resize:vertical; }
 </div>
 {% else %}
 <div style="text-align:center;padding:40px;color:var(--cl-muted);background:var(--cl-surface);border-radius:10px;margin-bottom:24px">
-  🎉 No upcoming reminders
+  {{ t('🎉 No upcoming reminders', '🎉 لا توجد تذكيرات قادمة') }}
 </div>
 {% endif %}
 
 <!-- Run Log -->
-<div class="section-title">📋 Reminder Run Log</div>
+<div class="section-title">{{ t('📋 Reminder Run Log', '📋 سجل تشغيل التذكيرات') }}</div>
 {% if run_log %}
 <div class="run-log" style="margin-bottom:24px">
   {% for run in run_log %}

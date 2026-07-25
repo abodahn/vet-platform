@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Performance Reviews{% endblock %}
-{% block page_title %}Performance Reviews{% endblock %}
-{% block page_sub %}Staff evaluation and goal tracking{% endblock %}
+{% block title %}{{ t('Performance Reviews','تقييمات الأداء') }}{% endblock %}
+{% block page_title %}{{ t('Performance Reviews','تقييمات الأداء') }}{% endblock %}
+{% block page_sub %}{{ t('Staff evaluation and goal tracking','تقييم الموظفين ومتابعة الأهداف') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.performance_new') }}" class="pf-btn pf-btn-primary">+ New Review</a>
-<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">HR Dashboard</a>
+<a href="{{ url_for('hr.performance_new') }}" class="pf-btn pf-btn-primary">+ {{ t('New Review','تقييم جديد') }}</a>
+<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('HR Dashboard','لوحة الموارد البشرية') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -31,23 +31,23 @@
 {% block content %}
 <div class="perf-filter">
   <form method="get" style="display:contents">
-    <input type="text" name="period" value="{{ period_filter or '' }}" placeholder="Period (e.g. 2025-Q2)" style="min-width:160px">
+    <input type="text" name="period" value="{{ period_filter or '' }}" placeholder="{{ t('Period (e.g. 2025-Q2)','الفترة (مثال: 2025-Q2)') }}" style="min-width:160px">
     {% if is_manager %}
     <select name="user_id">
-      <option value="">All Staff</option>
+      <option value="">{{ t('All Staff','جميع الموظفين') }}</option>
       {% for s in staff_list %}
       <option value="{{ s.id }}" {% if uid_filter == s.id|string %}selected{% endif %}>{{ s.full_name }}</option>
       {% endfor %}
     </select>
     {% endif %}
     <select name="status">
-      <option value="">All Statuses</option>
+      <option value="">{{ t('All Statuses','جميع الحالات') }}</option>
       {% for st in ['Draft','Submitted','Acknowledged'] %}
-      <option value="{{ st }}" {% if status_filter == st %}selected{% endif %}>{{ st }}</option>
+      <option value="{{ st }}" {% if status_filter == st %}selected{% endif %}>{{ t(st, {'Draft':'مسودة','Submitted':'مُرسل','Acknowledged':'مُعتمد'}.get(st,'')) }}</option>
       {% endfor %}
     </select>
-    <button type="submit">Filter</button>
-    <a href="{{ url_for('hr.performance_list') }}" class="pf-btn pf-btn-secondary pf-btn-sm">Reset</a>
+    <button type="submit">{{ t('Filter','تصفية') }}</button>
+    <a href="{{ url_for('hr.performance_list') }}" class="pf-btn pf-btn-secondary pf-btn-sm">{{ t('Reset','إعادة تعيين') }}</a>
   </form>
 </div>
 
@@ -56,12 +56,12 @@
   <table class="perf-table">
     <thead>
       <tr>
-        <th>Staff</th>
-        <th>Period</th>
-        <th>Rating</th>
-        <th>Reviewer</th>
-        <th>Status</th>
-        <th>Date</th>
+        <th>{{ t('Staff','الموظف') }}</th>
+        <th>{{ t('Period','الفترة') }}</th>
+        <th>{{ t('Rating','التقييم') }}</th>
+        <th>{{ t('Reviewer','المقيّم') }}</th>
+        <th>{{ t('Status','الحالة') }}</th>
+        <th>{{ t('Date','التاريخ') }}</th>
         <th></th>
       </tr>
     </thead>
@@ -87,20 +87,20 @@
         <td style="color:var(--cl-muted)">{{ r.reviewer_name or '—' }}</td>
         <td>
           {% if r.status == 'Draft' %}
-            <span class="status-chip chip-draft">Draft</span>
+            <span class="status-chip chip-draft">{{ t('Draft','مسودة') }}</span>
           {% elif r.status == 'Submitted' %}
-            <span class="status-chip chip-submitted">Submitted</span>
+            <span class="status-chip chip-submitted">{{ t('Submitted','مُرسل') }}</span>
           {% elif r.status == 'Acknowledged' %}
-            <span class="status-chip chip-acknowledged">Acknowledged</span>
+            <span class="status-chip chip-acknowledged">{{ t('Acknowledged','مُعتمد') }}</span>
           {% else %}
             <span class="status-chip chip-draft">{{ r.status }}</span>
           {% endif %}
         </td>
         <td style="font-size:12px;color:var(--cl-muted)">{{ r.reviewed_at or r.created_at[:10] if r.created_at else '—' }}</td>
         <td>
-          <a href="{{ url_for('hr.performance_detail', rev_id=r.id) }}" class="pf-btn pf-btn-sm">View</a>
+          <a href="{{ url_for('hr.performance_detail', rev_id=r.id) }}" class="pf-btn pf-btn-sm">{{ t('View','عرض') }}</a>
           {% if r.status != 'Acknowledged' %}
-          <a href="{{ url_for('hr.performance_edit', rev_id=r.id) }}" class="pf-btn pf-btn-sm">Edit</a>
+          <a href="{{ url_for('hr.performance_edit', rev_id=r.id) }}" class="pf-btn pf-btn-sm">{{ t('Edit','تعديل') }}</a>
           {% endif %}
         </td>
       </tr>
@@ -111,8 +111,8 @@
 {% else %}
 <div style="text-align:center;padding:60px 20px;color:var(--cl-muted)">
   <div style="font-size:48px;margin-bottom:12px">📋</div>
-  <div style="font-size:18px;font-weight:600;margin-bottom:8px">No performance reviews found</div>
-  <div><a href="{{ url_for('hr.performance_new') }}">Create the first review</a></div>
+  <div style="font-size:18px;font-weight:600;margin-bottom:8px">{{ t('No performance reviews found','لا توجد تقييمات أداء') }}</div>
+  <div><a href="{{ url_for('hr.performance_new') }}">{{ t('Create the first review','أنشئ أول تقييم') }}</a></div>
 </div>
 {% endif %}
 {% endblock %}

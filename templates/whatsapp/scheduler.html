@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}WhatsApp Scheduler{% endblock %}
-{% block page_title %}WhatsApp Reminder Scheduler{% endblock %}
-{% block page_sub %}Manual triggers, history & queue status{% endblock %}
+{% block title %}{{ t('WhatsApp Scheduler', 'مجدول واتساب') }}{% endblock %}
+{% block page_title %}{{ t('WhatsApp Reminder Scheduler', 'مجدول تذكيرات واتساب') }}{% endblock %}
+{% block page_sub %}{{ t('Manual triggers, history & queue status', 'التشغيل اليدوي والسجل وحالة الطابور') }}{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">← Control Center</a>
+<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">{{ t('← Control Center', '← مركز التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -27,28 +27,28 @@
 <!-- Queue overview -->
 <div class="sch-grid">
   <div class="sch-card">
-    <h3>📅 Tomorrow's Appointments</h3>
+    <h3>{{ t("📅 Tomorrow's Appointments", '📅 مواعيد الغد') }}</h3>
     <div class="sch-big">{{ upcoming_appts }}</div>
-    <div class="sch-label">owners with WhatsApp who have appointments tomorrow</div>
+    <div class="sch-label">{{ t('owners with WhatsApp who have appointments tomorrow', 'مالك لديهم واتساب ولديهم مواعيد غداً') }}</div>
   </div>
   <div class="sch-card">
-    <h3>💉 Overdue Vaccines</h3>
+    <h3>{{ t('💉 Overdue Vaccines', '💉 تطعيمات متأخرة') }}</h3>
     <div class="sch-big" style="color:var(--pf-error,#dc2626)">{{ overdue_vaccines }}</div>
-    <div class="sch-label">pets with vaccine due or overdue (owner has WhatsApp)</div>
+    <div class="sch-label">{{ t('pets with vaccine due or overdue (owner has WhatsApp)', 'حيوان لديه تطعيم مستحق أو متأخر (المالك لديه واتساب)') }}</div>
   </div>
   <div class="sch-card">
-    <h3>🧾 Unpaid Invoices</h3>
+    <h3>{{ t('🧾 Unpaid Invoices', '🧾 فواتير غير مدفوعة') }}</h3>
     <div class="sch-big" style="color:#d97706">{{ overdue_invoices }}</div>
-    <div class="sch-label">owners with unpaid invoices and WhatsApp</div>
+    <div class="sch-label">{{ t('owners with unpaid invoices and WhatsApp', 'مالك لديهم فواتير غير مدفوعة وواتساب') }}</div>
   </div>
 </div>
 
 <!-- Manual trigger -->
 <div class="pf-card" style="margin-bottom:24px">
   <div class="pf-card-header">
-    <h3 class="pf-card-title">⚡ Manual Trigger</h3>
+    <h3 class="pf-card-title">{{ t('⚡ Manual Trigger', '⚡ تشغيل يدوي') }}</h3>
     <span style="font-size:.8rem;color:var(--cl-muted)">
-      Normally runs automatically at 09:00 daily. Use these buttons to trigger right now.
+      {{ t('Normally runs automatically at 09:00 daily. Use these buttons to trigger right now.', 'تعمل تلقائياً الساعة 09:00 يومياً. استخدم هذه الأزرار للتشغيل الآن.') }}
     </span>
   </div>
   <div style="padding:1.25rem" class="sch-actions">
@@ -56,34 +56,34 @@
       <input type="hidden" name="type" value="all">
       <button type="submit" class="pf-btn pf-btn-primary"
               onclick="return confirm('Run ALL reminder jobs now? This will send real WhatsApp messages.')">
-        🚀 Run All Jobs Now
+        {{ t('🚀 Run All Jobs Now', '🚀 تشغيل كل المهام الآن') }}
       </button>
     </form>
     <form method="post" action="{{ url_for('whatsapp.scheduler_run') }}" style="display:inline">
       <input type="hidden" name="type" value="appt">
       <button type="submit" class="pf-btn pf-btn-secondary"
               onclick="return confirm('Send appointment reminders now?')">
-        📅 Appointment Reminders
+        {{ t('📅 Appointment Reminders', '📅 تذكيرات المواعيد') }}
       </button>
     </form>
     <form method="post" action="{{ url_for('whatsapp.scheduler_run') }}" style="display:inline">
       <input type="hidden" name="type" value="vaccine">
       <button type="submit" class="pf-btn pf-btn-secondary"
               onclick="return confirm('Send vaccine reminders now?')">
-        💉 Vaccine Reminders
+        {{ t('💉 Vaccine Reminders', '💉 تذكيرات التطعيم') }}
       </button>
     </form>
     <form method="post" action="{{ url_for('whatsapp.scheduler_run') }}" style="display:inline">
       <input type="hidden" name="type" value="invoice">
       <button type="submit" class="pf-btn pf-btn-secondary"
               onclick="return confirm('Send invoice reminders now?')">
-        🧾 Invoice Reminders
+        {{ t('🧾 Invoice Reminders', '🧾 تذكيرات الفواتير') }}
       </button>
     </form>
     <form method="post" action="{{ url_for('whatsapp.scheduler_clear_history') }}" style="display:inline;margin-left:auto">
       <button type="submit" class="pf-btn pf-btn-ghost" style="color:var(--pf-error)"
               onclick="return confirm('Clear history older than 30 days?')">
-        🗑 Clear Old History
+        {{ t('🗑 Clear Old History', '🗑 مسح السجل القديم') }}
       </button>
     </form>
   </div>
@@ -98,7 +98,7 @@
       <span class="job-badge job-{{ type }}">{{ type.replace('_',' ').title() }}</span>
     </div>
     <div class="sch-big" style="font-size:22px">{{ count }}</div>
-    <div class="sch-label">total sent (all time)</div>
+    <div class="sch-label">{{ t('total sent (all time)', 'إجمالي المرسل (الإجمالي الكلي)') }}</div>
   </div>
   {% endfor %}
 </div>
@@ -107,16 +107,16 @@
 <!-- History table -->
 <div class="pf-card">
   <div class="pf-card-header">
-    <h3 class="pf-card-title">📋 Reminder History</h3>
+    <h3 class="pf-card-title">{{ t('📋 Reminder History', '📋 سجل التذكيرات') }}</h3>
   </div>
   <table class="pf-table">
     <thead>
       <tr>
         <th>#</th>
-        <th>Type</th>
-        <th>Entity</th>
-        <th>Status</th>
-        <th>Sent At</th>
+        <th>{{ t('Type', 'النوع') }}</th>
+        <th>{{ t('Entity', 'الكيان') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
+        <th>{{ t('Sent At', 'أُرسلت في') }}</th>
       </tr>
     </thead>
     <tbody>

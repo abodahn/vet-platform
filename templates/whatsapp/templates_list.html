@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}WhatsApp Templates{% endblock %}
-{% block page_title %}WhatsApp Templates{% endblock %}
-{% block page_sub %}Manage message templates for WhatsApp communication{% endblock %}
+{% block title %}{{ t('WhatsApp Templates', 'قوالب واتساب') }}{% endblock %}
+{% block page_title %}{{ t('WhatsApp Templates', 'قوالب واتساب') }}{% endblock %}
+{% block page_sub %}{{ t('Manage message templates for WhatsApp communication', 'إدارة قوالب الرسائل للتواصل عبر واتساب') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.template_new') }}" class="pf-btn pf-btn-primary">➕ New Template</a>
-<a href="{{ url_for('whatsapp.message_log') }}" class="pf-btn pf-btn-secondary">📋 Message Log</a>
-<a href="{{ url_for('whatsapp.reminders') }}" class="pf-btn pf-btn-secondary">🔔 Reminders</a>
+<a href="{{ url_for('whatsapp.template_new') }}" class="pf-btn pf-btn-primary">{{ t('➕ New Template', '➕ قالب جديد') }}</a>
+<a href="{{ url_for('whatsapp.message_log') }}" class="pf-btn pf-btn-secondary">{{ t('📋 Message Log', '📋 سجل الرسائل') }}</a>
+<a href="{{ url_for('whatsapp.reminders') }}" class="pf-btn pf-btn-secondary">{{ t('🔔 Reminders', '🔔 التذكيرات') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -108,8 +108,8 @@ details[open] summary { margin-bottom:8px; }
 
 {# --- Build category counts --- #}
 {% set counts = {'all': templates|length, 'appointment': 0, 'followup': 0, 'vaccine': 0, 'campaign': 0} %}
-{% for t in templates %}
-  {% set sc = t.scenario or 'custom' %}
+{% for tpl in templates %}
+  {% set sc = tpl.scenario or 'custom' %}
   {% if sc == 'appointment' %}{% set _ = counts.update({'appointment': counts.appointment + 1}) %}
   {% elif sc == 'followup' %}{% set _ = counts.update({'followup': counts.followup + 1}) %}
   {% elif sc == 'vaccine' %}{% set _ = counts.update({'vaccine': counts.vaccine + 1}) %}
@@ -119,26 +119,26 @@ details[open] summary { margin-bottom:8px; }
 {# --- Category tabs --- #}
 <div class="cat-tabs">
   <div class="cat-tab tab-all active" onclick="filterCat('all', this)">
-    📋 All <span class="count">{{ counts.all }}</span>
+    {{ t('📋 All', '📋 الكل') }} <span class="count">{{ counts.all }}</span>
   </div>
   <div class="cat-tab tab-appointment" onclick="filterCat('appointment', this)">
-    📅 Appointment <span class="count">{{ counts.appointment }}</span>
+    {{ t('📅 Appointment', '📅 موعد') }} <span class="count">{{ counts.appointment }}</span>
   </div>
   <div class="cat-tab tab-followup" onclick="filterCat('followup', this)">
-    🔄 Follow-up <span class="count">{{ counts.followup }}</span>
+    {{ t('🔄 Follow-up', '🔄 متابعة') }} <span class="count">{{ counts.followup }}</span>
   </div>
   <div class="cat-tab tab-vaccine" onclick="filterCat('vaccine', this)">
-    💉 Vaccine <span class="count">{{ counts.vaccine }}</span>
+    {{ t('💉 Vaccine', '💉 تطعيم') }} <span class="count">{{ counts.vaccine }}</span>
   </div>
   <div class="cat-tab tab-campaign" onclick="filterCat('campaign', this)">
-    📢 Campaign &amp; Other <span class="count">{{ counts.campaign }}</span>
+    {{ t('📢 Campaign &amp; Other', '📢 حملة وأخرى') }} <span class="count">{{ counts.campaign }}</span>
   </div>
 </div>
 
 {# --- Search --- #}
 <div class="tmpl-search">
   <span class="tmpl-search-icon">🔍</span>
-  <input type="text" id="tmpl-search" placeholder="Search templates by name or message…" oninput="filterSearch(this.value)">
+  <input type="text" id="tmpl-search" placeholder="{{ t('Search templates by name or message…', 'ابحث في القوالب بالاسم أو الرسالة…') }}" oninput="filterSearch(this.value)">
 </div>
 
 <div style="color:var(--cl-muted);font-size:13px;margin-bottom:16px;" id="tmpl-count">
@@ -147,34 +147,34 @@ details[open] summary { margin-bottom:8px; }
 
 {# --- Grid --- #}
 <div class="templates-grid" id="tmpl-grid">
-{% for t in templates %}
-{% set sc = t.scenario or 'custom' %}
+{% for tpl in templates %}
+{% set sc = tpl.scenario or 'custom' %}
 {% set cat_group = sc if sc in ('appointment','followup','vaccine') else 'campaign' %}
 {% set cat_cls = 'cat-' ~ sc %}
 
 <div class="tmpl-card"
      data-scenario="{{ sc }}"
      data-group="{{ cat_group }}"
-     data-search="{{ (t.name ~ ' ' ~ (t.template_text or ''))|lower }}">
+     data-search="{{ (tpl.name ~ ' ' ~ (tpl.template_text or ''))|lower }}">
 
   <div class="tmpl-header">
     <div>
-      <div class="tmpl-name">{{ t.name.replace('_',' ').title() }}</div>
-      <div class="tmpl-name-code">{{ t.name }}</div>
+      <div class="tmpl-name">{{ tpl.name.replace('_',' ').title() }}</div>
+      <div class="tmpl-name-code">{{ tpl.name }}</div>
     </div>
     <span class="cat-badge {{ cat_cls }}">{{ sc.replace('_',' ').title() }}</span>
   </div>
 
   <details>
-    <summary>👁 Preview message</summary>
-    <div class="tmpl-preview" style="white-space:pre-wrap">{{ t.template_text or '(empty)' }}</div>
+    <summary>{{ t('👁 Preview message', '👁 معاينة الرسالة') }}</summary>
+    <div class="tmpl-preview" style="white-space:pre-wrap">{{ tpl.template_text or '(empty)' }}</div>
   </details>
 
-  {% if t.variables_json and t.variables_json != '[]' %}
+  {% if tpl.variables_json and tpl.variables_json != '[]' %}
   <div>
-    <div style="font-size:11px;font-weight:600;color:var(--cl-muted);text-transform:uppercase;margin-bottom:6px;">Variables</div>
+    <div style="font-size:11px;font-weight:600;color:var(--cl-muted);text-transform:uppercase;margin-bottom:6px;">{{ t('Variables', 'المتغيرات') }}</div>
     <div class="tmpl-vars">
-      {% set vars = t.variables_json %}
+      {% set vars = tpl.variables_json %}
       {% if vars.startswith('[') %}
         {% for v in vars[1:-1].replace('"','').replace("'",'').split(',') %}
           {% if v.strip() %}
@@ -190,15 +190,15 @@ details[open] summary { margin-bottom:8px; }
 
   <div class="tmpl-footer">
     <div class="tmpl-lang">
-      🌐 {{ 'Arabic' if t.language == 'ar' else 'English' }}
+      🌐 {{ 'Arabic' if tpl.language == 'ar' else 'English' }}
       &nbsp;·&nbsp;
-      {% if t.is_active %}<span style="color:#166534;">● Active</span>{% else %}<span style="color:#991b1b;">● Inactive</span>{% endif %}
-      {% if t.is_default %}&nbsp;·&nbsp;<span style="color:#d97706;">⭐ Default</span>{% endif %}
+      {% if tpl.is_active %}<span style="color:#166534;">{{ t('● Active', '● نشط') }}</span>{% else %}<span style="color:#991b1b;">{{ t('● Inactive', '● غير نشط') }}</span>{% endif %}
+      {% if tpl.is_default %}&nbsp;·&nbsp;<span style="color:#d97706;">{{ t('⭐ Default', '⭐ افتراضي') }}</span>{% endif %}
     </div>
     <div class="tmpl-actions">
-      <a href="{{ url_for('whatsapp.template_edit', tid=t.id) }}" class="btn-edit">✏️ Edit</a>
-      <form method="post" action="{{ url_for('whatsapp.template_delete', tid=t.id) }}"
-            onsubmit="return confirm('Delete template \'{{ t.name }}\'?')" style="margin:0">
+      <a href="{{ url_for('whatsapp.template_edit', tid=tpl.id) }}" class="btn-edit">{{ t('✏️ Edit', '✏️ تعديل') }}</a>
+      <form method="post" action="{{ url_for('whatsapp.template_delete', tid=tpl.id) }}"
+            onsubmit="return confirm('Delete template \'{{ tpl.name }}\'?')" style="margin:0">
         <input type="hidden" name="_csrf_token" value="{{ session.get('_csrf_token','') }}">
         <button type="submit" class="btn-del">🗑</button>
       </form>
@@ -210,16 +210,16 @@ details[open] summary { margin-bottom:8px; }
 
 <div id="no-results">
   <div style="font-size:40px;">🔍</div>
-  <div style="font-size:18px;font-weight:700;margin:12px 0 6px;">No templates found</div>
-  <div>Try a different search term or category.</div>
+  <div style="font-size:18px;font-weight:700;margin:12px 0 6px;">{{ t('No templates found', 'لا توجد قوالب') }}</div>
+  <div>{{ t('Try a different search term or category.', 'جرّب كلمة بحث أو فئة مختلفة.') }}</div>
 </div>
 
 {% else %}
 <div class="empty-state">
   <div style="font-size:56px;">💬</div>
-  <div style="font-size:20px;font-weight:700;margin:12px 0 8px;">No templates yet</div>
-  <div style="margin-bottom:20px;">Create your first WhatsApp message template to get started.</div>
-  <a href="{{ url_for('whatsapp.template_new') }}" class="pf-btn pf-btn-primary">➕ Create Template</a>
+  <div style="font-size:20px;font-weight:700;margin:12px 0 8px;">{{ t('No templates yet', 'لا توجد قوالب بعد') }}</div>
+  <div style="margin-bottom:20px;">{{ t('Create your first WhatsApp message template to get started.', 'أنشئ أول قالب رسالة واتساب للبدء.') }}</div>
+  <a href="{{ url_for('whatsapp.template_new') }}" class="pf-btn pf-btn-primary">{{ t('➕ Create Template', '➕ إنشاء قالب') }}</a>
 </div>
 {% endif %}
 {% endblock %}

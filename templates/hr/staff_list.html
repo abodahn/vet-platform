@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}Staff Management{% endblock %}
+{% block title %}{{ t('Staff Management','إدارة الموظفين') }}{% endblock %}
 
-{% block page_title %}Staff Management{% endblock %}
-{% block page_sub %}Manage clinic staff, roles, and access{% endblock %}
+{% block page_title %}{{ t('Staff Management','إدارة الموظفين') }}{% endblock %}
+{% block page_sub %}{{ t('Manage clinic staff, roles, and access','إدارة موظفي العيادة والأدوار والصلاحيات') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">HR Dashboard</a>
-<a href="{{ url_for('hr.staff_new') }}" class="pf-btn pf-btn-primary">+ New Staff</a>
-<a href="{{ url_for('hr.roles_list') }}" class="pf-btn pf-btn-secondary">View Roles</a>
+<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('HR Dashboard','لوحة الموارد البشرية') }}</a>
+<a href="{{ url_for('hr.staff_new') }}" class="pf-btn pf-btn-primary">+ {{ t('New Staff','موظف جديد') }}</a>
+<a href="{{ url_for('hr.roles_list') }}" class="pf-btn pf-btn-secondary">{{ t('View Roles','عرض الأدوار') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -36,11 +36,12 @@
 {% endblock %}
 
 {% block content %}
+{% set contract_labels_ar = {'Full-time':'دوام كامل','Part-time':'دوام جزئي','Contract':'عقد','Probation':'تحت التجربة','Intern':'متدرب'} %}
 <!-- Filter Bar -->
 <div class="hr-filter-bar">
   <form method="get" style="display:contents">
     <select name="role" onchange="this.form.submit()">
-      <option value="">All Roles</option>
+      <option value="">{{ t('All Roles','جميع الأدوار') }}</option>
       {% for role in roles %}
       <option value="{{ role }}" {% if role_filter == role %}selected{% endif %}>
         {{ role.replace('_',' ').title() }}
@@ -49,44 +50,44 @@
     </select>
 
     <select name="contract" onchange="this.form.submit()">
-      <option value="">All Contracts</option>
+      <option value="">{{ t('All Contracts','جميع العقود') }}</option>
       {% for ct in ['Full-time','Part-time','Contract','Probation','Intern'] %}
-      <option value="{{ ct }}" {% if contract_filter == ct %}selected{% endif %}>{{ ct }}</option>
+      <option value="{{ ct }}" {% if contract_filter == ct %}selected{% endif %}>{{ t(ct, contract_labels_ar.get(ct,'')) }}</option>
       {% endfor %}
     </select>
 
     <select name="status" onchange="this.form.submit()">
-      <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
-      <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
-      <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+      <option value="active" {% if status_filter == 'active' %}selected{% endif %}>{{ t('Active','نشط') }}</option>
+      <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>{{ t('Inactive','غير نشط') }}</option>
+      <option value="all" {% if status_filter == 'all' %}selected{% endif %}>{{ t('All','الكل') }}</option>
     </select>
 
-    <input type="text" name="q" value="{{ search }}" placeholder="Search name, title, email…" style="min-width:210px;">
-    <button type="submit">Search</button>
+    <input type="text" name="q" value="{{ search }}" placeholder="{{ t('Search name, title, email…','ابحث بالاسم أو المسمى الوظيفي أو البريد…') }}" style="min-width:210px;">
+    <button type="submit">{{ t('Search','بحث') }}</button>
     {% if role_filter or search or contract_filter or status_filter not in ('active', '') %}
-    <a href="{{ url_for('hr.staff_list') }}" style="color:var(--cl-muted);text-decoration:none;font-size:13px;">x Clear</a>
+    <a href="{{ url_for('hr.staff_list') }}" style="color:var(--cl-muted);text-decoration:none;font-size:13px;">x {{ t('Clear','مسح') }}</a>
     {% endif %}
   </form>
 </div>
 
 {% set contract_colors = {'Full-time':'#16a34a','Part-time':'#0891b2','Contract':'#d97706','Probation':'#dc2626','Intern':'#7c3aed'} %}
 
-<div class="result-count">{{ users|length }} staff member{{ 's' if users|length != 1 else '' }} found</div>
+<div class="result-count">{{ users|length }} {{ t('staff member','موظف') }}{% if current_lang != 'ar' %}{{ 's' if users|length != 1 else '' }}{% endif %} {{ t('found','موجود') }}</div>
 
 {% if users %}
 <div style="overflow-x:auto;">
   <table class="staff-table">
     <thead>
       <tr>
-        <th>Staff Member</th>
-        <th>Job Title</th>
-        <th>Role</th>
-        <th>Contract</th>
-        <th>Branch</th>
-        <th>Contact</th>
-        <th>Status</th>
-        <th>Hired</th>
-        <th>Actions</th>
+        <th>{{ t('Staff Member','الموظف') }}</th>
+        <th>{{ t('Job Title','المسمى الوظيفي') }}</th>
+        <th>{{ t('Role','الدور') }}</th>
+        <th>{{ t('Contract','العقد') }}</th>
+        <th>{{ t('Branch','الفرع') }}</th>
+        <th>{{ t('Contact','التواصل') }}</th>
+        <th>{{ t('Status','الحالة') }}</th>
+        <th>{{ t('Hired','تاريخ التعيين') }}</th>
+        <th>{{ t('Actions','إجراءات') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -118,7 +119,7 @@
         </td>
         <td>
           <span class="ct-badge" style="background:{{ cc }}22;color:{{ cc }};border:1px solid {{ cc }}44">
-            {{ u.contract_type or 'Full-time' }}
+            {% set ct_val = u.contract_type or 'Full-time' %}{{ t(ct_val, contract_labels_ar.get(ct_val,'')) }}
           </span>
         </td>
         <td>{{ u.branch_name or '—' }}</td>
@@ -129,15 +130,15 @@
         </td>
         <td>
           {% if u.is_active %}
-            <span class="status-badge status-active">Active</span>
+            <span class="status-badge status-active">{{ t('Active','نشط') }}</span>
           {% else %}
-            <span class="status-badge status-inactive">Inactive</span>
+            <span class="status-badge status-inactive">{{ t('Inactive','غير نشط') }}</span>
           {% endif %}
         </td>
         <td style="font-size:12px;color:var(--cl-muted);">{{ u.hire_date or '—' }}</td>
         <td>
-          <a href="{{ url_for('hr.staff_detail', user_id=u.id) }}" class="action-btn btn-view">View</a>
-          <a href="{{ url_for('hr.staff_edit', user_id=u.id) }}" class="action-btn btn-edit">Edit</a>
+          <a href="{{ url_for('hr.staff_detail', user_id=u.id) }}" class="action-btn btn-view">{{ t('View','عرض') }}</a>
+          <a href="{{ url_for('hr.staff_edit', user_id=u.id) }}" class="action-btn btn-edit">{{ t('Edit','تعديل') }}</a>
         </td>
       </tr>
       {% endfor %}
@@ -147,8 +148,8 @@
 {% else %}
 <div class="empty-state">
   <div style="font-size:48px;margin-bottom:12px;">👥</div>
-  <div style="font-size:18px;font-weight:600;margin-bottom:8px;">No staff found</div>
-  <div>Try adjusting your filters or <a href="{{ url_for('hr.staff_new') }}">add a new staff member</a>.</div>
+  <div style="font-size:18px;font-weight:600;margin-bottom:8px;">{{ t('No staff found','لا يوجد موظفون') }}</div>
+  <div>{{ t('Try adjusting your filters or','جرّب تعديل التصفية أو') }} <a href="{{ url_for('hr.staff_new') }}">{{ t('add a new staff member','أضف موظفاً جديداً') }}</a>.</div>
 </div>
 {% endif %}
 {% endblock %}

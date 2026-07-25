@@ -2,16 +2,16 @@
 
 {% block title %}{{ page_title }}{% endblock %}
 {% block page_title %}{{ page_title }}{% endblock %}
-{% block page_sub %}{% if is_edit %}Update pet information{% else %}Register a new pet for {{ owner.full_name }}{% endif %}{% endblock %}
+{% block page_sub %}{% if is_edit %}{{ t('Update pet information','تحديث بيانات الحيوان') }}{% else %}{{ t('Register a new pet for','تسجيل حيوان جديد لـ') }} {{ owner.full_name }}{% endif %}{% endblock %}
 
 {% block topbar_actions %}
   {% if is_edit %}
   <a href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);">
-    ← Back to Pet
+    {{ t('← Back to Pet','← العودة إلى الحيوان') }}
   </a>
   {% else %}
   <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);">
-    ← Back to Owner
+    {{ t('← Back to Owner','← العودة إلى المالك') }}
   </a>
   {% endif %}
 {% endblock %}
@@ -182,7 +182,7 @@
 <div class="owner-banner">
   <div class="owner-banner-avatar">{{ (owner.full_name or 'O')[:2] | upper }}</div>
   <div>
-    <div class="owner-banner-label">Owner</div>
+    <div class="owner-banner-label">{{ t('Owner','المالك') }}</div>
     <div class="owner-banner-name">{{ owner.full_name }}</div>
   </div>
   <div style="margin-left:auto;font-size:0.85rem;opacity:0.8;">
@@ -195,23 +195,23 @@
 
   <!-- ── Identity ──────────────────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">🐾 Pet Identity</div>
+    <div class="form-card-header">🐾 {{ t('Pet Identity','بيانات الحيوان') }}</div>
     <div class="form-card-body">
 
       <!-- Species selector -->
       <div class="form-group" style="margin-bottom:20px;">
-        <label class="form-label">Species <span class="req">*</span></label>
+        <label class="form-label">{{ t('Species','النوع') }} <span class="req">*</span></label>
         <div class="species-selector">
           {% set current_species = pet.get('species','') %}
           {% for sp_val, sp_label, sp_emoji in [
-            ('Dog','Dog','🐕'),
-            ('Cat','Cat','🐈'),
-            ('Rabbit','Rabbit','🐰'),
-            ('Bird','Bird','🐦'),
-            ('Hamster','Hamster','🐹'),
-            ('Fish','Fish','🐟'),
-            ('Turtle','Turtle','🐢'),
-            ('Other','Other','🐾'),
+            ('Dog',t('Dog','كلب'),'🐕'),
+            ('Cat',t('Cat','قطة'),'🐈'),
+            ('Rabbit',t('Rabbit','أرنب'),'🐰'),
+            ('Bird',t('Bird','طائر'),'🐦'),
+            ('Hamster',t('Hamster','هامستر'),'🐹'),
+            ('Fish',t('Fish','سمكة'),'🐟'),
+            ('Turtle',t('Turtle','سلحفاة'),'🐢'),
+            ('Other',t('Other','أخرى'),'🐾'),
           ] %}
           <span>
             <input type="radio" name="species" id="sp_{{ sp_val }}" value="{{ sp_val }}"
@@ -228,25 +228,25 @@
 
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label" for="pet_name">Pet Name <span class="req">*</span></label>
+          <label class="form-label" for="pet_name">{{ t('Pet Name','اسم الحيوان') }} <span class="req">*</span></label>
           <input type="text" id="pet_name" name="pet_name" class="form-control"
-                 value="{{ pet.get('pet_name','') }}" required placeholder="e.g. Max, Bella">
+                 value="{{ pet.get('pet_name','') }}" required placeholder="{{ t('e.g. Max, Bella','مثال: ماكس، بيلا') }}">
         </div>
         <div class="form-group">
-          <label class="form-label" for="breed">Breed</label>
+          <label class="form-label" for="breed">{{ t('Breed','السلالة') }}</label>
           <input type="text" id="breed" name="breed" class="form-control"
-                 value="{{ pet.get('breed','') }}" placeholder="e.g. Golden Retriever">
+                 value="{{ pet.get('breed','') }}" placeholder="{{ t('e.g. Golden Retriever','مثال: جولدن ريتريفر') }}">
         </div>
         <div class="form-group">
-          <label class="form-label" for="sex">Sex</label>
+          <label class="form-label" for="sex">{{ t('Sex','الجنس') }}</label>
           <select id="sex" name="sex" class="form-control">
             {% for s in ['Male', 'Female', 'Unknown'] %}
-            <option value="{{ s }}" {% if pet.get('sex','Unknown') == s %}selected{% endif %}>{{ s }}</option>
+            <option value="{{ s }}" {% if pet.get('sex','Unknown') == s %}selected{% endif %}>{{ t(s, {'Male':'ذكر','Female':'أنثى','Unknown':'غير معروف'}.get(s,'')) }}</option>
             {% endfor %}
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label" for="dob">Date of Birth</label>
+          <label class="form-label" for="dob">{{ t('Date of Birth','تاريخ الميلاد') }}</label>
           <input type="date" id="dob" name="dob" class="form-control"
                  value="{{ pet.get('dob','')[:10] if pet.get('dob') else '' }}">
         </div>
@@ -256,30 +256,30 @@
 
   <!-- ── Physical ──────────────────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">⚖️ Physical Details</div>
+    <div class="form-card-header">⚖️ {{ t('Physical Details','البيانات الجسدية') }}</div>
     <div class="form-card-body">
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label" for="weight_kg">Weight (kg)</label>
+          <label class="form-label" for="weight_kg">{{ t('Weight (kg)','الوزن (كجم)') }}</label>
           <input type="number" id="weight_kg" name="weight_kg" class="form-control"
-                 value="{{ pet.get('weight_kg','') }}" step="0.1" min="0" placeholder="e.g. 4.5">
+                 value="{{ pet.get('weight_kg','') }}" step="0.1" min="0" placeholder="{{ t('e.g. 4.5','مثال: 4.5') }}">
         </div>
         <div class="form-group">
-          <label class="form-label" for="color">Color / Markings</label>
+          <label class="form-label" for="color">{{ t('Color / Markings','اللون / العلامات') }}</label>
           <input type="text" id="color" name="color" class="form-control"
-                 value="{{ pet.get('color','') }}" placeholder="e.g. Golden, Black & White">
+                 value="{{ pet.get('color','') }}" placeholder="{{ t('e.g. Golden, Black & White','مثال: ذهبي، أبيض وأسود') }}">
         </div>
         <div class="form-group">
-          <label class="form-label" for="microchip_id">Microchip ID</label>
+          <label class="form-label" for="microchip_id">{{ t('Microchip ID','رقم الميكروشيب') }}</label>
           <input type="text" id="microchip_id" name="microchip_id" class="form-control"
-                 value="{{ pet.get('microchip_id','') }}" placeholder="15-digit microchip number">
+                 value="{{ pet.get('microchip_id','') }}" placeholder="{{ t('15-digit microchip number','رقم ميكروشيب من 15 رقماً') }}">
         </div>
         <div class="form-group">
-          <label class="form-label">Neutered / Spayed</label>
+          <label class="form-label">{{ t('Neutered / Spayed','محوّل / معقّم') }}</label>
           <div class="checkbox-row">
             <input type="checkbox" id="neutered" name="neutered" value="1"
                    {% if pet.get('neutered') %}checked{% endif %}>
-            <label for="neutered">Yes, this pet is neutered/spayed</label>
+            <label for="neutered">{{ t('Yes, this pet is neutered/spayed','نعم، هذا الحيوان محوّل/معقّم') }}</label>
           </div>
         </div>
       </div>
@@ -288,26 +288,26 @@
 
   <!-- ── Medical ───────────────────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">🏥 Medical Information</div>
+    <div class="form-card-header">🏥 {{ t('Medical Information','المعلومات الطبية') }}</div>
     <div class="form-card-body">
       <div class="form-grid">
         <div class="form-group form-grid-full">
-          <label class="form-label" for="allergies">Known Allergies</label>
+          <label class="form-label" for="allergies">{{ t('Known Allergies','الحساسية المعروفة') }}</label>
           <textarea id="allergies" name="allergies" class="form-control"
-                    placeholder="List any known allergies or sensitivities…">{{ pet.get('allergies','') }}</textarea>
+                    placeholder="{{ t('List any known allergies or sensitivities…','اذكر أي حساسية أو تحسس معروف…') }}">{{ pet.get('allergies','') }}</textarea>
           {% if pet.get('allergies') %}
-          <div class="alert-box">⚠️ Allergy alert on file</div>
+          <div class="alert-box">⚠️ {{ t('Allergy alert on file','يوجد تنبيه حساسية بالملف') }}</div>
           {% endif %}
         </div>
         <div class="form-group form-grid-full">
-          <label class="form-label" for="chronic_conditions">Chronic Conditions</label>
+          <label class="form-label" for="chronic_conditions">{{ t('Chronic Conditions','الأمراض المزمنة') }}</label>
           <textarea id="chronic_conditions" name="chronic_conditions" class="form-control"
-                    placeholder="Diabetes, epilepsy, heart disease, etc.">{{ pet.get('chronic_conditions','') }}</textarea>
+                    placeholder="{{ t('Diabetes, epilepsy, heart disease, etc.','السكري، الصرع، أمراض القلب، إلخ.') }}">{{ pet.get('chronic_conditions','') }}</textarea>
         </div>
         <div class="form-group form-grid-full">
-          <label class="form-label" for="diet_notes">Diet Notes</label>
+          <label class="form-label" for="diet_notes">{{ t('Diet Notes','ملاحظات التغذية') }}</label>
           <textarea id="diet_notes" name="diet_notes" class="form-control"
-                    placeholder="Special diet requirements, feeding schedule…">{{ pet.get('diet_notes','') }}</textarea>
+                    placeholder="{{ t('Special diet requirements, feeding schedule…','متطلبات غذائية خاصة، مواعيد التغذية…') }}">{{ pet.get('diet_notes','') }}</textarea>
         </div>
       </div>
     </div>
@@ -315,21 +315,21 @@
 
   <!-- ── Insurance ───────────────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">🛡️ Pet Insurance</div>
+    <div class="form-card-header">🛡️ {{ t('Pet Insurance','تأمين الحيوان') }}</div>
     <div class="form-card-body">
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label" for="insurance_provider">Insurance Provider</label>
+          <label class="form-label" for="insurance_provider">{{ t('Insurance Provider','شركة التأمين') }}</label>
           <input type="text" id="insurance_provider" name="insurance_provider" class="form-control"
-                 value="{{ pet.get('insurance_provider','') }}" placeholder="e.g. AXA, MetLife, Allianz">
+                 value="{{ pet.get('insurance_provider','') }}" placeholder="{{ t('e.g.','مثال:') }} AXA, MetLife, Allianz">
         </div>
         <div class="form-group">
-          <label class="form-label" for="policy_number">Policy Number</label>
+          <label class="form-label" for="policy_number">{{ t('Policy Number','رقم الوثيقة') }}</label>
           <input type="text" id="policy_number" name="policy_number" class="form-control"
-                 value="{{ pet.get('policy_number','') }}" placeholder="Policy / certificate number">
+                 value="{{ pet.get('policy_number','') }}" placeholder="{{ t('Policy / certificate number','رقم الوثيقة / الشهادة') }}">
         </div>
         <div class="form-group">
-          <label class="form-label" for="policy_expiry">Policy Expiry Date</label>
+          <label class="form-label" for="policy_expiry">{{ t('Policy Expiry Date','تاريخ انتهاء الوثيقة') }}</label>
           <input type="date" id="policy_expiry" name="policy_expiry" class="form-control"
                  value="{{ pet.get('policy_expiry','')[:10] if pet.get('policy_expiry') else '' }}">
         </div>
@@ -339,11 +339,11 @@
 
   <!-- ── Notes ─────────────────────────────────────────────── -->
   <div class="form-card">
-    <div class="form-card-header">📝 Additional Notes</div>
+    <div class="form-card-header">📝 {{ t('Additional Notes','ملاحظات إضافية') }}</div>
     <div class="form-card-body">
       <div class="form-group">
         <textarea name="notes" class="form-control" style="min-height:100px;"
-                  placeholder="Any other relevant notes about this pet…">{{ pet.get('notes','') }}</textarea>
+                  placeholder="{{ t('Any other relevant notes about this pet…','أي ملاحظات أخرى ذات صلة بهذا الحيوان…') }}">{{ pet.get('notes','') }}</textarea>
       </div>
     </div>
   </div>
@@ -352,12 +352,12 @@
   <div class="form-card">
     <div class="form-actions">
       <button type="submit" class="btn-save">
-        {% if is_edit %}💾 Save Changes{% else %}✅ Register Pet{% endif %}
+        {% if is_edit %}💾 {{ t('Save Changes','حفظ التغييرات') }}{% else %}✅ {{ t('Register Pet','تسجيل الحيوان') }}{% endif %}
       </button>
       {% if is_edit %}
-      <a href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}" class="btn-cancel">Cancel</a>
+      <a href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}" class="btn-cancel">{{ t('Cancel','إلغاء') }}</a>
       {% else %}
-      <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn-cancel">Cancel</a>
+      <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn-cancel">{{ t('Cancel','إلغاء') }}</a>
       {% endif %}
     </div>
   </div>

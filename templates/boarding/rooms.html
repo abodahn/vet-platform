@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Boarding Rooms{% endblock %}
-{% block page_title %}Boarding Rooms{% endblock %}
+{% block title %}{{ t('Boarding Rooms', 'غرف الإيواء') }}{% endblock %}
+{% block page_title %}{{ t('Boarding Rooms', 'غرف الإيواء') }}{% endblock %}
 {% block page_sub %}Manage hotel rooms and suites{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('boarding.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+<a href="{{ url_for('boarding.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -14,7 +14,7 @@
     <div class="pf-card-header"><h3 class="pf-card-title">Rooms ({{ rooms|length }})</h3></div>
     <table class="pf-table">
       <thead>
-        <tr><th>Room #</th><th>Type</th><th>Capacity</th><th>Rate/Day</th><th>Status</th><th>Active</th><th></th></tr>
+        <tr><th>Room #</th><th>{{ t('Type', 'النوع') }}</th><th>{{ t('Capacity', 'السعة') }}</th><th>{{ t('Rate/Day', 'السعر/اليوم') }}</th><th>{{ t('Status', 'الحالة') }}</th><th>{{ t('Active', 'نشط') }}</th><th></th></tr>
       </thead>
       <tbody>
         {% for r in rooms %}
@@ -25,19 +25,19 @@
           <td>{{ r.daily_rate or 0 }} EGP</td>
           <td>
             {% if r.active_bookings and r.active_bookings > 0 %}
-            <span class="pf-badge warning">Occupied</span>
+            <span class="pf-badge warning">{{ t('Occupied', 'مشغول') }}</span>
             {% else %}
-            <span class="pf-badge success">Available</span>
+            <span class="pf-badge success">{{ t('Available', 'متاح') }}</span>
             {% endif %}
           </td>
           <td>
-            {% if r.is_active %}<span class="pf-badge success">Yes</span>
-            {% else %}<span class="pf-badge error">No</span>{% endif %}
+            {% if r.is_active %}<span class="pf-badge success">{{ t('Yes', 'نعم') }}</span>
+            {% else %}<span class="pf-badge error">{{ t('No', 'لا') }}</span>{% endif %}
           </td>
           <td>
             <button type="button"
               onclick="editRoom({{ r.id }}, '{{ r.room_number|e }}', '{{ (r.room_type or 'Standard')|e }}', {{ r.capacity or 1 }}, {{ r.daily_rate or 0 }}, {{ 1 if r.is_active else 0 }})"
-              class="pf-btn pf-btn-ghost" style="padding:3px 8px;font-size:.8rem">Edit</button>
+              class="pf-btn pf-btn-ghost" style="padding:3px 8px;font-size:.8rem">{{ t('Edit', 'تعديل') }}</button>
           </td>
         </tr>
         {% else %}
@@ -69,21 +69,21 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
           <div>
-            <label class="pf-label">Capacity</label>
+            <label class="pf-label">{{ t('Capacity', 'السعة') }}</label>
             <input type="number" name="capacity" id="rCapacity" class="pf-input" min="1" value="1">
           </div>
           <div>
-            <label class="pf-label">Daily Rate (EGP)</label>
+            <label class="pf-label">{{ t('Daily Rate (EGP)', 'السعر اليومي (جنيه)') }}</label>
             <input type="number" name="daily_rate" id="rRate" class="pf-input" step="0.01" min="0" value="0">
           </div>
         </div>
         <div style="margin-bottom:1.25rem;display:flex;align-items:center;gap:.5rem">
           <input type="checkbox" name="is_active" id="rActive" value="1" checked style="width:16px;height:16px">
-          <label for="rActive" class="pf-label" style="margin:0">Active</label>
+          <label for="rActive" class="pf-label" style="margin:0">{{ t('Active', 'نشط') }}</label>
         </div>
         <div style="display:flex;gap:.75rem">
           <button type="submit" class="pf-btn pf-btn-primary">Save Room</button>
-          <button type="button" onclick="resetForm()" class="pf-btn pf-btn-ghost">Clear</button>
+          <button type="button" onclick="resetForm()" class="pf-btn pf-btn-ghost">{{ t('Clear', 'مسح') }}</button>
         </div>
       </form>
     </div>

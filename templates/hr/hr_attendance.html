@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Attendance Search — HR{% endblock %}
-{% block page_title %}Attendance Records{% endblock %}
-{% block page_sub %}Search, filter and manage staff sign-in history{% endblock %}
+{% block title %}{{ t('Attendance Search — HR','بحث الحضور — الموارد البشرية') }}{% endblock %}
+{% block page_title %}{{ t('Attendance Records','سجلات الحضور') }}{% endblock %}
+{% block page_sub %}{{ t('Search, filter and manage staff sign-in history','البحث والتصفية وإدارة سجل حضور الموظفين') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">HR Dashboard</a>
-<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">Staff List</a>
-<button onclick="document.getElementById('addModal').style.display='flex'" class="pf-btn pf-btn-primary">+ Log Attendance</button>
+<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('HR Dashboard','لوحة الموارد البشرية') }}</a>
+<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">{{ t('Staff List','قائمة الموظفين') }}</a>
+<button onclick="document.getElementById('addModal').style.display='flex'" class="pf-btn pf-btn-primary">+ {{ t('Log Attendance','تسجيل حضور') }}</button>
 {% endblock %}
 
 {% block head_extra %}
@@ -112,8 +112,8 @@
 <div class="live-board">
   <div class="live-title">
     <span class="live-dot"></span>
-    Today — {{ today }} &nbsp;·&nbsp; {{ today_att|length }} records
-    {% if absent_today %} &nbsp;·&nbsp; <span style="color:#dc2626">{{ absent_today|length }} not recorded</span>{% endif %}
+    {{ t('Today','اليوم') }} — {{ today }} &nbsp;·&nbsp; {{ today_att|length }} {{ t('records','سجل') }}
+    {% if absent_today %} &nbsp;·&nbsp; <span style="color:#dc2626">{{ absent_today|length }} {{ t('not recorded','بدون تسجيل') }}</span>{% endif %}
   </div>
   {% if today_att %}
   <div class="live-grid">
@@ -126,15 +126,15 @@
       <div class="live-role">{{ r.role.replace('_',' ').title() }}</div>
       {% if r.check_in %}
       <div class="live-time">
-        In: <strong>{{ r.check_in }}</strong>
-        {% if r.check_out %} → Out: <strong>{{ r.check_out }}</strong>{% endif %}
+        {{ t('In:','دخول:') }} <strong>{{ r.check_in }}</strong>
+        {% if r.check_out %} → {{ t('Out:','خروج:') }} <strong>{{ r.check_out }}</strong>{% endif %}
       </div>
       {% endif %}
       <div style="margin-top:4px">
-        {% if r.status=='Present' %}<span class="live-status ls-present">Present</span>
-        {% elif r.status=='Late' %}<span class="live-status ls-late">Late</span>
-        {% elif r.status=='On Leave' %}<span class="live-status ls-onleave">On Leave</span>
-        {% else %}<span class="live-status ls-absent">Absent</span>
+        {% if r.status=='Present' %}<span class="live-status ls-present">{{ t('Present','حاضر') }}</span>
+        {% elif r.status=='Late' %}<span class="live-status ls-late">{{ t('Late','متأخر') }}</span>
+        {% elif r.status=='On Leave' %}<span class="live-status ls-onleave">{{ t('On Leave','في إجازة') }}</span>
+        {% else %}<span class="live-status ls-absent">{{ t('Absent','غائب') }}</span>
         {% endif %}
         {% if r.hours_worked %}<span class="live-status ls-none" style="margin-left:4px">{{ "%.1f"|format(r.hours_worked|float) }}h</span>{% endif %}
       </div>
@@ -146,12 +146,12 @@
         {{ r.full_name }}
       </a>
       <div class="live-role">{{ r.role.replace('_',' ').title() }}</div>
-      <div style="margin-top:6px"><span class="live-status ls-none">No record</span></div>
+      <div style="margin-top:6px"><span class="live-status ls-none">{{ t('No record','لا يوجد سجل') }}</span></div>
     </div>
     {% endfor %}
   </div>
   {% else %}
-  <div style="color:var(--cl-muted);font-size:13px">No attendance records yet for today.</div>
+  <div style="color:var(--cl-muted);font-size:13px">{{ t('No attendance records yet for today.','لا توجد سجلات حضور لليوم بعد.') }}</div>
   {% endif %}
 </div>
 
@@ -159,27 +159,27 @@
 <div class="stats-row">
   <div class="stat-card">
     <div class="stat-num" style="color:var(--cl-primary)">{{ stats.total_n or 0 }}</div>
-    <div class="stat-lbl">Total Records</div>
+    <div class="stat-lbl">{{ t('Total Records','إجمالي السجلات') }}</div>
   </div>
   <div class="stat-card">
     <div class="stat-num" style="color:#16a34a">{{ stats.present_n or 0 }}</div>
-    <div class="stat-lbl">Present</div>
+    <div class="stat-lbl">{{ t('Present','حاضر') }}</div>
   </div>
   <div class="stat-card">
     <div class="stat-num" style="color:#d97706">{{ stats.late_n or 0 }}</div>
-    <div class="stat-lbl">Late</div>
+    <div class="stat-lbl">{{ t('Late','متأخر') }}</div>
   </div>
   <div class="stat-card">
     <div class="stat-num" style="color:#dc2626">{{ stats.absent_n or 0 }}</div>
-    <div class="stat-lbl">Absent</div>
+    <div class="stat-lbl">{{ t('Absent','غائب') }}</div>
   </div>
   <div class="stat-card">
     <div class="stat-num" style="color:#7c3aed">{{ stats.on_leave_n or 0 }}</div>
-    <div class="stat-lbl">On Leave</div>
+    <div class="stat-lbl">{{ t('On Leave','في إجازة') }}</div>
   </div>
   <div class="stat-card">
     <div class="stat-num" style="color:#0891b2">{{ "%.1f"|format((stats.avg_hours or 0)|float) }}</div>
-    <div class="stat-lbl">Avg Hours</div>
+    <div class="stat-lbl">{{ t('Avg Hours','متوسط الساعات') }}</div>
   </div>
 </div>
 
@@ -187,38 +187,38 @@
 <div class="search-box">
   <form method="get" action="{{ url_for('hr.hr_attendance') }}">
     <div class="filt-row">
-      <input type="text" name="q" value="{{ q_name }}" placeholder="Search staff name or username…" id="q-input">
+      <input type="text" name="q" value="{{ q_name }}" placeholder="{{ t('Search staff name or username…','ابحث باسم الموظف أو اسم المستخدم…') }}" id="q-input">
       <select name="status">
-        <option value="">All Statuses</option>
+        <option value="">{{ t('All Statuses','جميع الحالات') }}</option>
         {% for s in ['Present','Late','Absent','On Leave'] %}
-        <option value="{{ s }}" {% if f_status==s %}selected{% endif %}>{{ s }}</option>
+        <option value="{{ s }}" {% if f_status==s %}selected{% endif %}>{{ t(s, {'Present':'حاضر','Late':'متأخر','Absent':'غائب','On Leave':'في إجازة'}.get(s,'')) }}</option>
         {% endfor %}
       </select>
       <select name="branch_id">
-        <option value="">All Branches</option>
+        <option value="">{{ t('All Branches','جميع الفروع') }}</option>
         {% for br in branches %}
         <option value="{{ br.id }}" {% if f_branch|string==br.id|string %}selected{% endif %}>{{ br.name }}</option>
         {% endfor %}
       </select>
       <select name="user_id">
-        <option value="">All Staff</option>
+        <option value="">{{ t('All Staff','جميع الموظفين') }}</option>
         {% for st in all_staff %}
         <option value="{{ st.id }}" {% if f_user_id|string==st.id|string %}selected{% endif %}>{{ st.full_name }}</option>
         {% endfor %}
       </select>
       <input type="date" name="date_from" value="{{ f_from }}" id="date-from">
       <input type="date" name="date_to"   value="{{ f_to }}"   id="date-to">
-      <button type="submit">Search</button>
-      <a href="{{ url_for('hr.hr_attendance') }}" style="padding:9px 14px;border:1px solid var(--cl-border);border-radius:8px;font-size:13px;color:var(--cl-muted);text-decoration:none">Reset</a>
+      <button type="submit">{{ t('Search','بحث') }}</button>
+      <a href="{{ url_for('hr.hr_attendance') }}" style="padding:9px 14px;border:1px solid var(--cl-border);border-radius:8px;font-size:13px;color:var(--cl-muted);text-decoration:none">{{ t('Reset','إعادة تعيين') }}</a>
     </div>
     <div class="presets">
-      <span style="font-size:12px;color:var(--cl-muted);align-self:center">Quick:</span>
-      <button type="button" class="preset-btn" onclick="setRange(0,0)">Today</button>
-      <button type="button" class="preset-btn" onclick="setRange(-1,-1)">Yesterday</button>
-      <button type="button" class="preset-btn" onclick="setRange(-6,0)">Last 7 Days</button>
-      <button type="button" class="preset-btn" onclick="setRange(-13,0)">Last 2 Weeks</button>
-      <button type="button" class="preset-btn" onclick="thisMonth()">This Month</button>
-      <button type="button" class="preset-btn" onclick="lastMonth()">Last Month</button>
+      <span style="font-size:12px;color:var(--cl-muted);align-self:center">{{ t('Quick:','سريع:') }}</span>
+      <button type="button" class="preset-btn" onclick="setRange(0,0)">{{ t('Today','اليوم') }}</button>
+      <button type="button" class="preset-btn" onclick="setRange(-1,-1)">{{ t('Yesterday','أمس') }}</button>
+      <button type="button" class="preset-btn" onclick="setRange(-6,0)">{{ t('Last 7 Days','آخر 7 أيام') }}</button>
+      <button type="button" class="preset-btn" onclick="setRange(-13,0)">{{ t('Last 2 Weeks','آخر أسبوعين') }}</button>
+      <button type="button" class="preset-btn" onclick="thisMonth()">{{ t('This Month','هذا الشهر') }}</button>
+      <button type="button" class="preset-btn" onclick="lastMonth()">{{ t('Last Month','الشهر الماضي') }}</button>
     </div>
   </form>
 </div>
@@ -227,17 +227,17 @@
 <div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
     <div style="font-size:13px;color:var(--cl-muted)">
-      Showing {{ rows|length }} of <strong>{{ total }}</strong> records
+      {{ t('Showing','عرض') }} {{ rows|length }} {{ t('of','من') }} <strong>{{ total }}</strong> {{ t('records','سجل') }}
       &nbsp;({{ f_from }} → {{ f_to }})
     </div>
     {% if total > per_page %}
     <div class="pager">
       {% if page > 1 %}
-        <a href="{{ request.url | replace('page='~page, 'page='~(page-1)) if 'page=' in request.url else (request.url ~ '&page='~(page-1)) }}">← Prev</a>
+        <a href="{{ request.url | replace('page='~page, 'page='~(page-1)) if 'page=' in request.url else (request.url ~ '&page='~(page-1)) }}">{{ t('← Prev','← السابق') }}</a>
       {% endif %}
       <span class="cur">{{ page }} / {{ total_pages }}</span>
       {% if page < total_pages %}
-        <a href="{{ request.url | replace('page='~page, 'page='~(page+1)) if 'page=' in request.url else (request.url ~ '&page='~(page+1)) }}">Next →</a>
+        <a href="{{ request.url | replace('page='~page, 'page='~(page+1)) if 'page=' in request.url else (request.url ~ '&page='~(page+1)) }}">{{ t('Next →','التالي ←') }}</a>
       {% endif %}
     </div>
     {% endif %}
@@ -248,16 +248,16 @@
     <table class="att-table">
       <thead>
         <tr>
-          <th>Staff Member</th>
-          <th>Date</th>
-          <th>Check In</th>
-          <th>Check Out</th>
-          <th>Hours</th>
-          <th>Break</th>
-          <th>Status</th>
-          <th>Branch</th>
-          <th>Notes</th>
-          <th>Recorded By</th>
+          <th>{{ t('Staff Member','الموظف') }}</th>
+          <th>{{ t('Date','التاريخ') }}</th>
+          <th>{{ t('Check In','الدخول') }}</th>
+          <th>{{ t('Check Out','الخروج') }}</th>
+          <th>{{ t('Hours','الساعات') }}</th>
+          <th>{{ t('Break','الاستراحة') }}</th>
+          <th>{{ t('Status','الحالة') }}</th>
+          <th>{{ t('Branch','الفرع') }}</th>
+          <th>{{ t('Notes','ملاحظات') }}</th>
+          <th>{{ t('Recorded By','سجّله') }}</th>
           <th></th>
         </tr>
       </thead>
@@ -286,13 +286,13 @@
             {% else %}—{% endif %}
           </td>
           <td style="color:var(--cl-muted);font-size:12px">
-            {{ r.break_minutes ~ ' min' if r.break_minutes else '—' }}
+            {{ r.break_minutes ~ ' ' ~ t('min','د') if r.break_minutes else '—' }}
           </td>
           <td>
-            {% if r.status=='Present' %}<span class="status-pill sp-present">Present</span>
-            {% elif r.status=='Late' %}<span class="status-pill sp-late">Late</span>
-            {% elif r.status=='Absent' %}<span class="status-pill sp-absent">Absent</span>
-            {% elif r.status=='On Leave' %}<span class="status-pill sp-onleave">On Leave</span>
+            {% if r.status=='Present' %}<span class="status-pill sp-present">{{ t('Present','حاضر') }}</span>
+            {% elif r.status=='Late' %}<span class="status-pill sp-late">{{ t('Late','متأخر') }}</span>
+            {% elif r.status=='Absent' %}<span class="status-pill sp-absent">{{ t('Absent','غائب') }}</span>
+            {% elif r.status=='On Leave' %}<span class="status-pill sp-onleave">{{ t('On Leave','في إجازة') }}</span>
             {% else %}<span class="status-pill sp-other">{{ r.status }}</span>
             {% endif %}
           </td>
@@ -303,8 +303,8 @@
           <td style="font-size:11px;color:var(--cl-muted)">{{ r.recorded_by or '—' }}</td>
           <td>
             <form method="post" action="{{ url_for('hr.hr_attendance_delete', rec_id=r.id) }}"
-                  onsubmit="return confirm('Delete this attendance record?')">
-              <button type="submit" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px" title="Delete">✕</button>
+                  onsubmit="return confirm('{{ t('Delete this attendance record?','حذف سجل الحضور هذا؟') }}')">
+              <button type="submit" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px" title="{{ t('Delete','حذف') }}">✕</button>
             </form>
           </td>
         </tr>
@@ -315,8 +315,8 @@
   {% else %}
   <div class="empty-state">
     <div class="ei">🕐</div>
-    <div style="font-size:17px;font-weight:600;margin-bottom:6px">No records found</div>
-    <div>Try adjusting the date range or filters above.</div>
+    <div style="font-size:17px;font-weight:600;margin-bottom:6px">{{ t('No records found','لا توجد سجلات') }}</div>
+    <div>{{ t('Try adjusting the date range or filters above.','جرّب تعديل النطاق الزمني أو التصفية أعلاه.') }}</div>
   </div>
   {% endif %}
 </div>
@@ -326,47 +326,47 @@
 <!-- ═══════════════════════════════════════════════════════════ ADD MODAL -->
 <div class="modal-bg" id="addModal" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal-box">
-    <h3>Log Attendance Record</h3>
+    <h3>{{ t('Log Attendance Record','تسجيل سجل حضور') }}</h3>
     <form method="post" action="{{ url_for('hr.hr_attendance_add') }}">
       <div class="form-grid">
         <div class="form-group span2">
-          <label>Staff Member *</label>
+          <label>{{ t('Staff Member','الموظف') }} *</label>
           <select name="user_id" required>
-            <option value="">— select staff —</option>
+            <option value="">— {{ t('select staff','اختر موظفاً') }} —</option>
             {% for st in all_staff %}
             <option value="{{ st.id }}">{{ st.full_name }}</option>
             {% endfor %}
           </select>
         </div>
         <div class="form-group">
-          <label>Date *</label>
+          <label>{{ t('Date','التاريخ') }} *</label>
           <input type="date" name="work_date" value="{{ today }}" required>
         </div>
         <div class="form-group">
-          <label>Status *</label>
+          <label>{{ t('Status','الحالة') }} *</label>
           <select name="status" required>
-            <option value="Present">Present</option>
-            <option value="Late">Late</option>
-            <option value="Absent">Absent</option>
-            <option value="On Leave">On Leave</option>
+            <option value="Present">{{ t('Present','حاضر') }}</option>
+            <option value="Late">{{ t('Late','متأخر') }}</option>
+            <option value="Absent">{{ t('Absent','غائب') }}</option>
+            <option value="On Leave">{{ t('On Leave','في إجازة') }}</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Check In</label>
+          <label>{{ t('Check In','الدخول') }}</label>
           <input type="time" name="check_in">
         </div>
         <div class="form-group">
-          <label>Check Out</label>
+          <label>{{ t('Check Out','الخروج') }}</label>
           <input type="time" name="check_out">
         </div>
         <div class="form-group span2">
-          <label>Notes</label>
-          <input type="text" name="notes" placeholder="Optional note…">
+          <label>{{ t('Notes','ملاحظات') }}</label>
+          <input type="text" name="notes" placeholder="{{ t('Optional note…','ملاحظة اختيارية…') }}">
         </div>
       </div>
       <div class="modal-btns">
-        <button type="button" class="btn-cancel" onclick="document.getElementById('addModal').style.display='none'">Cancel</button>
-        <button type="submit" class="btn-save">Save Record</button>
+        <button type="button" class="btn-cancel" onclick="document.getElementById('addModal').style.display='none'">{{ t('Cancel','إلغاء') }}</button>
+        <button type="submit" class="btn-save">{{ t('Save Record','حفظ السجل') }}</button>
       </div>
     </form>
   </div>

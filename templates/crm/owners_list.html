@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Owners & Clients{% endblock %}
+{% block title %}{{ t('Owners & Clients','الملاك والعملاء') }}{% endblock %}
 
-{% block page_title %}Owners & Clients{% endblock %}
-{% block page_sub %}{{ total }} registered clients{% endblock %}
+{% block page_title %}{{ t('Owners & Clients','الملاك والعملاء') }}{% endblock %}
+{% block page_sub %}{{ total }} {{ t('registered clients','عميل مسجل') }}{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('crm.owner_new') }}" class="pf-btn pf-btn-primary">
-    ➕ New Owner
+    ➕ {{ t('New Owner','مالك جديد') }}
   </a>
 {% endblock %}
 
@@ -202,18 +202,18 @@
 {% block content %}
 
 <div class="stats-row">
-  <div class="stat-chip">📋 <span>Total Owners:</span> <strong>{{ total }}</strong></div>
+  <div class="stat-chip">📋 <span>{{ t('Total Owners:','إجمالي الملاك:') }}</span> <strong>{{ total }}</strong></div>
   {% if q %}
-  <div class="stat-chip">🔍 <span>Search results for:</span> <strong>{{ q }}</strong></div>
+  <div class="stat-chip">🔍 <span>{{ t('Search results for:','نتائج البحث عن:') }}</span> <strong>{{ q }}</strong></div>
   {% endif %}
 </div>
 
 <!-- Search bar -->
 <form method="get" action="{{ url_for('crm.owners_list') }}" class="crm-search-bar">
-  <input type="search" name="q" value="{{ q }}" placeholder="Search by name, phone, or email…" autocomplete="off">
-  <button type="submit">🔍 Search</button>
+  <input type="search" name="q" value="{{ q }}" placeholder="{{ t('Search by name, phone, or email…','ابحث بالاسم أو الهاتف أو البريد…') }}" autocomplete="off">
+  <button type="submit">🔍 {{ t('Search','بحث') }}</button>
   {% if q %}
-  <a href="{{ url_for('crm.owners_list') }}" class="btn-sm clear-btn" style="padding:10px 16px;text-decoration:none;border-radius:8px;border:1.5px solid var(--cl-border);background:var(--cl-surface);color:var(--cl-muted);">✕ Clear</a>
+  <a href="{{ url_for('crm.owners_list') }}" class="btn-sm clear-btn" style="padding:10px 16px;text-decoration:none;border-radius:8px;border:1.5px solid var(--cl-border);background:var(--cl-surface);color:var(--cl-muted);">✕ {{ t('Clear','مسح') }}</a>
   {% endif %}
 </form>
 
@@ -222,12 +222,12 @@
   <table class="owners-table">
     <thead>
       <tr>
-        <th>Owner</th>
-        <th>Phone</th>
-        <th>Pets</th>
-        <th>Balance</th>
-        <th>Status</th>
-        <th>Actions</th>
+        <th>{{ t('Owner','المالك') }}</th>
+        <th>{{ t('Phone','الهاتف') }}</th>
+        <th>{{ t('Pets','الحيوانات') }}</th>
+        <th>{{ t('Balance','الرصيد') }}</th>
+        <th>{{ t('Status','الحالة') }}</th>
+        <th>{{ t('Actions','إجراءات') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -256,16 +256,16 @@
         <td>
           {% set bal = owner.outstanding_balance or 0 %}
           {% if bal > 0 %}
-          <span class="balance-due">{{ "%.2f"|format(bal) }} EGP</span>
+          <span class="balance-due">{{ "%.2f"|format(bal) }} {{ t('EGP','جنيه') }}</span>
           {% else %}
           <span class="balance-zero">—</span>
           {% endif %}
         </td>
         <td>
           {% if owner.vip_flag %}
-          <span class="badge-vip">⭐ VIP</span>
+          <span class="badge-vip">⭐ {{ t('VIP','مميز') }}</span>
           {% else %}
-          <span style="color:var(--cl-muted);font-size:0.85rem;">Standard</span>
+          <span style="color:var(--cl-muted);font-size:0.85rem;">{{ t('Standard','عادي') }}</span>
           {% endif %}
           {% if owner.loyalty_balance and owner.loyalty_balance > 0 %}
           <span style="display:inline-block;margin-left:4px;padding:2px 7px;
@@ -277,8 +277,8 @@
         </td>
         <td onclick="event.stopPropagation()">
           <div class="action-btns">
-            <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn-sm btn-view">View</a>
-            <a href="{{ url_for('crm.owner_edit', owner_id=owner.id) }}" class="btn-sm btn-edit">Edit</a>
+            <a href="{{ url_for('crm.owner_detail', owner_id=owner.id) }}" class="btn-sm btn-view">{{ t('View','عرض') }}</a>
+            <a href="{{ url_for('crm.owner_edit', owner_id=owner.id) }}" class="btn-sm btn-edit">{{ t('Edit','تعديل') }}</a>
           </div>
         </td>
       </tr>
@@ -291,9 +291,9 @@
 {% if total_pages > 1 %}
 <div class="pagination-bar">
   {% if page > 1 %}
-  <a href="{{ url_for('crm.owners_list', q=q, page=page-1) }}" class="page-btn">← Prev</a>
+  <a href="{{ url_for('crm.owners_list', q=q, page=page-1) }}" class="page-btn">{{ t('← Prev','← السابق') }}</a>
   {% else %}
-  <span class="page-btn disabled">← Prev</span>
+  <span class="page-btn disabled">{{ t('← Prev','← السابق') }}</span>
   {% endif %}
 
   {% for p in range(1, total_pages + 1) %}
@@ -307,9 +307,9 @@
   {% endfor %}
 
   {% if page < total_pages %}
-  <a href="{{ url_for('crm.owners_list', q=q, page=page+1) }}" class="page-btn">Next →</a>
+  <a href="{{ url_for('crm.owners_list', q=q, page=page+1) }}" class="page-btn">{{ t('Next →','التالي ←') }}</a>
   {% else %}
-  <span class="page-btn disabled">Next →</span>
+  <span class="page-btn disabled">{{ t('Next →','التالي ←') }}</span>
   {% endif %}
 </div>
 {% endif %}
@@ -317,8 +317,8 @@
 {% else %}
 <div class="empty-state">
   <span class="emoji">🐾</span>
-  <p>{% if q %}No owners found matching "<strong>{{ q }}</strong>"{% else %}No owners registered yet{% endif %}</p>
-  <a href="{{ url_for('crm.owner_new') }}" class="pf-btn pf-btn-primary" style="margin-top:16px;display:inline-block;">➕ Add First Owner</a>
+  <p>{% if q %}{{ t('No owners found matching','لا يوجد ملاك مطابقون لـ') }} "<strong>{{ q }}</strong>"{% else %}{{ t('No owners registered yet','لا يوجد ملاك مسجلون بعد') }}{% endif %}</p>
+  <a href="{{ url_for('crm.owner_new') }}" class="pf-btn pf-btn-primary" style="margin-top:16px;display:inline-block;">➕ {{ t('Add First Owner','إضافة أول مالك') }}</a>
 </div>
 {% endif %}
 

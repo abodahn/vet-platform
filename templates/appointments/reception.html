@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
 {% block title %}Reception Workspace — {{ today_str }}{% endblock %}
-{% block page_title %}🖥️ Reception Workspace{% endblock %}
+{% block page_title %}{{ t('🖥️ Reception Workspace', '🖥️ مساحة الاستقبال') }}{% endblock %}
 {% block page_sub %}Today · {{ today_str }} · Quick check-in &amp; appointment management{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('appointments.appt_new', date=today_str) }}" class="pf-btn pf-btn-primary">
-    ➕ New Appointment
+    {{ t('➕ New Appointment', '➕ موعد جديد') }}
   </a>
   <a href="{{ url_for('appointments.schedule', date=today_str) }}"
      class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">
-    📅 Day Schedule
+    {{ t('📅 Day Schedule', '📅 جدول اليوم') }}
   </a>
 {% endblock %}
 
@@ -235,22 +235,22 @@
   <div class="rec-stat s-total">
     <div class="rec-stat-icon">📋</div>
     <div class="rec-stat-value">{{ total }}</div>
-    <div class="rec-stat-label">Total Today</div>
+    <div class="rec-stat-label">{{ t('Total Today', 'إجمالي اليوم') }}</div>
   </div>
   <div class="rec-stat s-checkin">
     <div class="rec-stat-icon">🏥</div>
     <div class="rec-stat-value">{{ checked_in }}</div>
-    <div class="rec-stat-label">Checked In</div>
+    <div class="rec-stat-label">{{ t('Checked In', 'تم الوصول') }}</div>
   </div>
   <div class="rec-stat s-waiting">
     <div class="rec-stat-icon">🕐</div>
     <div class="rec-stat-value">{{ waiting }}</div>
-    <div class="rec-stat-label">Waiting</div>
+    <div class="rec-stat-label">{{ t('Waiting', 'في الانتظار') }}</div>
   </div>
   <div class="rec-stat s-complete">
     <div class="rec-stat-icon">✅</div>
     <div class="rec-stat-value">{{ completed }}</div>
-    <div class="rec-stat-label">Completed</div>
+    <div class="rec-stat-label">{{ t('Completed', 'مكتمل') }}</div>
   </div>
 </div>
 
@@ -261,11 +261,11 @@
   <div class="rec-panel">
     <div class="rec-panel-head">
       <div>
-        <div class="rec-panel-title">📅 Today's Appointments</div>
+        <div class="rec-panel-title">{{ t("📅 Today's Appointments", '📅 مواعيد اليوم') }}</div>
         <div class="rec-panel-sub">{{ today_str }} · {{ total }} appointment{{ 's' if total != 1 }}</div>
       </div>
       <a href="{{ url_for('appointments.appt_new', date=today_str) }}"
-         class="pf-btn pf-btn-primary pf-btn-sm">➕ Book</a>
+         class="pf-btn pf-btn-primary pf-btn-sm">{{ t('➕ Book', '➕ حجز') }}</a>
     </div>
 
     {% if total > 0 %}
@@ -308,11 +308,11 @@
     {% else %}
     <div class="empty-agenda">
       <span class="ei">📭</span>
-      No appointments scheduled for today.
+      {{ t('No appointments scheduled for today.', 'لا توجد مواعيد مجدولة اليوم.') }}
       <br>
       <a href="{{ url_for('appointments.appt_new', date=today_str) }}"
          class="pf-btn pf-btn-primary" style="margin-top:14px;display:inline-block;">
-        ➕ Book First Appointment
+        {{ t('➕ Book First Appointment', '➕ احجز أول موعد') }}
       </a>
     </div>
     {% endif %}
@@ -325,14 +325,14 @@
     <div class="rec-panel">
       <div class="rec-panel-head">
         <div>
-          <div class="rec-panel-title">🔍 Owner Lookup</div>
-          <div class="rec-panel-sub">Search by name or phone to check in</div>
+          <div class="rec-panel-title">{{ t('🔍 Owner Lookup', '🔍 البحث عن مالك') }}</div>
+          <div class="rec-panel-sub">{{ t('Search by name or phone to check in', 'ابحث بالاسم أو الهاتف لتسجيل الوصول') }}</div>
         </div>
       </div>
       <div class="owner-search-wrap">
         <input type="text" id="ownerSearchInput"
                class="owner-search-input"
-               placeholder="Type owner name or phone…"
+               placeholder="{{ t('Type owner name or phone…', 'اكتب اسم المالك أو الهاتف…') }}"
                autocomplete="off">
         <div class="owner-search-hint">{{ owners|length }} owners registered</div>
       </div>
@@ -364,7 +364,7 @@
         <div class="sel-owner-name" id="selectedOwnerName">—</div>
         <div id="petChipsWrap" style="margin-bottom:4px"></div>
         <a href="#" id="quickBookLink" class="quick-book-btn">
-          📅 Book Appointment for this Owner
+          {{ t('📅 Book Appointment for this Owner', '📅 حجز موعد لهذا المالك') }}
         </a>
       </div>
     </div>
@@ -373,7 +373,7 @@
     <div class="rec-panel">
       <div class="rec-panel-head">
         <div>
-          <div class="rec-panel-title">🏥 Checked-In Queue</div>
+          <div class="rec-panel-title">{{ t('🏥 Checked-In Queue', '🏥 قائمة الوصول') }}</div>
           <div class="rec-panel-sub">{{ checked_in }} currently checked in</div>
         </div>
       </div>
@@ -387,7 +387,7 @@
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:0.82rem;font-weight:700;color:#7c3aed;">{{ appt.appt_start[:5] }}</span>
             <span style="font-size:0.88rem;font-weight:700;">{{ appt.pet_name }}</span>
-            <span class="st-badge st-purple" style="margin-left:auto">Checked In</span>
+            <span class="st-badge st-purple" style="margin-left:auto">{{ t('Checked In', 'تم الوصول') }}</span>
           </div>
           <div style="font-size:0.78rem;color:var(--cl-text-muted);margin-top:3px;">
             👤 {{ appt.owner_name }}
@@ -398,7 +398,7 @@
       {% endfor %}
       {% else %}
       <div style="padding:24px;text-align:center;color:var(--cl-text-muted);font-size:0.85rem;">
-        No patients currently checked in
+        {{ t('No patients currently checked in', 'لا يوجد مرضى مسجلو الوصول حالياً') }}
       </div>
       {% endif %}
     </div>
@@ -407,7 +407,7 @@
     <div class="rec-panel">
       <div class="rec-panel-head">
         <div>
-          <div class="rec-panel-title">🕐 Waiting / Scheduled</div>
+          <div class="rec-panel-title">{{ t('🕐 Waiting / Scheduled', '🕐 في الانتظار / مجدول') }}</div>
           <div class="rec-panel-sub">{{ waiting }} appointment{{ 's' if waiting != 1 }} pending</div>
         </div>
       </div>
@@ -433,7 +433,7 @@
           <button type="submit"
                   class="pf-btn pf-btn-sm"
                   style="background:color-mix(in srgb,#7c3aed 12%,transparent);color:#6d28d9;border:1.5px solid #c4b5fd;font-size:0.75rem;padding:5px 10px;">
-            Check In
+            {{ t('Check In', 'تسجيل وصول') }}
           </button>
         </form>
       </div>
@@ -441,12 +441,12 @@
       {% if waiting_appts|length > 8 %}
       <div style="padding:10px 16px;text-align:center;font-size:0.78rem;color:var(--cl-text-muted)">
         +{{ waiting_appts|length - 8 }} more —
-        <a href="{{ url_for('appointments.schedule', date=today_str) }}" style="color:var(--cl-primary)">view all</a>
+        <a href="{{ url_for('appointments.schedule', date=today_str) }}" style="color:var(--cl-primary)">{{ t('view all', 'عرض الكل') }}</a>
       </div>
       {% endif %}
       {% else %}
       <div style="padding:24px;text-align:center;color:var(--cl-text-muted);font-size:0.85rem;">
-        No appointments waiting
+        {{ t('No appointments waiting', 'لا توجد مواعيد في الانتظار') }}
       </div>
       {% endif %}
     </div>

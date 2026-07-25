@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Reminder Settings{% endblock %}
-{% block page_title %}WhatsApp Reminder Settings{% endblock %}
-{% block page_sub %}Configure automated daily reminders sent at 09:00{% endblock %}
+{% block title %}{{ t('Reminder Settings', 'إعدادات التذكير') }}{% endblock %}
+{% block page_title %}{{ t('WhatsApp Reminder Settings', 'إعدادات تذكيرات واتساب') }}{% endblock %}
+{% block page_sub %}{{ t('Configure automated daily reminders sent at 09:00', 'إعداد التذكيرات اليومية التلقائية المرسلة الساعة 09:00') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">← Templates</a>
+<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">{{ t('← Templates', '← القوالب') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -16,7 +16,7 @@
     <!-- Toggle cards -->
     <div class="pf-card">
       <div style="font-weight:700;font-size:15px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--cl-border)">
-        🔔 Reminder Types
+        {{ t('🔔 Reminder Types', '🔔 أنواع التذكيرات') }}
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
 
@@ -61,7 +61,7 @@
     <!-- Message templates -->
     <div class="pf-card">
       <div style="font-weight:700;font-size:15px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--cl-border)">
-        ✉️ Message Templates
+        {{ t('✉️ Message Templates', '✉️ قوالب الرسائل') }}
         <span style="font-size:11px;font-weight:400;color:var(--cl-text-light);margin-left:8px">
           Variables: {owner}, {pet}, {date}, {time}, {vaccine}, {invoice}, {amount}
         </span>
@@ -83,8 +83,8 @@
     </div>
 
     <div style="display:flex;justify-content:flex-end;gap:10px">
-      <a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">Cancel</a>
-      <button type="submit" class="pf-btn pf-btn-primary">Save Settings</button>
+      <a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">{{ t('Cancel', 'إلغاء') }}</a>
+      <button type="submit" class="pf-btn pf-btn-primary">{{ t('Save Settings', 'حفظ الإعدادات') }}</button>
     </div>
 
   </div>

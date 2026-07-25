@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Roles & Permissions{% endblock %}
-{% block page_title %}Roles & Permissions{% endblock %}
-{% block page_sub %}All roles grouped by department · click a role to see its permissions{% endblock %}
+{% block title %}{{ t('Roles & Permissions', 'الأدوار والصلاحيات') }}{% endblock %}
+{% block page_title %}{{ t('Roles & Permissions', 'الأدوار والصلاحيات') }}{% endblock %}
+{% block page_sub %}{{ t('All roles grouped by department · click a role to see its permissions', 'جميع الأدوار مجمّعة حسب القسم · اضغط على دور لعرض صلاحياته') }}{% endblock %}
 
 {% block topbar_actions %}
-<button class="pf-btn pf-btn-primary" onclick="openCreateModal()">+ New Custom Role</button>
+<button class="pf-btn pf-btn-primary" onclick="openCreateModal()">{{ t('+ New Custom Role', '+ دور مخصص جديد') }}</button>
 {% endblock %}
 
 {% block head_extra %}
@@ -135,8 +135,8 @@
 
 {# ── Tabs ── #}
 <div class="rp-tabs">
-  <button class="rp-tab active" id="tab-roles" onclick="switchTab('roles')">Roles & Permissions</button>
-  <button class="rp-tab"        id="tab-staff" onclick="switchTab('staff')">Staff Access</button>
+  <button class="rp-tab active" id="tab-roles" onclick="switchTab('roles')">{{ t('Roles & Permissions', 'الأدوار والصلاحيات') }}</button>
+  <button class="rp-tab"        id="tab-staff" onclick="switchTab('staff')">{{ t('Staff Access', 'صلاحيات الموظفين') }}</button>
 </div>
 
 {# ══════════════════════════════════════
@@ -155,7 +155,7 @@
     <div class="role-meta">
       <span class="meta-pill {% if ucount > 0 %}users{% endif %}">{{ ucount }} user{{ 's' if ucount != 1 else '' }}</span>
       <span class="meta-pill">{{ perms|length }} perm{{ 's' if perms|length != 1 else '' }}</span>
-      {% if is_system %}<span class="badge-builtin">built-in</span>{% endif %}
+      {% if is_system %}<span class="badge-builtin">{{ t('built-in', 'مدمج') }}</span>{% endif %}
       <span class="role-chevron">▼</span>
     </div>
   </div>
@@ -167,17 +167,17 @@
     </div>
     <div class="detail-footer">
       {% if is_system %}
-        <span class="detail-note">System roles are enforced in code and cannot be modified.</span>
+        <span class="detail-note">{{ t('System roles are enforced in code and cannot be modified.', 'أدوار النظام مطبقة في الكود ولا يمكن تعديلها.') }}</span>
       {% else %}
         <button class="btn-sm btn-edit-s"
           onclick="event.stopPropagation();openEdit({{ role_id }},'{{ key }}','{{ label }}','{{ display_ar }}','{{ color }}',{{ perms|tojson }})">
-          Edit Role
+          {{ t('Edit Role', 'تعديل الدور') }}
         </button>
         {% if session.user.role == 'super_admin' %}
         <form method="post" action="{{ url_for('system.role_delete', role_id=role_id) }}" style="display:inline"
               onsubmit="event.stopPropagation();return confirm('Delete role {{ label }}?')">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-          <button type="submit" class="btn-sm btn-del-s">Delete</button>
+          <button type="submit" class="btn-sm btn-del-s">{{ t('Delete', 'حذف') }}</button>
         </form>
         {% endif %}
       {% endif %}
@@ -188,7 +188,7 @@
 
 {# MANAGEMENT #}
 <div class="cat-section">
-  <div class="cat-label">Management</div>
+  <div class="cat-label">{{ t('Management', 'الإدارة') }}</div>
   {{ role_row('super_admin',    'Super Admin',    system_role_colors['super_admin'],    system_role_perms['super_admin'],    user_counts.get('super_admin',0),    True) }}
   {{ role_row('clinic_owner',   'Clinic Owner',   system_role_colors['clinic_owner'],   system_role_perms['clinic_owner'],   user_counts.get('clinic_owner',0),   True) }}
   {{ role_row('branch_manager', 'Branch Manager', system_role_colors['branch_manager'], system_role_perms['branch_manager'], user_counts.get('branch_manager',0), True) }}
@@ -196,32 +196,32 @@
 
 {# CLINICAL #}
 <div class="cat-section">
-  <div class="cat-label">Clinical</div>
+  <div class="cat-label">{{ t('Clinical', 'السريري') }}</div>
   {{ role_row('doctor', 'Doctor / Vet', system_role_colors['doctor'], system_role_perms['doctor'], user_counts.get('doctor',0), True) }}
   {{ role_row('nurse',  'Nurse',        system_role_colors['nurse'],  system_role_perms['nurse'],  user_counts.get('nurse',0),  True) }}
 </div>
 
 {# FRONT DESK #}
 <div class="cat-section">
-  <div class="cat-label">Front Desk</div>
-  {{ role_row('receptionist', 'Receptionist', system_role_colors['receptionist'], system_role_perms['receptionist'], user_counts.get('receptionist',0), True) }}
+  <div class="cat-label">{{ t('Front Desk', 'الاستقبال') }}</div>
+  {{ role_row('reception', 'Receptionist', system_role_colors['reception'], system_role_perms['reception'], user_counts.get('reception',0), True) }}
 </div>
 
 {# PHARMACY & STOCK #}
 <div class="cat-section">
-  <div class="cat-label">Pharmacy &amp; Stock</div>
+  <div class="cat-label">{{ t('Pharmacy &amp; Stock', 'الصيدلية والمخزون') }}</div>
   {{ role_row('pharmacist', 'Pharmacist', system_role_colors['pharmacist'], system_role_perms['pharmacist'], user_counts.get('pharmacist',0), True) }}
 </div>
 
 {# SERVICES #}
 <div class="cat-section">
-  <div class="cat-label">Services</div>
+  <div class="cat-label">{{ t('Services', 'الخدمات') }}</div>
   {{ role_row('groomer', 'Groomer', system_role_colors['groomer'], system_role_perms['groomer'], user_counts.get('groomer',0), True) }}
 </div>
 
 {# SYSTEM & IT #}
 <div class="cat-section">
-  <div class="cat-label">System &amp; IT</div>
+  <div class="cat-label">{{ t('System &amp; IT', 'النظام وتقنية المعلومات') }}</div>
   {{ role_row('hr',            'HR',            system_role_colors['hr'],            system_role_perms['hr'],            user_counts.get('hr',0),            True) }}
   {{ role_row('support_admin', 'Support Admin',  system_role_colors['support_admin'], system_role_perms['support_admin'], user_counts.get('support_admin',0), True) }}
   {{ role_row('staff',         'Staff',          system_role_colors['staff'],         system_role_perms['staff'],         user_counts.get('staff',0),         True) }}
@@ -241,7 +241,7 @@
   {% else %}
   <div style="text-align:center;padding:32px;color:var(--text-muted);background:var(--surface);
               border-radius:12px;border:2px dashed var(--border);font-size:13px">
-    No custom roles yet — click <strong>+ New Custom Role</strong> to create one.
+    {{ t('No custom roles yet — click', 'لا توجد أدوار مخصصة بعد — اضغط') }} <strong>{{ t('+ New Custom Role', '+ دور مخصص جديد') }}</strong> {{ t('to create one.', 'لإنشاء واحد.') }}
   </div>
   {% endfor %}
 </div>
@@ -254,12 +254,12 @@
    ══════════════════════════════════════ #}
 <div class="tab-panel" id="panel-staff">
   <div class="staff-bar">
-    <input id="sa-search" type="search" class="form-control" placeholder="Search name or username…"
+    <input id="sa-search" type="search" class="form-control" placeholder="{{ t('Search name or username…', 'ابحث بالاسم أو اسم المستخدم…') }}"
            style="max-width:260px" oninput="saFilter()">
     <select id="sa-role" class="form-control" style="max-width:190px" onchange="saFilter()">
-      <option value="">All roles</option>
+      <option value="">{{ t('All roles', 'جميع الأدوار') }}</option>
       {% for k in ['super_admin','clinic_owner','branch_manager','doctor','nurse',
-                   'receptionist','pharmacist','groomer','hr','support_admin','staff'] %}
+                   'reception','pharmacist','groomer','hr','support_admin','staff'] %}
       <option value="{{ k }}">{{ k }}</option>
       {% endfor %}
       {% for r in roles %}
@@ -267,15 +267,15 @@
       {% endfor %}
     </select>
     <select id="sa-status" class="form-control" style="max-width:130px" onchange="saFilter()">
-      <option value="">Any status</option>
-      <option value="1">Active</option>
-      <option value="0">Inactive</option>
+      <option value="">{{ t('Any status', 'أي حالة') }}</option>
+      <option value="1">{{ t('Active', 'نشط') }}</option>
+      <option value="0">{{ t('Inactive', 'غير نشط') }}</option>
     </select>
     <span style="font-size:12px;color:var(--text-muted);margin-left:auto" id="sa-label">—</span>
   </div>
 
   <div id="sa-loading" style="text-align:center;padding:60px;color:var(--text-muted)">
-    <div style="font-size:32px;margin-bottom:10px">⏳</div>Loading staff list…
+    <div style="font-size:32px;margin-bottom:10px">⏳</div>{{ t('Loading staff list…', 'جارٍ تحميل قائمة الموظفين…') }}
   </div>
 
   <div id="sa-wrap" style="display:none">
@@ -283,7 +283,7 @@
       <table class="sa-table">
         <thead>
           <tr>
-            <th>Staff Member</th><th>Username</th><th>Current Role</th><th>Status</th><th>Assign Role</th>
+            <th>{{ t('Staff Member', 'الموظف') }}</th><th>{{ t('Username', 'اسم المستخدم') }}</th><th>{{ t('Current Role', 'الدور الحالي') }}</th><th>{{ t('Status', 'الحالة') }}</th><th>{{ t('Assign Role', 'تعيين دور') }}</th>
           </tr>
         </thead>
         <tbody id="sa-tbody"></tbody>
@@ -298,7 +298,7 @@
 <div id="modal-create" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal-box">
     <div class="modal-head">
-      <h3>New Custom Role</h3>
+      <h3>{{ t('New Custom Role', 'دور مخصص جديد') }}</h3>
       <button class="modal-close" onclick="document.getElementById('modal-create').style.display='none'">×</button>
     </div>
     <div class="modal-body">
@@ -306,27 +306,27 @@
         <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Role Key *</label>
+            <label class="form-label">{{ t('Role Key *', 'مفتاح الدور *') }}</label>
             <input type="text" name="name" class="form-control" placeholder="e.g. head_nurse" required
-                   pattern="[a-z0-9_]+" title="Lowercase, numbers, underscores only">
+                   pattern="[a-z0-9_]+" title="{{ t('Lowercase, numbers, underscores only', 'أحرف صغيرة وأرقام وشرطات سفلية فقط') }}">
           </div>
           <div class="form-group">
-            <label class="form-label">Display Name (EN) *</label>
+            <label class="form-label">{{ t('Display Name (EN) *', 'الاسم المعروض (إنجليزي) *') }}</label>
             <input type="text" name="display_name" class="form-control" placeholder="Head Nurse" required>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Display Name (AR)</label>
+            <label class="form-label">{{ t('Display Name (AR)', 'الاسم المعروض (عربي)') }}</label>
             <input type="text" name="display_name_ar" class="form-control" placeholder="رئيس الممرضين" dir="rtl">
           </div>
           <div class="form-group">
-            <label class="form-label">Badge Color</label>
+            <label class="form-label">{{ t('Badge Color', 'لون الشارة') }}</label>
             <input type="color" name="color" class="form-control" value="#1a3a6b" style="height:42px;padding:4px 8px">
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Permissions</label>
+          <label class="form-label">{{ t('Permissions', 'الصلاحيات') }}</label>
           <div class="perm-grid-modal">
             {% for key, label in all_permissions %}
             <label class="perm-check">
@@ -337,8 +337,8 @@
           </div>
         </div>
         <div class="modal-foot">
-          <button type="button" class="btn-cancel" onclick="document.getElementById('modal-create').style.display='none'">Cancel</button>
-          <button type="submit" class="btn-save">Create Role</button>
+          <button type="button" class="btn-cancel" onclick="document.getElementById('modal-create').style.display='none'">{{ t('Cancel', 'إلغاء') }}</button>
+          <button type="submit" class="btn-save">{{ t('Create Role', 'إنشاء دور') }}</button>
         </div>
       </form>
     </div>
@@ -349,7 +349,7 @@
 <div id="modal-edit" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal-box">
     <div class="modal-head">
-      <h3>Edit Custom Role</h3>
+      <h3>{{ t('Edit Custom Role', 'تعديل دور مخصص') }}</h3>
       <button class="modal-close" onclick="document.getElementById('modal-edit').style.display='none'">×</button>
     </div>
     <div class="modal-body">
@@ -357,26 +357,26 @@
         <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Role Key</label>
+            <label class="form-label">{{ t('Role Key', 'مفتاح الدور') }}</label>
             <input type="text" id="edit-key" class="form-control" disabled style="opacity:.55">
           </div>
           <div class="form-group">
-            <label class="form-label">Display Name (EN) *</label>
+            <label class="form-label">{{ t('Display Name (EN) *', 'الاسم المعروض (إنجليزي) *') }}</label>
             <input type="text" id="edit-name" name="display_name" class="form-control" required>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Display Name (AR)</label>
+            <label class="form-label">{{ t('Display Name (AR)', 'الاسم المعروض (عربي)') }}</label>
             <input type="text" id="edit-ar" name="display_name_ar" class="form-control" dir="rtl">
           </div>
           <div class="form-group">
-            <label class="form-label">Badge Color</label>
+            <label class="form-label">{{ t('Badge Color', 'لون الشارة') }}</label>
             <input type="color" id="edit-color" name="color" class="form-control" style="height:42px;padding:4px 8px">
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Permissions</label>
+          <label class="form-label">{{ t('Permissions', 'الصلاحيات') }}</label>
           <div class="perm-grid-modal" id="edit-perm-grid">
             {% for key, label in all_permissions %}
             <label class="perm-check">
@@ -387,8 +387,8 @@
           </div>
         </div>
         <div class="modal-foot">
-          <button type="button" class="btn-cancel" onclick="document.getElementById('modal-edit').style.display='none'">Cancel</button>
-          <button type="submit" class="btn-save">Save Changes</button>
+          <button type="button" class="btn-cancel" onclick="document.getElementById('modal-edit').style.display='none'">{{ t('Cancel', 'إلغاء') }}</button>
+          <button type="submit" class="btn-save">{{ t('Save Changes', 'حفظ التغييرات') }}</button>
         </div>
       </form>
     </div>
@@ -469,7 +469,7 @@ var _SA_PER   = 25;
 
 var _roleOpts = (function(){
   var sys = ['super_admin','clinic_owner','branch_manager','doctor','nurse',
-             'receptionist','pharmacist','groomer','hr','support_admin','staff'];
+             'reception','pharmacist','groomer','hr','support_admin','staff'];
   var opts = sys.map(function(r){ return '<option value="'+r+'">'+r+'</option>'; }).join('');
   var cKeys   = {{ roles | map(attribute='name')         | list | tojson }};
   var cLabels = {{ roles | map(attribute='display_name') | list | tojson }};

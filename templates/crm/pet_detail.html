@@ -2,25 +2,25 @@
 
 {% block title %}{{ pet.pet_name }}{% endblock %}
 {% block page_title %}{{ pet._emoji }} {{ pet.pet_name }}{% endblock %}
-{% block page_sub %}{{ pet.species }}{% if pet.breed %} · {{ pet.breed }}{% endif %} — owned by {{ pet.owner_name }}{% endblock %}
+{% block page_sub %}{{ pet.species }}{% if pet.breed %} · {{ pet.breed }}{% endif %} — {{ t('owned by','يملكه') }} {{ pet.owner_name }}{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('appointments.appt_new', pet_id=pet.id, owner_id=pet.owner_id) }}"
-     class="pf-btn pf-btn-primary">📅 New Appointment</a>
+     class="pf-btn pf-btn-primary">📅 {{ t('New Appointment','موعد جديد') }}</a>
   <button onclick="openPetSummary({{ pet.id }})"
           style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;
                  border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:600;font-size:.85rem;
                  margin-left:8px">
-    ✨ AI Summary
+    ✨ {{ t('AI Summary','ملخص ذكي') }}
   </button>
   <a href="{{ url_for('imaging.pet_studies', pet_id=pet.id) }}"
-     class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">🩻 Imaging</a>
+     class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">🩻 {{ t('Imaging','التصوير الطبي') }}</a>
   <a href="{{ url_for('crm.pet_edit', pet_id=pet.id) }}"
-     class="pf-btn" style="background:var(--cl-surface);color:var(--cl-primary);border:1.5px solid var(--cl-primary);margin-left:8px;">✏️ Edit</a>
+     class="pf-btn" style="background:var(--cl-surface);color:var(--cl-primary);border:1.5px solid var(--cl-primary);margin-left:8px;">✏️ {{ t('Edit','تعديل') }}</a>
   <a href="{{ url_for('crm.pet_history_pdf', pet_id=pet.id) }}"
-     class="pf-btn" style="background:var(--cl-surface);color:#dc2626;border:1.5px solid #dc2626;margin-left:8px;">📄 Medical History PDF</a>
+     class="pf-btn" style="background:var(--cl-surface);color:#dc2626;border:1.5px solid #dc2626;margin-left:8px;">📄 {{ t('Medical History PDF','السجل الطبي PDF') }}</a>
   <a href="{{ url_for('crm.owner_detail', owner_id=pet.owner_id) }}"
-     class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">← Owner</a>
+     class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">← {{ t('Owner','المالك') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -209,7 +209,7 @@
           <span class="status-pill">{{ pet._age }}</span>
           {% endif %}
           {% if pet.neutered %}
-          <span class="status-pill" style="background:rgba(16,185,129,0.3);">Neutered</span>
+          <span class="status-pill" style="background:rgba(16,185,129,0.3);">{{ t('Neutered','محوّل') }}</span>
           {% endif %}
         </div>
       </div>
@@ -219,7 +219,7 @@
         <div class="pet-info-row">
           <span class="pet-info-icon">⚖️</span>
           <div>
-            <div class="pet-info-label">Weight</div>
+            <div class="pet-info-label">{{ t('Weight','الوزن') }}</div>
             <div class="pet-info-value">{{ pet.weight_kg }} kg</div>
           </div>
         </div>
@@ -228,7 +228,7 @@
         <div class="pet-info-row">
           <span class="pet-info-icon">🎂</span>
           <div>
-            <div class="pet-info-label">Date of Birth</div>
+            <div class="pet-info-label">{{ t('Date of Birth','تاريخ الميلاد') }}</div>
             <div class="pet-info-value">{{ pet.dob[:10] }}</div>
           </div>
         </div>
@@ -237,7 +237,7 @@
         <div class="pet-info-row">
           <span class="pet-info-icon">🎨</span>
           <div>
-            <div class="pet-info-label">Color</div>
+            <div class="pet-info-label">{{ t('Color','اللون') }}</div>
             <div class="pet-info-value">{{ pet.color }}</div>
           </div>
         </div>
@@ -246,7 +246,7 @@
         <div class="pet-info-row">
           <span class="pet-info-icon">💿</span>
           <div>
-            <div class="pet-info-label">Microchip</div>
+            <div class="pet-info-label">{{ t('Microchip','الميكروشيب') }}</div>
             <div class="pet-info-value" style="font-family:monospace;font-size:0.85rem;">{{ pet.microchip_id }}</div>
           </div>
         </div>
@@ -255,7 +255,7 @@
         <div class="pet-info-row">
           <span class="pet-info-icon">🏥</span>
           <div>
-            <div class="pet-info-label">Chronic Conditions</div>
+            <div class="pet-info-label">{{ t('Chronic Conditions','الأمراض المزمنة') }}</div>
             <div class="pet-info-value">{{ pet.chronic_conditions }}</div>
           </div>
         </div>
@@ -264,21 +264,21 @@
         <div class="pet-info-row" style="background:color-mix(in srgb,#3b82f6 8%,var(--cl-bg));border-radius:8px;padding:8px 10px;margin-top:4px;">
           <span class="pet-info-icon">🛡️</span>
           <div style="flex:1;">
-            <div class="pet-info-label">Insurance</div>
+            <div class="pet-info-label">{{ t('Insurance','التأمين') }}</div>
             {% if pet.insurance_provider %}
             <div class="pet-info-value" style="font-weight:700;">{{ pet.insurance_provider }}</div>
             {% endif %}
             {% if pet.policy_number %}
             <div style="font-size:.8rem;color:var(--cl-muted);font-family:monospace;margin-top:2px;">
-              Policy: {{ pet.policy_number }}
+              {{ t('Policy:','رقم الوثيقة:') }} {{ pet.policy_number }}
             </div>
             {% endif %}
             {% if pet.policy_expiry %}
               {% set exp = pet.policy_expiry[:10] %}
               <div style="font-size:.78rem;margin-top:2px;
                 {% if exp < today_str %}color:#ef4444;font-weight:700;{% elif exp < soon_str %}color:#f59e0b;font-weight:600;{% else %}color:#16a34a;{% endif %}">
-                Expires: {{ exp }}
-                {% if exp < today_str %} ⚠️ EXPIRED{% elif exp < soon_str %} ⏰ Expiring soon{% endif %}
+                {{ t('Expires:','تنتهي في:') }} {{ exp }}
+                {% if exp < today_str %} ⚠️ {{ t('EXPIRED','منتهية') }}{% elif exp < soon_str %} ⏰ {{ t('Expiring soon','تنتهي قريباً') }}{% endif %}
               </div>
             {% endif %}
           </div>
@@ -287,7 +287,7 @@
       </div>
 
       {% if pet.allergies %}
-      <div class="allergy-alert">⚠️ Allergies: {{ pet.allergies }}</div>
+      <div class="allergy-alert">⚠️ {{ t('Allergies:','الحساسية:') }} {{ pet.allergies }}</div>
       {% endif %}
 
       <div class="pet-card-divider"></div>
@@ -305,8 +305,8 @@
       </div>
 
       <div class="pet-card-footer">
-        <a href="{{ url_for('crm.pet_edit', pet_id=pet.id) }}">✏️ Edit</a>
-        <a href="{{ url_for('appointments.appt_new', pet_id=pet.id, owner_id=pet.owner_id) }}">📅 Book</a>
+        <a href="{{ url_for('crm.pet_edit', pet_id=pet.id) }}">✏️ {{ t('Edit','تعديل') }}</a>
+        <a href="{{ url_for('appointments.appt_new', pet_id=pet.id, owner_id=pet.owner_id) }}">📅 {{ t('Book','حجز') }}</a>
       </div>
     </div>
   </div>
@@ -318,8 +318,8 @@
     {% if weight_history %}
     <div class="section-card">
       <div class="section-header">
-        <h3>⚖️ Weight History</h3>
-        <span style="font-size:0.82rem;color:var(--cl-muted);">Last {{ weight_history|length }} measurements</span>
+        <h3>⚖️ {{ t('Weight History','سجل الوزن') }}</h3>
+        <span style="font-size:0.82rem;color:var(--cl-muted);">{{ t('Last','آخر') }} {{ weight_history|length }} {{ t('measurements','قياس') }}</span>
       </div>
       <div class="section-body">
         {% set max_w = weight_history | map(attribute='weight') | max %}
@@ -340,8 +340,8 @@
     <!-- Timeline -->
     <div class="section-card">
       <div class="section-header">
-        <h3>📋 Medical Timeline</h3>
-        <span style="font-size:0.82rem;color:var(--cl-muted);">{{ timeline | length }} events</span>
+        <h3>📋 {{ t('Medical Timeline','السجل الزمني الطبي') }}</h3>
+        <span style="font-size:0.82rem;color:var(--cl-muted);">{{ timeline | length }} {{ t('events','حدث') }}</span>
       </div>
       <div class="section-body">
         {% if timeline %}
@@ -375,31 +375,31 @@
           {% endfor %}
         </div>
         {% else %}
-        <div class="empty-state">No medical events recorded yet.</div>
+        <div class="empty-state">{{ t('No medical events recorded yet.','لا توجد أحداث طبية مسجلة بعد.') }}</div>
         {% endif %}
       </div>
       <div class="quick-action-btns">
-        <a href="{{ url_for('appointments.appt_new', pet_id=pet.id, owner_id=pet.owner_id) }}">📅 New Appointment</a>
-        <a href="/visits/new?pet_id={{ pet.id }}&owner_id={{ pet.owner_id }}">🩺 New Visit</a>
+        <a href="{{ url_for('appointments.appt_new', pet_id=pet.id, owner_id=pet.owner_id) }}">📅 {{ t('New Appointment','موعد جديد') }}</a>
+        <a href="/visits/new?pet_id={{ pet.id }}&owner_id={{ pet.owner_id }}">🩺 {{ t('New Visit','زيارة جديدة') }}</a>
       </div>
     </div>
 
     <!-- Vaccinations -->
     <div class="section-card">
       <div class="section-header">
-        <h3>💉 Vaccinations</h3>
-        <a href="/vaccinations/new?pet_id={{ pet.id }}" class="pf-btn pf-btn-primary" style="font-size:0.82rem;padding:6px 14px;">➕ Add</a>
+        <h3>💉 {{ t('Vaccinations','التطعيمات') }}</h3>
+        <a href="/vaccinations/new?pet_id={{ pet.id }}" class="pf-btn pf-btn-primary" style="font-size:0.82rem;padding:6px 14px;">➕ {{ t('Add','إضافة') }}</a>
       </div>
       <div class="section-body" style="padding:0;">
         {% if vaccinations %}
         <table class="vacc-table">
           <thead>
             <tr>
-              <th>Vaccine</th>
-              <th>Brand</th>
-              <th>Administered</th>
-              <th>Next Due</th>
-              <th>By</th>
+              <th>{{ t('Vaccine','اللقاح') }}</th>
+              <th>{{ t('Brand','الماركة') }}</th>
+              <th>{{ t('Administered','تاريخ الإعطاء') }}</th>
+              <th>{{ t('Next Due','الجرعة التالية') }}</th>
+              <th>{{ t('By','بواسطة') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -422,7 +422,7 @@
           </tbody>
         </table>
         {% else %}
-        <div class="empty-state">No vaccinations recorded yet.</div>
+        <div class="empty-state">{{ t('No vaccinations recorded yet.','لا توجد تطعيمات مسجلة بعد.') }}</div>
         {% endif %}
       </div>
     </div>
@@ -430,7 +430,7 @@
     <!-- Notes -->
     {% if pet.notes %}
     <div class="section-card">
-      <div class="section-header"><h3>📝 Notes</h3></div>
+      <div class="section-header"><h3>📝 {{ t('Notes','ملاحظات') }}</h3></div>
       <div class="section-body">
         <div style="background:color-mix(in srgb,var(--cl-accent) 8%,var(--cl-bg));border:1.5px solid color-mix(in srgb,var(--cl-accent) 25%,var(--cl-border));border-radius:9px;padding:14px 18px;font-size:0.93rem;white-space:pre-wrap;">{{ pet.notes }}</div>
       </div>
@@ -470,12 +470,12 @@
       <button onclick="printSummary()"
               style="background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.4);
                      color:#c4b5fd;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.83rem">
-        🖨 Print
+        {{ t('🖨 Print', '🖨 طباعة') }}
       </button>
       <button onclick="document.getElementById('petSummaryModal').style.display='none'"
               style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
                      color:#94a3b8;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.83rem">
-        Close
+        {{ t('Close', 'إغلاق') }}
       </button>
     </div>
   </div>

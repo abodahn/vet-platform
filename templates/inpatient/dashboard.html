@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Inpatient / Hospitalisation{% endblock %}
+{% block title %}{{ t('Inpatient / Hospitalisation', 'التنويم') }}{% endblock %}
 
 {% block content %}
 <div class="pf-page-header">
   <div>
-    <h1 class="pf-page-title">🏥 Inpatient Ward</h1>
-    <p class="pf-page-sub">Active hospitalisations &amp; clinical monitoring</p>
+    <h1 class="pf-page-title">{{ t('🏥 Inpatient Ward', '🏥 عنبر التنويم') }}</h1>
+    <p class="pf-page-sub">{{ t('Active hospitalisations &amp; clinical monitoring', 'حالات التنويم النشطة والمتابعة السريرية') }}</p>
   </div>
   <div class="pf-topbar-actions">
-    <a href="{{ url_for('inpatient.admit') }}" class="pf-btn pf-btn-primary">+ Admit Patient</a>
+    <a href="{{ url_for('inpatient.admit') }}" class="pf-btn pf-btn-primary">{{ t('+ Admit Patient', '+ تنويم مريض') }}</a>
   </div>
 </div>
 
@@ -17,27 +17,27 @@
   {% set s = stats %}
   <div class="pf-card" style="text-align:center;padding:1rem">
     <div style="font-size:2rem;font-weight:700;color:#2563eb">{{ s.active or 0 }}</div>
-    <div style="font-size:.8rem;color:var(--cl-muted)">Active Stays</div>
+    <div style="font-size:.8rem;color:var(--cl-muted)">{{ t('Active Stays', 'الإقامات النشطة') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1rem">
     <div style="font-size:2rem;font-weight:700;color:#dc2626">{{ s.critical or 0 }}</div>
-    <div style="font-size:.8rem;color:var(--cl-muted)">Critical</div>
+    <div style="font-size:.8rem;color:var(--cl-muted)">{{ t('Critical', 'حرج') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1rem">
     <div style="font-size:2rem;font-weight:700;color:#d97706">{{ s.ready or 0 }}</div>
-    <div style="font-size:.8rem;color:var(--cl-muted)">Ready for Discharge</div>
+    <div style="font-size:.8rem;color:var(--cl-muted)">{{ t('Ready for Discharge', 'جاهز للخروج') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1rem">
     <div style="font-size:2rem;font-weight:700;color:#16a34a">{{ s.discharged_today or 0 }}</div>
-    <div style="font-size:.8rem;color:var(--cl-muted)">Discharged Today</div>
+    <div style="font-size:.8rem;color:var(--cl-muted)">{{ t('Discharged Today', 'خرجوا اليوم') }}</div>
   </div>
 </div>
 
 {# ── Filter bar ── #}
 <div class="pf-card" style="padding:.8rem 1rem;margin-bottom:1rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-  <span style="font-weight:600;font-size:.85rem">Filter:</span>
+  <span style="font-weight:600;font-size:.85rem">{{ t('Filter:', 'تصفية:') }}</span>
   <a href="{{ url_for('inpatient.dashboard') }}"
-     class="pf-btn {% if not status_f %}pf-btn-primary{% else %}pf-btn-secondary{% endif %}" style="font-size:.8rem;padding:4px 12px">All Active</a>
+     class="pf-btn {% if not status_f %}pf-btn-primary{% else %}pf-btn-secondary{% endif %}" style="font-size:.8rem;padding:4px 12px">{{ t('All Active', 'كل النشط') }}</a>
   {% for st in statuses %}
   <a href="{{ url_for('inpatient.dashboard', status=st) }}"
      class="pf-btn {% if status_f==st %}pf-btn-primary{% else %}pf-btn-secondary{% endif %}" style="font-size:.8rem;padding:4px 12px">{{ st }}</a>
@@ -61,7 +61,7 @@
       <div style="font-size:.82rem;color:var(--cl-muted);margin-bottom:.4rem">
         👤 {{ s.owner_name }} · {{ s.owner_phone }}
       </div>
-      <div style="font-size:.82rem;margin-bottom:.3rem"><strong>Reason:</strong> {{ s.reason[:80] }}{% if s.reason|length > 80 %}…{% endif %}</div>
+      <div style="font-size:.82rem;margin-bottom:.3rem"><strong>{{ t('Reason:', 'السبب:') }}</strong> {{ s.reason[:80] }}{% if s.reason|length > 80 %}…{% endif %}</div>
       <div style="display:flex;gap:1rem;font-size:.78rem;color:var(--cl-muted)">
         <span>🏥 Ward: {{ s.ward }}</span>
         {% if s.cage_number %}<span>🔢 Cage: {{ s.cage_number }}</span>{% endif %}
@@ -74,8 +74,8 @@
 {% else %}
 <div class="pf-card" style="text-align:center;padding:3rem;color:var(--cl-muted)">
   <div style="font-size:3rem;margin-bottom:1rem">🏥</div>
-  <div style="font-size:1.1rem;font-weight:600">No active inpatient stays</div>
-  <a href="{{ url_for('inpatient.admit') }}" class="pf-btn pf-btn-primary" style="margin-top:1rem">Admit First Patient</a>
+  <div style="font-size:1.1rem;font-weight:600">{{ t('No active inpatient stays', 'لا توجد حالات تنويم نشطة') }}</div>
+  <a href="{{ url_for('inpatient.admit') }}" class="pf-btn pf-btn-primary" style="margin-top:1rem">{{ t('Admit First Patient', 'نوّم أول مريض') }}</a>
 </div>
 {% endif %}
 {% endblock %}

@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Send WhatsApp{% endblock %}
-{% block page_title %}Send Message{% endblock %}
-{% block page_sub %}Send text, images, files or videos via WhatsApp{% endblock %}
+{% block title %}{{ t('Send WhatsApp', 'إرسال واتساب') }}{% endblock %}
+{% block page_title %}{{ t('Send Message', 'إرسال رسالة') }}{% endblock %}
+{% block page_sub %}{{ t('Send text, images, files or videos via WhatsApp', 'إرسال نصوص أو صور أو ملفات أو فيديوهات عبر واتساب') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">← Control Center</a>
+<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">{{ t('← Control Center', '← مركز التحكم') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -47,19 +47,19 @@
 
   <!-- LEFT: Send form -->
   <div class="send-card">
-    <h3>✉️ Send</h3>
+    <h3>{{ t('✉️ Send', '✉️ إرسال') }}</h3>
 
     <!-- Tabs: Text / Image / File / Video -->
     <div class="send-tabs">
-      <button class="stab active" onclick="showSendTab('text')">💬 Text</button>
-      <button class="stab"        onclick="showSendTab('image')">🖼 Image</button>
-      <button class="stab"        onclick="showSendTab('file')">📎 File</button>
-      <button class="stab"        onclick="showSendTab('video')">🎬 Video</button>
+      <button class="stab active" onclick="showSendTab('text')">{{ t('💬 Text', '💬 نص') }}</button>
+      <button class="stab"        onclick="showSendTab('image')">{{ t('🖼 Image', '🖼 صورة') }}</button>
+      <button class="stab"        onclick="showSendTab('file')">{{ t('📎 File', '📎 ملف') }}</button>
+      <button class="stab"        onclick="showSendTab('video')">{{ t('🎬 Video', '🎬 فيديو') }}</button>
     </div>
 
     <!-- Phone (shared) -->
     <div class="field">
-      <label>Phone Number *</label>
+      <label>{{ t('Phone Number *', 'رقم الهاتف *') }}</label>
       <input type="text" id="send-phone" class="pf-input" placeholder="e.g. 201012345678 or chat_id@c.us">
     </div>
 
@@ -67,18 +67,18 @@
     <div id="panel-text" class="send-panel active">
       <div class="field">
         <label style="display:flex;align-items:center;justify-content:space-between">
-          <span>Message *</span>
+          <span>{{ t('Message *', 'الرسالة *') }}</span>
           <button type="button" onclick="openAiDraft()"
                   style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;
                          border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.75rem;font-weight:600">
-            ✨ AI Draft
+            {{ t('✨ AI Draft', '✨ مسودة بالذكاء الاصطناعي') }}
           </button>
         </label>
-        <textarea id="send-text" rows="5" class="pf-input" placeholder="Type your message…"
+        <textarea id="send-text" rows="5" class="pf-input" placeholder="{{ t('Type your message…', 'اكتب رسالتك…') }}"
                   style="width:100%;resize:vertical"></textarea>
       </div>
       <button class="pf-btn pf-btn-primary" style="width:100%" onclick="sendText()">
-        📤 Send Message
+        {{ t('📤 Send Message', '📤 إرسال رسالة') }}
       </button>
     </div>
 
@@ -91,24 +91,24 @@
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
           <span style="background:linear-gradient(135deg,#8b5cf6,#6366f1);border-radius:8px;
                        padding:5px 9px;font-size:1rem">✨</span>
-          <h3 style="margin:0;font-size:1rem">AI Message Drafter</h3>
+          <h3 style="margin:0;font-size:1rem">{{ t('AI Message Drafter', 'مُحرّر الرسائل بالذكاء الاصطناعي') }}</h3>
           <button onclick="closeAiDraft()" style="margin-left:auto;background:none;border:none;
                   font-size:1.2rem;cursor:pointer;color:var(--cl-muted)">×</button>
         </div>
-        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:6px">What's the message about?</label>
+        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:6px">{{ t("What's the message about?", 'ما موضوع الرسالة؟') }}</label>
         <textarea id="aiDraftContext" rows="3" class="pf-input"
-                  placeholder="e.g. Remind owner about vaccination due next week for their cat Mimi…"
+                  placeholder="{{ t('e.g. Remind owner about vaccination due next week for their cat Mimi…', 'مثال: ذكّر المالك بموعد تطعيم قطته ميمي الأسبوع القادم…') }}"
                   style="width:100%;margin-bottom:10px;resize:vertical"></textarea>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <select id="aiDraftLang" class="pf-input" style="flex:0 0 120px">
-            <option value="en">English</option>
-            <option value="ar">Arabic</option>
+            <option value="en">{{ t('English', 'الإنجليزية') }}</option>
+            <option value="ar">{{ t('Arabic', 'العربية') }}</option>
           </select>
           <button onclick="generateAiDraft()"
                   style="flex:1;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;
                          border:none;border-radius:8px;padding:8px;cursor:pointer;font-weight:600;
                          font-size:.88rem" id="aiDraftBtn">
-            🤖 Generate Message
+            {{ t('🤖 Generate Message', '🤖 توليد الرسالة') }}
           </button>
         </div>
         <div id="aiDraftResult" style="display:none;background:var(--cl-bg,#f8fafc);
@@ -116,8 +116,8 @@
              font-size:.85rem;white-space:pre-wrap;margin-bottom:12px;max-height:150px;overflow-y:auto"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button onclick="useAiDraft()" id="aiUseBtn" style="display:none"
-                  class="pf-btn pf-btn-primary pf-btn-sm">✅ Use This Message</button>
-          <button onclick="closeAiDraft()" class="pf-btn pf-btn-ghost pf-btn-sm">Cancel</button>
+                  class="pf-btn pf-btn-primary pf-btn-sm">{{ t('✅ Use This Message', '✅ استخدم هذه الرسالة') }}</button>
+          <button onclick="closeAiDraft()" class="pf-btn pf-btn-ghost pf-btn-sm">{{ t('Cancel', 'إلغاء') }}</button>
         </div>
       </div>
     </div>
@@ -158,45 +158,45 @@
     <!-- IMAGE panel -->
     <div id="panel-image" class="send-panel">
       <div class="field">
-        <label>Image File *</label>
+        <label>{{ t('Image File *', 'ملف الصورة *') }}</label>
         <input type="file" id="img-file" accept="image/*" class="pf-input">
       </div>
       <div class="field">
-        <label>Caption (optional)</label>
-        <input type="text" id="img-caption" class="pf-input" placeholder="Caption…">
+        <label>{{ t('Caption (optional)', 'تعليق (اختياري)') }}</label>
+        <input type="text" id="img-caption" class="pf-input" placeholder="{{ t('Caption…', 'تعليق…') }}">
       </div>
       <button class="pf-btn pf-btn-primary" style="width:100%" onclick="sendMedia('image')">
-        📤 Send Image
+        {{ t('📤 Send Image', '📤 إرسال الصورة') }}
       </button>
     </div>
 
     <!-- FILE panel -->
     <div id="panel-file" class="send-panel">
       <div class="field">
-        <label>Document File *</label>
+        <label>{{ t('Document File *', 'ملف المستند *') }}</label>
         <input type="file" id="doc-file" class="pf-input">
       </div>
       <div class="field">
-        <label>Caption (optional)</label>
-        <input type="text" id="doc-caption" class="pf-input" placeholder="Caption…">
+        <label>{{ t('Caption (optional)', 'تعليق (اختياري)') }}</label>
+        <input type="text" id="doc-caption" class="pf-input" placeholder="{{ t('Caption…', 'تعليق…') }}">
       </div>
       <button class="pf-btn pf-btn-primary" style="width:100%" onclick="sendMedia('file')">
-        📤 Send File
+        {{ t('📤 Send File', '📤 إرسال الملف') }}
       </button>
     </div>
 
     <!-- VIDEO panel -->
     <div id="panel-video" class="send-panel">
       <div class="field">
-        <label>Video File *</label>
+        <label>{{ t('Video File *', 'ملف الفيديو *') }}</label>
         <input type="file" id="vid-file" accept="video/*" class="pf-input">
       </div>
       <div class="field">
-        <label>Caption (optional)</label>
-        <input type="text" id="vid-caption" class="pf-input" placeholder="Caption…">
+        <label>{{ t('Caption (optional)', 'تعليق (اختياري)') }}</label>
+        <input type="text" id="vid-caption" class="pf-input" placeholder="{{ t('Caption…', 'تعليق…') }}">
       </div>
       <button class="pf-btn pf-btn-primary" style="width:100%" onclick="sendMedia('video')">
-        📤 Send Video
+        {{ t('📤 Send Video', '📤 إرسال الفيديو') }}
       </button>
     </div>
 
@@ -205,38 +205,38 @@
 
   <!-- RIGHT: Template picker -->
   <div class="send-card">
-    <h3>📋 Templates</h3>
+    <h3>{{ t('📋 Templates', '📋 القوالب') }}</h3>
     <p style="font-size:.83rem;color:var(--muted,#64748b);margin:0 0 14px">
-      Click a template to load its text into the message box.
+      {{ t('Click a template to load its text into the message box.', 'اضغط على قالب لتحميل نصه في صندوق الرسالة.') }}
     </p>
-    <input type="text" placeholder="Search templates…" oninput="filterTemplates(this.value)"
+    <input type="text" placeholder="{{ t('Search templates…', 'ابحث في القوالب…') }}" oninput="filterTemplates(this.value)"
            class="pf-input" style="width:100%;margin-bottom:12px">
 
     <div class="tpl-grid" id="tpl-grid">
-      {% for t in templates %}
-      <div class="tpl-card" onclick="selectTemplate('{{ t.id }}','{{ t.template_text | replace("'","") | truncate(200) }}')"
-           data-name="{{ t.name|lower }}" data-text="{{ (t.template_text or '')|lower }}" id="tpl-{{ t.id }}">
-        <div class="tpl-name">{{ t.name }}</div>
-        <div class="tpl-preview">{{ t.template_text or '(empty)' }}</div>
+      {% for tpl in templates %}
+      <div class="tpl-card" onclick="selectTemplate('{{ tpl.id }}','{{ tpl.template_text | replace("'","") | truncate(200) }}')"
+           data-name="{{ tpl.name|lower }}" data-text="{{ (tpl.template_text or '')|lower }}" id="tpl-{{ tpl.id }}">
+        <div class="tpl-name">{{ tpl.name }}</div>
+        <div class="tpl-preview">{{ tpl.template_text or '(empty)' }}</div>
       </div>
       {% else %}
       <div style="color:var(--muted,#64748b);font-size:.85rem;padding:10px">
-        No templates yet.
-        <a href="{{ url_for('whatsapp.template_new') }}">Create one →</a>
+        {{ t('No templates yet.', 'لا توجد قوالب بعد.') }}
+        <a href="{{ url_for('whatsapp.template_new') }}">{{ t('Create one →', 'أنشئ واحداً ←') }}</a>
       </div>
       {% endfor %}
     </div>
 
     <a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-ghost" style="width:100%;margin-top:8px">
-      Manage Templates →
+      {{ t('Manage Templates →', 'إدارة القوالب ←') }}
     </a>
 
     <!-- Quick phone lookup -->
     <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border,#e2e8f0)">
-      <h3>🔍 Phone Lookup</h3>
+      <h3>{{ t('🔍 Phone Lookup', '🔍 البحث عن رقم') }}</h3>
       <div style="display:flex;gap:8px">
-        <input type="text" id="lookup-phone" class="pf-input" placeholder="Phone number…" style="flex:1">
-        <button class="pf-btn pf-btn-ghost" onclick="lookupPhone()">Lookup</button>
+        <input type="text" id="lookup-phone" class="pf-input" placeholder="{{ t('Phone number…', 'رقم الهاتف…') }}" style="flex:1">
+        <button class="pf-btn pf-btn-ghost" onclick="lookupPhone()">{{ t('Lookup', 'بحث') }}</button>
       </div>
       <div id="lookup-result" style="margin-top:10px;font-size:.83rem;color:var(--muted,#64748b)"></div>
     </div>

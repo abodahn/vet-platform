@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Leave Request #{{ req.id }}{% endblock %}
-{% block page_title %}Leave Request{% endblock %}
+{% block page_title %}{{ t('Leave Request', 'طلب إجازة') }}{% endblock %}
 {% block page_sub %}#{{ req.id }} — {{ req.staff_name }}{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">← Leave Requests</a>
+  <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">{{ t('← Leave Requests', '← طلبات الإجازة') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -20,28 +20,28 @@
         </div>
         <div class="pf-card-sub">Submitted {{ req.created_at[:10] }}</div>
       </div>
-      {% if req.status == 'Pending' %}<span class="pf-badge soon" style="font-size:13px">⏳ Pending</span>
-      {% elif req.status == 'Approved' %}<span class="pf-badge active" style="font-size:13px">✅ Approved</span>
-      {% else %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b;font-size:13px">❌ Rejected</span>{% endif %}
+      {% if req.status == 'Pending' %}<span class="pf-badge soon" style="font-size:13px">{{ t('⏳ Pending', '⏳ قيد الانتظار') }}</span>
+      {% elif req.status == 'Approved' %}<span class="pf-badge active" style="font-size:13px">{{ t('✅ Approved', '✅ معتمد') }}</span>
+      {% else %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b;font-size:13px">{{ t('❌ Rejected', '❌ مرفوض') }}</span>{% endif %}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">
       <div style="background:var(--cl-surface-2);border-radius:var(--cl-radius-sm);padding:16px;text-align:center">
-        <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:4px">Start Date</div>
+        <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:4px">{{ t('Start Date', 'تاريخ البدء') }}</div>
         <div style="font-weight:700;font-size:16px">{{ req.start_date }}</div>
       </div>
       <div style="background:var(--cl-surface-2);border-radius:var(--cl-radius-sm);padding:16px;text-align:center">
-        <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:4px">End Date</div>
+        <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:4px">{{ t('End Date', 'تاريخ الانتهاء') }}</div>
         <div style="font-weight:700;font-size:16px">{{ req.end_date }}</div>
       </div>
       <div style="background:{{ req.color }}18;border:1px solid {{ req.color }}44;border-radius:var(--cl-radius-sm);padding:16px;text-align:center">
-        <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:4px">Business Days</div>
+        <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:4px">{{ t('Business Days', 'أيام العمل') }}</div>
         <div style="font-weight:800;font-size:24px;color:{{ req.color }}">{{ req.days_requested }}</div>
       </div>
     </div>
 
     <div class="pf-form-group">
-      <label class="pf-form-label">Reason</label>
+      <label class="pf-form-label">{{ t('Reason', 'السبب') }}</label>
       <div style="background:var(--cl-surface-2);border-radius:var(--cl-radius-sm);padding:14px;font-size:14px;min-height:80px">
         {{ req.reason or 'No reason provided.' }}
       </div>
@@ -49,7 +49,7 @@
 
     {% if req.status == 'Rejected' and req.rejection_reason %}
     <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:var(--cl-radius-sm);padding:14px;margin-top:8px">
-      <div style="font-weight:600;color:#991b1b;margin-bottom:4px">Rejection Reason</div>
+      <div style="font-weight:600;color:#991b1b;margin-bottom:4px">{{ t('Rejection Reason', 'سبب الرفض') }}</div>
       <div style="font-size:13px;color:#7f1d1d">{{ req.rejection_reason }}</div>
     </div>
     {% endif %}
@@ -64,20 +64,20 @@
     {% if is_manager and req.status == 'Pending' %}
     <div style="display:flex;gap:12px;margin-top:20px;padding-top:16px;border-top:1px solid var(--cl-border)">
       <form method="POST" action="{{ url_for('attendance.leave_approve', req_id=req.id) }}" style="flex:1">
-        <button type="submit" class="pf-btn pf-btn-primary" style="width:100%">✅ Approve</button>
+        <button type="submit" class="pf-btn pf-btn-primary" style="width:100%">{{ t('✅ Approve', '✅ اعتماد') }}</button>
       </form>
       <button type="button" class="pf-btn pf-btn-sm" style="flex:1;background:#fee2e2;color:#991b1b;border:none"
               onclick="document.getElementById('reject-panel').style.display='block';this.style.display='none'">
-        ❌ Reject
+        {{ t('❌ Reject', '❌ رفض') }}
       </button>
     </div>
     <div id="reject-panel" style="display:none;margin-top:12px">
       <form method="POST" action="{{ url_for('attendance.leave_reject', req_id=req.id) }}">
         <div class="pf-form-group">
-          <label class="pf-form-label">Rejection Reason</label>
-          <textarea name="rejection_reason" class="pf-form-control" rows="3" placeholder="Explain why this is rejected..." required></textarea>
+          <label class="pf-form-label">{{ t('Rejection Reason', 'سبب الرفض') }}</label>
+          <textarea name="rejection_reason" class="pf-form-control" rows="3" placeholder="{{ t('Explain why this is rejected...', 'اشرح سبب الرفض...') }}" required></textarea>
         </div>
-        <button type="submit" class="pf-btn" style="background:#ef4444;color:#fff">Confirm Rejection</button>
+        <button type="submit" class="pf-btn" style="background:#ef4444;color:#fff">{{ t('Confirm Rejection', 'تأكيد الرفض') }}</button>
       </form>
     </div>
     {% endif %}
@@ -87,15 +87,15 @@
   <div style="display:flex;flex-direction:column;gap:16px">
 
     <div class="pf-card">
-      <div class="pf-card-header"><div class="pf-card-title">👤 Staff</div></div>
+      <div class="pf-card-header"><div class="pf-card-title">{{ t('👤 Staff', '👤 الموظف') }}</div></div>
       <div style="padding:4px 0">
         <div style="font-weight:700;font-size:15px">{{ req.staff_name }}</div>
         <div style="font-size:12px;color:var(--cl-text-muted);margin-top:2px">{{ req.staff_role }}</div>
         <div style="margin-top:8px">
           {% if req.is_paid %}
-          <span class="pf-badge active">Paid Leave</span>
+          <span class="pf-badge active">{{ t('Paid Leave', 'إجازة مدفوعة') }}</span>
           {% else %}
-          <span class="pf-badge">Unpaid Leave</span>
+          <span class="pf-badge">{{ t('Unpaid Leave', 'إجازة بدون أجر') }}</span>
           {% endif %}
         </div>
       </div>

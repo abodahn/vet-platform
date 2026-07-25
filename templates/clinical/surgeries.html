@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Surgeries{% endblock %}
-{% block page_title %}Surgeries{% endblock %}
-{% block page_sub %}Surgical procedure records{% endblock %}
+{% block title %}{{ t('Surgeries', 'العمليات الجراحية') }}{% endblock %}
+{% block page_title %}{{ t('Surgeries', 'العمليات الجراحية') }}{% endblock %}
+{% block page_sub %}{{ t('Surgical procedure records', 'سجلات الإجراءات الجراحية') }}{% endblock %}
 
 {% block topbar_actions %}
 <a href="{{ url_for('clinical.surgery_new') }}" class="pf-btn pf-btn-primary">
-  ＋ Record Surgery
+  {{ t('＋ Record Surgery', '＋ تسجيل عملية') }}
 </a>
 {% endblock %}
 
@@ -31,7 +31,7 @@
 
 <div class="pf-card">
   <div class="pf-card-header">
-    <span>🔧 Surgery Records</span>
+    <span>{{ t('🔧 Surgery Records', '🔧 سجلات العمليات') }}</span>
     <span style="font-size:0.82rem;color:var(--text-muted)">{{ surgeries|length }} records</span>
   </div>
 
@@ -40,14 +40,14 @@
     <table class="pf-table">
       <thead>
         <tr>
-          <th>Date</th>
-          <th>Patient</th>
-          <th>Procedure</th>
-          <th>Surgeon</th>
-          <th>Anesthesia</th>
-          <th>Duration</th>
-          <th>Outcome</th>
-          <th>Follow-up</th>
+          <th>{{ t('Date', 'التاريخ') }}</th>
+          <th>{{ t('Patient', 'المريض') }}</th>
+          <th>{{ t('Procedure', 'الإجراء') }}</th>
+          <th>{{ t('Surgeon', 'الجراح') }}</th>
+          <th>{{ t('Anesthesia', 'التخدير') }}</th>
+          <th>{{ t('Duration', 'المدة') }}</th>
+          <th>{{ t('Outcome', 'النتيجة') }}</th>
+          <th>{{ t('Follow-up', 'المتابعة') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -86,9 +86,9 @@
   {% else %}
   <div class="pf-card-body" style="text-align:center;color:var(--text-muted);padding:2.5rem">
     <div style="font-size:2rem;margin-bottom:0.75rem">🔧</div>
-    <p>No surgery records yet.</p>
+    <p>{{ t('No surgery records yet.', 'لا توجد سجلات عمليات بعد.') }}</p>
     <a href="{{ url_for('clinical.surgery_new') }}" class="pf-btn pf-btn-primary" style="margin-top:0.5rem">
-      Record First Surgery
+      {{ t('Record First Surgery', 'سجّل أول عملية') }}
     </a>
   </div>
   {% endif %}

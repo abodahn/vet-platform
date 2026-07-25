@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Clinic Settings{% endblock %}
-{% block page_title %}Clinic Settings{% endblock %}
-{% block page_sub %}Configure clinic information, preferences, and appearance{% endblock %}
+{% block title %}{{ t('Clinic Settings', 'إعدادات العيادة') }}{% endblock %}
+{% block page_title %}{{ t('Clinic Settings', 'إعدادات العيادة') }}{% endblock %}
+{% block page_sub %}{{ t('Configure clinic information, preferences, and appearance', 'إعداد بيانات العيادة والتفضيلات والمظهر') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">🖥️ Monitor</a>
-<a href="{{ url_for('system.diagnostics') }}" class="pf-btn pf-btn-secondary">🔬 Diagnostics</a>
+<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">{{ t('🖥️ Monitor', '🖥️ المراقبة') }}</a>
+<a href="{{ url_for('system.diagnostics') }}" class="pf-btn pf-btn-secondary">{{ t('🔬 Diagnostics', '🔬 التشخيص') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -42,42 +42,42 @@
 
   <!-- Clinic Info -->
   <div class="form-card">
-    <div class="form-card-title">🏥 Clinic Information</div>
+    <div class="form-card-title">{{ t('🏥 Clinic Information', '🏥 بيانات العيادة') }}</div>
     <div class="form-grid">
       <div class="form-group">
-        <label>Clinic Name (English) *</label>
+        <label>{{ t('Clinic Name (English) *', 'اسم العيادة (إنجليزي) *') }}</label>
         <input type="text" name="name" value="{{ clinic.get('name','') }}" required placeholder="Aleefy Veterinary Clinic">
       </div>
       <div class="form-group">
-        <label>Clinic Name (Arabic)</label>
+        <label>{{ t('Clinic Name (Arabic)', 'اسم العيادة (عربي)') }}</label>
         <input type="text" name="name_ar" value="{{ clinic.get('name_ar','') }}" placeholder="مستشفى بريميوم للحيوانات" dir="rtl">
       </div>
       <div class="form-group">
-        <label>Lead Doctor / Owner</label>
+        <label>{{ t('Lead Doctor / Owner', 'الطبيب المسؤول / المالك') }}</label>
         <input type="text" name="doctor_name" value="{{ clinic.get('doctor_name','') }}" placeholder="Dr. Your Name">
       </div>
       <div class="form-group">
-        <label>Phone Number</label>
+        <label>{{ t('Phone Number', 'رقم الهاتف') }}</label>
         <input type="tel" name="phone" value="{{ clinic.get('phone','') }}" placeholder="+20 2 xxxx xxxx">
       </div>
       <div class="form-group">
-        <label>Email Address</label>
+        <label>{{ t('Email Address', 'البريد الإلكتروني') }}</label>
         <input type="email" name="email" value="{{ clinic.get('email','') }}" placeholder="info@premiumvet.com">
       </div>
       <div class="form-group">
-        <label>Website</label>
+        <label>{{ t('Website', 'الموقع الإلكتروني') }}</label>
         <input type="url" name="website" value="{{ clinic.get('website','') }}" placeholder="https://premiumvet.com">
       </div>
       <div class="form-group full">
-        <label>Address</label>
+        <label>{{ t('Address', 'العنوان') }}</label>
         <textarea name="address" placeholder="123 Nile Street, Cairo, Egypt">{{ clinic.get('address','') }}</textarea>
       </div>
       <div class="form-group">
-        <label>License Number</label>
+        <label>{{ t('License Number', 'رقم الترخيص') }}</label>
         <input type="text" name="license_number" value="{{ clinic.get('license_number','') }}" placeholder="VET-EG-XXXXX">
       </div>
       <div class="form-group">
-        <label>Tax / VAT Number</label>
+        <label>{{ t('Tax / VAT Number', 'الرقم الضريبي') }}</label>
         <input type="text" name="tax_number" value="{{ clinic.get('tax_number','') }}" placeholder="000-000-000">
       </div>
     </div>
@@ -85,19 +85,19 @@
 
   <!-- Preferences -->
   <div class="form-card">
-    <div class="form-card-title">🌍 Preferences</div>
+    <div class="form-card-title">{{ t('🌍 Preferences', '🌍 التفضيلات') }}</div>
     <div class="form-grid">
       <div class="form-group">
-        <label>Currency</label>
+        <label>{{ t('Currency', 'العملة') }}</label>
         <select name="currency">
           {% for cur in ['EGP','USD','EUR','GBP','SAR','AED'] %}
           <option value="{{ cur }}" {% if clinic.get('currency','EGP') == cur %}selected{% endif %}>{{ cur }}</option>
           {% endfor %}
         </select>
-        <div class="hint">Used on invoices and financial reports</div>
+        <div class="hint">{{ t('Used on invoices and financial reports', 'تُستخدم في الفواتير والتقارير المالية') }}</div>
       </div>
       <div class="form-group">
-        <label>Timezone</label>
+        <label>{{ t('Timezone', 'المنطقة الزمنية') }}</label>
         <select name="timezone">
           {% for tz in ['Africa/Cairo','UTC','Asia/Riyadh','Asia/Dubai','Europe/London','America/New_York'] %}
           <option value="{{ tz }}" {% if clinic.get('timezone','Africa/Cairo') == tz %}selected{% endif %}>{{ tz }}</option>
@@ -109,38 +109,38 @@
 
   <!-- Appearance -->
   <div class="form-card">
-    <div class="form-card-title">🎨 Appearance</div>
+    <div class="form-card-title">{{ t('🎨 Appearance', '🎨 المظهر') }}</div>
     <div class="form-grid">
       <div class="form-group">
-        <label>Default Theme</label>
+        <label>{{ t('Default Theme', 'الوضع الافتراضي') }}</label>
         <select name="default_theme">
           <option value="medical" {% if settings_rows.get('default_theme','medical') == 'medical' %}selected{% endif %}>
-            Medical (White / Navy / Gold)
+            {{ t('Medical (White / Navy / Gold)', 'طبي (أبيض / كحلي / ذهبي)') }}
           </option>
           <option value="logo" {% if settings_rows.get('default_theme') == 'logo' %}selected{% endif %}>
-            Logo (Navy / Yellow / Blue)
+            {{ t('Logo (Navy / Yellow / Blue)', 'الشعار (كحلي / أصفر / أزرق)') }}
           </option>
         </select>
         <div class="theme-preview">
           <div class="theme-swatch {% if settings_rows.get('default_theme','medical') == 'medical' %}selected{% endif %}"
-               style="background:linear-gradient(135deg,#1a3a6b,#c9a84c);" title="Medical Theme">M</div>
+               style="background:linear-gradient(135deg,#1a3a6b,#c9a84c);" title="{{ t('Medical Theme', 'الوضع الطبي') }}">M</div>
           <div class="theme-swatch {% if settings_rows.get('default_theme') == 'logo' %}selected{% endif %}"
-               style="background:linear-gradient(135deg,#0d1b4b,#f5c518);" title="Logo Theme">L</div>
+               style="background:linear-gradient(135deg,#0d1b4b,#f5c518);" title="{{ t('Logo Theme', 'وضع الشعار') }}">L</div>
         </div>
       </div>
       <div class="form-group">
-        <label>Default Language</label>
+        <label>{{ t('Default Language', 'اللغة الافتراضية') }}</label>
         <select name="default_language">
-          <option value="en" {% if settings_rows.get('default_language','en') == 'en' %}selected{% endif %}>English</option>
-          <option value="ar" {% if settings_rows.get('default_language') == 'ar' %}selected{% endif %}>Arabic (عربي)</option>
+          <option value="en" {% if settings_rows.get('default_language','en') == 'en' %}selected{% endif %}>{{ t('English', 'الإنجليزية') }}</option>
+          <option value="ar" {% if settings_rows.get('default_language') == 'ar' %}selected{% endif %}>{{ t('Arabic (عربي)', 'العربية') }}</option>
         </select>
-        <div class="hint">Applied to new sessions by default</div>
+        <div class="hint">{{ t('Applied to new sessions by default', 'يُطبق على الجلسات الجديدة افتراضياً') }}</div>
       </div>
     </div>
   </div>
 
   <div class="form-actions">
-    <button type="submit" class="btn-save">💾 Save All Settings</button>
+    <button type="submit" class="btn-save">{{ t('💾 Save All Settings', '💾 حفظ كل الإعدادات') }}</button>
   </div>
 </form>
 {% endblock %}

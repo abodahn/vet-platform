@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Migration Report{% endblock %}
-{% block page_title %}Migration Report{% endblock %}
+{% block title %}{{ t('Migration Report', 'تقرير الترحيل') }}{% endblock %}
+{% block page_title %}{{ t('Migration Report', 'تقرير الترحيل') }}{% endblock %}
 {% block page_sub %}{{ 'DRY RUN — no data was changed' if report.dry_run else 'Full migration completed' }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('migration.index') }}" class="pf-btn pf-btn-secondary">← Back</a>
+<a href="{{ url_for('migration.index') }}" class="pf-btn pf-btn-secondary">{{ t('← Back', '← رجوع') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -43,7 +43,7 @@
     <div class="stat-row"><span>Imported</span><span class="stat-val ok">{{ s.imported }}</span></div>
     <div class="stat-row"><span>Duplicates (skipped)</span><span class="stat-val dup">{{ s.duplicate }}</span></div>
     <div class="stat-row"><span>Skipped (invalid)</span><span class="stat-val skip">{{ s.skipped }}</span></div>
-    <div class="stat-row"><span>Failed</span><span class="stat-val fail">{{ s.failed }}</span></div>
+    <div class="stat-row"><span>{{ t('Failed', 'فشل') }}</span><span class="stat-val fail">{{ s.failed }}</span></div>
     {% if s.errors %}
     <div class="error-box">{% for e in s.errors %}{{ e }}{% if not loop.last %}\n{% endif %}{% endfor %}</div>
     {% endif %}
@@ -53,7 +53,7 @@
 
 <div style="background:var(--cl-surface);border-radius:14px;padding:20px;box-shadow:var(--cl-shadow-card)">
   <div style="font-size:13px;color:var(--cl-text-muted)">
-    Started: <strong>{{ report.started_at }}</strong> &nbsp;|&nbsp;
+    {{ t('Started:', 'بدأت:') }} <strong>{{ report.started_at }}</strong> &nbsp;|&nbsp;
     Completed: <strong>{{ report.completed_at }}</strong>
     {% if report.dry_run %}
     &nbsp;|&nbsp; <span style="color:#d97706;font-weight:700">DRY RUN — no changes made</span>

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Pet Shop Reports{% endblock %}
-{% block page_title %}Pet Shop Reports{% endblock %}
+{% block title %}{{ t('Pet Shop Reports', 'تقارير متجر الحيوانات') }}{% endblock %}
+{% block page_title %}{{ t('Pet Shop Reports', 'تقارير متجر الحيوانات') }}{% endblock %}
 {% block page_sub %}Revenue, top products, stock health and daily breakdowns{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('petshop.orders') }}" class="pf-btn pf-btn-secondary">🧾 Orders</a>
-<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+<a href="{{ url_for('petshop.orders') }}" class="pf-btn pf-btn-secondary">{{ t('🧾 Orders', '🧾 الطلبات') }}</a>
+<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -49,8 +49,8 @@
   <input type="date" name="date_from" value="{{ date_from }}">
   <span style="color:var(--cl-text-muted)">→</span>
   <input type="date" name="date_to" value="{{ date_to }}">
-  <button type="submit" class="pf-btn pf-btn-primary" style="padding:8px 18px">Apply</button>
-  <a href="{{ url_for('petshop.reports') }}" class="pf-btn pf-btn-secondary" style="padding:8px 14px">Reset</a>
+  <button type="submit" class="pf-btn pf-btn-primary" style="padding:8px 18px">{{ t('Apply', 'تطبيق') }}</button>
+  <a href="{{ url_for('petshop.reports') }}" class="pf-btn pf-btn-secondary" style="padding:8px 14px">{{ t('Reset', 'إعادة تعيين') }}</a>
   <span style="font-size:11px;color:var(--cl-text-muted);margin-left:auto">
     Showing: <strong>{{ date_from }}</strong> → <strong>{{ date_to }}</strong>
   </span>
@@ -96,7 +96,7 @@
     <div class="sec-title">🏆 Top Products by Revenue</div>
     {% if top_products %}
     <table class="tbl">
-      <thead><tr><th>#</th><th>Product</th><th style="text-align:right">Qty Sold</th><th style="text-align:right">Revenue</th></tr></thead>
+      <thead><tr><th>#</th><th>{{ t('Product', 'المنتج') }}</th><th style="text-align:right">Qty Sold</th><th style="text-align:right">{{ t('Revenue', 'الإيرادات') }}</th></tr></thead>
       <tbody>
         {% for p in top_products %}
         <tr>
@@ -121,10 +121,10 @@
 
   <!-- Low stock -->
   <div class="sec-card">
-    <div class="sec-title">⚠️ Low Stock Alerts</div>
+    <div class="sec-title">{{ t('⚠️ Low Stock Alerts', '⚠️ تنبيهات نقص المخزون') }}</div>
     {% if low_stock %}
     <table class="tbl">
-      <thead><tr><th>Product</th><th>Stock</th><th>Reorder At</th></tr></thead>
+      <thead><tr><th>{{ t('Product', 'المنتج') }}</th><th>{{ t('Stock', 'المخزون') }}</th><th>{{ t('Reorder At', 'إعادة الطلب عند') }}</th></tr></thead>
       <tbody>
         {% for p in low_stock %}
         <tr>
@@ -151,9 +151,9 @@
   <table class="tbl">
     <thead>
       <tr>
-        <th>Date</th>
-        <th style="text-align:center">Orders</th>
-        <th style="text-align:right">Revenue</th>
+        <th>{{ t('Date', 'التاريخ') }}</th>
+        <th style="text-align:center">{{ t('Orders', 'الطلبات') }}</th>
+        <th style="text-align:right">{{ t('Revenue', 'الإيرادات') }}</th>
         <th style="text-align:right">Avg Order</th>
         <th style="min-width:160px">Revenue Bar</th>
       </tr>

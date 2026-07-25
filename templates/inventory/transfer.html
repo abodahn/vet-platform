@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Stock Transfer{% endblock %}
-{% block page_title %}Stock Transfer{% endblock %}
-{% block page_sub %}Move stock between warehouses or branches{% endblock %}
+{% block title %}{{ t('Stock Transfer', 'تحويل مخزون') }}{% endblock %}
+{% block page_title %}{{ t('Stock Transfer', 'تحويل مخزون') }}{% endblock %}
+{% block page_sub %}{{ t('Move stock between warehouses or branches', 'نقل المخزون بين المخازن أو الفروع') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('inventory.dashboard') }}" class="pf-btn pf-btn-secondary">Inventory Dashboard</a>
-<a href="{{ url_for('inventory.movements') }}" class="pf-btn pf-btn-secondary">Movement Log</a>
+<a href="{{ url_for('inventory.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('Inventory Dashboard', 'لوحة المخزون') }}</a>
+<a href="{{ url_for('inventory.movements') }}" class="pf-btn pf-btn-secondary">{{ t('Movement Log', 'سجل الحركات') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -54,12 +54,12 @@
 
     <!-- From side -->
     <div class="tf-card">
-      <h3>From — Source</h3>
+      <h3>{{ t('From — Source', 'من — المصدر') }}</h3>
 
       <div class="tf-field">
-        <label>Item / Product</label>
+        <label>{{ t('Item / Product', 'الصنف / المنتج') }}</label>
         <select id="itemSelect" onchange="loadBatches(this.value)" required>
-          <option value="">Select item...</option>
+          <option value="">{{ t('Select item...', 'اختر الصنف...') }}</option>
           {% for item in items %}
           <option value="{{ item.id }}">{{ item.name }}
             {% if item.unit %} ({{ item.unit }}){% endif %}
@@ -70,39 +70,39 @@
       </div>
 
       <div class="tf-field">
-        <label>Source Batch</label>
+        <label>{{ t('Source Batch', 'الدفعة المصدر') }}</label>
         <select id="batchSelect" name="batch_id" onchange="showBatchInfo(this)" required disabled>
-          <option value="">Select item first...</option>
+          <option value="">{{ t('Select item first...', 'اختر الصنف أولاً...') }}</option>
         </select>
         <div class="batch-info" id="batchInfo">
           <div class="bi-row">
-            <span class="bi-label">Batch No:</span>
+            <span class="bi-label">{{ t('Batch No:', 'رقم الدفعة:') }}</span>
             <span class="bi-val" id="biBatch">—</span>
           </div>
           <div class="bi-row">
-            <span class="bi-label">Expiry:</span>
+            <span class="bi-label">{{ t('Expiry:', 'الانتهاء:') }}</span>
             <span class="bi-val" id="biExpiry">—</span>
           </div>
           <div class="bi-row">
-            <span class="bi-label">Warehouse:</span>
+            <span class="bi-label">{{ t('Warehouse:', 'المخزن:') }}</span>
             <span class="bi-val" id="biWarehouse">—</span>
           </div>
           <div class="bi-row">
-            <span class="bi-label">Available Stock:</span>
+            <span class="bi-label">{{ t('Available Stock:', 'المخزون المتاح:') }}</span>
             <span class="bi-stock" id="biStock">0</span>
           </div>
         </div>
       </div>
 
       <div class="tf-field">
-        <label>Quantity to Transfer</label>
+        <label>{{ t('Quantity to Transfer', 'الكمية المراد تحويلها') }}</label>
         <input type="number" name="quantity" id="qtyInput" step="0.01" min="0.01"
-               placeholder="Enter quantity" required>
+               placeholder="{{ t('Enter quantity', 'أدخل الكمية') }}" required>
       </div>
 
       <div class="tf-field">
-        <label>Transfer Note (optional)</label>
-        <textarea name="notes" rows="2" placeholder="Reason or reference..."></textarea>
+        <label>{{ t('Transfer Note (optional)', 'ملاحظة التحويل (اختياري)') }}</label>
+        <textarea name="notes" rows="2" placeholder="{{ t('Reason or reference...', 'السبب أو المرجع...') }}"></textarea>
       </div>
     </div>
 
@@ -112,18 +112,18 @@
 
       <!-- To side -->
       <div class="tf-card" style="width:100%;box-sizing:border-box">
-        <h3>To — Destination</h3>
+        <h3>{{ t('To — Destination', 'إلى — الوجهة') }}</h3>
         <div class="tf-field">
-          <label>Destination Warehouse</label>
+          <label>{{ t('Destination Warehouse', 'المخزن الوجهة') }}</label>
           <select name="to_warehouse_id" required>
-            <option value="">Select warehouse...</option>
+            <option value="">{{ t('Select warehouse...', 'اختر المخزن...') }}</option>
             {% for wh in warehouses %}
             <option value="{{ wh.id }}">{{ wh.name }}</option>
             {% endfor %}
           </select>
         </div>
         <button type="submit" class="tf-submit" id="submitBtn">
-          Transfer Stock &rarr;
+          {{ t('Transfer Stock &rarr;', 'تحويل المخزون &larr;') }}
         </button>
       </div>
     </div>

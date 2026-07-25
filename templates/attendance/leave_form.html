@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Request Leave{% endblock %}
-{% block page_title %}New Leave Request{% endblock %}
-{% block page_sub %}Submit a leave application{% endblock %}
+{% block title %}{{ t('Request Leave', 'طلب إجازة') }}{% endblock %}
+{% block page_title %}{{ t('New Leave Request', 'طلب إجازة جديد') }}{% endblock %}
+{% block page_sub %}{{ t('Submit a leave application', 'تقديم طلب إجازة') }}{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">← My Leaves</a>
+  <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">{{ t('← My Leaves', '← إجازاتي') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -12,13 +12,13 @@
 
   <div class="pf-card">
     <div class="pf-card-header">
-      <div class="pf-card-title">📋 Leave Application</div>
+      <div class="pf-card-title">{{ t('📋 Leave Application', '📋 نموذج طلب الإجازة') }}</div>
     </div>
     <form method="POST" id="leave-form">
       <div class="pf-form-group">
-        <label class="pf-form-label">Leave Type <span style="color:#ef4444">*</span></label>
+        <label class="pf-form-label">{{ t('Leave Type', 'نوع الإجازة') }} <span style="color:#ef4444">*</span></label>
         <select name="leave_type_id" id="lt-select" class="pf-form-control" required onchange="updateBalance()">
-          <option value="">— Select leave type —</option>
+          <option value="">{{ t('— Select leave type —', '— اختر نوع الإجازة —') }}</option>
           {% for lt in leave_types %}
           <option value="{{ lt.id }}"
                   data-remaining="{{ balances[lt.id].remaining if lt.id in balances else lt.days_per_year }}"
@@ -32,12 +32,12 @@
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div class="pf-form-group">
-          <label class="pf-form-label">Start Date <span style="color:#ef4444">*</span></label>
+          <label class="pf-form-label">{{ t('Start Date', 'تاريخ البدء') }} <span style="color:#ef4444">*</span></label>
           <input type="date" name="start_date" id="start-date" class="pf-form-control" required
                  min="{{ today }}" onchange="calcDays()">
         </div>
         <div class="pf-form-group">
-          <label class="pf-form-label">End Date <span style="color:#ef4444">*</span></label>
+          <label class="pf-form-label">{{ t('End Date', 'تاريخ الانتهاء') }} <span style="color:#ef4444">*</span></label>
           <input type="date" name="end_date" id="end-date" class="pf-form-control" required
                  min="{{ today }}" onchange="calcDays()">
         </div>
@@ -45,18 +45,18 @@
 
       <div id="days-preview" style="display:none;margin-bottom:16px;padding:12px;background:var(--cl-surface-2);border-radius:var(--cl-radius-sm);border-left:3px solid #3b82f6">
         <span id="days-text" style="font-weight:600"></span>
-        <span style="color:var(--cl-text-muted);font-size:12px"> (business days, excl. weekends & holidays)</span>
+        <span style="color:var(--cl-text-muted);font-size:12px"> {{ t('(business days, excl. weekends & holidays)', '(أيام عمل، بدون عطلات نهاية الأسبوع والعطلات الرسمية)') }}</span>
       </div>
 
       <div class="pf-form-group">
-        <label class="pf-form-label">Reason</label>
+        <label class="pf-form-label">{{ t('Reason', 'السبب') }}</label>
         <textarea name="reason" class="pf-form-control" rows="4"
-                  placeholder="Briefly describe the reason for your leave request..."></textarea>
+                  placeholder="{{ t('Briefly describe the reason for your leave request...', 'اذكر باختصار سبب طلب الإجازة...') }}"></textarea>
       </div>
 
       <div style="display:flex;gap:10px;margin-top:8px">
-        <button type="submit" class="pf-btn pf-btn-primary">Submit Request</button>
-        <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">Cancel</a>
+        <button type="submit" class="pf-btn pf-btn-primary">{{ t('Submit Request', 'إرسال الطلب') }}</button>
+        <a href="{{ url_for('attendance.leaves_list') }}" class="pf-btn pf-btn-sm">{{ t('Cancel', 'إلغاء') }}</a>
       </div>
     </form>
   </div>
@@ -65,7 +65,7 @@
   <div>
     <div class="pf-card">
       <div class="pf-card-header">
-        <div class="pf-card-title">⚖️ My Balances</div>
+        <div class="pf-card-title">{{ t('⚖️ My Balances', '⚖️ أرصدتي') }}</div>
       </div>
       <div id="balance-panel">
         {% for lt in leave_types %}
@@ -74,8 +74,8 @@
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
             <span style="width:10px;height:10px;border-radius:50%;background:{{ lt.color }}"></span>
             <span style="font-weight:600;font-size:13px">{{ lt.name }}</span>
-            {% if lt.is_paid %}<span class="pf-badge active" style="font-size:10px">Paid</span>
-            {% else %}<span class="pf-badge" style="font-size:10px">Unpaid</span>{% endif %}
+            {% if lt.is_paid %}<span class="pf-badge active" style="font-size:10px">{{ t('Paid', 'مدفوع') }}</span>
+            {% else %}<span class="pf-badge" style="font-size:10px">{{ t('Unpaid', 'بدون أجر') }}</span>{% endif %}
           </div>
           <div style="background:var(--cl-border);border-radius:4px;height:8px;overflow:hidden;margin-bottom:4px">
             {% set pct = ((b.allocated - b.remaining) / b.allocated * 100) if b.allocated else 0 %}
@@ -91,12 +91,12 @@
     </div>
 
     <div class="pf-card" style="margin-top:12px">
-      <div class="pf-card-header"><div class="pf-card-title">ℹ️ Notes</div></div>
+      <div class="pf-card-header"><div class="pf-card-title">{{ t('ℹ️ Notes', 'ℹ️ ملاحظات') }}</div></div>
       <ul style="font-size:12px;color:var(--cl-text-muted);margin:0;padding-left:16px;line-height:2">
-        <li>Days counted are business days only</li>
-        <li>Weekends and public holidays excluded</li>
-        <li>Manager approval required</li>
-        <li>Balance deducted upon approval</li>
+        <li>{{ t('Days counted are business days only', 'تُحتسب أيام العمل فقط') }}</li>
+        <li>{{ t('Weekends and public holidays excluded', 'تُستثنى عطلات نهاية الأسبوع والعطلات الرسمية') }}</li>
+        <li>{{ t('Manager approval required', 'يلزم اعتماد المدير') }}</li>
+        <li>{{ t('Balance deducted upon approval', 'يُخصم الرصيد عند الاعتماد') }}</li>
       </ul>
     </div>
   </div>

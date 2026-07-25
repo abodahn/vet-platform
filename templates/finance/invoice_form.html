@@ -154,10 +154,10 @@
     <div class="form-card">
       <div class="form-card-header">💰 {{ t('Summary', 'الملخص') }}</div>
       <div class="form-card-body">
-        <div class="summary-row"><span class="summary-label">{{ t('Subtotal', 'المجموع الفرعي') }}</span><span class="summary-val" id="s-subtotal">0.00 EGP</span></div>
-        <div class="summary-row"><span class="summary-label">{{ t('Discount', 'خصم') }}</span><span class="summary-val" id="s-discount" style="color:var(--cl-success)">— 0.00 EGP</span></div>
-        <div class="summary-row"><span class="summary-label">{{ t('Tax', 'الضريبة') }}</span><span class="summary-val" id="s-tax">+ 0.00 EGP</span></div>
-        <div class="summary-row"><span class="summary-label">{{ t('TOTAL', 'الإجمالي') }}</span><span class="summary-val" id="s-total" style="color:var(--cl-primary);font-size:20px">0.00 EGP</span></div>
+        <div class="summary-row"><span class="summary-label">{{ t('Subtotal', 'المجموع الفرعي') }}</span><span class="summary-val" id="s-subtotal">{{ t('0.00 EGP', '0.00 جنيه') }}</span></div>
+        <div class="summary-row"><span class="summary-label">{{ t('Discount', 'خصم') }}</span><span class="summary-val" id="s-discount" style="color:var(--cl-success)">{{ t('— 0.00 EGP', '— 0.00 جنيه') }}</span></div>
+        <div class="summary-row"><span class="summary-label">{{ t('Tax', 'الضريبة') }}</span><span class="summary-val" id="s-tax">{{ t('+ 0.00 EGP', '+ 0.00 جنيه') }}</span></div>
+        <div class="summary-row"><span class="summary-label">{{ t('TOTAL', 'الإجمالي') }}</span><span class="summary-val" id="s-total" style="color:var(--cl-primary);font-size:20px">{{ t('0.00 EGP', '0.00 جنيه') }}</span></div>
       </div>
     </div>
     <button type="submit" class="submit-btn">🧾 {{ t('Create Invoice', 'إنشاء الفاتورة') }}</button>

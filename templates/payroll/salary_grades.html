@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Salary Grades{% endblock %}
+{% block title %}{{ t('Salary Grades', 'درجات الرواتب') }}{% endblock %}
 {% block content %}
 <div class="pf-page-header">
   <div>
-    <h1 class="pf-page-title">⚙ Salary Grades</h1>
-    <p class="pf-page-subtitle">Default basic salary and overtime rate per role. Used when bulk-generating payroll.</p>
+    <h1 class="pf-page-title">{{ t('⚙ Salary Grades', '⚙ درجات الرواتب') }}</h1>
+    <p class="pf-page-subtitle">{{ t('Default basic salary and overtime rate per role. Used when bulk-generating payroll.', 'الراتب الأساسي وسعر الساعة الإضافية الافتراضي لكل دور. يُستخدم عند الإنشاء الجماعي للرواتب.') }}</p>
   </div>
   <div class="pf-topbar-actions">
-    <a href="{{ url_for('payroll.dashboard') }}" class="pf-btn pf-btn-secondary">← Payroll</a>
+    <a href="{{ url_for('payroll.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('← Payroll', '← الرواتب') }}</a>
   </div>
 </div>
 
@@ -17,10 +17,10 @@
     <div class="pf-table-wrapper">
       <table class="pf-table">
         <thead><tr>
-          <th>Role</th>
-          <th>Basic Salary (EGP/month)</th>
-          <th>Overtime Rate (EGP/hour)</th>
-          <th>Notes</th>
+          <th>{{ t('Role', 'الدور') }}</th>
+          <th>{{ t('Basic Salary (EGP/month)', 'الراتب الأساسي (جنيه/شهر)') }}</th>
+          <th>{{ t('Overtime Rate (EGP/hour)', 'سعر الساعة الإضافية (جنيه/ساعة)') }}</th>
+          <th>{{ t('Notes', 'ملاحظات') }}</th>
         </tr></thead>
         <tbody>
           {% for role in roles %}
@@ -29,14 +29,14 @@
             <td><span class="pf-badge">{{ role }}</span></td>
             <td><input type="number" step="0.01" name="basic_{{ role }}" class="pf-input" style="width:140px" value="{{ g.basic_salary or 0 }}"></td>
             <td><input type="number" step="0.01" name="ot_{{ role }}" class="pf-input" style="width:120px" value="{{ g.overtime_rate or 0 }}"></td>
-            <td><input type="text" name="notes_{{ role }}" class="pf-input" value="{{ g.notes or '' }}" placeholder="optional"></td>
+            <td><input type="text" name="notes_{{ role }}" class="pf-input" value="{{ g.notes or '' }}" placeholder="{{ t('optional', 'اختياري') }}"></td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
     <div style="padding:16px">
-      <button type="submit" class="pf-btn pf-btn-primary">💾 Save All Grades</button>
+      <button type="submit" class="pf-btn pf-btn-primary">{{ t('💾 Save All Grades', '💾 حفظ كل الدرجات') }}</button>
     </div>
   </form>
 </div>

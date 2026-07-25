@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Admit Patient{% endblock %}
+{% block title %}{{ t('Admit Patient', 'تنويم مريض') }}{% endblock %}
 {% block content %}
 <div class="pf-page-header">
-  <div><h1 class="pf-page-title">🏥 Admit Patient</h1></div>
+  <div><h1 class="pf-page-title">{{ t('🏥 Admit Patient', '🏥 تنويم مريض') }}</h1></div>
   <div class="pf-topbar-actions">
-    <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">← Back</a>
+    <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('← Back', '← رجوع') }}</a>
   </div>
 </div>
 
@@ -14,9 +14,9 @@
     <div class="pf-form-grid">
 
       <div class="pf-form-group" style="grid-column:1/-1">
-        <label class="pf-label">Owner *</label>
+        <label class="pf-label">{{ t('Owner *', 'المالك *') }}</label>
         <select name="owner_id" id="ownerSelect" class="pf-input" required onchange="loadPets(this.value)">
-          <option value="">— select owner —</option>
+          <option value="">{{ t('— select owner —', '— اختر المالك —') }}</option>
           {% for o in owners %}
           <option value="{{ o.id }}">{{ o.full_name }} ({{ o.phone }})</option>
           {% endfor %}
@@ -24,51 +24,51 @@
       </div>
 
       <div class="pf-form-group" style="grid-column:1/-1">
-        <label class="pf-label">Pet *</label>
+        <label class="pf-label">{{ t('Pet *', 'الحيوان *') }}</label>
         <select name="pet_id" id="petSelect" class="pf-input" required>
-          <option value="">— select owner first —</option>
+          <option value="">{{ t('— select owner first —', '— اختر المالك أولاً —') }}</option>
         </select>
       </div>
 
       <div class="pf-form-group">
-        <label class="pf-label">Ward</label>
+        <label class="pf-label">{{ t('Ward', 'العنبر') }}</label>
         <select name="ward" class="pf-input">
           {% for w in wards %}<option>{{ w }}</option>{% endfor %}
         </select>
       </div>
       <div class="pf-form-group">
-        <label class="pf-label">Cage / Kennel Number</label>
+        <label class="pf-label">{{ t('Cage / Kennel Number', 'رقم القفص') }}</label>
         <input type="text" name="cage_number" class="pf-input" placeholder="e.g. K-3">
       </div>
 
       <div class="pf-form-group" style="grid-column:1/-1">
-        <label class="pf-label">Reason for Admission *</label>
-        <textarea name="reason" class="pf-input" rows="2" required placeholder="Chief complaint / reason for hospitalisation"></textarea>
+        <label class="pf-label">{{ t('Reason for Admission *', 'سبب التنويم *') }}</label>
+        <textarea name="reason" class="pf-input" rows="2" required placeholder="{{ t('Chief complaint / reason for hospitalisation', 'الشكوى الرئيسية / سبب التنويم') }}"></textarea>
       </div>
 
       <div class="pf-form-group" style="grid-column:1/-1">
-        <label class="pf-label">Initial Diagnosis</label>
-        <input type="text" name="diagnosis" class="pf-input" placeholder="Working diagnosis">
+        <label class="pf-label">{{ t('Initial Diagnosis', 'التشخيص المبدئي') }}</label>
+        <input type="text" name="diagnosis" class="pf-input" placeholder="{{ t('Working diagnosis', 'التشخيص المبدئي') }}">
       </div>
 
       <div class="pf-form-group" style="grid-column:1/-1">
-        <label class="pf-label">Treatment Plan</label>
-        <textarea name="treatment_plan" class="pf-input" rows="3" placeholder="IV fluids, monitoring, medications…"></textarea>
+        <label class="pf-label">{{ t('Treatment Plan', 'خطة العلاج') }}</label>
+        <textarea name="treatment_plan" class="pf-input" rows="3" placeholder="{{ t('IV fluids, monitoring, medications…', 'سوائل وريدية، مراقبة، أدوية…') }}"></textarea>
       </div>
 
       <div class="pf-form-group">
-        <label class="pf-label">Expected Discharge Date</label>
+        <label class="pf-label">{{ t('Expected Discharge Date', 'تاريخ الخروج المتوقع') }}</label>
         <input type="date" name="expected_discharge" class="pf-input" min="{{ today }}">
       </div>
       <div class="pf-form-group">
-        <label class="pf-label">Daily Rate (EGP)</label>
+        <label class="pf-label">{{ t('Daily Rate (EGP)', 'السعر اليومي (جنيه)') }}</label>
         <input type="number" step="0.01" name="daily_rate" class="pf-input" value="0" min="0">
       </div>
 
     </div>
     <div style="margin-top:1.5rem;display:flex;gap:.75rem;justify-content:flex-end">
-      <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">Cancel</a>
-      <button type="submit" class="pf-btn pf-btn-primary">🏥 Admit Patient</button>
+      <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('Cancel', 'إلغاء') }}</a>
+      <button type="submit" class="pf-btn pf-btn-primary">{{ t('🏥 Admit Patient', '🏥 تنويم مريض') }}</button>
     </div>
   </form>
 </div>

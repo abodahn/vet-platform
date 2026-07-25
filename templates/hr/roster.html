@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Weekly Roster{% endblock %}
-{% block page_title %}Weekly Roster{% endblock %}
-{% block page_sub %}Visual schedule — who works which shift each day{% endblock %}
+{% block title %}{{ t('Weekly Roster','جدول المناوبات الأسبوعي') }}{% endblock %}
+{% block page_title %}{{ t('Weekly Roster','جدول المناوبات الأسبوعي') }}{% endblock %}
+{% block page_sub %}{{ t('Visual schedule — who works which shift each day','جدول مرئي — من يعمل في أي مناوبة كل يوم') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">HR Dashboard</a>
-<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">Staff List</a>
+<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('HR Dashboard','لوحة الموارد البشرية') }}</a>
+<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">{{ t('Staff List','قائمة الموظفين') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -44,17 +44,17 @@
 
 {% block content %}
 
-{% set day_names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+{% set day_names = [t('Mon','إثنين'),t('Tue','ثلاثاء'),t('Wed','أربعاء'),t('Thu','خميس'),t('Fri','جمعة'),t('Sat','سبت'),t('Sun','أحد')] %}
 {% set today_str = today.isoformat() if today else '' %}
 
 <!-- Week navigation -->
 <div class="roster-nav">
-  <a href="{{ url_for('hr.roster', week=prev_week) }}" class="pf-btn pf-btn-secondary">&larr; Prev Week</a>
+  <a href="{{ url_for('hr.roster', week=prev_week) }}" class="pf-btn pf-btn-secondary">{{ t('&larr; Prev Week','&larr; الأسبوع السابق') }}</a>
   <div class="week-label">
-    Week of {{ week_start.strftime('%d %b %Y') }} &ndash; {{ week_days[-1].strftime('%d %b %Y') }}
+    {{ t('Week of','أسبوع') }} {{ week_start.strftime('%d %b %Y') }} &ndash; {{ week_days[-1].strftime('%d %b %Y') }}
   </div>
-  <a href="{{ url_for('hr.roster', week=next_week) }}" class="pf-btn pf-btn-secondary">Next Week &rarr;</a>
-  <a href="{{ url_for('hr.roster') }}" class="pf-btn pf-btn-primary">Today</a>
+  <a href="{{ url_for('hr.roster', week=next_week) }}" class="pf-btn pf-btn-secondary">{{ t('Next Week &rarr;','الأسبوع التالي &larr;') }}</a>
+  <a href="{{ url_for('hr.roster') }}" class="pf-btn pf-btn-primary">{{ t('Today','اليوم') }}</a>
 </div>
 
 <!-- Build lookup: shift_id -> list of assignments -->
@@ -70,7 +70,7 @@
 <div style="overflow-x:auto">
   <div class="roster-grid" style="min-width:760px">
     <!-- Header row -->
-    <div class="roster-header">Shift / Staff</div>
+    <div class="roster-header">{{ t('Shift / Staff','المناوبة / الموظف') }}</div>
     {% for d in week_days %}
     <div class="roster-header {{ 'today-col' if d.isoformat()==today_str else '' }}" style="{{ 'border-bottom:2px solid #22c55e' if d.isoformat()==today_str else '' }}">
       <div class="day-name">{{ day_names[loop.index0] }}</div>
@@ -85,7 +85,7 @@
     <div class="roster-shift-label" style="border-left:4px solid {{ shift.color or '#6b7280' }}">
       <span style="color:{{ shift.color or 'var(--cl-primary)' }}">{{ shift.name }}</span>
       <span class="shift-time">{{ shift.start_time or '' }} - {{ shift.end_time or '' }}</span>
-      <span class="shift-time">{{ s_staff|length }} staff</span>
+      <span class="shift-time">{{ s_staff|length }} {{ t('staff','موظف') }}</span>
     </div>
     {% for d in week_days %}
     {% set day_num = d.isoweekday()|string %}
@@ -93,7 +93,7 @@
     <div class="roster-cell {{ 'today-col' if d.isoformat()==today_str else '' }}"
          style="{{ 'background:#f9fafb' if not is_work_day else '' }}">
       {% if not is_work_day %}
-        <div style="font-size:10px;color:var(--cl-muted);text-align:center;padding-top:10px">Off</div>
+        <div style="font-size:10px;color:var(--cl-muted);text-align:center;padding-top:10px">{{ t('Off','إجازة') }}</div>
       {% else %}
         {% for a in s_staff %}
         {% set att = att_map.get((a.user_id, d.isoformat()), {}) %}
@@ -101,7 +101,7 @@
         {% if on_leave %}
           <div class="staff-chip chip-leave">
             <span class="dot" style="background:#3b82f6"></span>
-            {{ a.full_name.split(' ')[0] }} (Leave)
+            {{ a.full_name.split(' ')[0] }} ({{ t('Leave','إجازة') }})
           </div>
         {% elif att %}
           {% if att.status == 'Present' %}
@@ -112,7 +112,7 @@
           {% elif att.status == 'Late' %}
             <div class="staff-chip chip-late">
               <span class="dot" style="background:#d97706"></span>
-              {{ a.full_name.split(' ')[0] }} (Late)
+              {{ a.full_name.split(' ')[0] }} ({{ t('Late','متأخر') }})
             </div>
           {% else %}
             <div class="staff-chip chip-absent">
@@ -136,24 +136,24 @@
 
 <!-- Legend -->
 <div class="roster-legend">
-  <div class="legend-item"><div class="legend-dot" style="background:#16a34a"></div> Present</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#d97706"></div> Late</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#dc2626"></div> Absent</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> On Leave</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#9ca3af"></div> No record yet</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#16a34a"></div> {{ t('Present','حاضر') }}</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#d97706"></div> {{ t('Late','متأخر') }}</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#dc2626"></div> {{ t('Absent','غائب') }}</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> {{ t('On Leave','في إجازة') }}</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#9ca3af"></div> {{ t('No record yet','لا يوجد سجل بعد') }}</div>
 </div>
 
 {% else %}
 <div style="text-align:center;padding:60px;color:var(--cl-muted)">
   <div style="font-size:48px;margin-bottom:12px">📅</div>
-  <div style="font-size:18px;font-weight:600;margin-bottom:8px">No shifts configured</div>
-  <div>Go to <a href="{{ url_for('attendance.shifts_list') }}" style="color:var(--cl-primary)">Attendance &rarr; Shifts</a> to create shifts first.</div>
+  <div style="font-size:18px;font-weight:600;margin-bottom:8px">{{ t('No shifts configured','لا توجد مناوبات معرّفة') }}</div>
+  <div>{{ t('Go to','اذهب إلى') }} <a href="{{ url_for('attendance.shifts_list') }}" style="color:var(--cl-primary)">{{ t('Attendance &rarr; Shifts','الحضور &larr; المناوبات') }}</a> {{ t('to create shifts first.','لإنشاء المناوبات أولاً.') }}</div>
 </div>
 {% endif %}
 
 {% if unassigned %}
 <div class="unassigned-section">
-  <div style="font-size:15px;font-weight:700;margin-bottom:10px;color:var(--cl-muted)">Staff without shift assignment ({{ unassigned|length }})</div>
+  <div style="font-size:15px;font-weight:700;margin-bottom:10px;color:var(--cl-muted)">{{ t('Staff without shift assignment','موظفون بدون مناوبة') }} ({{ unassigned|length }})</div>
   {% for s in unassigned %}
   <a href="{{ url_for('hr.staff_detail', user_id=s.id) }}" class="ua-chip" style="text-decoration:none;color:var(--cl-text)">
     {{ s.full_name }}

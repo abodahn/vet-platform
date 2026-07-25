@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Suppliers{% endblock %}
-{% block page_title %}Suppliers{% endblock %}
+{% block title %}{{ t('Suppliers', 'الموردون') }}{% endblock %}
+{% block page_title %}{{ t('Suppliers', 'الموردون') }}{% endblock %}
 {% block page_sub %}Manage your supplier directory{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('procurement.dashboard') }}" class="pf-btn pf-btn-ghost">← Dashboard</a>
+  <a href="{{ url_for('procurement.dashboard') }}" class="pf-btn pf-btn-ghost">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -23,12 +23,12 @@
       <table class="pf-table">
         <thead>
           <tr>
-            <th>Name</th>
+            <th>{{ t('Name', 'الاسم') }}</th>
             <th>Contact</th>
-            <th>Phone</th>
-            <th>Email</th>
-            <th>Payment Terms</th>
-            <th>Active</th>
+            <th>{{ t('Phone', 'الهاتف') }}</th>
+            <th>{{ t('Email', 'البريد الإلكتروني') }}</th>
+            <th>{{ t('Payment Terms', 'شروط الدفع') }}</th>
+            <th>{{ t('Active', 'نشط') }}</th>
             <th># Orders</th>
             <th></th>
           </tr>
@@ -43,15 +43,15 @@
             <td>{{ s['payment_terms'] or '—' }}</td>
             <td>
               {% if s['is_active'] %}
-                <span class="pf-badge success">Yes</span>
+                <span class="pf-badge success">{{ t('Yes', 'نعم') }}</span>
               {% else %}
-                <span class="pf-badge error">No</span>
+                <span class="pf-badge error">{{ t('No', 'لا') }}</span>
               {% endif %}
             </td>
             <td>{{ s['po_count'] or 0 }}</td>
             <td>
               <a href="{{ url_for('procurement.supplier_detail', supplier_id=s['id']) }}"
-                 class="pf-btn pf-btn-ghost" style="font-size:.8rem;">View</a>
+                 class="pf-btn pf-btn-ghost" style="font-size:.8rem;">{{ t('View', 'عرض') }}</a>
             </td>
           </tr>
           {% endfor %}
@@ -73,33 +73,33 @@
     <form method="POST" action="{{ url_for('procurement.supplier_new') }}" style="padding:.5rem 0;">
 
       <div style="margin-bottom:1rem;">
-        <label class="pf-label">Name <span style="color:red">*</span></label>
+        <label class="pf-label">{{ t('Name', 'الاسم') }} <span style="color:red">*</span></label>
         <input type="text" name="name" class="pf-input" required placeholder="Supplier name">
       </div>
 
       <div style="margin-bottom:1rem;">
-        <label class="pf-label">Contact Person</label>
+        <label class="pf-label">{{ t('Contact Person', 'مسؤول التواصل') }}</label>
         <input type="text" name="contact_person" class="pf-input" placeholder="Contact name">
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem;">
         <div>
-          <label class="pf-label">Phone</label>
+          <label class="pf-label">{{ t('Phone', 'الهاتف') }}</label>
           <input type="text" name="phone" class="pf-input" placeholder="Phone number">
         </div>
         <div>
-          <label class="pf-label">Email</label>
-          <input type="email" name="email" class="pf-input" placeholder="Email">
+          <label class="pf-label">{{ t('Email', 'البريد الإلكتروني') }}</label>
+          <input type="email" name="email" class="pf-input" placeholder="{{ t('Email', 'البريد الإلكتروني') }}">
         </div>
       </div>
 
       <div style="margin-bottom:1rem;">
-        <label class="pf-label">Address</label>
-        <input type="text" name="address" class="pf-input" placeholder="Address">
+        <label class="pf-label">{{ t('Address', 'العنوان') }}</label>
+        <input type="text" name="address" class="pf-input" placeholder="{{ t('Address', 'العنوان') }}">
       </div>
 
       <div style="margin-bottom:1rem;">
-        <label class="pf-label">Payment Terms</label>
+        <label class="pf-label">{{ t('Payment Terms', 'شروط الدفع') }}</label>
         <select name="payment_terms" class="pf-input">
           <option value="">Select terms</option>
           <option value="Net 30">Net 30</option>
@@ -110,7 +110,7 @@
       </div>
 
       <div style="margin-bottom:1rem;">
-        <label class="pf-label">Notes</label>
+        <label class="pf-label">{{ t('Notes', 'ملاحظات') }}</label>
         <textarea name="notes" class="pf-input" rows="3" placeholder="Any additional notes..."></textarea>
       </div>
 

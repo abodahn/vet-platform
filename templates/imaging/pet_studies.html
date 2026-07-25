@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Imaging — {{ pet.pet_name }}{% endblock %}
 {% block page_title %}🩻 {{ pet.pet_name }} — Imaging Studies{% endblock %}
-{% block page_sub %}All imaging records for this patient{% endblock %}
+{% block page_sub %}{{ t('All imaging records for this patient', 'جميع سجلات التصوير لهذا المريض') }}{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('imaging.upload', pet_id=pet.id) }}" class="pf-btn pf-btn-primary">➕ Upload Study</a>
+  <a href="{{ url_for('imaging.upload', pet_id=pet.id) }}" class="pf-btn pf-btn-primary">{{ t('➕ Upload Study', '➕ رفع دراسة') }}</a>
   <a href="{{ url_for('imaging.analyzer') }}" class="pf-btn"
      style="background:linear-gradient(135deg,#f43f5e,#a855f7);color:#fff;border:none;margin-left:8px;">
-    🔬 AI Analyzer
+    {{ t('🔬 AI Analyzer', '🔬 محلل AI') }}
   </a>
-  <a href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}" class="pf-btn" style="margin-left:8px;">← Pet Profile</a>
+  <a href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}" class="pf-btn" style="margin-left:8px;">{{ t('← Pet Profile', '← ملف الحيوان') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -28,7 +28,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
         <span class="v3-badge">{{ s.study_type }}</span>
         {% if s.ai_analysis %}
-        <span style="font-size:.75rem;color:#16a34a;font-weight:600;">✓ AI</span>
+        <span style="font-size:.75rem;color:#16a34a;font-weight:600;">{{ t('✓ AI', '✓ AI') }}</span>
         {% endif %}
       </div>
       <div style="font-size:.88rem;color:var(--cl-muted);">{{ s.body_region or 'No region' }}</div>
@@ -44,11 +44,11 @@
 <div class="v3-card" style="padding:50px;text-align:center;color:var(--cl-muted);">
   <div style="font-size:3.5rem;margin-bottom:14px;">🩻</div>
   <div style="font-size:1.05rem;font-weight:600;margin-bottom:8px;">No imaging studies yet for {{ pet.pet_name }}</div>
-  <div style="margin-bottom:20px;font-size:.9rem;">Upload an X-ray, ultrasound, or use the AI Photo Analyzer</div>
+  <div style="margin-bottom:20px;font-size:.9rem;">{{ t('Upload an X-ray, ultrasound, or use the AI Photo Analyzer', 'ارفع أشعة سينية أو موجات فوق صوتية، أو استخدم محلل الصور AI') }}</div>
   <div style="display:flex;gap:12px;justify-content:center;">
-    <a href="{{ url_for('imaging.upload', pet_id=pet.id) }}" class="pf-btn pf-btn-primary">📤 Upload Study</a>
+    <a href="{{ url_for('imaging.upload', pet_id=pet.id) }}" class="pf-btn pf-btn-primary">{{ t('📤 Upload Study', '📤 رفع دراسة') }}</a>
     <a href="{{ url_for('imaging.analyzer') }}" class="pf-btn"
-       style="background:linear-gradient(135deg,#f43f5e,#a855f7);color:#fff;border:none;">🔬 AI Analyzer</a>
+       style="background:linear-gradient(135deg,#f43f5e,#a855f7);color:#fff;border:none;">{{ t('🔬 AI Analyzer', '🔬 محلل AI') }}</a>
   </div>
 </div>
 {% endif %}

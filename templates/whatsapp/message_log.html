@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}WhatsApp Message Log{% endblock %}
-{% block page_title %}Message Log{% endblock %}
-{% block page_sub %}Recent WhatsApp messages sent from the platform{% endblock %}
+{% block title %}{{ t('WhatsApp Message Log', 'سجل رسائل واتساب') }}{% endblock %}
+{% block page_title %}{{ t('Message Log', 'سجل الرسائل') }}{% endblock %}
+{% block page_sub %}{{ t('Recent WhatsApp messages sent from the platform', 'أحدث رسائل واتساب المرسلة من المنصة') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">💬 Templates</a>
-<a href="{{ url_for('whatsapp.reminders') }}" class="pf-btn pf-btn-secondary">🔔 Reminders</a>
+<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">{{ t('💬 Templates', '💬 القوالب') }}</a>
+<a href="{{ url_for('whatsapp.reminders') }}" class="pf-btn pf-btn-secondary">{{ t('🔔 Reminders', '🔔 التذكيرات') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -39,19 +39,19 @@
 <div class="stats-bar">
   <div class="stat-pill">
     <strong style="color:var(--cl-primary);">{{ logs|length }}</strong>
-    Total Shown
+    {{ t('Total Shown', 'إجمالي المعروض') }}
   </div>
   <div class="stat-pill">
     <strong style="color:#166534;">{{ sent_count }}</strong>
-    Sent
+    {{ t('Sent', 'مُرسل') }}
   </div>
   <div class="stat-pill">
     <strong style="color:#991b1b;">{{ failed_count }}</strong>
-    Failed
+    {{ t('Failed', 'فشل') }}
   </div>
   <div class="stat-pill">
     <strong style="color:#92400e;">{{ pending_count }}</strong>
-    Pending
+    {{ t('Pending', 'قيد الانتظار') }}
   </div>
 </div>
 
@@ -59,12 +59,12 @@
   <table class="log-table">
     <thead>
       <tr>
-        <th>Date / Time</th>
-        <th>Owner</th>
-        <th>Phone</th>
-        <th>Message</th>
-        <th>Template</th>
-        <th>Status</th>
+        <th>{{ t('Date / Time', 'التاريخ / الوقت') }}</th>
+        <th>{{ t('Owner', 'المالك') }}</th>
+        <th>{{ t('Phone', 'الهاتف') }}</th>
+        <th>{{ t('Message', 'الرسالة') }}</th>
+        <th>{{ t('Template', 'القالب') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -84,19 +84,19 @@
           {% if log.template_name %}
             <span class="tmpl-tag">{{ log.template_name }}</span>
           {% else %}
-            <span style="color:var(--cl-muted);">custom</span>
+            <span style="color:var(--cl-muted);">{{ t('custom', 'مخصص') }}</span>
           {% endif %}
         </td>
         <td>
           {% if log.status == 'Sent' %}
-            <span class="status-sent">✓ Sent</span>
+            <span class="status-sent">{{ t('✓ Sent', '✓ أُرسلت') }}</span>
           {% elif log.status == 'Failed' %}
-            <span class="status-failed">✗ Failed</span>
+            <span class="status-failed">{{ t('✗ Failed', '✗ فشلت') }}</span>
             {% if log.error %}
             <div style="font-size:11px;color:#991b1b;margin-top:3px;" title="{{ log.error }}">{{ log.error[:40] }}…</div>
             {% endif %}
           {% else %}
-            <span class="status-pending">⏳ Pending</span>
+            <span class="status-pending">{{ t('⏳ Pending', '⏳ قيد الانتظار') }}</span>
           {% endif %}
         </td>
       </tr>
@@ -107,9 +107,9 @@
 {% else %}
 <div class="empty-state">
   <div style="font-size:56px;" class="wa-green">💬</div>
-  <div style="font-size:20px;font-weight:700;margin:12px 0 8px;">No messages sent yet</div>
-  <div style="margin-bottom:20px;">Messages sent via WhatsApp will appear here.</div>
-  <a href="{{ url_for('whatsapp.reminders') }}" class="pf-btn pf-btn-primary">🔔 View Pending Reminders</a>
+  <div style="font-size:20px;font-weight:700;margin:12px 0 8px;">{{ t('No messages sent yet', 'لم تُرسل رسائل بعد') }}</div>
+  <div style="margin-bottom:20px;">{{ t('Messages sent via WhatsApp will appear here.', 'ستظهر هنا الرسائل المرسلة عبر واتساب.') }}</div>
+  <a href="{{ url_for('whatsapp.reminders') }}" class="pf-btn pf-btn-primary">{{ t('🔔 View Pending Reminders', '🔔 عرض التذكيرات المعلقة') }}</a>
 </div>
 {% endif %}
 {% endblock %}

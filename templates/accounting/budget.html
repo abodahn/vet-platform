@@ -140,7 +140,7 @@
     <summary style="cursor:pointer;font-size:.9rem;font-weight:700;
                     color:var(--cl-primary);list-style:none;
                     padding:10px 0;border-top:1px solid var(--cl-border)">
-      ⚙️ Edit Budget Targets
+      {{ t('⚙️ Edit Budget Targets', '⚙️ تعديل أهداف الميزانية') }}
     </summary>
     <div style="background:var(--cl-surface);border:1px solid var(--cl-border);
                 border-radius:12px;padding:20px;margin-top:12px">
@@ -150,8 +150,8 @@
         <table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-bottom:16px">
           <thead>
             <tr style="border-bottom:2px solid var(--cl-border)">
-              <th style="text-align:left;padding:.5rem .7rem;color:var(--cl-muted);font-weight:600">Category</th>
-              <th style="text-align:right;padding:.5rem .7rem;color:var(--cl-muted);font-weight:600">Monthly Budget (EGP)</th>
+              <th style="text-align:left;padding:.5rem .7rem;color:var(--cl-muted);font-weight:600">{{ t('Category', 'الفئة') }}</th>
+              <th style="text-align:right;padding:.5rem .7rem;color:var(--cl-muted);font-weight:600">{{ t('Monthly Budget (EGP)', 'الميزانية الشهرية (جنيه)') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -172,7 +172,7 @@
             <!-- Add new category row -->
             <tr style="border-top:2px dashed var(--cl-border);background:var(--cl-bg)">
               <td style="padding:.5rem .7rem">
-                <input type="text" name="new_category" placeholder="New category name (optional)"
+                <input type="text" name="new_category" placeholder="{{ t('New category name (optional)', 'اسم فئة جديدة (اختياري)') }}"
                        style="width:100%;padding:5px 10px;border:1px solid var(--cl-border);
                               border-radius:6px;font-size:.85rem">
               </td>
@@ -186,9 +186,9 @@
         </table>
 
         <div style="display:flex;gap:10px;align-items:center">
-          <button type="submit" class="pf-btn pf-btn-primary">💾 Save Budget Targets</button>
+          <button type="submit" class="pf-btn pf-btn-primary">{{ t('💾 Save Budget Targets', '💾 حفظ أهداف الميزانية') }}</button>
           <span style="font-size:.78rem;color:var(--cl-muted)">
-            Changes take effect immediately on the dashboard.
+            {{ t('Changes take effect immediately on the dashboard.', 'تسري التغييرات فوراً على لوحة التحكم.') }}
           </span>
         </div>
       </form>

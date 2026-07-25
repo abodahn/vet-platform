@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}AI Assistant{% endblock %}
+{% block title %}{{ t('AI Assistant', 'المساعد الذكي') }}{% endblock %}
 
-{% block page_title %}AI Assistant{% endblock %}
+{% block page_title %}{{ t('AI Assistant', 'المساعد الذكي') }}{% endblock %}
 {% block page_sub %}Powered by <strong>freellmapi</strong> — multi-model router (Gemini · GPT · Claude){% endblock %}
 
 {% block topbar_actions %}
 <a href="{{ url_for('ai_assistant.history') }}" class="pf-btn pf-btn-secondary" style="font-size:0.85rem;">
-  📋 History
+  {{ t('📋 History', '📋 السجل') }}
 </a>
 {% if api_configured %}
 <form method="post" action="{{ url_for('ai_assistant.clear') }}" style="display:inline">
   <button type="submit" class="pf-btn pf-btn-secondary" style="font-size:0.85rem;"
           onclick="return confirm('Clear all conversation history?')">
-    🗑 Clear
+    {{ t('🗑 Clear', '🗑 مسح') }}
   </button>
 </form>
 {% endif %}
@@ -233,7 +233,7 @@
 
   <!-- ── Quick-prompt sidebar ── -->
   <aside class="ai-sidebar">
-    <div class="ai-sidebar-title">Quick Prompts</div>
+    <div class="ai-sidebar-title">{{ t('Quick Prompts', 'أسئلة سريعة') }}</div>
 
     {% if user_role in ('doctor', 'super_admin', 'clinic_owner') %}
       <button class="ai-quick-btn" data-prompt="Calculate amoxicillin dosage for a 10 kg dog with a skin infection. Include dosage mg/kg, frequency, and duration.">
@@ -317,7 +317,7 @@
     {% if not api_configured %}
     <div class="ai-not-configured">
       <div style="font-size:3rem">🤖</div>
-      <h3>AI Assistant Not Configured</h3>
+      <h3>{{ t('AI Assistant Not Configured', 'المساعد الذكي غير مُعد') }}</h3>
       <p>The <code>openai</code> Python package is required.</p>
       <p>Run in your terminal:</p>
       <code>pip install openai</code>

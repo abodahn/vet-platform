@@ -84,7 +84,7 @@
           <div style="margin-bottom:1rem">
             <label class="pf-label">{{ t('Doctor Name', 'اسم الطبيب') }}</label>
             <input type="text" name="doctor_name" class="pf-input"
-                   placeholder="Dr. ..." value="{{ session.get('user',{}).get('full_name','') }}">
+                   placeholder="{{ t('Dr. ...', 'د. ...') }}" value="{{ session.get('user',{}).get('full_name','') }}">
           </div>
           <div style="margin-bottom:1rem">
             <label class="pf-label">{{ t('Chief Complaint', 'الشكوى الرئيسية') }} *</label>

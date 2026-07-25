@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Stock Movements{% endblock %}
-{% block page_title %}Stock Movements{% endblock %}
-{% block page_sub %}Full movement history log{% endblock %}
+{% block title %}{{ t('Stock Movements', 'حركات المخزون') }}{% endblock %}
+{% block page_title %}{{ t('Stock Movements', 'حركات المخزون') }}{% endblock %}
+{% block page_sub %}{{ t('Full movement history log', 'سجل الحركات الكامل') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('inventory.dashboard') }}" class="btn btn-secondary">← Dashboard</a>
+<a href="{{ url_for('inventory.dashboard') }}" class="btn btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -30,35 +30,35 @@
 <div class="filter-bar">
   <form method="get" style="display:contents">
     <div class="filter-group">
-      <label class="filter-label">Item</label>
+      <label class="filter-label">{{ t('Item', 'الصنف') }}</label>
       <select name="item_id" class="filter-control">
-        <option value="">All Items</option>
+        <option value="">{{ t('All Items', 'جميع الأصناف') }}</option>
         {% for i in items_for_filter %}
         <option value="{{ i.id }}" {% if request.args.get('item_id')|int == i.id %}selected{% endif %}>{{ i.name }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="filter-group">
-      <label class="filter-label">Type</label>
+      <label class="filter-label">{{ t('Type', 'النوع') }}</label>
       <select name="type" class="filter-control">
-        <option value="">All Types</option>
-        <option value="in" {% if request.args.get('type')=='in' %}selected{% endif %}>Stock In</option>
-        <option value="out" {% if request.args.get('type')=='out' %}selected{% endif %}>Stock Out</option>
-        <option value="adjustment" {% if request.args.get('type')=='adjustment' %}selected{% endif %}>Adjustment</option>
-        <option value="expired" {% if request.args.get('type')=='expired' %}selected{% endif %}>Expired</option>
-        <option value="damaged" {% if request.args.get('type')=='damaged' %}selected{% endif %}>Damaged</option>
+        <option value="">{{ t('All Types', 'جميع الأنواع') }}</option>
+        <option value="in" {% if request.args.get('type')=='in' %}selected{% endif %}>{{ t('Stock In', 'وارد') }}</option>
+        <option value="out" {% if request.args.get('type')=='out' %}selected{% endif %}>{{ t('Stock Out', 'منصرف') }}</option>
+        <option value="adjustment" {% if request.args.get('type')=='adjustment' %}selected{% endif %}>{{ t('Adjustment', 'تسوية') }}</option>
+        <option value="expired" {% if request.args.get('type')=='expired' %}selected{% endif %}>{{ t('Expired', 'منتهية') }}</option>
+        <option value="damaged" {% if request.args.get('type')=='damaged' %}selected{% endif %}>{{ t('Damaged', 'تالف') }}</option>
       </select>
     </div>
     <div class="filter-group">
-      <label class="filter-label">Limit</label>
+      <label class="filter-label">{{ t('Limit', 'الحد') }}</label>
       <select name="limit" class="filter-control">
-        <option value="50" {% if request.args.get('limit','100')=='50' %}selected{% endif %}>Last 50</option>
-        <option value="100" {% if request.args.get('limit','100')=='100' %}selected{% endif %}>Last 100</option>
-        <option value="500" {% if request.args.get('limit','100')=='500' %}selected{% endif %}>Last 500</option>
+        <option value="50" {% if request.args.get('limit','100')=='50' %}selected{% endif %}>{{ t('Last 50', 'آخر 50') }}</option>
+        <option value="100" {% if request.args.get('limit','100')=='100' %}selected{% endif %}>{{ t('Last 100', 'آخر 100') }}</option>
+        <option value="500" {% if request.args.get('limit','100')=='500' %}selected{% endif %}>{{ t('Last 500', 'آخر 500') }}</option>
       </select>
     </div>
-    <button type="submit" style="padding:8px 20px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Filter</button>
-    <a href="{{ url_for('inventory.movements') }}" style="padding:8px 16px; border:1.5px solid var(--cl-border); border-radius:8px; text-decoration:none; color:var(--cl-text); font-weight:600; font-size:13px;">Reset</a>
+    <button type="submit" style="padding:8px 20px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;">{{ t('Filter', 'تصفية') }}</button>
+    <a href="{{ url_for('inventory.movements') }}" style="padding:8px 16px; border:1.5px solid var(--cl-border); border-radius:8px; text-decoration:none; color:var(--cl-text); font-weight:600; font-size:13px;">{{ t('Reset', 'إعادة تعيين') }}</a>
   </form>
 </div>
 
@@ -66,13 +66,13 @@
   <table>
     <thead>
       <tr>
-        <th>Date/Time</th>
-        <th>Item</th>
-        <th>Type</th>
-        <th style="text-align:right">Qty</th>
-        <th>Reference</th>
-        <th>By</th>
-        <th>Notes</th>
+        <th>{{ t('Date/Time', 'التاريخ/الوقت') }}</th>
+        <th>{{ t('Item', 'الصنف') }}</th>
+        <th>{{ t('Type', 'النوع') }}</th>
+        <th style="text-align:right">{{ t('Qty', 'الكمية') }}</th>
+        <th>{{ t('Reference', 'المرجع') }}</th>
+        <th>{{ t('By', 'بواسطة') }}</th>
+        <th>{{ t('Notes', 'ملاحظات') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -92,7 +92,7 @@
         <td style="font-size:12px; color:var(--cl-muted);">{{ m.notes or '—' }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="7" style="text-align:center; padding:32px; color:var(--cl-muted);">No movements found</td></tr>
+      <tr><td colspan="7" style="text-align:center; padding:32px; color:var(--cl-muted);">{{ t('No movements found', 'لا توجد حركات') }}</td></tr>
       {% endfor %}
     </tbody>
   </table>

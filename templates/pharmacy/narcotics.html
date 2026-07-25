@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Narcotics Register{% endblock %}
-{% block page_title %}Narcotics &amp; Controlled Drugs Register{% endblock %}
-{% block page_sub %}Audit log of all controlled substance dispensing events{% endblock %}
+{% block title %}{{ t('Narcotics Register', 'سجل المخدرات') }}{% endblock %}
+{% block page_title %}{{ t('Narcotics &amp; Controlled Drugs Register', 'سجل المخدرات والمواد الخاضعة للرقابة') }}{% endblock %}
+{% block page_sub %}{{ t('Audit log of all controlled substance dispensing events', 'سجل مراجعة لجميع عمليات صرف المواد الخاضعة للرقابة') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('pharmacy.index') }}" class="pf-btn pf-btn-secondary">Dispensing Queue</a>
-<a href="{{ url_for('pharmacy.history') }}" class="pf-btn pf-btn-secondary">Full History</a>
-<button onclick="window.print()" class="pf-btn pf-btn-primary">Print Register</button>
+<a href="{{ url_for('pharmacy.index') }}" class="pf-btn pf-btn-secondary">{{ t('Dispensing Queue', 'قائمة الصرف') }}</a>
+<a href="{{ url_for('pharmacy.history') }}" class="pf-btn pf-btn-secondary">{{ t('Full History', 'السجل الكامل') }}</a>
+<button onclick="window.print()" class="pf-btn pf-btn-primary">{{ t('Print Register', 'طباعة السجل') }}</button>
 {% endblock %}
 
 {% block head_extra %}
@@ -39,23 +39,24 @@
 {% block content %}
 
 <div class="narc-notice">
-  <strong>Regulatory Notice:</strong> This register records all dispensing events for controlled and narcotic substances.
-  It must be maintained accurately and is subject to regulatory inspection. Entries are auto-generated from dispensing records.
+  <strong>{{ t('Regulatory Notice:', 'إشعار تنظيمي:') }}</strong> {{ t('This register records all dispensing events for controlled and narcotic substances.
+  It must be maintained accurately and is subject to regulatory inspection. Entries are auto-generated from dispensing records.', 'يسجل هذا السجل جميع عمليات صرف المواد المخدرة والخاضعة للرقابة.
+  يجب حفظه بدقة وهو خاضع للتفتيش التنظيمي. تُنشأ القيود تلقائياً من سجلات الصرف.') }}
 </div>
 
 <!-- KPIs -->
 <div class="narc-kpi">
   <div class="narc-kpi-card">
     <div class="narc-kpi-num" style="color:#7c3aed">{{ total_events }}</div>
-    <div class="narc-kpi-lbl">Dispensing Events</div>
+    <div class="narc-kpi-lbl">{{ t('Dispensing Events', 'عمليات الصرف') }}</div>
   </div>
   <div class="narc-kpi-card">
     <div class="narc-kpi-num" style="color:#dc2626">{{ "%.2f"|format(total_qty) }}</div>
-    <div class="narc-kpi-lbl">Total Units Dispensed</div>
+    <div class="narc-kpi-lbl">{{ t('Total Units Dispensed', 'إجمالي الوحدات المصروفة') }}</div>
   </div>
   <div class="narc-kpi-card">
     <div class="narc-kpi-num" style="color:var(--cl-primary)">{{ controlled_items|length }}</div>
-    <div class="narc-kpi-lbl">Controlled Substances</div>
+    <div class="narc-kpi-lbl">{{ t('Controlled Substances', 'المواد الخاضعة للرقابة') }}</div>
   </div>
 </div>
 
@@ -63,27 +64,27 @@
 <form method="GET" action="">
   <div class="narc-filters">
     <div>
-      <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">From</label>
+      <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">{{ t('From', 'من') }}</label>
       <input type="date" name="date_from" value="{{ date_from }}">
     </div>
     <div>
-      <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">To</label>
+      <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">{{ t('To', 'إلى') }}</label>
       <input type="date" name="date_to" value="{{ date_to }}">
     </div>
     <div>
-      <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Substance</label>
+      <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">{{ t('Substance', 'المادة') }}</label>
       <select name="item_id">
-        <option value="">All Controlled Substances</option>
+        <option value="">{{ t('All Controlled Substances', 'جميع المواد الخاضعة للرقابة') }}</option>
         {% for ci in controlled_items %}
         <option value="{{ ci.id }}" {{ 'selected' if item_id_filter==ci.id|string else '' }}>{{ ci.name }}</option>
         {% endfor %}
       </select>
     </div>
     <div style="padding-top:16px">
-      <button type="submit">Filter</button>
+      <button type="submit">{{ t('Filter', 'تصفية') }}</button>
     </div>
     <div style="padding-top:16px">
-      <a href="{{ url_for('pharmacy.narcotics') }}" class="pf-btn pf-btn-secondary">Reset</a>
+      <a href="{{ url_for('pharmacy.narcotics') }}" class="pf-btn pf-btn-secondary">{{ t('Reset', 'إعادة تعيين') }}</a>
     </div>
   </div>
 </form>
@@ -94,15 +95,15 @@
     <thead>
       <tr>
         <th>#</th>
-        <th>Date &amp; Time</th>
-        <th>Substance / Drug</th>
-        <th>Batch</th>
-        <th>Qty</th>
-        <th>Patient</th>
-        <th>Owner</th>
-        <th>Doctor</th>
-        <th>Dispensed By</th>
-        <th>RX Ref</th>
+        <th>{{ t('Date &amp; Time', 'التاريخ والوقت') }}</th>
+        <th>{{ t('Substance / Drug', 'المادة / الدواء') }}</th>
+        <th>{{ t('Batch', 'الدفعة') }}</th>
+        <th>{{ t('Qty', 'الكمية') }}</th>
+        <th>{{ t('Patient', 'المريض') }}</th>
+        <th>{{ t('Owner', 'المالك') }}</th>
+        <th>{{ t('Doctor', 'الطبيب') }}</th>
+        <th>{{ t('Dispensed By', 'صُرف بواسطة') }}</th>
+        <th>{{ t('RX Ref', 'مرجع الوصفة') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -143,8 +144,8 @@
 {% else %}
 <div style="text-align:center;padding:60px;color:var(--cl-muted)">
   <div style="font-size:48px;margin-bottom:12px">&#128138;</div>
-  <div style="font-size:18px;font-weight:600;margin-bottom:8px">No controlled drug dispensing events found</div>
-  <div>Events appear here automatically when controlled substances are dispensed via prescriptions.</div>
+  <div style="font-size:18px;font-weight:600;margin-bottom:8px">{{ t('No controlled drug dispensing events found', 'لا توجد عمليات صرف لمواد خاضعة للرقابة') }}</div>
+  <div>{{ t('Events appear here automatically when controlled substances are dispensed via prescriptions.', 'تظهر العمليات هنا تلقائياً عند صرف مواد خاضعة للرقابة عبر الوصفات.') }}</div>
 </div>
 {% endif %}
 

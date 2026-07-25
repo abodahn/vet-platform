@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}New Campaign{% endblock %}
-{% block page_title %}Create Campaign{% endblock %}
-{% block page_sub %}Create a new bulk WhatsApp campaign via Wapilot{% endblock %}
+{% block title %}{{ t('New Campaign', 'حملة جديدة') }}{% endblock %}
+{% block page_title %}{{ t('Create Campaign', 'إنشاء حملة') }}{% endblock %}
+{% block page_sub %}{{ t('Create a new bulk WhatsApp campaign via Wapilot', 'إنشاء حملة واتساب جماعية جديدة عبر Wapilot') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.campaigns_list') }}" class="pf-btn pf-btn-ghost">← Campaigns</a>
+<a href="{{ url_for('whatsapp.campaigns_list') }}" class="pf-btn pf-btn-ghost">{{ t('← Campaigns', '← الحملات') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -17,7 +17,7 @@
 
     <div style="margin-bottom:22px">
       <label style="display:block;font-weight:600;font-size:.9rem;margin-bottom:6px">
-        Default Message
+        {{ t('Default Message', 'الرسالة الافتراضية') }}
       </label>
       <p style="color:var(--muted,#64748b);font-size:.82rem;margin:0 0 8px">
         This message will be sent to contacts that don't have an individual message set.
@@ -29,7 +29,7 @@
     </div>
 
     <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:14px;font-size:.85rem;color:#92400e">
-      <strong>ℹ️ Note:</strong> The campaign will be created using your configured instance
+      <strong>{{ t('ℹ️ Note:', 'ℹ️ ملاحظة:') }}</strong> The campaign will be created using your configured instance
       (<strong>instance4042</strong>). After creation, you'll be taken to the campaign page
       where you can add contacts and start sending.
     </div>
@@ -37,9 +37,9 @@
 
   <div style="display:flex;gap:12px">
     <button type="submit" class="pf-btn pf-btn-primary" style="padding:11px 28px">
-      🚀 Create Campaign
+      {{ t('🚀 Create Campaign', '🚀 إنشاء الحملة') }}
     </button>
-    <a href="{{ url_for('whatsapp.campaigns_list') }}" class="pf-btn pf-btn-ghost">Cancel</a>
+    <a href="{{ url_for('whatsapp.campaigns_list') }}" class="pf-btn pf-btn-ghost">{{ t('Cancel', 'إلغاء') }}</a>
   </div>
 </form>
 </div>

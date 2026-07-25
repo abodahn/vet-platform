@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en" dir="ltr">
+<html lang="{{ current_lang or 'en' }}"
+      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -391,10 +392,10 @@
 
     <!-- Quick-nav buttons -->
     <div class="action-buttons">
-      <a href="/" class="btn btn-primary">🏠 Dashboard</a>
-      <a href="/appointments/" class="btn btn-gold">📅 Appointments</a>
-      <a href="/crm/pets" class="btn btn-gold">🐾 Pets</a>
-      <button onclick="history.back()" class="btn btn-ghost">← Back</button>
+      <a href="/" class="btn btn-primary">{{ t('🏠 Dashboard', '🏠 لوحة التحكم') }}</a>
+      <a href="/appointments/" class="btn btn-gold">{{ t('📅 Appointments', '📅 المواعيد') }}</a>
+      <a href="/crm/pets" class="btn btn-gold">{{ t('🐾 Pets', '🐾 الحيوانات') }}</a>
+      <button onclick="history.back()" class="btn btn-ghost">{{ t('← Back', '← رجوع') }}</button>
     </div>
 
   </div><!-- /.error-card -->

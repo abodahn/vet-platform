@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}{% if editing %}Edit Staff{% else %}New Staff Member{% endif %}{% endblock %}
+{% block title %}{% if editing %}{{ t('Edit Staff','تعديل موظف') }}{% else %}{{ t('New Staff Member','موظف جديد') }}{% endif %}{% endblock %}
 
-{% block page_title %}{% if editing %}Edit Staff Member{% else %}New Staff Member{% endif %}{% endblock %}
-{% block page_sub %}{% if editing %}Update staff information and access{% else %}Create a new user account{% endif %}{% endblock %}
+{% block page_title %}{% if editing %}{{ t('Edit Staff Member','تعديل بيانات الموظف') }}{% else %}{{ t('New Staff Member','موظف جديد') }}{% endif %}{% endblock %}
+{% block page_sub %}{% if editing %}{{ t('Update staff information and access','تحديث بيانات الموظف والصلاحيات') }}{% else %}{{ t('Create a new user account','إنشاء حساب مستخدم جديد') }}{% endif %}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">← Back to Staff List</a>
+<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">{{ t('← Back to Staff List','← العودة إلى قائمة الموظفين') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -38,22 +38,22 @@
 
   <!-- Account Credentials -->
   <div class="form-card">
-    <div class="form-card-title">Account Credentials</div>
+    <div class="form-card-title">{{ t('Account Credentials','بيانات الحساب') }}</div>
     <div class="form-grid">
       <div class="form-group">
-        <label>Username *</label>
+        <label>{{ t('Username','اسم المستخدم') }} *</label>
         <input type="text" name="username" value="{{ form.get('username','') }}"
                {% if editing %}readonly style="background:var(--cl-bg);color:var(--cl-muted);"{% endif %}
-               required placeholder="e.g. dr.ahmed" autocomplete="off">
+               required placeholder="{{ t('e.g. dr.ahmed','مثال: dr.ahmed') }}" autocomplete="off">
       </div>
       {% if not editing %}
       <div class="form-group">
-        <label>Password *</label>
-        <input type="password" name="password" required placeholder="Min 6 characters" autocomplete="new-password">
+        <label>{{ t('Password','كلمة المرور') }} *</label>
+        <input type="password" name="password" required placeholder="{{ t('Min 6 characters','6 أحرف على الأقل') }}" autocomplete="new-password">
       </div>
       <div class="form-group">
-        <label>Confirm Password *</label>
-        <input type="password" name="confirm_password" required placeholder="Repeat password" autocomplete="new-password">
+        <label>{{ t('Confirm Password','تأكيد كلمة المرور') }} *</label>
+        <input type="password" name="confirm_password" required placeholder="{{ t('Repeat password','أعد كتابة كلمة المرور') }}" autocomplete="new-password">
       </div>
       {% endif %}
     </div>
@@ -61,54 +61,54 @@
 
   <!-- Personal Information -->
   <div class="form-card">
-    <div class="form-card-title">Personal Information</div>
+    <div class="form-card-title">{{ t('Personal Information','البيانات الشخصية') }}</div>
     <div class="form-grid">
       <div class="form-group">
-        <label>Full Name (English)</label>
+        <label>{{ t('Full Name (English)','الاسم الكامل (إنجليزي)') }}</label>
         <input type="text" name="full_name" value="{{ form.get('full_name','') }}" placeholder="Dr. Ahmed Hassan">
       </div>
       <div class="form-group">
-        <label>Full Name (Arabic)</label>
+        <label>{{ t('Full Name (Arabic)','الاسم الكامل (عربي)') }}</label>
         <input type="text" name="full_name_ar" value="{{ form.get('full_name_ar','') }}" placeholder="د. أحمد حسن" dir="rtl">
       </div>
       <div class="form-group">
-        <label>Email Address</label>
+        <label>{{ t('Email Address','البريد الإلكتروني') }}</label>
         <input type="email" name="email" value="{{ form.get('email','') }}" placeholder="staff@clinic.com">
       </div>
       <div class="form-group">
-        <label>Phone Number</label>
+        <label>{{ t('Phone Number','رقم الهاتف') }}</label>
         <input type="tel" name="phone" value="{{ form.get('phone','') }}" placeholder="+20 10 xxxx xxxx">
       </div>
       <div class="form-group">
-        <label>Gender</label>
+        <label>{{ t('Gender','النوع') }}</label>
         <select name="gender">
-          <option value="">— Not specified —</option>
+          <option value="">— {{ t('Not specified','غير محدد') }} —</option>
           {% for g in ['Male','Female','Not specified'] %}
-          <option value="{{ g }}" {% if form.get('gender') == g %}selected{% endif %}>{{ g }}</option>
+          <option value="{{ g }}" {% if form.get('gender') == g %}selected{% endif %}>{{ t(g, {'Male':'ذكر','Female':'أنثى','Not specified':'غير محدد'}.get(g,'')) }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="form-group">
-        <label>Date of Birth</label>
+        <label>{{ t('Date of Birth','تاريخ الميلاد') }}</label>
         <input type="date" name="dob" value="{{ form.get('dob','') }}">
       </div>
       <div class="form-group">
-        <label>National ID</label>
-        <input type="text" name="national_id" value="{{ form.get('national_id','') }}" placeholder="National ID number">
+        <label>{{ t('National ID','الرقم القومي') }}</label>
+        <input type="text" name="national_id" value="{{ form.get('national_id','') }}" placeholder="{{ t('National ID number','رقم البطاقة القومية') }}">
       </div>
     </div>
   </div>
 
   <!-- Emergency Contact -->
   <div class="form-card">
-    <div class="form-card-title">Emergency Contact</div>
+    <div class="form-card-title">{{ t('Emergency Contact','جهة الاتصال في الطوارئ') }}</div>
     <div class="form-grid">
       <div class="form-group">
-        <label>Emergency Contact Name</label>
-        <input type="text" name="emergency_contact" value="{{ form.get('emergency_contact','') }}" placeholder="Full name of emergency contact">
+        <label>{{ t('Emergency Contact Name','اسم جهة الاتصال في الطوارئ') }}</label>
+        <input type="text" name="emergency_contact" value="{{ form.get('emergency_contact','') }}" placeholder="{{ t('Full name of emergency contact','الاسم الكامل لجهة الاتصال') }}">
       </div>
       <div class="form-group">
-        <label>Emergency Contact Phone</label>
+        <label>{{ t('Emergency Contact Phone','هاتف جهة الاتصال في الطوارئ') }}</label>
         <input type="tel" name="emergency_phone" value="{{ form.get('emergency_phone','') }}" placeholder="+20 10 xxxx xxxx">
       </div>
     </div>
@@ -116,22 +116,22 @@
 
   <!-- Employment Details -->
   <div class="form-card">
-    <div class="form-card-title">Employment Details</div>
+    <div class="form-card-title">{{ t('Employment Details','بيانات التوظيف') }}</div>
     <div class="form-grid">
       <div class="form-group">
-        <label>Job Title</label>
-        <input type="text" name="job_title" value="{{ form.get('job_title','') }}" placeholder="e.g. Senior Veterinarian">
+        <label>{{ t('Job Title','المسمى الوظيفي') }}</label>
+        <input type="text" name="job_title" value="{{ form.get('job_title','') }}" placeholder="{{ t('e.g. Senior Veterinarian','مثال: طبيب بيطري أول') }}">
       </div>
       <div class="form-group">
-        <label>Contract Type</label>
+        <label>{{ t('Contract Type','نوع العقد') }}</label>
         <select name="contract_type">
           {% for ct in ['Full-time','Part-time','Contract','Probation','Intern'] %}
-          <option value="{{ ct }}" {% if form.get('contract_type','Full-time') == ct %}selected{% endif %}>{{ ct }}</option>
+          <option value="{{ ct }}" {% if form.get('contract_type','Full-time') == ct %}selected{% endif %}>{{ t(ct, {'Full-time':'دوام كامل','Part-time':'دوام جزئي','Contract':'عقد','Probation':'تحت التجربة','Intern':'متدرب'}.get(ct,'')) }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="form-group">
-        <label>Hire Date</label>
+        <label>{{ t('Hire Date','تاريخ التعيين') }}</label>
         <input type="date" name="hire_date" value="{{ form.get('hire_date','') }}">
       </div>
     </div>
@@ -139,10 +139,10 @@
 
   <!-- Role & Access -->
   <div class="form-card">
-    <div class="form-card-title">Role & Access Control</div>
+    <div class="form-card-title">{{ t('Role & Access Control','الدور والصلاحيات') }}</div>
     <div class="form-grid">
       <div class="form-group">
-        <label>Role *</label>
+        <label>{{ t('Role','الدور') }} *</label>
         <select name="role" required>
           {% for role in roles %}
           <option value="{{ role }}" {% if form.get('role') == role %}selected{% endif %}>
@@ -152,9 +152,9 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Branch</label>
+        <label>{{ t('Branch','الفرع') }}</label>
         <select name="branch_id">
-          <option value="">— No Branch —</option>
+          <option value="">— {{ t('No Branch','بدون فرع') }} —</option>
           {% for branch in branches %}
           <option value="{{ branch.id }}" {% if form.get('branch_id')|string == branch.id|string %}selected{% endif %}>
             {{ branch.name }}
@@ -163,24 +163,24 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Work Shift</label>
+        <label>{{ t('Work Shift','المناوبة') }}</label>
         <select name="shift_id">
-          <option value="">— No Shift —</option>
+          <option value="">— {{ t('No Shift','بدون مناوبة') }} —</option>
           {% for sh in shifts %}
           <option value="{{ sh.id }}" {% if form.get('shift_id')|string == sh.id|string %}selected{% endif %}>
             {{ sh.name }} ({{ sh.start_time }} – {{ sh.end_time }})
           </option>
           {% endfor %}
         </select>
-        <span class="hint">Assigning a shift here will set it from today.</span>
+        <span class="hint">{{ t('Assigning a shift here will set it from today.','تعيين مناوبة هنا سيبدأ سريانها من اليوم.') }}</span>
       </div>
       <div class="form-group" style="align-self:end">
-        <label>Account Status</label>
+        <label>{{ t('Account Status','حالة الحساب') }}</label>
         <div class="checkbox-row">
           <input type="checkbox" name="is_active" id="is_active"
                  {% if form.get('is_active', 1)|int %}checked{% endif %}>
           <label for="is_active" style="text-transform:none;font-size:14px;color:var(--cl-text);">
-            Active — user can log in
+            {{ t('Active — user can log in','نشط — يمكن للمستخدم تسجيل الدخول') }}
           </label>
         </div>
       </div>
@@ -188,9 +188,9 @@
   </div>
 
   <div class="form-actions">
-    <a href="{{ url_for('hr.staff_list') }}" class="btn-cancel">Cancel</a>
+    <a href="{{ url_for('hr.staff_list') }}" class="btn-cancel">{{ t('Cancel','إلغاء') }}</a>
     <button type="submit" class="btn-save">
-      {% if editing %}Save Changes{% else %}Create Staff Member{% endif %}
+      {% if editing %}{{ t('Save Changes','حفظ التغييرات') }}{% else %}{{ t('Create Staff Member','إنشاء موظف') }}{% endif %}
     </button>
   </div>
 </form>

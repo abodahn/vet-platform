@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ current_lang or 'en' }}"
+      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Waiting Room — Aleefy</title>
+  <title>{{ t('Waiting Room — Aleefy', 'غرفة الانتظار — Aleefy') }}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{
@@ -141,17 +142,17 @@
 
   <!-- Queue -->
   <div class="wr-queue">
-    <div class="wr-queue-title">Today's Queue &nbsp;<span class="pulse-dot"></span></div>
+    <div class="wr-queue-title">{{ t("Today's Queue &nbsp;", 'قائمة اليوم &nbsp;') }}<span class="pulse-dot"></span></div>
 
     {% if queue %}
     <table class="wr-table">
       <thead>
         <tr>
           <th>#</th>
-          <th>Patient</th>
-          <th>Type</th>
-          <th>Doctor</th>
-          <th>Est. Wait</th>
+          <th>{{ t('Patient', 'المريض') }}</th>
+          <th>{{ t('Type', 'النوع') }}</th>
+          <th>{{ t('Doctor', 'الطبيب') }}</th>
+          <th>{{ t('Est. Wait', 'الانتظار المتوقع') }}</th>
         </tr>
       </thead>
       <tbody id="queueBody">
@@ -176,9 +177,9 @@
           <td><span class="wr-doc">Dr. {{ q.doctor_name or '?' }}</span></td>
           <td>
             {% if q.status == 'Checked-in' %}
-            <span class="wr-wait now">🟢 In Progress</span>
+            <span class="wr-wait now">{{ t('🟢 In Progress', '🟢 جارٍ') }}</span>
             {% elif q.wait_min == 0 %}
-            <span class="wr-wait now">Next up</span>
+            <span class="wr-wait now">{{ t('Next up', 'التالي') }}</span>
             {% else %}
             <span class="wr-wait">~{{ q.wait_min }} min</span>
             {% endif %}
@@ -190,8 +191,8 @@
     {% else %}
     <div class="wr-empty">
       <div style="font-size:3rem;margin-bottom:12px">🌟</div>
-      <div>No patients in queue right now</div>
-      <div style="font-size:.85rem;color:#1e293b;margin-top:6px">Walk-ins welcome</div>
+      <div>{{ t('No patients in queue right now', 'لا يوجد مرضى في قائمة الانتظار حالياً') }}</div>
+      <div style="font-size:.85rem;color:#1e293b;margin-top:6px">{{ t('Walk-ins welcome', 'المراجعون بدون موعد مرحب بهم') }}</div>
     </div>
     {% endif %}
   </div>
@@ -203,30 +204,30 @@
     <div class="wr-stats">
       <div class="wr-stat">
         <div class="wr-stat-val" id="statTotal">{{ queue|length }}</div>
-        <div class="wr-stat-label">In Queue</div>
+        <div class="wr-stat-label">{{ t('In Queue', 'في الانتظار') }}</div>
       </div>
       <div class="wr-stat">
         <div class="wr-stat-val amber" id="statActive">
           {{ queue | selectattr('status','equalto','Checked-in') | list | length }}
         </div>
-        <div class="wr-stat-label">In Consultation</div>
+        <div class="wr-stat-label">{{ t('In Consultation', 'في الكشف') }}</div>
       </div>
       <div class="wr-stat">
         <div class="wr-stat-val" id="statWait">
           {{ (queue | selectattr('status','ne','Checked-in') | list | length) * 20 }}
         </div>
-        <div class="wr-stat-label">Max Wait (min)</div>
+        <div class="wr-stat-label">{{ t('Max Wait (min)', 'أقصى انتظار (دقيقة)') }}</div>
       </div>
       <div class="wr-stat">
         <div class="wr-stat-val" style="color:#3b82f6">24</div>
-        <div class="wr-stat-label">Yrs of Care</div>
+        <div class="wr-stat-label">{{ t('Yrs of Care', 'سنوات من الرعاية') }}</div>
       </div>
     </div>
 
     <!-- Health Tips -->
     <div class="wr-tips">
-      <div class="wr-tip-label">Health Tip of the Moment</div>
-      <div class="wr-tip-content" id="tipText">Loading tip...</div>
+      <div class="wr-tip-label">{{ t('Health Tip of the Moment', 'نصيحة صحية') }}</div>
+      <div class="wr-tip-content" id="tipText">{{ t('Loading tip...', 'جارٍ التحميل...') }}</div>
     </div>
 
   </div>

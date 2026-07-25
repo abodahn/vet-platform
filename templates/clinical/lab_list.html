@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Lab Requests{% endblock %}
-{% block page_title %}Lab Requests{% endblock %}
-{% block page_sub %}Manage laboratory test requests and results{% endblock %}
+{% block title %}{{ t('Lab Requests', 'طلبات المختبر') }}{% endblock %}
+{% block page_title %}{{ t('Lab Requests', 'طلبات المختبر') }}{% endblock %}
+{% block page_sub %}{{ t('Manage laboratory test requests and results', 'إدارة طلبات ونتائج الفحوصات المخبرية') }}{% endblock %}
 
 {% block topbar_actions %}
 <a href="{{ url_for('clinical.lab_new') }}" class="pf-btn pf-btn-primary">
-  ＋ New Lab Request
+  {{ t('＋ New Lab Request', '＋ طلب مختبر جديد') }}
 </a>
 {% endblock %}
 
@@ -91,13 +91,13 @@
       <table class="pf-table">
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Pet</th>
-            <th>Test</th>
-            <th>Priority</th>
-            <th>Status</th>
-            <th>Doctor</th>
-            <th>Actions</th>
+            <th>{{ t('Date', 'التاريخ') }}</th>
+            <th>{{ t('Pet', 'الحيوان') }}</th>
+            <th>{{ t('Test', 'الفحص') }}</th>
+            <th>{{ t('Priority', 'الأولوية') }}</th>
+            <th>{{ t('Status', 'الحالة') }}</th>
+            <th>{{ t('Doctor', 'الطبيب') }}</th>
+            <th>{{ t('Actions', 'إجراءات') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -113,11 +113,11 @@
               {% if lab.test_code %}<div style="font-size:0.78rem;color:var(--text-muted)">{{ lab.test_code }}</div>{% endif %}
             </td>
             <td><span class="priority-badge priority-{{ lab.priority }}">{{ lab.priority }}</span></td>
-            <td><span class="status-badge status-Pending">Pending</span></td>
+            <td><span class="status-badge status-Pending">{{ t('Pending', 'قيد الانتظار') }}</span></td>
             <td style="font-size:0.85rem">{{ lab.doctor_name or '—' }}</td>
             <td>
               <a href="{{ url_for('clinical.lab_detail', lab_id=lab.id) }}" class="pf-btn pf-btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.65rem">
-                View / Enter Results
+                {{ t('View / Enter Results', 'عرض / إدخال النتائج') }}
               </a>
             </td>
           </tr>
@@ -127,7 +127,7 @@
     </div>
   </div>
   {% else %}
-  <div class="empty-tab">✅ No pending lab requests.</div>
+  <div class="empty-tab">{{ t('✅ No pending lab requests.', '✅ لا توجد طلبات مختبر معلقة.') }}</div>
   {% endif %}
 </div>
 
@@ -139,12 +139,12 @@
       <table class="pf-table">
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Pet</th>
-            <th>Test</th>
-            <th>Priority</th>
-            <th>Doctor</th>
-            <th>Actions</th>
+            <th>{{ t('Date', 'التاريخ') }}</th>
+            <th>{{ t('Pet', 'الحيوان') }}</th>
+            <th>{{ t('Test', 'الفحص') }}</th>
+            <th>{{ t('Priority', 'الأولوية') }}</th>
+            <th>{{ t('Doctor', 'الطبيب') }}</th>
+            <th>{{ t('Actions', 'إجراءات') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -160,7 +160,7 @@
             <td style="font-size:0.85rem">{{ lab.doctor_name or '—' }}</td>
             <td>
               <a href="{{ url_for('clinical.lab_detail', lab_id=lab.id) }}" class="pf-btn pf-btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.65rem">
-                Enter Results
+                {{ t('Enter Results', 'إدخال النتائج') }}
               </a>
             </td>
           </tr>
@@ -170,7 +170,7 @@
     </div>
   </div>
   {% else %}
-  <div class="empty-tab">No tests currently in progress.</div>
+  <div class="empty-tab">{{ t('No tests currently in progress.', 'لا توجد فحوصات جارية حالياً.') }}</div>
   {% endif %}
 </div>
 
@@ -182,12 +182,12 @@
       <table class="pf-table">
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Pet</th>
-            <th>Test</th>
-            <th>Priority</th>
-            <th>Doctor</th>
-            <th>Actions</th>
+            <th>{{ t('Date', 'التاريخ') }}</th>
+            <th>{{ t('Pet', 'الحيوان') }}</th>
+            <th>{{ t('Test', 'الفحص') }}</th>
+            <th>{{ t('Priority', 'الأولوية') }}</th>
+            <th>{{ t('Doctor', 'الطبيب') }}</th>
+            <th>{{ t('Actions', 'إجراءات') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -203,7 +203,7 @@
             <td style="font-size:0.85rem">{{ lab.doctor_name or '—' }}</td>
             <td>
               <a href="{{ url_for('clinical.lab_detail', lab_id=lab.id) }}" class="pf-btn pf-btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.65rem">
-                View Results
+                {{ t('View Results', 'عرض النتائج') }}
               </a>
             </td>
           </tr>
@@ -213,7 +213,7 @@
     </div>
   </div>
   {% else %}
-  <div class="empty-tab">No completed tests yet.</div>
+  <div class="empty-tab">{{ t('No completed tests yet.', 'لا توجد فحوصات مكتملة بعد.') }}</div>
   {% endif %}
 </div>
 

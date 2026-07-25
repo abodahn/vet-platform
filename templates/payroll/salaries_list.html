@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Salaries List{% endblock %}
+{% block title %}{{ t('Salaries List', 'قائمة الرواتب') }}{% endblock %}
 {% block content %}
 <div class="pf-page-header">
   <div>
-    <h1 class="pf-page-title">💰 Salaries</h1>
+    <h1 class="pf-page-title">{{ t('💰 Salaries', '💰 الرواتب') }}</h1>
     <p class="pf-page-subtitle">{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month-1] }} {{ year }}</p>
   </div>
   <div class="pf-topbar-actions">
-    <a href="{{ url_for('payroll.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+    <a href="{{ url_for('payroll.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
     <a href="{{ url_for('payroll.salaries_export_xlsx', year=year, month=month) }}"
-       class="pf-btn" style="background:#16a34a;color:#fff">📊 Export Excel</a>
-    <a href="{{ url_for('payroll.salary_new') }}" class="pf-btn pf-btn-primary">+ New</a>
+       class="pf-btn" style="background:#16a34a;color:#fff">{{ t('📊 Export Excel', '📊 تصدير Excel') }}</a>
+    <a href="{{ url_for('payroll.salary_new') }}" class="pf-btn pf-btn-primary">{{ t('+ New', '+ جديد') }}</a>
   </div>
 </div>
 
@@ -24,12 +24,12 @@
       {% for m in range(1,13) %}<option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ months[m-1] }}</option>{% endfor %}
     </select>
     <select name="status" class="pf-input" style="width:120px">
-      <option value="">All status</option>
+      <option value="">{{ t('All status', 'كل الحالات') }}</option>
       {% for s in ['Draft','Approved','Paid','Cancelled'] %}
       <option value="{{ s }}" {% if status_f==s %}selected{% endif %}>{{ s }}</option>
       {% endfor %}
     </select>
-    <button type="submit" class="pf-btn pf-btn-secondary">Filter</button>
+    <button type="submit" class="pf-btn pf-btn-secondary">{{ t('Filter', 'تصفية') }}</button>
   </form>
 </div>
 
@@ -37,9 +37,9 @@
   <div class="pf-table-wrapper">
     <table class="pf-table">
       <thead><tr>
-        <th>Staff</th><th>Role</th>
-        <th>Basic</th><th>OT</th><th>Allow.</th><th>Deduct.</th>
-        <th>Gross</th><th>Net</th><th>Status</th><th>Payment</th><th>Actions</th>
+        <th>{{ t('Staff', 'الموظف') }}</th><th>{{ t('Role', 'الدور') }}</th>
+        <th>{{ t('Basic', 'الأساسي') }}</th><th>{{ t('OT', 'إضافي') }}</th><th>{{ t('Allow.', 'بدلات') }}</th><th>{{ t('Deduct.', 'استقطاعات') }}</th>
+        <th>{{ t('Gross', 'الإجمالي') }}</th><th>{{ t('Net', 'الصافي') }}</th><th>{{ t('Status', 'الحالة') }}</th><th>{{ t('Payment', 'الدفع') }}</th><th>{{ t('Actions', 'إجراءات') }}</th>
       </tr></thead>
       <tbody>
         {% for r in rows %}
@@ -59,14 +59,14 @@
           </td>
           <td>{{ r.payment_method or '—' }}{% if r.payment_date %}<br><small>{{ r.payment_date }}</small>{% endif %}</td>
           <td>
-            <a href="{{ url_for('payroll.salary_detail', sid=r.id) }}" class="pf-btn pf-btn-sm pf-btn-secondary">View</a>
+            <a href="{{ url_for('payroll.salary_detail', sid=r.id) }}" class="pf-btn pf-btn-sm pf-btn-secondary">{{ t('View', 'عرض') }}</a>
             {% if r.status != 'Paid' %}
-            <a href="{{ url_for('payroll.salary_edit', sid=r.id) }}" class="pf-btn pf-btn-sm pf-btn-secondary">Edit</a>
+            <a href="{{ url_for('payroll.salary_edit', sid=r.id) }}" class="pf-btn pf-btn-sm pf-btn-secondary">{{ t('Edit', 'تعديل') }}</a>
             {% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="11" style="text-align:center;padding:32px;color:#6b7280">No records found.</td></tr>
+        <tr><td colspan="11" style="text-align:center;padding:32px;color:#6b7280">{{ t('No records found.', 'لا توجد سجلات.') }}</td></tr>
         {% endfor %}
       </tbody>
     </table>

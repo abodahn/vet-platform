@@ -2,17 +2,17 @@
 
 {% block title %}{{ owner.full_name }}{% endblock %}
 {% block page_title %}{{ owner.full_name }}{% if owner.vip_flag %} ⭐{% endif %}{% endblock %}
-{% block page_sub %}Owner Profile — ID #{{ owner.id }}{% endblock %}
+{% block page_sub %}{{ t('Owner Profile','ملف المالك') }} — ID #{{ owner.id }}{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('crm.pet_new', owner_id=owner.id) }}" class="pf-btn pf-btn-primary">
-    🐾 Add Pet
+    🐾 {{ t('Add Pet','إضافة حيوان') }}
   </a>
   <a href="{{ url_for('crm.owner_edit', owner_id=owner.id) }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-primary);border:1.5px solid var(--cl-primary);margin-left:8px;">
-    ✏️ Edit
+    ✏️ {{ t('Edit','تعديل') }}
   </a>
   <a href="{{ url_for('crm.owners_list') }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">
-    ← Back
+    ← {{ t('Back','رجوع') }}
   </a>
 {% endblock %}
 
@@ -265,7 +265,7 @@
         <div class="info-card-ar">{{ owner.full_name_ar }}</div>
         {% endif %}
         {% if owner.vip_flag %}
-        <div><span class="vip-badge">⭐ VIP Client</span></div>
+        <div><span class="vip-badge">⭐ {{ t('VIP Client','عميل مميز') }}</span></div>
         {% endif %}
       </div>
 
@@ -274,7 +274,7 @@
         <div class="info-row">
           <span class="info-row-icon">📱</span>
           <div>
-            <div class="info-row-label">Phone</div>
+            <div class="info-row-label">{{ t('Phone','الهاتف') }}</div>
             <div class="info-row-value">{{ owner.phone }}</div>
           </div>
         </div>
@@ -283,7 +283,7 @@
         <div class="info-row">
           <span class="info-row-icon">💬</span>
           <div>
-            <div class="info-row-label">WhatsApp</div>
+            <div class="info-row-label">{{ t('WhatsApp','واتساب') }}</div>
             <div class="info-row-value">{{ owner.whatsapp_phone }}</div>
           </div>
         </div>
@@ -292,7 +292,7 @@
         <div class="info-row">
           <span class="info-row-icon">✉️</span>
           <div>
-            <div class="info-row-label">Email</div>
+            <div class="info-row-label">{{ t('Email','البريد الإلكتروني') }}</div>
             <div class="info-row-value">{{ owner.email }}</div>
           </div>
         </div>
@@ -301,7 +301,7 @@
         <div class="info-row">
           <span class="info-row-icon">📍</span>
           <div>
-            <div class="info-row-label">Address</div>
+            <div class="info-row-label">{{ t('Address','العنوان') }}</div>
             <div class="info-row-value">{{ owner.address }}</div>
           </div>
         </div>
@@ -310,7 +310,7 @@
         <div class="info-row">
           <span class="info-row-icon">⚙️</span>
           <div>
-            <div class="info-row-label">Preferred Contact</div>
+            <div class="info-row-label">{{ t('Preferred Contact','وسيلة التواصل المفضلة') }}</div>
             <div class="info-row-value">{{ owner.preferred_contact }}</div>
           </div>
         </div>
@@ -319,7 +319,7 @@
         <div class="info-row">
           <span class="info-row-icon">🩺</span>
           <div>
-            <div class="info-row-label">Preferred Doctor</div>
+            <div class="info-row-label">{{ t('Preferred Doctor','الطبيب المفضل') }}</div>
             <div class="info-row-value">{{ owner.preferred_doctor }}</div>
           </div>
         </div>
@@ -327,7 +327,7 @@
         <div class="info-row">
           <span class="info-row-icon">📅</span>
           <div>
-            <div class="info-row-label">Member Since</div>
+            <div class="info-row-label">{{ t('Member Since','عميل منذ') }}</div>
             <div class="info-row-value">{{ (owner.created_at or '')[:10] }}</div>
           </div>
         </div>
@@ -335,8 +335,8 @@
 
       <div class="info-card-divider"></div>
       <div class="info-card-footer">
-        <a href="{{ url_for('crm.owner_edit', owner_id=owner.id) }}">✏️ Edit</a>
-        <a href="{{ url_for('appointments.appt_new', owner_id=owner.id) }}">📅 Book Appt</a>
+        <a href="{{ url_for('crm.owner_edit', owner_id=owner.id) }}">✏️ {{ t('Edit','تعديل') }}</a>
+        <a href="{{ url_for('appointments.appt_new', owner_id=owner.id) }}">📅 {{ t('Book Appt','حجز موعد') }}</a>
       </div>
     </div>
   </div>
@@ -349,31 +349,31 @@
       <div class="stat-card">
         <div class="stat-icon">🐾</div>
         <div class="stat-value">{{ pets | length }}</div>
-        <div class="stat-label">Pets</div>
+        <div class="stat-label">{{ t('Pets','الحيوانات') }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🩺</div>
         <div class="stat-value">{{ stats.visit_count }}</div>
-        <div class="stat-label">Total Visits</div>
+        <div class="stat-label">{{ t('Total Visits','إجمالي الزيارات') }}</div>
       </div>
       <div class="stat-card {% if stats.balance > 0 %}danger{% endif %}">
         <div class="stat-icon">💰</div>
         <div class="stat-value">{{ "%.0f"|format(stats.balance) }}</div>
-        <div class="stat-label">Balance EGP</div>
+        <div class="stat-label">{{ t('Balance EGP','الرصيد بالجنيه') }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">📅</div>
         <div class="stat-value" style="font-size:0.9rem;">{{ stats.last_visit[:10] if stats.last_visit else '—' }}</div>
-        <div class="stat-label">Last Visit</div>
+        <div class="stat-label">{{ t('Last Visit','آخر زيارة') }}</div>
       </div>
     </div>
 
     <!-- Pets section -->
     <div class="section-card">
       <div class="section-header">
-        <h3>🐾 Pets ({{ pets | length }})</h3>
+        <h3>🐾 {{ t('Pets','الحيوانات') }} ({{ pets | length }})</h3>
         <a href="{{ url_for('crm.pet_new', owner_id=owner.id) }}" class="pf-btn pf-btn-primary" style="font-size:0.85rem;padding:7px 16px;">
-          ➕ Add Pet
+          ➕ {{ t('Add Pet','إضافة حيوان') }}
         </a>
       </div>
       <div class="section-body">
@@ -392,14 +392,14 @@
               <span class="meta-pill">{{ pet._age }}</span>
               {% endif %}
               {% if pet.neutered %}
-              <span class="meta-pill" style="background:color-mix(in srgb, var(--cl-success) 12%, transparent);color:var(--cl-success);">Neutered</span>
+              <span class="meta-pill" style="background:color-mix(in srgb, var(--cl-success) 12%, transparent);color:var(--cl-success);">{{ t('Neutered','محوّل') }}</span>
               {% endif %}
             </div>
           </a>
           {% endfor %}
         </div>
         {% else %}
-        <div class="empty-section">No pets registered yet. <a href="{{ url_for('crm.pet_new', owner_id=owner.id) }}">Add first pet →</a></div>
+        <div class="empty-section">{{ t('No pets registered yet.','لا توجد حيوانات مسجلة بعد.') }} <a href="{{ url_for('crm.pet_new', owner_id=owner.id) }}">{{ t('Add first pet →','أضف أول حيوان ←') }}</a></div>
         {% endif %}
       </div>
     </div>
@@ -407,7 +407,7 @@
     <!-- Recent Visits section -->
     <div class="section-card">
       <div class="section-header">
-        <h3>🩺 Recent Visits</h3>
+        <h3>🩺 {{ t('Recent Visits','آخر الزيارات') }}</h3>
       </div>
       <div class="section-body">
         {% if recent_visits %}
@@ -427,7 +427,7 @@
           {% endfor %}
         </div>
         {% else %}
-        <div class="empty-section">No visit history yet.</div>
+        <div class="empty-section">{{ t('No visit history yet.','لا يوجد سجل زيارات بعد.') }}</div>
         {% endif %}
       </div>
     </div>
@@ -435,7 +435,7 @@
     <!-- Notes -->
     {% if owner.notes %}
     <div class="section-card">
-      <div class="section-header"><h3>📝 Notes</h3></div>
+      <div class="section-header"><h3>📝 {{ t('Notes','ملاحظات') }}</h3></div>
       <div class="section-body">
         <div class="notes-box">{{ owner.notes }}</div>
       </div>
@@ -445,9 +445,9 @@
     <!-- ── Loyalty Points ─────────────────────────────────────── -->
     <div class="section-card">
       <div class="section-header" style="display:flex;align-items:center;justify-content:space-between">
-        <h3>🎁 Loyalty Points</h3>
+        <h3>🎁 {{ t('Loyalty Points','نقاط الولاء') }}</h3>
         <span style="font-size:1.6rem;font-weight:800;color:var(--cl-primary)">
-          {{ loyalty_balance }} pts
+          {{ loyalty_balance }} {{ t('pts','نقطة') }}
         </span>
       </div>
       <div class="section-body">
@@ -456,23 +456,23 @@
         <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
           <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;
                       padding:12px 20px;flex:1;min-width:140px;text-align:center">
-            <div style="font-size:.78rem;color:#1d4ed8;font-weight:600">BALANCE</div>
+            <div style="font-size:.78rem;color:#1d4ed8;font-weight:600">{{ t('BALANCE','الرصيد') }}</div>
             <div style="font-size:1.6rem;font-weight:800;color:#1d4ed8">{{ loyalty_balance }}</div>
-            <div style="font-size:.72rem;color:#3b82f6">points</div>
+            <div style="font-size:.72rem;color:#3b82f6">{{ t('points','نقاط') }}</div>
           </div>
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;
                       padding:12px 20px;flex:1;min-width:140px;text-align:center">
-            <div style="font-size:.78rem;color:#15803d;font-weight:600">REDEEM VALUE</div>
+            <div style="font-size:.78rem;color:#15803d;font-weight:600">{{ t('REDEEM VALUE','قيمة الاستبدال') }}</div>
             <div style="font-size:1.6rem;font-weight:800;color:#15803d">
               {{ "%.0f"|format(loyalty_balance * redeem_rate) }}
             </div>
-            <div style="font-size:.72rem;color:#16a34a">EGP (if redeemed)</div>
+            <div style="font-size:.72rem;color:#16a34a">{{ t('EGP (if redeemed)','جنيه (عند الاستبدال)') }}</div>
           </div>
           <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;
                       padding:12px 20px;flex:1;min-width:140px;text-align:center">
-            <div style="font-size:.78rem;color:#a16207;font-weight:600">EARN RATE</div>
+            <div style="font-size:.78rem;color:#a16207;font-weight:600">{{ t('EARN RATE','معدل الكسب') }}</div>
             <div style="font-size:1.6rem;font-weight:800;color:#a16207">1</div>
-            <div style="font-size:.72rem;color:#ca8a04">pt per 10 EGP paid</div>
+            <div style="font-size:.72rem;color:#ca8a04">{{ t('pt per 10 EGP paid','نقطة لكل 10 جنيه مدفوعة') }}</div>
           </div>
         </div>
 
@@ -481,17 +481,17 @@
         <form method="post"
               action="{{ url_for('crm.redeem_points', owner_id=owner.id) }}"
               style="margin-bottom:16px"
-              onsubmit="return confirm('Redeem 100 points for 50 EGP credit?')">
+              onsubmit="return confirm('{{ t('Redeem 100 points for 50 EGP credit?','استبدال 100 نقطة مقابل رصيد 50 جنيه؟') }}')">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="pf-btn pf-btn-primary">
-            🎁 Redeem 100 pts → 50 EGP credit
+            🎁 {{ t('Redeem 100 pts → 50 EGP credit','استبدال 100 نقطة ← رصيد 50 جنيه') }}
           </button>
         </form>
         {% else %}
         <div style="background:#f8fafc;border:1px dashed var(--cl-border);border-radius:8px;
                     padding:10px 14px;font-size:.84rem;color:var(--cl-muted);margin-bottom:16px">
-          Minimum {{ 100 - loyalty_balance }} more points needed to redeem
-          (need 100, have {{ loyalty_balance }}).
+          {{ t('Minimum','تحتاج') }} {{ 100 - loyalty_balance }} {{ t('more points needed to redeem','نقطة إضافية للاستبدال') }}
+          ({{ t('need 100, have','المطلوب 100، المتاح') }} {{ loyalty_balance }}).
         </div>
         {% endif %}
 
@@ -499,7 +499,7 @@
         <details style="margin-bottom:16px">
           <summary style="cursor:pointer;font-size:.85rem;font-weight:600;
                           color:var(--cl-muted);list-style:none">
-            ⚙️ Manual Adjustment
+            ⚙️ {{ t('Manual Adjustment','تعديل يدوي') }}
           </summary>
           <form method="post"
                 action="{{ url_for('crm.adjust_points', owner_id=owner.id) }}"
@@ -507,17 +507,17 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div>
               <label style="font-size:.78rem;color:var(--cl-muted);font-weight:600;
-                            display:block;margin-bottom:4px">Points (+ or -)</label>
+                            display:block;margin-bottom:4px">{{ t('Points (+ or -)','النقاط (+ أو -)') }}</label>
               <input type="number" name="points" class="pf-input" style="width:110px"
-                     placeholder="e.g. 50 or -20" required>
+                     placeholder="{{ t('e.g. 50 or -20','مثال: 50 أو -20') }}" required>
             </div>
             <div style="flex:1;min-width:180px">
               <label style="font-size:.78rem;color:var(--cl-muted);font-weight:600;
-                            display:block;margin-bottom:4px">Reason</label>
+                            display:block;margin-bottom:4px">{{ t('Reason','السبب') }}</label>
               <input type="text" name="reason" class="pf-input"
-                     placeholder="e.g. Welcome bonus" value="Manual adjustment">
+                     placeholder="{{ t('e.g. Welcome bonus','مثال: مكافأة ترحيبية') }}" value="Manual adjustment">
             </div>
-            <button type="submit" class="pf-btn pf-btn-secondary">Apply</button>
+            <button type="submit" class="pf-btn pf-btn-secondary">{{ t('Apply','تطبيق') }}</button>
           </form>
         </details>
 
@@ -527,10 +527,10 @@
           <table style="width:100%;font-size:.83rem;border-collapse:collapse">
             <thead>
               <tr style="border-bottom:2px solid var(--cl-border)">
-                <th style="text-align:left;padding:.4rem .6rem;color:var(--cl-muted);font-weight:600">Date</th>
-                <th style="text-align:left;padding:.4rem .6rem;color:var(--cl-muted);font-weight:600">Reason</th>
-                <th style="text-align:left;padding:.4rem .6rem;color:var(--cl-muted);font-weight:600">By</th>
-                <th style="text-align:right;padding:.4rem .6rem;color:var(--cl-muted);font-weight:600">Points</th>
+                <th style="text-align:left;padding:.4rem .6rem;color:var(--cl-muted);font-weight:600">{{ t('Date','التاريخ') }}</th>
+                <th style="text-align:left;padding:.4rem .6rem;color:var(--cl-muted);font-weight:600">{{ t('Reason','السبب') }}</th>
+                <th style="text-align:left;padding:.4rem .6rem;color:var(--cl-muted);font-weight:600">{{ t('By','بواسطة') }}</th>
+                <th style="text-align:right;padding:.4rem .6rem;color:var(--cl-muted);font-weight:600">{{ t('Points','النقاط') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -549,7 +549,7 @@
           </table>
         </div>
         {% else %}
-        <div style="color:var(--cl-muted);font-size:.88rem">No points activity yet.</div>
+        <div style="color:var(--cl-muted);font-size:.88rem">{{ t('No points activity yet.','لا يوجد نشاط نقاط بعد.') }}</div>
         {% endif %}
 
       </div>

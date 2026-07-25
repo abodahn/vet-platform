@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}My Schedule{% endblock %}
-{% block page_title %}My Schedule{% endblock %}
+{% block title %}{{ t('My Schedule', 'جدولي') }}{% endblock %}
+{% block page_title %}{{ t('My Schedule', 'جدولي') }}{% endblock %}
 {% block page_sub %}Weekly view for Dr. {{ doctor_name }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('doctor.my_schedule', week=week_offset - 1) }}" class="pf-btn pf-btn-ghost">← Prev Week</a>
-<a href="{{ url_for('doctor.my_schedule', week=0) }}" class="pf-btn pf-btn-secondary">This Week</a>
-<a href="{{ url_for('doctor.my_schedule', week=week_offset + 1) }}" class="pf-btn pf-btn-ghost">Next Week →</a>
+<a href="{{ url_for('doctor.my_schedule', week=week_offset - 1) }}" class="pf-btn pf-btn-ghost">{{ t('← Prev Week', '← الأسبوع السابق') }}</a>
+<a href="{{ url_for('doctor.my_schedule', week=0) }}" class="pf-btn pf-btn-secondary">{{ t('This Week', 'هذا الأسبوع') }}</a>
+<a href="{{ url_for('doctor.my_schedule', week=week_offset + 1) }}" class="pf-btn pf-btn-ghost">{{ t('Next Week →', 'الأسبوع التالي ←') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -41,7 +41,7 @@
         <div style="color:var(--pf-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">{{ a.reason or '' }}</div>
       </div>
       {% else %}
-      <div style="text-align:center;color:var(--pf-muted);font-size:.78rem;padding:.75rem 0;opacity:.6">Free</div>
+      <div style="text-align:center;color:var(--pf-muted);font-size:.78rem;padding:.75rem 0;opacity:.6">{{ t('Free', 'متاح') }}</div>
       {% endfor %}
     </div>
   </div>
@@ -49,10 +49,10 @@
 </div>
 
 <div style="margin-top:1rem;font-size:.8rem;color:var(--pf-muted);display:flex;gap:1.5rem">
-  <span>Legend:</span>
-  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#f59e0b;border-radius:2px;display:inline-block"></span> Scheduled</span>
-  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#3b82f6;border-radius:2px;display:inline-block"></span> In Progress</span>
-  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#10b981;border-radius:2px;display:inline-block"></span> Completed</span>
-  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#ef4444;border-radius:2px;display:inline-block"></span> Cancelled</span>
+  <span>{{ t('Legend:', 'المفتاح:') }}</span>
+  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#f59e0b;border-radius:2px;display:inline-block"></span> {{ t('Scheduled', 'مجدول') }}</span>
+  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#3b82f6;border-radius:2px;display:inline-block"></span> {{ t('In Progress', 'جارٍ') }}</span>
+  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#10b981;border-radius:2px;display:inline-block"></span> {{ t('Completed', 'مكتمل') }}</span>
+  <span style="display:flex;align-items:center;gap:.3rem"><span style="width:10px;height:10px;background:#ef4444;border-radius:2px;display:inline-block"></span> {{ t('Cancelled', 'ملغى') }}</span>
 </div>
 {% endblock %}

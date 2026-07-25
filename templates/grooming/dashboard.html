@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Grooming{% endblock %}
-{% block page_title %}Grooming{% endblock %}
+{% block title %}{{ t('Grooming', 'التجميل') }}{% endblock %}
+{% block page_title %}{{ t('Grooming', 'التجميل') }}{% endblock %}
 {% block page_sub %}Pet grooming bookings & services{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('grooming.booking_new_form') }}" class="pf-btn pf-btn-primary">+ New Booking</a>
-<a href="{{ url_for('grooming.services_list') }}" class="pf-btn pf-btn-secondary">Services</a>
+<a href="{{ url_for('grooming.booking_new_form') }}" class="pf-btn pf-btn-primary">{{ t('+ New Booking', '+ حجز جديد') }}</a>
+<a href="{{ url_for('grooming.services_list') }}" class="pf-btn pf-btn-secondary">{{ t('Services', 'الخدمات') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -16,11 +16,11 @@
   </div>
   <div class="pf-card" style="text-align:center;padding:1.25rem">
     <div style="font-size:2rem;font-weight:800;color:var(--pf-accent)">{{ stats_week }}</div>
-    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">This Week</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">{{ t('This Week', 'هذا الأسبوع') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1.25rem">
     <div style="font-size:2rem;font-weight:800;color:#10b981">{{ stats_inprogress }}</div>
-    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">In Progress</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">{{ t('In Progress', 'جارٍ') }}</div>
   </div>
 </div>
 
@@ -32,7 +32,7 @@
   </div>
   <table class="pf-table">
     <thead>
-      <tr><th>Time</th><th>Pet</th><th>Owner</th><th>Service</th><th>Groomer</th><th>Duration</th><th>Price</th><th>Status</th><th></th></tr>
+      <tr><th>{{ t('Time', 'الوقت') }}</th><th>{{ t('Pet', 'الحيوان') }}</th><th>{{ t('Owner', 'المالك') }}</th><th>{{ t('Service', 'الخدمة') }}</th><th>{{ t('Groomer', 'المُجمِّل') }}</th><th>{{ t('Duration', 'المدة') }}</th><th>{{ t('Price', 'السعر') }}</th><th>{{ t('Status', 'الحالة') }}</th><th></th></tr>
     </thead>
     <tbody>
       {% for b in today_bookings %}
@@ -45,9 +45,9 @@
         <td>{{ b.duration_min or '—' }}{% if b.duration_min %} min{% endif %}</td>
         <td>{% if b.price %}{{ "%.2f"|format(b.price|float) }} EGP{% else %}—{% endif %}</td>
         <td>
-          {% if b.status == 'Scheduled' %}<span class="pf-badge warning">Scheduled</span>
-          {% elif b.status == 'In Progress' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">In Progress</span>
-          {% elif b.status == 'Completed' %}<span class="pf-badge success">Completed</span>
+          {% if b.status == 'Scheduled' %}<span class="pf-badge warning">{{ t('Scheduled', 'مجدول') }}</span>
+          {% elif b.status == 'In Progress' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">{{ t('In Progress', 'جارٍ') }}</span>
+          {% elif b.status == 'Completed' %}<span class="pf-badge success">{{ t('Completed', 'مكتمل') }}</span>
           {% else %}<span class="pf-badge error">{{ b.status }}</span>{% endif %}
         </td>
         <td>
@@ -74,11 +74,11 @@
 <div class="pf-card">
   <div class="pf-card-header" style="display:flex;justify-content:space-between;align-items:center">
     <h3 class="pf-card-title">📆 Upcoming (next 7 days)</h3>
-    <a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost" style="font-size:.85rem">View All</a>
+    <a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost" style="font-size:.85rem">{{ t('View All', 'عرض الكل') }}</a>
   </div>
   <table class="pf-table">
     <thead>
-      <tr><th>Date</th><th>Pet</th><th>Owner</th><th>Service</th><th>Status</th></tr>
+      <tr><th>{{ t('Date', 'التاريخ') }}</th><th>{{ t('Pet', 'الحيوان') }}</th><th>{{ t('Owner', 'المالك') }}</th><th>{{ t('Service', 'الخدمة') }}</th><th>{{ t('Status', 'الحالة') }}</th></tr>
     </thead>
     <tbody>
       {% for b in upcoming %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Public Holidays{% endblock %}
-{% block page_title %}Public Holidays{% endblock %}
+{% block title %}{{ t('Public Holidays', 'العطلات الرسمية') }}{% endblock %}
+{% block page_title %}{{ t('Public Holidays', 'العطلات الرسمية') }}{% endblock %}
 {% block page_sub %}{{ year }} — {{ holidays|length }} holiday{{ 's' if holidays|length != 1 }}{% endblock %}
 
 {% block topbar_actions %}
@@ -11,7 +11,7 @@
       {% endfor %}
     </select>
   </form>
-  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -24,7 +24,7 @@
     </div>
     {% if holidays %}
     <table class="pf-table">
-      <thead><tr><th>Date</th><th>Name</th><th>Arabic</th><th></th></tr></thead>
+      <thead><tr><th>{{ t('Date', 'التاريخ') }}</th><th>{{ t('Name', 'الاسم') }}</th><th>{{ t('Arabic', 'العربية') }}</th><th></th></tr></thead>
       <tbody>
         {% for h in holidays %}
         <tr>
@@ -34,10 +34,10 @@
           <td>
             <div style="display:flex;gap:6px">
               <button class="pf-btn pf-btn-sm"
-                onclick="editHoliday({{ h.id }},'{{ h.name }}','{{ h.name_ar }}','{{ h.holiday_date }}')">Edit</button>
+                onclick="editHoliday({{ h.id }},'{{ h.name }}','{{ h.name_ar }}','{{ h.holiday_date }}')">{{ t('Edit', 'تعديل') }}</button>
               <form method="POST" action="{{ url_for('attendance.holiday_delete', hid=h.id) }}"
                     onsubmit="return confirm('Delete this holiday?')">
-                <button type="submit" class="pf-btn pf-btn-sm" style="background:#fee2e2;color:#991b1b">Delete</button>
+                <button type="submit" class="pf-btn pf-btn-sm" style="background:#fee2e2;color:#991b1b">{{ t('Delete', 'حذف') }}</button>
               </form>
             </div>
           </td>
@@ -55,25 +55,25 @@
   <!-- Add/Edit Form -->
   <div class="pf-card">
     <div class="pf-card-header">
-      <div class="pf-card-title" id="form-title">➕ Add Holiday</div>
+      <div class="pf-card-title" id="form-title">{{ t('➕ Add Holiday', '➕ إضافة عطلة') }}</div>
     </div>
     <form method="POST" action="{{ url_for('attendance.holiday_save') }}" id="holiday-form">
       <input type="hidden" name="holiday_id" id="h-id" value="">
       <div class="pf-form-group">
-        <label class="pf-form-label">Date <span style="color:#ef4444">*</span></label>
+        <label class="pf-form-label">{{ t('Date', 'التاريخ') }} <span style="color:#ef4444">*</span></label>
         <input type="date" name="holiday_date" id="h-date" class="pf-form-control" required>
       </div>
       <div class="pf-form-group">
-        <label class="pf-form-label">Name (English) <span style="color:#ef4444">*</span></label>
-        <input type="text" name="name" id="h-name" class="pf-form-control" placeholder="e.g. National Day" required>
+        <label class="pf-form-label">{{ t('Name (English)', 'الاسم (إنجليزي)') }} <span style="color:#ef4444">*</span></label>
+        <input type="text" name="name" id="h-name" class="pf-form-control" placeholder="{{ t('e.g. National Day', 'مثال: العيد الوطني') }}" required>
       </div>
       <div class="pf-form-group">
-        <label class="pf-form-label">Name (Arabic)</label>
+        <label class="pf-form-label">{{ t('Name (Arabic)', 'الاسم (عربي)') }}</label>
         <input type="text" name="name_ar" id="h-name-ar" class="pf-form-control" placeholder="e.g. اليوم الوطني" dir="rtl">
       </div>
       <div style="display:flex;gap:10px;margin-top:8px">
-        <button type="submit" class="pf-btn pf-btn-primary" id="form-submit-btn">Add Holiday</button>
-        <button type="button" class="pf-btn pf-btn-sm" onclick="resetForm()">Reset</button>
+        <button type="submit" class="pf-btn pf-btn-primary" id="form-submit-btn">{{ t('Add Holiday', 'إضافة عطلة') }}</button>
+        <button type="button" class="pf-btn pf-btn-sm" onclick="resetForm()">{{ t('Reset', 'إعادة تعيين') }}</button>
       </div>
     </form>
 

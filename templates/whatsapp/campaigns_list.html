@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}WhatsApp Campaigns{% endblock %}
-{% block page_title %}Campaigns{% endblock %}
-{% block page_sub %}Bulk WhatsApp messaging campaigns via Wapilot{% endblock %}
+{% block title %}{{ t('WhatsApp Campaigns', 'حملات واتساب') }}{% endblock %}
+{% block page_title %}{{ t('Campaigns', 'الحملات') }}{% endblock %}
+{% block page_sub %}{{ t('Bulk WhatsApp messaging campaigns via Wapilot', 'حملات مراسلة واتساب جماعية عبر Wapilot') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">← Control Center</a>
-<a href="{{ url_for('whatsapp.campaign_new') }}"   class="pf-btn pf-btn-primary">➕ New Campaign</a>
+<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">{{ t('← Control Center', '← مركز التحكم') }}</a>
+<a href="{{ url_for('whatsapp.campaign_new') }}"   class="pf-btn pf-btn-primary">{{ t('➕ New Campaign', '➕ حملة جديدة') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -35,7 +35,7 @@
 {% if error %}
 <div class="pf-alert pf-alert-warning" style="margin-bottom:20px">
   ⚠️ Could not load campaigns from Wapilot: {{ error }}<br>
-  <small>Check your API token and instance ID in <a href="{{ url_for('whatsapp.wa_settings') }}">Settings</a>.</small>
+  <small>{{ t('Check your API token and instance ID in', 'تحقق من رمز API ومعرّف الحساب في') }} <a href="{{ url_for('whatsapp.wa_settings') }}">{{ t('Settings', 'الإعدادات') }}</a>.</small>
 </div>
 {% endif %}
 
@@ -57,25 +57,25 @@
     </span>
 
     <div class="cmp-stat">
-      <span>Total: <b>{{ c.total or c.messages_count or 0 }}</b></span>
-      <span>Sent: <b>{{ c.sent or c.done or 0 }}</b></span>
-      <span>Failed: <b>{{ c.failed or 0 }}</b></span>
-      <span>Queued: <b>{{ c.queued or 0 }}</b></span>
+      <span>{{ t('Total:', 'الإجمالي:') }} <b>{{ c.total or c.messages_count or 0 }}</b></span>
+      <span>{{ t('Sent:', 'أُرسلت:') }} <b>{{ c.sent or c.done or 0 }}</b></span>
+      <span>{{ t('Failed:', 'فشلت:') }} <b>{{ c.failed or 0 }}</b></span>
+      <span>{{ t('Queued:', 'في الطابور:') }} <b>{{ c.queued or 0 }}</b></span>
     </div>
 
     <div class="cmp-actions">
       <a href="{{ url_for('whatsapp.campaign_detail', campaign_id=c.id or c.campaign_id) }}"
-         class="pf-btn pf-btn-primary" style="font-size:.82rem;padding:6px 12px">📊 Details</a>
+         class="pf-btn pf-btn-primary" style="font-size:.82rem;padding:6px 12px">{{ t('📊 Details', '📊 التفاصيل') }}</a>
       <button class="pf-btn pf-btn-secondary" style="font-size:.82rem;padding:6px 12px"
-              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'start')">▶ Start</button>
+              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'start')">{{ t('▶ Start', '▶ بدء') }}</button>
       <button class="pf-btn pf-btn-ghost" style="font-size:.82rem;padding:6px 12px"
-              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'pause')">⏸ Pause</button>
+              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'pause')">{{ t('⏸ Pause', '⏸ إيقاف مؤقت') }}</button>
       <button class="pf-btn pf-btn-ghost" style="font-size:.82rem;padding:6px 12px"
-              onclick="showScheduleModal('{{ c.id or c.campaign_id }}')">🕐 Schedule</button>
+              onclick="showScheduleModal('{{ c.id or c.campaign_id }}')">{{ t('🕐 Schedule', '🕐 جدولة') }}</button>
       <button class="pf-btn pf-btn-ghost" style="font-size:.82rem;padding:6px 12px"
-              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'copy')">📋 Copy</button>
+              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'copy')">{{ t('📋 Copy', '📋 نسخ') }}</button>
       <button class="pf-btn pf-btn-danger" style="font-size:.82rem;padding:6px 12px"
-              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'reset-failed')">↩ Reset</button>
+              onclick="campaignAction('{{ c.id or c.campaign_id }}', 'reset-failed')">{{ t('↩ Reset', '↩ إعادة تعيين') }}</button>
     </div>
   </div>
   {% endfor %}
@@ -83,10 +83,10 @@
 {% else %}
 <div class="empty-state">
   <div class="ico">📣</div>
-  <h3>No campaigns yet</h3>
-  <p>Create your first campaign to send bulk WhatsApp messages.</p>
+  <h3>{{ t('No campaigns yet', 'لا توجد حملات بعد') }}</h3>
+  <p>{{ t('Create your first campaign to send bulk WhatsApp messages.', 'أنشئ أول حملة لإرسال رسائل واتساب جماعية.') }}</p>
   <a href="{{ url_for('whatsapp.campaign_new') }}" class="pf-btn pf-btn-primary" style="margin-top:14px">
-    ➕ Create Campaign
+    {{ t('➕ Create Campaign', '➕ إنشاء حملة') }}
   </a>
 </div>
 {% endif %}
@@ -95,11 +95,11 @@
 <div id="schedule-modal" style="display:none;position:fixed;inset:0;z-index:1000;
      background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:14px;padding:28px;width:380px;max-width:90vw">
-    <h3 style="margin:0 0 18px">📅 Schedule Campaign</h3>
+    <h3 style="margin:0 0 18px">{{ t('📅 Schedule Campaign', '📅 جدولة الحملة') }}</h3>
     <input type="datetime-local" id="schedule-dt" class="pf-input" style="width:100%;margin-bottom:16px">
     <div style="display:flex;gap:10px">
-      <button class="pf-btn pf-btn-primary" style="flex:1" onclick="doSchedule()">Schedule</button>
-      <button class="pf-btn pf-btn-ghost"   style="flex:1" onclick="closeSchedule()">Cancel</button>
+      <button class="pf-btn pf-btn-primary" style="flex:1" onclick="doSchedule()">{{ t('Schedule', 'الجدول') }}</button>
+      <button class="pf-btn pf-btn-ghost"   style="flex:1" onclick="closeSchedule()">{{ t('Cancel', 'إلغاء') }}</button>
     </div>
   </div>
 </div>

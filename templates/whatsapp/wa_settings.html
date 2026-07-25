@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}WhatsApp Settings{% endblock %}
-{% block page_title %}WhatsApp Settings{% endblock %}
-{% block page_sub %}Configure Wapilot API connection and reminder messages{% endblock %}
+{% block title %}{{ t('WhatsApp Settings', 'إعدادات واتساب') }}{% endblock %}
+{% block page_title %}{{ t('WhatsApp Settings', 'إعدادات واتساب') }}{% endblock %}
+{% block page_sub %}{{ t('Configure Wapilot API connection and reminder messages', 'إعداد اتصال Wapilot API ورسائل التذكير') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">← Control Center</a>
+<a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost">{{ t('← Control Center', '← مركز التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -14,9 +14,9 @@
   <!-- Wapilot Connection -->
   <div style="background:var(--card-bg,#fff);border:1px solid var(--border,#e2e8f0);
               border-radius:14px;padding:28px;margin-bottom:24px">
-    <h3 style="margin:0 0 4px;font-size:1.05rem">🔌 Wapilot API Connection</h3>
+    <h3 style="margin:0 0 4px;font-size:1.05rem">{{ t('🔌 Wapilot API Connection', '🔌 اتصال Wapilot API') }}</h3>
     <p style="color:var(--muted,#64748b);font-size:.85rem;margin:0 0 22px">
-      Credentials from <a href="https://wapilot.net" target="_blank">wapilot.net</a> dashboard.
+      {{ t('Credentials from', 'بيانات الاعتماد من') }} <a href="https://wapilot.net" target="_blank">wapilot.net</a> dashboard.
     </p>
 
     {% for key, label, desc in wapilot_keys %}
@@ -32,7 +32,7 @@
 
     <!-- Test connection button -->
     <button type="button" class="pf-btn pf-btn-ghost" onclick="testConnection()">
-      🔍 Test Connection
+      {{ t('🔍 Test Connection', '🔍 اختبار الاتصال') }}
     </button>
     <span id="test-result" style="margin-left:14px;font-size:.85rem"></span>
   </div>
@@ -40,9 +40,9 @@
   <!-- Reminder Messages -->
   <div style="background:var(--card-bg,#fff);border:1px solid var(--border,#e2e8f0);
               border-radius:14px;padding:28px;margin-bottom:24px">
-    <h3 style="margin:0 0 4px;font-size:1.05rem">🔔 Automated Reminder Settings</h3>
+    <h3 style="margin:0 0 4px;font-size:1.05rem">{{ t('🔔 Automated Reminder Settings', '🔔 إعدادات التذكير التلقائي') }}</h3>
     <p style="color:var(--muted,#64748b);font-size:.85rem;margin:0 0 22px">
-      Variables: <code>{owner}</code> <code>{pet}</code> <code>{date}</code> <code>{time}</code>
+      {{ t('Variables:', 'المتغيرات:') }} <code>{owner}</code> <code>{pet}</code> <code>{date}</code> <code>{time}</code>
       <code>{vaccine}</code> <code>{invoice}</code> <code>{amount}</code>
     </p>
 
@@ -68,10 +68,10 @@
   </div>
 
   <button type="submit" class="pf-btn pf-btn-primary" style="padding:12px 32px;font-size:1rem">
-    💾 Save Settings
+    {{ t('💾 Save Settings', '💾 حفظ الإعدادات') }}
   </button>
   <a href="{{ url_for('whatsapp.control_center') }}" class="pf-btn pf-btn-ghost" style="margin-left:12px">
-    Cancel
+    {{ t('Cancel', 'إلغاء') }}
   </a>
 </form>
 {% endblock %}

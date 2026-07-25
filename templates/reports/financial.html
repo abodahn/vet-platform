@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Financial Reports{% endblock %}
-{% block page_title %}Financial Reports{% endblock %}
+{% block title %}{{ t('Financial Reports', 'التقارير المالية') }}{% endblock %}
+{% block page_title %}{{ t('Financial Reports', 'التقارير المالية') }}{% endblock %}
 {% block page_sub %}Revenue, payments, and financial summary{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('reports.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
-<a href="{{ url_for('reports.clinical') }}" class="pf-btn pf-btn-secondary">🩺 Clinical</a>
-<a href="{{ url_for('reports.export_csv', type='invoices') }}" class="pf-btn pf-btn-primary">📥 Export CSV</a>
+<a href="{{ url_for('reports.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
+<a href="{{ url_for('reports.clinical') }}" class="pf-btn pf-btn-secondary">{{ t('🩺 Clinical', '🩺 سريري') }}</a>
+<a href="{{ url_for('reports.export_csv', type='invoices') }}" class="pf-btn pf-btn-primary">{{ t('📥 Export CSV', '📥 تصدير CSV') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -42,14 +42,14 @@
 
 <!-- Date Range Filter -->
 <form method="get" class="date-filter">
-  <label>From</label>
+  <label>{{ t('From', 'من') }}</label>
   <input type="date" name="date_from" value="{{ date_from }}">
-  <label>To</label>
+  <label>{{ t('To', 'إلى') }}</label>
   <input type="date" name="date_to" value="{{ date_to }}">
-  <button type="submit">🔍 Apply</button>
+  <button type="submit">{{ t('🔍 Apply', '🔍 تطبيق') }}</button>
   <a href="{{ url_for('reports.financial_compare', date_from=date_from, date_to=date_to) }}"
      class="pf-btn pf-btn-secondary" style="font-size:13px;padding:8px 14px">
-    📊 Compare Periods
+    {{ t('📊 Compare Periods', '📊 مقارنة الفترات') }}
   </a>
   <span style="color:var(--cl-muted);font-size:13px;">{{ date_from }} → {{ date_to }}</span>
 </form>
@@ -57,9 +57,9 @@
 {% if compare_mode %}
 <div style="background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:10px;
             padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-  <span style="font-weight:700;color:#1d4ed8">📊 Comparison Mode</span>
+  <span style="font-weight:700;color:#1d4ed8">{{ t('📊 Comparison Mode', '📊 وضع المقارنة') }}</span>
   <span style="color:var(--cl-text-light)">
-    Current: <strong>{{ date_from }} → {{ date_to }}</strong>
+    {{ t('Current:', 'الحالي:') }} <strong>{{ date_from }} → {{ date_to }}</strong>
     vs Previous: <strong>{{ prev_from }} → {{ prev_to }}</strong>
   </span>
   <a href="{{ url_for('reports.financial', date_from=date_from, date_to=date_to) }}"
@@ -85,7 +85,7 @@
   </div>
   <div class="summary-card" style="border-top-color:#3b82f6;">
     <div class="summary-value" style="color:#1d4ed8;">{{ "{:,.0f}".format(summary.invoiced) }}</div>
-    <div class="summary-label">Total Invoiced (EGP)</div>
+    <div class="summary-label">{{ t('Total Invoiced (EGP)', 'إجمالي المفوتر (جنيه)') }}</div>
   </div>
   <div class="summary-card" style="border-top-color:#f59e0b;">
     <div class="summary-value" style="color:#92400e;">{{ "{:,.0f}".format(summary.outstanding) }}</div>

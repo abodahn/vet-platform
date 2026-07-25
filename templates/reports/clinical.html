@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Clinical Reports{% endblock %}
-{% block page_title %}Clinical Reports{% endblock %}
-{% block page_sub %}Visit types, diagnoses, and doctor workload — last 30 days{% endblock %}
+{% block title %}{{ t('Clinical Reports', 'التقارير السريرية') }}{% endblock %}
+{% block page_title %}{{ t('Clinical Reports', 'التقارير السريرية') }}{% endblock %}
+{% block page_sub %}{{ t('Visit types, diagnoses, and doctor workload — last 30 days', 'أنواع الزيارات والتشخيصات وعبء عمل الأطباء — آخر 30 يوماً') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('reports.dashboard') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
-<a href="{{ url_for('reports.financial') }}" class="pf-btn pf-btn-secondary">💰 Financial</a>
+<a href="{{ url_for('reports.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
+<a href="{{ url_for('reports.financial') }}" class="pf-btn pf-btn-secondary">{{ t('💰 Financial', '💰 مالي') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -38,7 +38,7 @@
 
   <!-- Visits by Type -->
   <div class="report-card">
-    <div class="report-title">🩺 Visits by Type — Last 30 Days</div>
+    <div class="report-title">{{ t('🩺 Visits by Type — Last 30 Days', '🩺 الزيارات حسب النوع — آخر 30 يوماً') }}</div>
     {% if visits_by_type %}
       {% for row in visits_by_type %}
       {% set pct = (row.count / max_visits * 100) | round(1) %}
@@ -54,7 +54,7 @@
       </div>
       {% endfor %}
     {% else %}
-    <div class="empty-msg">No visit data for last 30 days</div>
+    <div class="empty-msg">{{ t('No visit data for last 30 days', 'لا توجد بيانات زيارات لآخر 30 يوماً') }}</div>
     {% endif %}
   </div>
 
@@ -82,15 +82,15 @@
 
   <!-- Top Diagnoses -->
   <div class="report-card full">
-    <div class="report-title">🔬 Top Diagnoses — Last 30 Days</div>
+    <div class="report-title">{{ t('🔬 Top Diagnoses — Last 30 Days', '🔬 أكثر التشخيصات — آخر 30 يوماً') }}</div>
     {% if top_diagnoses %}
     <table class="data-table">
       <thead>
         <tr>
           <th>#</th>
-          <th>Diagnosis</th>
-          <th>Cases</th>
-          <th>Frequency Bar</th>
+          <th>{{ t('Diagnosis', 'التشخيص') }}</th>
+          <th>{{ t('Cases', 'الحالات') }}</th>
+          <th>{{ t('Frequency Bar', 'شريط التكرار') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -112,7 +112,7 @@
       </tbody>
     </table>
     {% else %}
-    <div class="empty-msg">No diagnosis data for last 30 days</div>
+    <div class="empty-msg">{{ t('No diagnosis data for last 30 days', 'لا توجد بيانات تشخيص لآخر 30 يوماً') }}</div>
     {% endif %}
   </div>
 

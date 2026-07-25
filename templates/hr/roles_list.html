@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Roles & Permissions{% endblock %}
+{% block title %}{{ t('Roles & Permissions','الأدوار والصلاحيات') }}{% endblock %}
 
-{% block page_title %}Roles & Permissions{% endblock %}
-{% block page_sub %}Platform roles and their access levels{% endblock %}
+{% block page_title %}{{ t('Roles & Permissions','الأدوار والصلاحيات') }}{% endblock %}
+{% block page_sub %}{{ t('Platform roles and their access levels','أدوار المنصة ومستويات الصلاحيات') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">← Back to Staff</a>
+<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">{{ t('← Back to Staff','← العودة إلى الموظفين') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -32,28 +32,28 @@
   'finance':'💰','groomer':'✂️','boarding_staff':'🏠','support_admin':'🔧','auditor':'🔍'
 } %}
 {% set role_descs = {
-  'super_admin':'Full unrestricted access to all platform features and settings.',
-  'clinic_owner':'Clinic-wide access including financial reports and HR management.',
-  'branch_manager':'Manages a specific branch — staff, appointments, and operations.',
-  'doctor':'Clinical access — examinations, diagnoses, prescriptions, and records.',
-  'nurse':'Assists doctors with patient care, vitals, and treatment support.',
-  'reception':'Front-desk operations — appointments, check-ins, and owner contact.',
-  'inventory_mgr':'Manages stock, batches, suppliers, and purchase orders.',
-  'pharmacist':'Dispenses medications and manages pharmacy inventory.',
-  'finance':'Views and manages invoices, payments, and financial reports.',
-  'groomer':'Manages grooming appointments and service delivery.',
-  'boarding_staff':'Handles boarding bookings, room assignments, and pet care.',
-  'support_admin':'Technical support access — diagnostics, logs, and config.',
-  'auditor':'Read-only access to audit logs and reports for compliance.'
+  'super_admin':t('Full unrestricted access to all platform features and settings.','صلاحية كاملة وغير مقيدة لجميع مزايا المنصة وإعداداتها.'),
+  'clinic_owner':t('Clinic-wide access including financial reports and HR management.','صلاحية على مستوى العيادة تشمل التقارير المالية وإدارة الموارد البشرية.'),
+  'branch_manager':t('Manages a specific branch — staff, appointments, and operations.','يدير فرعاً محدداً — الموظفين والمواعيد والعمليات.'),
+  'doctor':t('Clinical access — examinations, diagnoses, prescriptions, and records.','صلاحية سريرية — الفحوصات والتشخيصات والوصفات والسجلات.'),
+  'nurse':t('Assists doctors with patient care, vitals, and treatment support.','يساعد الأطباء في رعاية المرضى والعلامات الحيوية ودعم العلاج.'),
+  'reception':t('Front-desk operations — appointments, check-ins, and owner contact.','عمليات الاستقبال — المواعيد وتسجيل الوصول والتواصل مع الملاك.'),
+  'inventory_mgr':t('Manages stock, batches, suppliers, and purchase orders.','يدير المخزون والدفعات والموردين وأوامر الشراء.'),
+  'pharmacist':t('Dispenses medications and manages pharmacy inventory.','يصرف الأدوية ويدير مخزون الصيدلية.'),
+  'finance':t('Views and manages invoices, payments, and financial reports.','يعرض ويدير الفواتير والمدفوعات والتقارير المالية.'),
+  'groomer':t('Manages grooming appointments and service delivery.','يدير مواعيد التجميل وتقديم الخدمة.'),
+  'boarding_staff':t('Handles boarding bookings, room assignments, and pet care.','يتولى حجوزات الإيواء وتوزيع الغرف ورعاية الحيوانات.'),
+  'support_admin':t('Technical support access — diagnostics, logs, and config.','صلاحية الدعم الفني — التشخيص والسجلات والإعدادات.'),
+  'auditor':t('Read-only access to audit logs and reports for compliance.','صلاحية قراءة فقط لسجلات المراجعة والتقارير لأغراض الامتثال.')
 } %}
 
 <div class="page-intro">
   <div style="font-size:36px;">🎭</div>
   <div>
-    <div style="font-weight:700;font-size:16px;margin-bottom:4px;">Platform Role System</div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:4px;">{{ t('Platform Role System','نظام أدوار المنصة') }}</div>
     <div style="color:var(--cl-muted);font-size:14px;">
-      {{ roles|length }} roles defined. Roles control what each staff member can access across the platform.
-      Super Admin always has full access regardless of role restrictions.
+      {{ roles|length }} {{ t('roles defined. Roles control what each staff member can access across the platform.','دور معرّف. تتحكم الأدوار فيما يمكن لكل موظف الوصول إليه عبر المنصة.') }}
+      {{ t('Super Admin always has full access regardless of role restrictions.','مدير النظام الأعلى لديه دائماً صلاحية كاملة بغض النظر عن قيود الأدوار.') }}
     </div>
   </div>
 </div>
@@ -61,7 +61,7 @@
 <div class="roles-grid">
   {% for role in roles %}
   {% set icon = role_icons.get(role.name, '👤') %}
-  {% set desc = role_descs.get(role.name, 'Platform role with specific access permissions.') %}
+  {% set desc = role_descs.get(role.name, t('Platform role with specific access permissions.','دور على المنصة بصلاحيات وصول محددة.')) %}
   <div class="role-card" style="border-left-color:{{ role.color or '#6b7280' }};">
     <div class="role-card-header">
       <div class="role-color-dot" style="background:{{ role.color or '#6b7280' }}1a;">
@@ -78,11 +78,11 @@
     <div class="role-desc">{{ desc }}</div>
     <div class="role-meta">
       <div class="user-count-badge" style="color:{{ role.color or '#6b7280' }};">
-        👥 {{ role.user_count }} active user{{ 's' if role.user_count != 1 else '' }}
+        👥 {{ role.user_count }} {{ t('active user','مستخدم نشط') }}{% if current_lang != 'ar' %}{{ 's' if role.user_count != 1 else '' }}{% endif %}
       </div>
       <a href="{{ url_for('hr.staff_list') }}?role={{ role.name }}"
          style="font-size:12px;color:var(--cl-primary);text-decoration:none;margin-left:auto;">
-        View Staff →
+        {{ t('View Staff →','عرض الموظفين ←') }}
       </a>
     </div>
   </div>

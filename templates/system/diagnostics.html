@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}System Diagnostics{% endblock %}
-{% block page_title %}System Diagnostics{% endblock %}
-{% block page_sub %}Platform health checks and integrity verification{% endblock %}
+{% block title %}{{ t('System Diagnostics', 'تشخيص النظام') }}{% endblock %}
+{% block page_title %}{{ t('System Diagnostics', 'تشخيص النظام') }}{% endblock %}
+{% block page_sub %}{{ t('Platform health checks and integrity verification', 'فحوصات سلامة المنصة والتحقق من التكامل') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ request.url }}" class="pf-btn pf-btn-primary">🔄 Re-run Diagnostics</a>
-<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">🖥️ Monitor</a>
-<a href="{{ url_for('system.settings') }}" class="pf-btn pf-btn-secondary">⚙️ Settings</a>
+<a href="{{ request.url }}" class="pf-btn pf-btn-primary">{{ t('🔄 Re-run Diagnostics', '🔄 إعادة تشغيل التشخيص') }}</a>
+<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">{{ t('🖥️ Monitor', '🖥️ المراقبة') }}</a>
+<a href="{{ url_for('system.settings') }}" class="pf-btn pf-btn-secondary">{{ t('⚙️ Settings', '⚙️ الإعدادات') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -52,7 +52,7 @@
   <div class="overall-icon">🚨</div>
   <div>
     <div class="overall-title" style="color:#991b1b;">{{ fail_count }} Check{{ 's' if fail_count != 1 }} Failed</div>
-    <div class="overall-sub">Review the failed checks below and take corrective action.</div>
+    <div class="overall-sub">{{ t('Review the failed checks below and take corrective action.', 'راجع الفحوصات الفاشلة أدناه واتخذ الإجراء التصحيحي.') }}</div>
   </div>
 </div>
 {% elif warn_count > 0 %}
@@ -60,14 +60,14 @@
   <div class="overall-icon">⚠️</div>
   <div>
     <div class="overall-title" style="color:#92400e;">{{ warn_count }} Warning{{ 's' if warn_count != 1 }}</div>
-    <div class="overall-sub">Platform is operational but some items need attention.</div>
+    <div class="overall-sub">{{ t('Platform is operational but some items need attention.', 'المنصة تعمل لكن بعض العناصر تحتاج إلى انتباه.') }}</div>
   </div>
 </div>
 {% else %}
 <div class="overall-banner all-pass">
   <div class="overall-icon">✅</div>
   <div>
-    <div class="overall-title" style="color:#166534;">All Systems Operational</div>
+    <div class="overall-title" style="color:#166534;">{{ t('All Systems Operational', 'جميع الأنظمة تعمل') }}</div>
     <div class="overall-sub">All {{ pass_count }} diagnostic checks passed successfully.</div>
   </div>
 </div>
@@ -77,32 +77,32 @@
 <div class="diag-summary">
   <div class="diag-pill">
     <strong>{{ checks|length }}</strong>
-    <span>Total Checks</span>
+    <span>{{ t('Total Checks', 'إجمالي الفحوصات') }}</span>
   </div>
   <div class="diag-pill" style="border-top:3px solid #22c55e;">
     <strong style="color:#166534;">{{ pass_count }}</strong>
-    <span>Passed</span>
+    <span>{{ t('Passed', 'نجح') }}</span>
   </div>
   <div class="diag-pill" style="border-top:3px solid #f59e0b;">
     <strong style="color:#92400e;">{{ warn_count }}</strong>
-    <span>Warnings</span>
+    <span>{{ t('Warnings', 'تحذيرات') }}</span>
   </div>
   <div class="diag-pill" style="border-top:3px solid #ef4444;">
     <strong style="color:#991b1b;">{{ fail_count }}</strong>
-    <span>Failed</span>
+    <span>{{ t('Failed', 'فشل') }}</span>
   </div>
 </div>
 
 <!-- Checks Table -->
 <div class="diag-card">
-  <div class="diag-card-title">🔬 Diagnostic Results</div>
+  <div class="diag-card-title">{{ t('🔬 Diagnostic Results', '🔬 نتائج التشخيص') }}</div>
   <table class="checks-table">
     <thead>
       <tr>
         <th>#</th>
-        <th>Check</th>
-        <th>Status</th>
-        <th>Details</th>
+        <th>{{ t('Check', 'الفحص') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
+        <th>{{ t('Details', 'التفاصيل') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -114,11 +114,11 @@
         </td>
         <td>
           {% if check.status == 'Pass' %}
-            <span class="status-pass">✓ Pass</span>
+            <span class="status-pass">{{ t('✓ Pass', '✓ نجح') }}</span>
           {% elif check.status == 'Fail' %}
-            <span class="status-fail">✗ Fail</span>
+            <span class="status-fail">{{ t('✗ Fail', '✗ فشل') }}</span>
           {% else %}
-            <span class="status-warn">⚠ Warning</span>
+            <span class="status-warn">{{ t('⚠ Warning', '⚠ تحذير') }}</span>
           {% endif %}
         </td>
         <td>
@@ -132,13 +132,13 @@
 
 <!-- Legacy App Check -->
 <div class="diag-card">
-  <div class="diag-card-title">🔗 Live Legacy App Connectivity</div>
+  <div class="diag-card-title">{{ t('🔗 Live Legacy App Connectivity', '🔗 اتصال التطبيق القديم') }}</div>
   <div class="legacy-section">
     <div>
-      <div style="font-size:12px;color:var(--cl-muted);margin-bottom:4px;">Legacy App URL</div>
+      <div style="font-size:12px;color:var(--cl-muted);margin-bottom:4px;">{{ t('Legacy App URL', 'رابط التطبيق القديم') }}</div>
       <div style="font-family:monospace;font-size:14px;color:var(--cl-primary);">{{ legacy_url }}</div>
     </div>
-    <button class="check-btn" onclick="checkLegacyDiag()">🔍 Test Connectivity</button>
+    <button class="check-btn" onclick="checkLegacyDiag()">{{ t('🔍 Test Connectivity', '🔍 اختبار الاتصال') }}</button>
     <span id="legacy-diag-result" style="font-size:14px;font-weight:600;"></span>
   </div>
 </div>

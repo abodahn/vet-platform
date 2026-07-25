@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}My Statistics{% endblock %}
-{% block page_title %}My Statistics{% endblock %}
+{% block title %}{{ t('My Statistics', 'إحصائياتي') }}{% endblock %}
+{% block page_title %}{{ t('My Statistics', 'إحصائياتي') }}{% endblock %}
 {% block page_sub %}Performance overview for Dr. {{ doctor_name }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('doctor.workspace') }}" class="pf-btn pf-btn-secondary">← Workspace</a>
+<a href="{{ url_for('doctor.workspace') }}" class="pf-btn pf-btn-secondary">{{ t('← Workspace', '← مساحة العمل') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -12,19 +12,19 @@
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;margin-bottom:1.5rem">
   <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid var(--pf-primary)">
     <div style="font-size:2.2rem;font-weight:800;color:var(--pf-primary)">{{ total_visits }}</div>
-    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Total Visits (All Time)</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">{{ t('Total Visits (All Time)', 'إجمالي الزيارات (الإجمالي الكلي)') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #10b981">
     <div style="font-size:2.2rem;font-weight:800;color:#10b981">{{ month_visits }}</div>
-    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">This Month</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">{{ t('This Month', 'هذا الشهر') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #f59e0b">
     <div style="font-size:2.2rem;font-weight:800;color:#f59e0b">{{ avg_per_day }}</div>
-    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Avg Visits / Day</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">{{ t('Avg Visits / Day', 'متوسط الزيارات / يوم') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #8b5cf6">
     <div style="font-size:2.2rem;font-weight:800;color:#8b5cf6">{{ unique_patients }}</div>
-    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">Unique Patients</div>
+    <div style="color:var(--pf-muted);font-size:.85rem;margin-top:.25rem">{{ t('Unique Patients', 'مرضى فريدون') }}</div>
   </div>
 </div>
 
@@ -32,7 +32,7 @@
 
   <!-- Monthly trend chart -->
   <div class="pf-card">
-    <div class="pf-card-header"><h3 class="pf-card-title">📈 Monthly Visits Trend</h3></div>
+    <div class="pf-card-header"><h3 class="pf-card-title">{{ t('📈 Monthly Visits Trend', '📈 اتجاه الزيارات الشهري') }}</h3></div>
     <div style="padding:1.25rem">
       {% set max_count = monthly_trend|map(attribute='count')|max if monthly_trend else 1 %}
       {% set max_count = max_count if max_count > 0 else 1 %}
@@ -54,7 +54,7 @@
 
   <!-- Species breakdown -->
   <div class="pf-card">
-    <div class="pf-card-header"><h3 class="pf-card-title">🐾 Species Breakdown</h3></div>
+    <div class="pf-card-header"><h3 class="pf-card-title">{{ t('🐾 Species Breakdown', '🐾 توزيع الأنواع') }}</h3></div>
     <div style="padding:1.25rem">
       {% set total_sp = species_breakdown|sum(attribute='cnt') if species_breakdown else 0 %}
       {% set colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'] %}
@@ -73,7 +73,7 @@
         </div>
       </div>
       {% else %}
-      <div style="text-align:center;color:var(--pf-muted);padding:1rem">No data yet</div>
+      <div style="text-align:center;color:var(--pf-muted);padding:1rem">{{ t('No data yet', 'لا توجد بيانات بعد') }}</div>
       {% endfor %}
     </div>
   </div>
@@ -81,7 +81,7 @@
 
 <!-- Top diagnoses -->
 <div class="pf-card">
-  <div class="pf-card-header"><h3 class="pf-card-title">🔬 Top 5 Diagnoses</h3></div>
+  <div class="pf-card-header"><h3 class="pf-card-title">{{ t('🔬 Top 5 Diagnoses', '🔬 أكثر 5 تشخيصات') }}</h3></div>
   <div style="padding:1.25rem">
     {% set max_diag = top_diagnoses[0].cnt if top_diagnoses else 1 %}
     {% for d in top_diagnoses %}
@@ -96,7 +96,7 @@
       </div>
     </div>
     {% else %}
-    <div style="text-align:center;color:var(--pf-muted);padding:1.5rem">No diagnosis data yet</div>
+    <div style="text-align:center;color:var(--pf-muted);padding:1.5rem">{{ t('No diagnosis data yet', 'لا توجد بيانات تشخيص بعد') }}</div>
     {% endfor %}
   </div>
 </div>

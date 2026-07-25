@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Boarding Bookings{% endblock %}
-{% block page_title %}Boarding Bookings{% endblock %}
+{% block title %}{{ t('Boarding Bookings', 'حجوزات الإيواء') }}{% endblock %}
+{% block page_title %}{{ t('Boarding Bookings', 'حجوزات الإيواء') }}{% endblock %}
 {% block page_sub %}All pet hotel bookings{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('boarding.booking_new_form') }}" class="pf-btn pf-btn-primary">+ New Booking</a>
-<a href="{{ url_for('boarding.dashboard') }}" class="pf-btn pf-btn-secondary">Dashboard</a>
+<a href="{{ url_for('boarding.booking_new_form') }}" class="pf-btn pf-btn-primary">{{ t('+ New Booking', '+ حجز جديد') }}</a>
+<a href="{{ url_for('boarding.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('Dashboard', 'لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -16,8 +16,8 @@
   </select>
   <input type="date" name="date_from" value="{{ date_from }}" class="pf-input" style="width:150px">
   <input type="date" name="date_to"   value="{{ date_to }}"   class="pf-input" style="width:150px">
-  <button type="submit" class="pf-btn pf-btn-secondary">Filter</button>
-  <a href="{{ url_for('boarding.bookings_list') }}" class="pf-btn pf-btn-ghost">Clear</a>
+  <button type="submit" class="pf-btn pf-btn-secondary">{{ t('Filter', 'تصفية') }}</button>
+  <a href="{{ url_for('boarding.bookings_list') }}" class="pf-btn pf-btn-ghost">{{ t('Clear', 'مسح') }}</a>
 </form>
 
 <div class="pf-card">
@@ -25,15 +25,15 @@
     <thead>
       <tr>
         <th>#</th>
-        <th>Pet</th>
-        <th>Owner</th>
-        <th>Room</th>
+        <th>{{ t('Pet', 'الحيوان') }}</th>
+        <th>{{ t('Owner', 'المالك') }}</th>
+        <th>{{ t('Room', 'الغرفة') }}</th>
         <th>Check-in</th>
         <th>Expected Out</th>
-        <th>Rate/Day</th>
-        <th>Status</th>
-        <th>Invoice</th>
-        <th>Actions</th>
+        <th>{{ t('Rate/Day', 'السعر/اليوم') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
+        <th>{{ t('Invoice', 'الفاتورة') }}</th>
+        <th>{{ t('Actions', 'إجراءات') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -51,8 +51,8 @@
         <td style="white-space:nowrap">{{ (b.expected_checkout or '')[:10] }}</td>
         <td>{{ b.daily_rate or '—' }} {% if b.daily_rate %}EGP{% endif %}</td>
         <td>
-          {% if b.status == 'Reserved' %}<span class="pf-badge warning">Reserved</span>
-          {% elif b.status == 'Checked-in' %}<span class="pf-badge success">Checked-in</span>
+          {% if b.status == 'Reserved' %}<span class="pf-badge warning">{{ t('Reserved', 'محجوز') }}</span>
+          {% elif b.status == 'Checked-in' %}<span class="pf-badge success">{{ t('Checked-in', 'تم الوصول') }}</span>
           {% elif b.status == 'Checked-out' %}<span class="pf-badge" style="background:#6b7280;color:#fff">Checked-out</span>
           {% else %}<span class="pf-badge error">{{ b.status }}</span>{% endif %}
         </td>
@@ -70,7 +70,7 @@
           <div style="display:flex;gap:.3rem;flex-wrap:wrap">
             {# Edit button — always available #}
             <a href="{{ url_for('boarding.booking_edit_form', booking_id=b.id) }}"
-               class="pf-btn pf-btn-sm pf-btn-ghost">✏️ Edit</a>
+               class="pf-btn pf-btn-sm pf-btn-ghost">{{ t('✏️ Edit', '✏️ تعديل') }}</a>
 
             {# Status-specific actions #}
             {% if b.status in ('Reserved', 'Booked') %}
@@ -88,13 +88,13 @@
             {# View invoice if it exists and not already shown as link #}
             {% if b.invoice_id and b.status == 'Checked-out' %}
               <a href="{{ url_for('finance.invoice_detail', inv_id=b.invoice_id) }}"
-                 class="pf-btn pf-btn-sm pf-btn-ghost">🧾 Receipt</a>
+                 class="pf-btn pf-btn-sm pf-btn-ghost">{{ t('🧾 Receipt', '🧾 إيصال') }}</a>
             {% endif %}
           </div>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="10" style="text-align:center;color:var(--pf-muted);padding:2rem" class="pf-empty">No bookings found.</td></tr>
+      <tr><td colspan="10" style="text-align:center;color:var(--pf-muted);padding:2rem" class="pf-empty">{{ t('No bookings found.', 'لا توجد حجوزات.') }}</td></tr>
       {% endfor %}
     </tbody>
   </table>

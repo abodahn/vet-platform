@@ -3,7 +3,7 @@
 {% block page_title %}Edit Grooming Booking{% endblock %}
 {% block page_sub %}Booking #{{ booking.id }} — {{ booking.pet_name }} ({{ booking.owner_name }}){% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost">← Back to Bookings</a>
+<a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost">{{ t('← Back to Bookings', '← العودة إلى الحجوزات') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -11,16 +11,16 @@
 
   {# Read-only patient info #}
   <div class="pf-card" style="margin-bottom:1.5rem">
-    <div class="pf-card-header"><h3 class="pf-card-title">Patient (read-only)</h3></div>
+    <div class="pf-card-header"><h3 class="pf-card-title">{{ t('Patient (read-only)', 'المريض (للقراءة فقط)') }}</h3></div>
     <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
       <div>
-        <label class="pf-label">Owner</label>
+        <label class="pf-label">{{ t('Owner', 'المالك') }}</label>
         <div class="pf-input" style="background:var(--pf-bg-alt,#f8fafc);cursor:default">
           {{ booking.owner_name }} &nbsp;<small style="color:var(--pf-muted)">{{ booking.phone }}</small>
         </div>
       </div>
       <div>
-        <label class="pf-label">Pet</label>
+        <label class="pf-label">{{ t('Pet', 'الحيوان') }}</label>
         <div class="pf-input" style="background:var(--pf-bg-alt,#f8fafc);cursor:default">
           <strong>{{ booking.pet_name }}</strong> &nbsp;<small style="color:var(--pf-muted)">{{ booking.species }}</small>
         </div>
@@ -30,12 +30,12 @@
 
   {# Editable appointment details #}
   <div class="pf-card" style="margin-bottom:1.5rem">
-    <div class="pf-card-header"><h3 class="pf-card-title">Appointment Details</h3></div>
+    <div class="pf-card-header"><h3 class="pf-card-title">{{ t('Appointment Details', 'تفاصيل الموعد') }}</h3></div>
     <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
       <div>
-        <label class="pf-label">Service</label>
+        <label class="pf-label">{{ t('Service', 'الخدمة') }}</label>
         <select name="service_id" class="pf-input" onchange="fillPrice(this)">
-          <option value="">— No specific service —</option>
+          <option value="">{{ t('— No specific service —', '— بدون خدمة محددة —') }}</option>
           {% for s in services %}
           <option value="{{ s.id }}" data-price="{{ s.price or 0 }}"
             {% if booking.service_id == s.id %}selected{% endif %}>
@@ -53,12 +53,12 @@
         <small style="color:var(--pf-muted);font-size:.75rem">Override service price for this session only</small>
       </div>
       <div>
-        <label class="pf-label">Groomer Name</label>
+        <label class="pf-label">{{ t('Groomer Name', 'اسم المُجمِّل') }}</label>
         <input type="text" name="groomer_name" class="pf-input"
                value="{{ booking.groomer_name or '' }}" placeholder="Groomer name">
       </div>
       <div>
-        <label class="pf-label">Status</label>
+        <label class="pf-label">{{ t('Status', 'الحالة') }}</label>
         <select name="status" class="pf-input">
           {% for s in ['Scheduled', 'In Progress', 'Completed', 'Cancelled'] %}
           <option value="{{ s }}" {% if booking.status == s %}selected{% endif %}>{{ s }}</option>
@@ -71,7 +71,7 @@
                value="{{ (booking.booking_date or '')[:16] }}">
       </div>
       <div style="grid-column:span 2">
-        <label class="pf-label">Notes</label>
+        <label class="pf-label">{{ t('Notes', 'ملاحظات') }}</label>
         <textarea name="notes" class="pf-input" rows="3"
                   placeholder="Special instructions, behaviour notes…">{{ booking.notes or '' }}</textarea>
       </div>
@@ -84,7 +84,7 @@
     <div style="padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem">
       <span style="font-size:1.4rem">🧾</span>
       <div>
-        <strong>Invoice already generated</strong>
+        <strong>{{ t('Invoice already generated', 'الفاتورة صادرة بالفعل') }}</strong>
         <div style="font-size:.85rem;color:var(--pf-muted)">Invoice #{{ booking.invoice_id }}</div>
       </div>
       <a href="{{ url_for('finance.invoice_detail', inv_id=booking.invoice_id) }}"
@@ -94,8 +94,8 @@
   {% endif %}
 
   <div style="display:flex;gap:1rem;flex-wrap:wrap">
-    <button type="submit" class="pf-btn pf-btn-primary">💾 Save Changes</button>
-    <a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost">Cancel</a>
+    <button type="submit" class="pf-btn pf-btn-primary">{{ t('💾 Save Changes', '💾 حفظ التغييرات') }}</button>
+    <a href="{{ url_for('grooming.bookings_list') }}" class="pf-btn pf-btn-ghost">{{ t('Cancel', 'إلغاء') }}</a>
 
     {# Quick-complete with invoice #}
     {% if booking.status not in ('Completed', 'Cancelled') and not booking.invoice_id %}

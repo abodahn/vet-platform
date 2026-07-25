@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Week Calendar{% endblock %}
-{% block page_title %}📆 Week Calendar{% endblock %}
+{% block title %}{{ t('Week Calendar', 'تقويم الأسبوع') }}{% endblock %}
+{% block page_title %}{{ t('📆 Week Calendar', '📆 تقويم الأسبوع') }}{% endblock %}
 {% block page_sub %}{{ monday.strftime('%d %b') }} – {{ sunday.strftime('%d %b %Y') }}{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('appointments.appt_new') }}" class="pf-btn pf-btn-primary">➕ New Appointment</a>
-  <a href="{{ url_for('appointments.schedule') }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">📋 Today</a>
+  <a href="{{ url_for('appointments.appt_new') }}" class="pf-btn pf-btn-primary">{{ t('➕ New Appointment', '➕ موعد جديد') }}</a>
+  <a href="{{ url_for('appointments.schedule') }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);margin-left:8px;">{{ t('📋 Today', '📋 اليوم') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -141,12 +141,12 @@
 
 <!-- Week navigation -->
 <div class="week-nav">
-  <a href="{{ url_for('appointments.calendar', week=prev_week) }}" class="week-nav-btn">← Prev Week</a>
+  <a href="{{ url_for('appointments.calendar', week=prev_week) }}" class="week-nav-btn">{{ t('← Prev Week', '← الأسبوع السابق') }}</a>
   <div class="week-nav-title">
     {{ monday.strftime('%d %B') }} — {{ sunday.strftime('%d %B %Y') }}
   </div>
-  <a href="{{ url_for('appointments.calendar') }}" class="week-today-btn">This Week</a>
-  <a href="{{ url_for('appointments.calendar', week=next_week) }}" class="week-nav-btn">Next Week →</a>
+  <a href="{{ url_for('appointments.calendar') }}" class="week-today-btn">{{ t('This Week', 'هذا الأسبوع') }}</a>
+  <a href="{{ url_for('appointments.calendar', week=next_week) }}" class="week-nav-btn">{{ t('Next Week →', 'الأسبوع التالي ←') }}</a>
 </div>
 
 <!-- 7-column calendar grid -->
@@ -181,7 +181,7 @@
         <div class="cal-more">+{{ day.appointments | length - 5 }} more</div>
         {% endif %}
       {% else %}
-        <div class="cal-empty">No appointments</div>
+        <div class="cal-empty">{{ t('No appointments', 'لا توجد مواعيد') }}</div>
       {% endif %}
     </div>
 
@@ -191,7 +191,7 @@
 
 <!-- Legend -->
 <div class="legend">
-  <span class="legend-title">Status:</span>
+  <span class="legend-title">{{ t('Status:', 'الحالة:') }}</span>
   {% for label, cls in [
     ('Scheduled','dot-blue'),
     ('Confirmed','dot-teal'),
@@ -205,7 +205,7 @@
     {{ label }}
   </div>
   {% endfor %}
-  <span style="margin-left:auto;font-size:0.78rem;color:var(--cl-muted);">Click any day to view its schedule</span>
+  <span style="margin-left:auto;font-size:0.78rem;color:var(--cl-muted);">{{ t('Click any day to view its schedule', 'اضغط على أي يوم لعرض جدوله') }}</span>
 </div>
 
 {% endblock %}

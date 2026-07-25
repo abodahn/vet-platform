@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Today's Queue{% endblock %}
-{% block page_title %}Today's Queue{% endblock %}
+{% block title %}{{ t("Today's Queue", 'قائمة اليوم') }}{% endblock %}
+{% block page_title %}{{ t("Today's Queue", 'قائمة اليوم') }}{% endblock %}
 {% block page_sub %}{{ today }} · Current time: {{ now }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('doctor.workspace') }}" class="pf-btn pf-btn-secondary">← Workspace</a>
-<a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary">+ New Visit</a>
+<a href="{{ url_for('doctor.workspace') }}" class="pf-btn pf-btn-secondary">{{ t('← Workspace', '← مساحة العمل') }}</a>
+<a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary">{{ t('+ New Visit', '+ زيارة جديدة') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -17,26 +17,26 @@
   {% set done    = appointments|selectattr('status','equalto','Completed')|list %}
   <div class="pf-card" style="padding:.75rem 1.25rem;display:flex;align-items:center;gap:.75rem">
     <span style="font-size:1.5rem;font-weight:800;color:#f59e0b">{{ waiting|length }}</span>
-    <span style="color:var(--pf-muted);font-size:.85rem">Waiting</span>
+    <span style="color:var(--pf-muted);font-size:.85rem">{{ t('Waiting', 'في الانتظار') }}</span>
   </div>
   <div class="pf-card" style="padding:.75rem 1.25rem;display:flex;align-items:center;gap:.75rem">
     <span style="font-size:1.5rem;font-weight:800;color:#3b82f6">{{ inprog|length }}</span>
-    <span style="color:var(--pf-muted);font-size:.85rem">In Progress</span>
+    <span style="color:var(--pf-muted);font-size:.85rem">{{ t('In Progress', 'جارٍ') }}</span>
   </div>
   <div class="pf-card" style="padding:.75rem 1.25rem;display:flex;align-items:center;gap:.75rem">
     <span style="font-size:1.5rem;font-weight:800;color:#10b981">{{ done|length }}</span>
-    <span style="color:var(--pf-muted);font-size:.85rem">Completed</span>
+    <span style="color:var(--pf-muted);font-size:.85rem">{{ t('Completed', 'مكتمل') }}</span>
   </div>
   <div class="pf-card" style="padding:.75rem 1.25rem;display:flex;align-items:center;gap:.75rem">
     <span style="font-size:1.5rem;font-weight:800;color:var(--pf-primary)">{{ appointments|length }}</span>
-    <span style="color:var(--pf-muted);font-size:.85rem">Total</span>
+    <span style="color:var(--pf-muted);font-size:.85rem">{{ t('Total', 'الإجمالي') }}</span>
   </div>
 </div>
 
 <div class="pf-card">
   <table class="pf-table">
     <thead>
-      <tr><th>#</th><th>Time</th><th>Pet</th><th>Owner</th><th>Phone</th><th>Reason</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>#</th><th>{{ t('Time', 'الوقت') }}</th><th>{{ t('Pet', 'الحيوان') }}</th><th>{{ t('Owner', 'المالك') }}</th><th>{{ t('Phone', 'الهاتف') }}</th><th>{{ t('Reason', 'السبب') }}</th><th>{{ t('Status', 'الحالة') }}</th><th>{{ t('Actions', 'إجراءات') }}</th></tr>
     </thead>
     <tbody>
       {% for a in appointments %}
@@ -54,34 +54,34 @@
         <td><a href="tel:{{ a.owner_phone }}" style="color:var(--pf-primary)">{{ a.owner_phone }}</a></td>
         <td style="font-size:.85rem;color:var(--pf-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.reason or '—' }}</td>
         <td>
-          {% if a.status in ('Scheduled','Confirmed','Waiting') %}<span class="pf-badge warning">Waiting</span>
-          {% elif a.status == 'In Progress' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">In Progress</span>
-          {% elif a.status == 'Completed' %}<span class="pf-badge success">Done</span>
-          {% elif a.status == 'Cancelled' %}<span class="pf-badge error">Cancelled</span>
+          {% if a.status in ('Scheduled','Confirmed','Waiting') %}<span class="pf-badge warning">{{ t('Waiting', 'في الانتظار') }}</span>
+          {% elif a.status == 'In Progress' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">{{ t('In Progress', 'جارٍ') }}</span>
+          {% elif a.status == 'Completed' %}<span class="pf-badge success">{{ t('Done', 'منتهٍ') }}</span>
+          {% elif a.status == 'Cancelled' %}<span class="pf-badge error">{{ t('Cancelled', 'ملغى') }}</span>
           {% else %}<span class="pf-badge">{{ a.status }}</span>{% endif %}
         </td>
         <td style="display:flex;gap:.4rem;flex-wrap:wrap">
           {% if a.status in ('Scheduled','Confirmed','Waiting') %}
           <form method="post" action="{{ url_for('doctor.checkin', appt_id=a.id) }}" style="display:inline">
             <input type="hidden" name="next" value="{{ request.path }}">
-            <button type="submit" class="pf-btn pf-btn-secondary" style="padding:3px 8px;font-size:.78rem">✓ In</button>
+            <button type="submit" class="pf-btn pf-btn-secondary" style="padding:3px 8px;font-size:.78rem">{{ t('✓ In', '✓ دخول') }}</button>
           </form>
           {% endif %}
           <a href="{{ url_for('visits.visit_new_form', appt_id=a.id, owner_id=a.owner_id, pet_id=a.pet_id) }}"
-             class="pf-btn pf-btn-primary" style="padding:3px 8px;font-size:.78rem">+ Visit</a>
+             class="pf-btn pf-btn-primary" style="padding:3px 8px;font-size:.78rem">{{ t('+ Visit', '+ زيارة') }}</a>
         </td>
       </tr>
       {% else %}
       <tr>
         <td colspan="8" style="text-align:center;padding:3rem;color:var(--pf-muted)">
           <div style="font-size:2rem;margin-bottom:.5rem">🎉</div>
-          <strong>Queue is empty today!</strong><br>
-          <small>No appointments scheduled for today.</small>
+          <strong>{{ t('Queue is empty today!', 'قائمة الانتظار فارغة اليوم!') }}</strong><br>
+          <small>{{ t('No appointments scheduled for today.', 'لا توجد مواعيد مجدولة اليوم.') }}</small>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
-<div style="margin-top:.75rem;font-size:.8rem;color:var(--pf-muted);text-align:right">Auto-refreshes every 60 seconds</div>
+<div style="margin-top:.75rem;font-size:.8rem;color:var(--pf-muted);text-align:right">{{ t('Auto-refreshes every 60 seconds', 'تحديث تلقائي كل 60 ثانية') }}</div>
 {% endblock %}

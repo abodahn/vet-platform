@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Doctor Workspace{% endblock %}
-{% block page_title %}Doctor Workspace{% endblock %}
+{% block title %}{{ t('Doctor Workspace', 'مساحة الطبيب') }}{% endblock %}
+{% block page_title %}{{ t('Doctor Workspace', 'مساحة الطبيب') }}{% endblock %}
 {% block page_sub %}Welcome, Dr. {{ doctor_name }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary">+ New Visit</a>
-<a href="{{ url_for('doctor.queue') }}" class="pf-btn pf-btn-secondary">📋 Queue</a>
+<a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary">{{ t('+ New Visit', '+ زيارة جديدة') }}</a>
+<a href="{{ url_for('doctor.queue') }}" class="pf-btn pf-btn-secondary">{{ t('📋 Queue', '📋 قائمة الانتظار') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -18,7 +18,7 @@
   </div>
   <div style="text-align:right;opacity:.8;font-size:.9rem">
     <div style="font-size:1.2rem;font-weight:700">{{ stats.appointments_today }}</div>
-    <div>appointments today</div>
+    <div>{{ t('appointments today', 'موعد اليوم') }}</div>
   </div>
 </div>
 
@@ -26,15 +26,15 @@
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-bottom:1.5rem">
   <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #3b82f6">
     <div style="font-size:2.5rem;font-weight:800;color:#3b82f6">{{ stats.appointments_today }}</div>
-    <div style="color:var(--pf-muted);margin-top:.25rem">📅 Today's Appointments</div>
+    <div style="color:var(--pf-muted);margin-top:.25rem">{{ t("📅 Today's Appointments", '📅 مواعيد اليوم') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #f59e0b">
     <div style="font-size:2.5rem;font-weight:800;color:#f59e0b">{{ stats.open_visits }}</div>
-    <div style="color:var(--pf-muted);margin-top:.25rem">🔓 Open Visits</div>
+    <div style="color:var(--pf-muted);margin-top:.25rem">{{ t('🔓 Open Visits', '🔓 زيارات مفتوحة') }}</div>
   </div>
   <div class="pf-card" style="text-align:center;padding:1.25rem;border-top:4px solid #10b981">
     <div style="font-size:2.5rem;font-weight:800;color:#10b981">{{ stats.completed_today }}</div>
-    <div style="color:var(--pf-muted);margin-top:.25rem">✅ Completed Today</div>
+    <div style="color:var(--pf-muted);margin-top:.25rem">{{ t('✅ Completed Today', '✅ اكتملت اليوم') }}</div>
   </div>
 </div>
 
@@ -44,13 +44,13 @@
   <!-- LEFT: Today's queue -->
   <div class="pf-card">
     <div class="pf-card-header" style="display:flex;justify-content:space-between;align-items:center">
-      <h3 class="pf-card-title">📋 Today's Queue</h3>
-      <a href="{{ url_for('doctor.queue') }}" class="pf-btn pf-btn-ghost" style="font-size:.85rem">Full Queue →</a>
+      <h3 class="pf-card-title">{{ t("📋 Today's Queue", '📋 قائمة اليوم') }}</h3>
+      <a href="{{ url_for('doctor.queue') }}" class="pf-btn pf-btn-ghost" style="font-size:.85rem">{{ t('Full Queue →', 'القائمة الكاملة ←') }}</a>
     </div>
     {% if todays_appointments %}
     <table class="pf-table">
       <thead>
-        <tr><th>Time</th><th>Pet</th><th>Owner</th><th>Reason</th><th>Status</th><th></th></tr>
+        <tr><th>{{ t('Time', 'الوقت') }}</th><th>{{ t('Pet', 'الحيوان') }}</th><th>{{ t('Owner', 'المالك') }}</th><th>{{ t('Reason', 'السبب') }}</th><th>{{ t('Status', 'الحالة') }}</th><th></th></tr>
       </thead>
       <tbody>
         {% for a in todays_appointments %}
@@ -66,20 +66,20 @@
           <td>{{ a.owner_name }}<br><small style="color:var(--pf-muted)">{{ a.owner_phone }}</small></td>
           <td style="font-size:.85rem;color:var(--pf-muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.reason or '—' }}</td>
           <td>
-            {% if a.status == 'Scheduled' %}<span class="pf-badge warning">Scheduled</span>
-            {% elif a.status == 'In Progress' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">In Progress</span>
-            {% elif a.status == 'Completed' %}<span class="pf-badge success">Done</span>
+            {% if a.status == 'Scheduled' %}<span class="pf-badge warning">{{ t('Scheduled', 'مجدول') }}</span>
+            {% elif a.status == 'In Progress' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">{{ t('In Progress', 'جارٍ') }}</span>
+            {% elif a.status == 'Completed' %}<span class="pf-badge success">{{ t('Done', 'منتهٍ') }}</span>
             {% else %}<span class="pf-badge error">{{ a.status }}</span>{% endif %}
           </td>
           <td>
             {% if a.status in ('Scheduled', 'Confirmed') %}
             <form method="post" action="{{ url_for('doctor.checkin', appt_id=a.id) }}" style="display:inline">
               <input type="hidden" name="next" value="{{ request.path }}">
-              <button type="submit" class="pf-btn pf-btn-ghost" style="padding:3px 8px;font-size:.78rem">Check In</button>
+              <button type="submit" class="pf-btn pf-btn-ghost" style="padding:3px 8px;font-size:.78rem">{{ t('Check In', 'تسجيل وصول') }}</button>
             </form>
             {% endif %}
             <a href="{{ url_for('visits.visit_new_form', appt_id=a.id, owner_id=a.owner_id, pet_id=a.pet_id) }}"
-               class="pf-btn pf-btn-primary" style="padding:3px 8px;font-size:.78rem">+ Visit</a>
+               class="pf-btn pf-btn-primary" style="padding:3px 8px;font-size:.78rem">{{ t('+ Visit', '+ زيارة') }}</a>
           </td>
         </tr>
         {% endfor %}
@@ -88,9 +88,9 @@
     {% else %}
     <div style="padding:2rem;text-align:center;color:var(--pf-muted)">
       <div style="font-size:2.5rem;margin-bottom:.75rem">🗓️</div>
-      <div style="font-weight:600;margin-bottom:.3rem">No appointments today</div>
-      <div style="font-size:.85rem">Enjoy the quiet — or add a walk-in.</div>
-      <a href="{{ url_for('appointments.appt_new') }}" class="pf-btn pf-btn-primary" style="margin-top:1rem;display:inline-block">+ Walk-in Appointment</a>
+      <div style="font-weight:600;margin-bottom:.3rem">{{ t('No appointments today', 'لا مواعيد اليوم') }}</div>
+      <div style="font-size:.85rem">{{ t('Enjoy the quiet — or add a walk-in.', 'استمتع بالهدوء — أو أضف مراجعاً بدون موعد.') }}</div>
+      <a href="{{ url_for('appointments.appt_new') }}" class="pf-btn pf-btn-primary" style="margin-top:1rem;display:inline-block">{{ t('+ Walk-in Appointment', '+ موعد بدون حجز') }}</a>
     </div>
     {% endif %}
   </div>
@@ -101,7 +101,7 @@
     <!-- Open visits -->
     <div class="pf-card">
       <div class="pf-card-header" style="display:flex;justify-content:space-between;align-items:center">
-        <h3 class="pf-card-title">🔓 Open Visits</h3>
+        <h3 class="pf-card-title">{{ t('🔓 Open Visits', '🔓 زيارات مفتوحة') }}</h3>
         <span class="pf-badge warning">{{ open_visits|length }}</span>
       </div>
       {% if open_visits %}
@@ -114,19 +114,19 @@
             <div style="font-size:.78rem;color:var(--pf-muted);margin-top:.15rem">{{ v.chief_complaint or 'No complaint noted' }}</div>
           </div>
           <a href="{{ url_for('visits.visit_detail', visit_id=v.visit_id) }}"
-             class="pf-btn pf-btn-primary" style="padding:4px 10px;font-size:.8rem;white-space:nowrap">Continue →</a>
+             class="pf-btn pf-btn-primary" style="padding:4px 10px;font-size:.8rem;white-space:nowrap">{{ t('Continue →', 'متابعة ←') }}</a>
         </div>
         {% endfor %}
       </div>
       {% else %}
-      <div style="padding:1.25rem;text-align:center;color:var(--pf-muted);font-size:.9rem">✅ No open visits</div>
+      <div style="padding:1.25rem;text-align:center;color:var(--pf-muted);font-size:.9rem">{{ t('✅ No open visits', '✅ لا توجد زيارات مفتوحة') }}</div>
       {% endif %}
     </div>
 
     <!-- Upcoming vaccinations -->
     <div class="pf-card">
       <div class="pf-card-header">
-        <h3 class="pf-card-title">💉 Vaccinations Due (7 days)</h3>
+        <h3 class="pf-card-title">{{ t('💉 Vaccinations Due (7 days)', '💉 تطعيمات مستحقة (7 أيام)') }}</h3>
       </div>
       {% if upcoming_vaccinations %}
       <div style="padding:0 .25rem">
@@ -138,19 +138,19 @@
         {% endfor %}
       </div>
       {% else %}
-      <div style="padding:1.25rem;text-align:center;color:var(--pf-muted);font-size:.85rem">✅ No vaccinations due this week</div>
+      <div style="padding:1.25rem;text-align:center;color:var(--pf-muted);font-size:.85rem">{{ t('✅ No vaccinations due this week', '✅ لا تطعيمات مستحقة هذا الأسبوع') }}</div>
       {% endif %}
     </div>
 
     <!-- Quick actions -->
     <div class="pf-card">
-      <div class="pf-card-header"><h3 class="pf-card-title">⚡ Quick Actions</h3></div>
+      <div class="pf-card-header"><h3 class="pf-card-title">{{ t('⚡ Quick Actions', '⚡ إجراءات سريعة') }}</h3></div>
       <div style="padding:1rem;display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
-        <a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary" style="text-align:center">📋 New Visit</a>
-        <a href="{{ url_for('doctor.queue') }}" class="pf-btn pf-btn-secondary" style="text-align:center">👥 Queue</a>
-        <a href="{{ url_for('doctor.my_schedule') }}" class="pf-btn pf-btn-ghost" style="text-align:center">📅 Schedule</a>
-        <a href="{{ url_for('doctor.my_stats') }}" class="pf-btn pf-btn-ghost" style="text-align:center">📊 My Stats</a>
-        <a href="{{ url_for('doctor.my_patients') }}" class="pf-btn pf-btn-ghost" style="text-align:center;grid-column:span 2">🐾 My Patients</a>
+        <a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary" style="text-align:center">{{ t('📋 New Visit', '📋 زيارة جديدة') }}</a>
+        <a href="{{ url_for('doctor.queue') }}" class="pf-btn pf-btn-secondary" style="text-align:center">{{ t('👥 Queue', '👥 قائمة الانتظار') }}</a>
+        <a href="{{ url_for('doctor.my_schedule') }}" class="pf-btn pf-btn-ghost" style="text-align:center">{{ t('📅 Schedule', '📅 الجدول') }}</a>
+        <a href="{{ url_for('doctor.my_stats') }}" class="pf-btn pf-btn-ghost" style="text-align:center">{{ t('📊 My Stats', '📊 إحصائياتي') }}</a>
+        <a href="{{ url_for('doctor.my_patients') }}" class="pf-btn pf-btn-ghost" style="text-align:center;grid-column:span 2">{{ t('🐾 My Patients', '🐾 مرضاي') }}</a>
       </div>
     </div>
 

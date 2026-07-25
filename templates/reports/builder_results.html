@@ -3,7 +3,7 @@
 {% block page_title %}{{ src_label }} Report{% endblock %}
 {% block page_sub %}{{ total }} row{{ 's' if total != 1 else '' }} returned{% if date_from or date_to %} &middot; {{ date_from or '…' }} → {{ date_to or '…' }}{% endif %}{% if status %} &middot; {{ status }}{% endif %}{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('reports.builder') }}" class="pf-btn pf-btn-ghost">← Builder</a>
+<a href="{{ url_for('reports.builder') }}" class="pf-btn pf-btn-ghost">{{ t('← Builder', '← المُنشئ') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -14,7 +14,7 @@
 
 <!-- Export / re-run bar -->
 <div class="rb-export-bar">
-  <span style="font-weight:600;color:var(--cl-muted);font-size:.88rem">Export as:</span>
+  <span style="font-weight:600;color:var(--cl-muted);font-size:.88rem">{{ t('Export as:', 'تصدير كـ:') }}</span>
 
   <!-- CSV -->
   <form method="post" action="{{ url_for('reports.builder_run') }}">
@@ -26,7 +26,7 @@
     <input type="hidden" name="status_filter" value="{{ status }}">
     <input type="hidden" name="limit" value="{{ limit }}">
     <input type="hidden" name="format" value="csv">
-    <button type="submit" class="pf-btn pf-btn-secondary pf-btn-sm">⬇ CSV</button>
+    <button type="submit" class="pf-btn pf-btn-secondary pf-btn-sm">{{ t('⬇ CSV', '⬇ CSV') }}</button>
   </form>
 
   <!-- Excel -->
@@ -39,7 +39,7 @@
     <input type="hidden" name="status_filter" value="{{ status }}">
     <input type="hidden" name="limit" value="{{ limit }}">
     <input type="hidden" name="format" value="xlsx">
-    <button type="submit" class="pf-btn pf-btn-secondary pf-btn-sm" style="background:#16a34a;color:#fff;border-color:#16a34a">⬇ Excel</button>
+    <button type="submit" class="pf-btn pf-btn-secondary pf-btn-sm" style="background:#16a34a;color:#fff;border-color:#16a34a">{{ t('⬇ Excel', '⬇ Excel') }}</button>
   </form>
 
   <span style="margin-left:auto;font-size:.85rem;color:var(--cl-muted)">
@@ -69,7 +69,7 @@
         {% else %}
         <tr>
           <td colspan="{{ col_labels|length }}" style="text-align:center;padding:2rem;color:var(--cl-muted)">
-            No data found for the selected filters.
+            {{ t('No data found for the selected filters.', 'لا توجد بيانات للتصفية المحددة.') }}
           </td>
         </tr>
         {% endfor %}
@@ -80,7 +80,7 @@
 
 <!-- Print button -->
 <div style="margin-top:12px;text-align:right">
-  <button onclick="window.print()" class="pf-btn pf-btn-ghost pf-btn-sm">🖨 Print</button>
+  <button onclick="window.print()" class="pf-btn pf-btn-ghost pf-btn-sm">{{ t('🖨 Print', '🖨 طباعة') }}</button>
 </div>
 
 <style>

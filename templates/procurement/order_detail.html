@@ -3,11 +3,11 @@
 {% block page_title %}Purchase Order #{{ po.id }}{% endblock %}
 {% block page_sub %}{{ po.po_number }} · {{ supplier.name if supplier else '—' }}{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('procurement.orders_list') }}" class="pf-btn pf-btn-ghost">← Orders</a>
+<a href="{{ url_for('procurement.orders_list') }}" class="pf-btn pf-btn-ghost">{{ t('← Orders', '← الطلبات') }}</a>
 {% if po.status in ('Draft','Sent') %}
 <form method="post" action="{{ url_for('procurement.order_receive', order_id=po.id) }}" style="display:inline"
       onsubmit="return confirm('Mark this order as Received and update inventory?')">
-  <button type="submit" class="pf-btn pf-btn-primary">✅ Mark Received</button>
+  <button type="submit" class="pf-btn pf-btn-primary">{{ t('✅ Mark Received', '✅ تعليم كمستلم') }}</button>
 </form>
 {% endif %}
 {% endblock %}
@@ -18,10 +18,10 @@
   <!-- LEFT: Line items -->
   <div>
     <div class="pf-card" style="margin-bottom:1.25rem">
-      <div class="pf-card-header"><h3 class="pf-card-title">📦 Order Lines</h3></div>
+      <div class="pf-card-header"><h3 class="pf-card-title">{{ t('📦 Order Lines', '📦 بنود الطلب') }}</h3></div>
       <table class="pf-table">
         <thead>
-          <tr><th>#</th><th>Item</th><th>Unit</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Cost</th><th style="text-align:right">Total</th></tr>
+          <tr><th>#</th><th>{{ t('Item', 'الصنف') }}</th><th>{{ t('Unit', 'الوحدة') }}</th><th style="text-align:right">{{ t('Qty', 'الكمية') }}</th><th style="text-align:right">{{ t('Unit Cost', 'تكلفة الوحدة') }}</th><th style="text-align:right">{{ t('Total', 'الإجمالي') }}</th></tr>
         </thead>
         <tbody>
           {% for line in lines %}
@@ -34,12 +34,12 @@
             <td style="text-align:right;font-weight:600;color:var(--pf-primary)">{{ '%.2f'|format(line.total or 0) }} EGP</td>
           </tr>
           {% else %}
-          <tr><td colspan="6" style="text-align:center;color:var(--pf-muted);padding:2rem">No line items.</td></tr>
+          <tr><td colspan="6" style="text-align:center;color:var(--pf-muted);padding:2rem">{{ t('No line items.', 'لا توجد بنود.') }}</td></tr>
           {% endfor %}
         </tbody>
         <tfoot>
           <tr style="background:var(--pf-surface-2)">
-            <td colspan="5" style="text-align:right;font-weight:700;padding:.75rem 1rem">Grand Total:</td>
+            <td colspan="5" style="text-align:right;font-weight:700;padding:.75rem 1rem">{{ t('Grand Total:', 'الإجمالي الكلي:') }}</td>
             <td style="text-align:right;font-weight:800;font-size:1.1rem;color:var(--pf-primary);padding:.75rem">
               {{ '%.2f'|format(po.total or 0) }} EGP
             </td>
@@ -50,7 +50,7 @@
 
     {% if po.notes %}
     <div class="pf-card">
-      <div class="pf-card-header"><h3 class="pf-card-title">📝 Notes</h3></div>
+      <div class="pf-card-header"><h3 class="pf-card-title">{{ t('📝 Notes', '📝 ملاحظات') }}</h3></div>
       <div style="padding:1.25rem;color:var(--pf-muted);font-size:.9rem">{{ po.notes }}</div>
     </div>
     {% endif %}
@@ -61,37 +61,37 @@
 
     <!-- Status card -->
     <div class="pf-card">
-      <div class="pf-card-header"><h3 class="pf-card-title">📋 Order Info</h3></div>
+      <div class="pf-card-header"><h3 class="pf-card-title">{{ t('📋 Order Info', '📋 بيانات الطلب') }}</h3></div>
       <div style="padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;font-size:.9rem">
         <div style="display:flex;justify-content:space-between">
-          <span style="color:var(--pf-muted)">PO Number</span>
+          <span style="color:var(--pf-muted)">{{ t('PO Number', 'رقم أمر الشراء') }}</span>
           <strong>{{ po.po_number }}</strong>
         </div>
         <div style="display:flex;justify-content:space-between">
-          <span style="color:var(--pf-muted)">Status</span>
-          {% if po.status == 'Draft' %}<span class="pf-badge warning">Draft</span>
-          {% elif po.status == 'Sent' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">Sent</span>
-          {% elif po.status == 'Received' %}<span class="pf-badge success">Received</span>
+          <span style="color:var(--pf-muted)">{{ t('Status', 'الحالة') }}</span>
+          {% if po.status == 'Draft' %}<span class="pf-badge warning">{{ t('Draft', 'مسودة') }}</span>
+          {% elif po.status == 'Sent' %}<span class="pf-badge" style="background:#3b82f6;color:#fff">{{ t('Sent', 'مُرسل') }}</span>
+          {% elif po.status == 'Received' %}<span class="pf-badge success">{{ t('Received', 'مستلم') }}</span>
           {% else %}<span class="pf-badge error">{{ po.status }}</span>{% endif %}
         </div>
         <div style="display:flex;justify-content:space-between">
-          <span style="color:var(--pf-muted)">Order Date</span>
+          <span style="color:var(--pf-muted)">{{ t('Order Date', 'تاريخ الطلب') }}</span>
           <span>{{ (po.order_date or '')[:10] }}</span>
         </div>
         {% if po.expected_date %}
         <div style="display:flex;justify-content:space-between">
-          <span style="color:var(--pf-muted)">Expected</span>
+          <span style="color:var(--pf-muted)">{{ t('Expected', 'المتوقع') }}</span>
           <span>{{ (po.expected_date or '')[:10] }}</span>
         </div>
         {% endif %}
         {% if po.received_date %}
         <div style="display:flex;justify-content:space-between">
-          <span style="color:var(--pf-muted)">Received</span>
+          <span style="color:var(--pf-muted)">{{ t('Received', 'مستلم') }}</span>
           <span style="color:#10b981;font-weight:600">{{ (po.received_date or '')[:10] }}</span>
         </div>
         {% endif %}
         <div style="display:flex;justify-content:space-between">
-          <span style="color:var(--pf-muted)">Created By</span>
+          <span style="color:var(--pf-muted)">{{ t('Created By', 'أنشأه') }}</span>
           <span>{{ po.created_by or '—' }}</span>
         </div>
       </div>
@@ -100,7 +100,7 @@
     <!-- Supplier card -->
     {% if supplier %}
     <div class="pf-card">
-      <div class="pf-card-header"><h3 class="pf-card-title">🏭 Supplier</h3></div>
+      <div class="pf-card-header"><h3 class="pf-card-title">{{ t('🏭 Supplier', '🏭 المورد') }}</h3></div>
       <div style="padding:1.25rem;display:flex;flex-direction:column;gap:.5rem;font-size:.9rem">
         <div style="font-weight:700;font-size:1rem">{{ supplier.name }}</div>
         {% if supplier.contact_name %}<div style="color:var(--pf-muted)">{{ supplier.contact_name }}</div>{% endif %}
@@ -108,7 +108,7 @@
         {% if supplier.email %}<div>✉️ {{ supplier.email }}</div>{% endif %}
         {% if supplier.payment_terms %}<div style="color:var(--pf-muted)">Terms: {{ supplier.payment_terms }}</div>{% endif %}
         <a href="{{ url_for('procurement.supplier_detail', supplier_id=supplier.id) }}"
-           class="pf-btn pf-btn-ghost" style="font-size:.82rem;margin-top:.5rem">View Supplier →</a>
+           class="pf-btn pf-btn-ghost" style="font-size:.82rem;margin-top:.5rem">{{ t('View Supplier →', 'عرض المورد ←') }}</a>
       </div>
     </div>
     {% endif %}
@@ -116,7 +116,7 @@
     <!-- Status change -->
     {% if po.status not in ('Received','Cancelled') %}
     <div class="pf-card">
-      <div class="pf-card-header"><h3 class="pf-card-title">🔄 Update Status</h3></div>
+      <div class="pf-card-header"><h3 class="pf-card-title">{{ t('🔄 Update Status', '🔄 تحديث الحالة') }}</h3></div>
       <div style="padding:1.25rem">
         <form method="post" action="{{ url_for('procurement.order_update_status', order_id=po.id) }}">
           <div style="display:flex;gap:.75rem">
@@ -125,7 +125,7 @@
               <option value="{{ s }}" {% if po.status==s %}selected{% endif %}>{{ s }}</option>
               {% endfor %}
             </select>
-            <button type="submit" class="pf-btn pf-btn-secondary">Update</button>
+            <button type="submit" class="pf-btn pf-btn-secondary">{{ t('Update', 'تحديث') }}</button>
           </div>
         </form>
       </div>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Telemedicine{% endblock %}
-{% block page_title %}Telemedicine{% endblock %}
+{% block title %}{{ t('Telemedicine', 'الاستشارة عن بُعد') }}{% endblock %}
+{% block page_title %}{{ t('Telemedicine', 'الاستشارة عن بُعد') }}{% endblock %}
 {% block page_sub %}Video consultations for remote patients{% endblock %}
 {% block topbar_actions %}
 <a href="{{ url_for('telemedicine.new_session') }}" class="pf-btn pf-btn-primary">+ New Session</a>
@@ -21,15 +21,15 @@
 
 <div class="tele-stats">
   <div class="tele-stat"><div class="tele-stat-val">{{ stats.total }}</div><div class="tele-stat-label">Total Sessions</div></div>
-  <div class="tele-stat"><div class="tele-stat-val" style="color:#1d4ed8">{{ stats.scheduled }}</div><div class="tele-stat-label">Scheduled</div></div>
-  <div class="tele-stat"><div class="tele-stat-val" style="color:#15803d">{{ stats.completed }}</div><div class="tele-stat-label">Completed</div></div>
-  <div class="tele-stat"><div class="tele-stat-val" style="color:#d97706">{{ stats.today }}</div><div class="tele-stat-label">Today</div></div>
+  <div class="tele-stat"><div class="tele-stat-val" style="color:#1d4ed8">{{ stats.scheduled }}</div><div class="tele-stat-label">{{ t('Scheduled', 'مجدول') }}</div></div>
+  <div class="tele-stat"><div class="tele-stat-val" style="color:#15803d">{{ stats.completed }}</div><div class="tele-stat-label">{{ t('Completed', 'مكتمل') }}</div></div>
+  <div class="tele-stat"><div class="tele-stat-val" style="color:#d97706">{{ stats.today }}</div><div class="tele-stat-label">{{ t('Today', 'اليوم') }}</div></div>
 </div>
 
 <div class="pf-card" style="margin-bottom:24px">
   <div class="pf-card-header"><h3 class="pf-card-title">📅 Upcoming Sessions</h3></div>
   <table class="pf-table">
-    <thead><tr><th>#</th><th>Date / Time</th><th>Owner</th><th>Pet</th><th>Doctor</th><th>Duration</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>#</th><th>{{ t('Date / Time', 'التاريخ / الوقت') }}</th><th>{{ t('Owner', 'المالك') }}</th><th>{{ t('Pet', 'الحيوان') }}</th><th>{{ t('Doctor', 'الطبيب') }}</th><th>{{ t('Duration', 'المدة') }}</th><th>{{ t('Status', 'الحالة') }}</th><th>{{ t('Actions', 'إجراءات') }}</th></tr></thead>
     <tbody>
       {% for ts in upcoming %}
       <tr>
@@ -41,7 +41,7 @@
         <td>{{ ts.duration_min }} min</td>
         <td><span class="pf-badge {% if ts.status=='Completed' %}success{% elif ts.status=='Cancelled' %}error{% else %}warning{% endif %}">{{ ts.status }}</span></td>
         <td style="white-space:nowrap">
-          <a href="{{ url_for('telemedicine.session_detail', sid=ts.id) }}" class="pf-btn pf-btn-sm pf-btn-ghost">View</a>
+          <a href="{{ url_for('telemedicine.session_detail', sid=ts.id) }}" class="pf-btn pf-btn-sm pf-btn-ghost">{{ t('View', 'عرض') }}</a>
           {% if ts.status == 'Scheduled' %}
           <a href="{{ ts.room_url }}" target="_blank" class="pf-btn pf-btn-sm pf-btn-primary">🎥 Join</a>
           {% endif %}
@@ -57,7 +57,7 @@
 <div class="pf-card">
   <div class="pf-card-header"><h3 class="pf-card-title">📋 Past Sessions</h3></div>
   <table class="pf-table">
-    <thead><tr><th>#</th><th>Date</th><th>Owner</th><th>Pet</th><th>Doctor</th><th>Status</th><th>Invoice</th></tr></thead>
+    <thead><tr><th>#</th><th>{{ t('Date', 'التاريخ') }}</th><th>{{ t('Owner', 'المالك') }}</th><th>{{ t('Pet', 'الحيوان') }}</th><th>{{ t('Doctor', 'الطبيب') }}</th><th>{{ t('Status', 'الحالة') }}</th><th>{{ t('Invoice', 'الفاتورة') }}</th></tr></thead>
     <tbody>
       {% for ts in past %}
       <tr>

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Products{% endblock %}
+{% block title %}{{ t('Products', 'المنتجات') }}{% endblock %}
 {% block page_title %}Pet Shop Products{% endblock %}
 {% block page_sub %}Manage product catalog, stock levels, and pricing{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('petshop.product_new') }}" class="pf-btn pf-btn-primary">+ Add Product</a>
+<a href="{{ url_for('petshop.product_new') }}" class="pf-btn pf-btn-primary">{{ t('+ Add Product', '+ إضافة منتج') }}</a>
 <a href="{{ url_for('petshop.categories') }}" class="pf-btn pf-btn-secondary">🏷️ Categories</a>
-<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -44,7 +44,7 @@
 <form method="get" class="filter-bar">
   <input type="search" name="q" placeholder="Search by name, SKU, barcode…" value="{{ q }}">
   <select name="cat">
-    <option value="">All Categories</option>
+    <option value="">{{ t('All Categories', 'جميع الفئات') }}</option>
     {% for c in categories %}
     <option value="{{ c.id }}" {% if cat == c.id|string %}selected{% endif %}>{{ c.name }}</option>
     {% endfor %}
@@ -55,9 +55,9 @@
     <option value="{{ s }}" {% if species == s %}selected{% endif %}>{{ s|capitalize }}</option>
     {% endfor %}
   </select>
-  <button type="submit" class="pf-btn pf-btn-primary" style="padding:9px 18px">Search</button>
+  <button type="submit" class="pf-btn pf-btn-primary" style="padding:9px 18px">{{ t('Search', 'بحث') }}</button>
   {% if q or cat or species %}
-  <a href="{{ url_for('petshop.products') }}" class="pf-btn pf-btn-secondary" style="padding:9px 14px">Clear</a>
+  <a href="{{ url_for('petshop.products') }}" class="pf-btn pf-btn-secondary" style="padding:9px 14px">{{ t('Clear', 'مسح') }}</a>
   {% endif %}
 </form>
 
@@ -88,7 +88,7 @@
         {% if p.stock_qty <= p.reorder_level %}⚠️{% else %}✓{% endif %}
         {{ p.stock_qty }} {{ p.unit }}
       </span>
-      <a href="{{ url_for('petshop.product_edit', pid=p.id) }}" class="btn-edit-sm">Edit</a>
+      <a href="{{ url_for('petshop.product_edit', pid=p.id) }}" class="btn-edit-sm">{{ t('Edit', 'تعديل') }}</a>
     </div>
   </div>
   {% endfor %}

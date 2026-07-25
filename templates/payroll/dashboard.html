@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Payroll Dashboard{% endblock %}
+{% block title %}{{ t('Payroll Dashboard', 'لوحة الرواتب') }}{% endblock %}
 {% block content %}
 <div class="pf-page-header">
   <div>
-    <h1 class="pf-page-title">💰 Payroll Dashboard</h1>
-    <p class="pf-page-subtitle">Manage staff salaries and payroll runs</p>
+    <h1 class="pf-page-title">{{ t('💰 Payroll Dashboard', '💰 لوحة الرواتب') }}</h1>
+    <p class="pf-page-subtitle">{{ t('Manage staff salaries and payroll runs', 'إدارة رواتب الموظفين ودورات الصرف') }}</p>
   </div>
   <div class="pf-topbar-actions">
     {% set months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
@@ -15,17 +15,17 @@
       <select name="month" class="pf-input" style="width:80px">
         {% for m in range(1,13) %}<option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ months[m-1] }}</option>{% endfor %}
       </select>
-      <button type="submit" class="pf-btn pf-btn-secondary">Filter</button>
+      <button type="submit" class="pf-btn pf-btn-secondary">{{ t('Filter', 'تصفية') }}</button>
     </form>
-    <a href="{{ url_for('payroll.salary_new') }}" class="pf-btn pf-btn-primary">+ New Salary</a>
-    <a href="{{ url_for('payroll.salary_grades') }}" class="pf-btn pf-btn-secondary">⚙ Grades</a>
+    <a href="{{ url_for('payroll.salary_new') }}" class="pf-btn pf-btn-primary">{{ t('+ New Salary', '+ راتب جديد') }}</a>
+    <a href="{{ url_for('payroll.salary_grades') }}" class="pf-btn pf-btn-secondary">{{ t('⚙ Grades', '⚙ الدرجات') }}</a>
     <form method="post" action="{{ url_for('payroll.bulk_generate') }}" style="display:inline">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="year" value="{{ year }}">
       <input type="hidden" name="month" value="{{ month }}">
       <button type="submit" class="pf-btn pf-btn-secondary"
         onclick="return confirm('Bulk-generate Draft salaries for all staff without records this period?')">
-        ⚡ Bulk Generate
+        {{ t('⚡ Bulk Generate', '⚡ إنشاء جماعي') }}
       </button>
     </form>
   </div>
@@ -35,34 +35,34 @@
 <div class="pf-stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:24px">
   <div class="pf-stat-card">
     <div class="pf-stat-value">{{ stats.total }}</div>
-    <div class="pf-stat-label">Total Records</div>
+    <div class="pf-stat-label">{{ t('Total Records', 'إجمالي السجلات') }}</div>
   </div>
   <div class="pf-stat-card" style="border-top:3px solid #6b7280">
     <div class="pf-stat-value">{{ stats.draft }}</div>
-    <div class="pf-stat-label">Draft</div>
+    <div class="pf-stat-label">{{ t('Draft', 'مسودة') }}</div>
   </div>
   <div class="pf-stat-card" style="border-top:3px solid #2563eb">
     <div class="pf-stat-value">{{ stats.approved }}</div>
-    <div class="pf-stat-label">Approved</div>
+    <div class="pf-stat-label">{{ t('Approved', 'معتمد') }}</div>
   </div>
   <div class="pf-stat-card" style="border-top:3px solid #16a34a">
     <div class="pf-stat-value">{{ stats.paid }}</div>
-    <div class="pf-stat-label">Paid</div>
+    <div class="pf-stat-label">{{ t('Paid', 'مدفوع') }}</div>
   </div>
   <div class="pf-stat-card" style="border-top:3px solid #16a34a">
     <div class="pf-stat-value">EGP {{ '{:,.0f}'.format(stats.total_paid) }}</div>
-    <div class="pf-stat-label">Total Paid Out</div>
+    <div class="pf-stat-label">{{ t('Total Paid Out', 'إجمالي المصروف') }}</div>
   </div>
   <div class="pf-stat-card" style="border-top:3px solid #f59e0b">
     <div class="pf-stat-value">EGP {{ '{:,.0f}'.format(stats.total_pending) }}</div>
-    <div class="pf-stat-label">Pending Payment</div>
+    <div class="pf-stat-label">{{ t('Pending Payment', 'في انتظار السداد') }}</div>
   </div>
 </div>
 
 {% if active_staff > stats.total %}
 <div class="pf-alert pf-alert-warning" style="margin-bottom:16px">
   ⚠ <strong>{{ active_staff - stats.total }}</strong> active staff have no salary record for this period.
-  Use <strong>Bulk Generate</strong> to create draft records.
+  Use <strong>{{ t('Bulk Generate', 'إنشاء جماعي') }}</strong> {{ t('to create draft records.', 'لإنشاء سجلات مسودة.') }}
 </div>
 {% endif %}
 
@@ -71,9 +71,9 @@
   <div class="pf-table-wrapper">
     <table class="pf-table">
       <thead><tr>
-        <th>Staff</th><th>Role</th>
-        <th>Basic</th><th>Allowances</th><th>Deductions</th>
-        <th>Gross</th><th>Net</th><th>Status</th><th>Actions</th>
+        <th>{{ t('Staff', 'الموظف') }}</th><th>{{ t('Role', 'الدور') }}</th>
+        <th>{{ t('Basic', 'الأساسي') }}</th><th>{{ t('Allowances', 'البدلات') }}</th><th>{{ t('Deductions', 'الاستقطاعات') }}</th>
+        <th>{{ t('Gross', 'الإجمالي') }}</th><th>{{ t('Net', 'الصافي') }}</th><th>{{ t('Status', 'الحالة') }}</th><th>{{ t('Actions', 'إجراءات') }}</th>
       </tr></thead>
       <tbody>
         {% for r in recent %}
@@ -91,18 +91,18 @@
             </span>
           </td>
           <td>
-            <a href="{{ url_for('payroll.salary_detail', sid=r.id) }}" class="pf-btn pf-btn-sm pf-btn-secondary">View</a>
+            <a href="{{ url_for('payroll.salary_detail', sid=r.id) }}" class="pf-btn pf-btn-sm pf-btn-secondary">{{ t('View', 'عرض') }}</a>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="9" style="text-align:center;color:#6b7280;padding:32px">No salary records for this period.</td></tr>
+        <tr><td colspan="9" style="text-align:center;color:#6b7280;padding:32px">{{ t('No salary records for this period.', 'لا توجد سجلات رواتب لهذه الفترة.') }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% if recent %}
   <div style="padding:12px 16px">
-    <a href="{{ url_for('payroll.salaries_list', year=year, month=month) }}" class="pf-btn pf-btn-secondary">View All →</a>
+    <a href="{{ url_for('payroll.salaries_list', year=year, month=month) }}" class="pf-btn pf-btn-secondary">{{ t('View All →', 'عرض الكل ←') }}</a>
   </div>
   {% endif %}
 </div>

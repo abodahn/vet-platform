@@ -4,8 +4,8 @@
 {% block page_sub %}{{ order.created_at[:16].replace('T',' ') if order.created_at else '' }} · {{ order.status|capitalize }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('petshop.orders') }}" class="pf-btn pf-btn-secondary">← Orders</a>
-<a href="{{ url_for('petshop.pos') }}" class="pf-btn pf-btn-primary">🛒 New Sale</a>
+<a href="{{ url_for('petshop.orders') }}" class="pf-btn pf-btn-secondary">{{ t('← Orders', '← الطلبات') }}</a>
+<a href="{{ url_for('petshop.pos') }}" class="pf-btn pf-btn-primary">{{ t('🛒 New Sale', '🛒 عملية بيع جديدة') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -34,15 +34,15 @@
   <!-- Left: items -->
   <div>
     <div class="od-card">
-      <div class="od-section-title">🧾 Order Items</div>
+      <div class="od-section-title">{{ t('🧾 Order Items', '🧾 بنود الطلب') }}</div>
       {% if items %}
       <table class="tbl">
         <thead>
           <tr>
-            <th>Product</th>
-            <th style="text-align:center">Qty</th>
-            <th style="text-align:right">Unit Price</th>
-            <th style="text-align:right">Line Total</th>
+            <th>{{ t('Product', 'المنتج') }}</th>
+            <th style="text-align:center">{{ t('Qty', 'الكمية') }}</th>
+            <th style="text-align:right">{{ t('Unit Price', 'سعر الوحدة') }}</th>
+            <th style="text-align:right">{{ t('Line Total', 'إجمالي البند') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -60,7 +60,7 @@
         </tbody>
       </table>
       {% else %}
-      <div style="text-align:center;padding:24px;color:var(--cl-text-muted)">No items found</div>
+      <div style="text-align:center;padding:24px;color:var(--cl-text-muted)">{{ t('No items found', 'لا توجد أصناف') }}</div>
       {% endif %}
     </div>
   </div>
@@ -69,20 +69,20 @@
   <div style="display:flex;flex-direction:column;gap:16px">
     <!-- Totals -->
     <div class="od-card">
-      <div class="od-section-title">💰 Totals</div>
+      <div class="od-section-title">{{ t('💰 Totals', '💰 الإجماليات') }}</div>
       <div class="total-row">
-        <span style="color:var(--cl-text-muted)">Subtotal</span>
+        <span style="color:var(--cl-text-muted)">{{ t('Subtotal', 'المجموع الفرعي') }}</span>
         <span>{{ "{:,.2f}".format(order.subtotal) }} EGP</span>
       </div>
       {% if order.discount_amount and order.discount_amount > 0 %}
       <div class="total-row">
-        <span style="color:#dc2626">Discount</span>
+        <span style="color:#dc2626">{{ t('Discount', 'الخصم') }}</span>
         <span style="color:#dc2626">− {{ "{:,.2f}".format(order.discount_amount) }} EGP</span>
       </div>
       {% endif %}
       {% if order.tax_amount and order.tax_amount > 0 %}
       <div class="total-row">
-        <span style="color:var(--cl-text-muted)">Tax</span>
+        <span style="color:var(--cl-text-muted)">{{ t('Tax', 'الضريبة') }}</span>
         <span>{{ "{:,.2f}".format(order.tax_amount) }} EGP</span>
       </div>
       {% endif %}
@@ -106,24 +106,24 @@
     <div class="od-card">
       <div class="od-section-title">📋 Details</div>
       <div class="meta-row">
-        <span class="meta-label">Status</span>
+        <span class="meta-label">{{ t('Status', 'الحالة') }}</span>
         <span class="meta-value"><span class="status-{{ order.status }}">{{ order.status }}</span></span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Customer</span>
+        <span class="meta-label">{{ t('Customer', 'العميل') }}</span>
         <span class="meta-value">{{ order.owner_name or 'Walk-in' }}</span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Payment</span>
+        <span class="meta-label">{{ t('Payment', 'الدفع') }}</span>
         <span class="meta-value">{{ (order.payment_method or 'cash')|capitalize }}</span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Date</span>
+        <span class="meta-label">{{ t('Date', 'التاريخ') }}</span>
         <span class="meta-value">{{ order.created_at[:16].replace('T',' ') if order.created_at else '—' }}</span>
       </div>
       {% if order.notes %}
       <div class="meta-row">
-        <span class="meta-label">Notes</span>
+        <span class="meta-label">{{ t('Notes', 'ملاحظات') }}</span>
         <span class="meta-value" style="font-size:12px">{{ order.notes }}</span>
       </div>
       {% endif %}
@@ -136,7 +136,7 @@
         <a href="{{ url_for('petshop.order_detail', oid=order.id) }}?print=1" target="_blank"
            style="display:block;text-align:center;padding:10px;background:var(--cl-primary-subtle);
                   color:var(--cl-primary);border-radius:8px;font-weight:700;font-size:13px;text-decoration:none">
-          🖨️ Print Receipt
+          {{ t('🖨️ Print Receipt', '🖨️ طباعة الإيصال') }}
         </a>
         {% if order.status == 'paid' %}
         <form method="post" action="{{ url_for('petshop.order_cancel', oid=order.id) }}"

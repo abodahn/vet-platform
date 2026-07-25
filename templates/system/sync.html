@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Sync Dashboard{% endblock %}
-{% block page_title %}Sync Dashboard{% endblock %}
-{% block page_sub %}Offline queue management · conflict resolution · device registry{% endblock %}
+{% block title %}{{ t('Sync Dashboard', 'لوحة المزامنة') }}{% endblock %}
+{% block page_title %}{{ t('Sync Dashboard', 'لوحة المزامنة') }}{% endblock %}
+{% block page_sub %}{{ t('Offline queue management · conflict resolution · device registry', 'إدارة الطابور دون اتصال · حل التعارضات · سجل الأجهزة') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">← System Monitor</a>
-<button class="pf-btn pf-btn-secondary" onclick="location.reload()">↻ Refresh</button>
+<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">{{ t('← System Monitor', '← مراقبة النظام') }}</a>
+<button class="pf-btn pf-btn-secondary" onclick="location.reload()">{{ t('↻ Refresh', '↻ تحديث') }}</button>
 {% endblock %}
 
 {% block head_extra %}
@@ -146,19 +146,19 @@
   <div class="stat-row">
     <div class="stat-chip chip-pending">
       <div class="chip-num">{{ sync_stats.pending }}</div>
-      <div class="chip-lbl">Pending</div>
+      <div class="chip-lbl">{{ t('Pending', 'قيد الانتظار') }}</div>
     </div>
     <div class="stat-chip chip-synced">
       <div class="chip-num">{{ sync_stats.synced }}</div>
-      <div class="chip-lbl">Synced</div>
+      <div class="chip-lbl">{{ t('Synced', 'متزامن') }}</div>
     </div>
     <div class="stat-chip chip-failed">
       <div class="chip-num">{{ sync_stats.failed }}</div>
-      <div class="chip-lbl">Failed</div>
+      <div class="chip-lbl">{{ t('Failed', 'فشل') }}</div>
     </div>
     <div class="stat-chip chip-conflict">
       <div class="chip-num">{{ sync_stats.conflicts }}</div>
-      <div class="chip-lbl">Conflicts</div>
+      <div class="chip-lbl">{{ t('Conflicts', 'التعارضات') }}</div>
     </div>
   </div>
 
@@ -169,7 +169,7 @@
         ⚠️ Unresolved Conflicts
         {% if conflicts %}<span class="ibadge b-conflict">{{ conflicts|length }}</span>{% endif %}
       </div>
-      <span style="font-size:12px;color:var(--text-muted);">Choose which version to keep — local (device) or server</span>
+      <span style="font-size:12px;color:var(--text-muted);">{{ t('Choose which version to keep — local (device) or server', 'اختر النسخة التي تريد الاحتفاظ بها — المحلية (الجهاز) أو الخادم') }}</span>
     </div>
 
     {% if conflicts %}
@@ -187,11 +187,11 @@
 
         <div class="conflict-payloads">
           <div class="payload-panel local">
-            <div class="payload-lbl">Device version (local)</div>
+            <div class="payload-lbl">{{ t('Device version (local)', 'نسخة الجهاز (محلية)') }}</div>
             <div class="payload-json">{{ c.local_payload or 'No data' }}</div>
           </div>
           <div class="payload-panel server">
-            <div class="payload-lbl">Server version (current)</div>
+            <div class="payload-lbl">{{ t('Server version (current)', 'نسخة الخادم (الحالية)') }}</div>
             <div class="payload-json">{{ c.server_payload or 'No data' }}</div>
           </div>
         </div>
@@ -201,13 +201,13 @@
                 onsubmit="return confirm('Keep LOCAL version? This overwrites server data.')" style="display:inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="keep" value="local">
-            <button class="btn-keep-local">Keep Local</button>
+            <button class="btn-keep-local">{{ t('Keep Local', 'الاحتفاظ بالمحلية') }}</button>
           </form>
           <form method="post" action="{{ url_for('system.sync_resolve_conflict', conflict_id=c.id) }}"
                 onsubmit="return confirm('Keep SERVER version? Device change will be discarded.')" style="display:inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="keep" value="server">
-            <button class="btn-keep-server">Keep Server</button>
+            <button class="btn-keep-server">{{ t('Keep Server', 'الاحتفاظ بالخادم') }}</button>
           </form>
         </div>
       </div>
@@ -215,7 +215,7 @@
     {% else %}
       <div class="empty">
         <div class="empty-icon">✅</div>
-        <div>No unresolved conflicts — everything is in sync.</div>
+        <div>{{ t('No unresolved conflicts — everything is in sync.', 'لا توجد تعارضات غير محلولة — كل شيء متزامن.') }}</div>
       </div>
     {% endif %}
   </div>
@@ -223,31 +223,31 @@
   {# ─── SYNC QUEUE ─── #}
   <div class="sec">
     <div class="sec-hdr">
-      <div class="sec-title">⚡ Sync Queue</div>
-      <span style="font-size:12px;color:var(--text-muted);">Last 100 items</span>
+      <div class="sec-title">{{ t('⚡ Sync Queue', '⚡ طابور المزامنة') }}</div>
+      <span style="font-size:12px;color:var(--text-muted);">{{ t('Last 100 items', 'آخر 100 عنصر') }}</span>
     </div>
 
     <form method="get" action="{{ url_for('system.sync_dashboard') }}" class="filter-bar">
       <select name="status">
-        <option value="">All Statuses</option>
+        <option value="">{{ t('All Statuses', 'جميع الحالات') }}</option>
         {% for s in ['PENDING','SYNCING','SYNCED','FAILED','CONFLICT'] %}
         <option value="{{ s }}" {{ 'selected' if f_status == s }}>{{ s }}</option>
         {% endfor %}
       </select>
       <select name="device">
-        <option value="">All Devices</option>
+        <option value="">{{ t('All Devices', 'جميع الأجهزة') }}</option>
         {% for d in device_ids %}
         <option value="{{ d }}" {{ 'selected' if f_device == d }}>{{ d[:28] }}</option>
         {% endfor %}
       </select>
       <select name="entity">
-        <option value="">All Entities</option>
+        <option value="">{{ t('All Entities', 'جميع الكيانات') }}</option>
         {% for e in entity_names %}
         <option value="{{ e }}" {{ 'selected' if f_entity == e }}>{{ e }}</option>
         {% endfor %}
       </select>
-      <button type="submit" class="btn-apply">Filter</button>
-      <a href="{{ url_for('system.sync_dashboard') }}" class="btn-clear">Clear</a>
+      <button type="submit" class="btn-apply">{{ t('Filter', 'تصفية') }}</button>
+      <a href="{{ url_for('system.sync_dashboard') }}" class="btn-clear">{{ t('Clear', 'مسح') }}</a>
     </form>
 
     {% if queue_items %}
@@ -255,8 +255,8 @@
       <table class="dt">
         <thead>
           <tr>
-            <th>Time</th><th>Status</th><th>Entity</th><th>Operation</th>
-            <th>Device</th><th>User</th><th>Retries</th><th>Payload</th><th>Error</th>
+            <th>{{ t('Time', 'الوقت') }}</th><th>{{ t('Status', 'الحالة') }}</th><th>{{ t('Entity', 'الكيان') }}</th><th>{{ t('Operation', 'العملية') }}</th>
+            <th>{{ t('Device', 'الجهاز') }}</th><th>{{ t('User', 'المستخدم') }}</th><th>{{ t('Retries', 'المحاولات') }}</th><th>{{ t('Payload', 'الحمولة') }}</th><th>{{ t('Error', 'خطأ') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -281,7 +281,7 @@
             </td>
             <td>
               {% if item.payload %}
-              <button class="payload-toggle" onclick="togglePayload(this)">View</button>
+              <button class="payload-toggle" onclick="togglePayload(this)">{{ t('View', 'عرض') }}</button>
               <div class="payload-box">{{ item.payload }}</div>
               {% else %}—{% endif %}
             </td>
@@ -307,8 +307,8 @@
   {# ─── DEVICES ─── #}
   <div class="sec" id="devices">
     <div class="sec-hdr">
-      <div class="sec-title">📱 Registered Devices <span class="ibadge b-info">{{ devices|length }}</span></div>
-      <span style="font-size:12px;color:var(--text-muted);">Active = seen within 1 hour</span>
+      <div class="sec-title">{{ t('📱 Registered Devices', '📱 الأجهزة المسجلة') }} <span class="ibadge b-info">{{ devices|length }}</span></div>
+      <span style="font-size:12px;color:var(--text-muted);">{{ t('Active = seen within 1 hour', 'نشط = ظهر خلال ساعة') }}</span>
     </div>
 
     {% if devices %}
@@ -327,19 +327,19 @@
             {{ 'Active' if dev.is_active else 'Inactive' }}
           </span>
         </div>
-        <div class="dev-row"><span>Platform</span><strong>{{ dev.platform or '—' }}</strong></div>
-        <div class="dev-row"><span>App Version</span><strong>{{ dev.app_version or '—' }}</strong></div>
-        <div class="dev-row"><span>User ID</span><strong>{{ dev.user_id or '—' }}</strong></div>
-        <div class="dev-row"><span>Last Online</span><strong>{{ (dev.last_online_at or '')[:16] or 'Never' }}</strong></div>
-        <div class="dev-row"><span>Last Sync</span><strong>{{ (dev.last_sync_at or '')[:16] or 'Never' }}</strong></div>
-        <div class="dev-row"><span>Registered</span><strong>{{ (dev.created_at or '')[:10] or '—' }}</strong></div>
+        <div class="dev-row"><span>{{ t('Platform', 'المنصة') }}</span><strong>{{ dev.platform or '—' }}</strong></div>
+        <div class="dev-row"><span>{{ t('App Version', 'إصدار التطبيق') }}</span><strong>{{ dev.app_version or '—' }}</strong></div>
+        <div class="dev-row"><span>{{ t('User ID', 'معرّف المستخدم') }}</span><strong>{{ dev.user_id or '—' }}</strong></div>
+        <div class="dev-row"><span>{{ t('Last Online', 'آخر اتصال') }}</span><strong>{{ (dev.last_online_at or '')[:16] or 'Never' }}</strong></div>
+        <div class="dev-row"><span>{{ t('Last Sync', 'آخر مزامنة') }}</span><strong>{{ (dev.last_sync_at or '')[:16] or 'Never' }}</strong></div>
+        <div class="dev-row"><span>{{ t('Registered', 'مسجل') }}</span><strong>{{ (dev.created_at or '')[:10] or '—' }}</strong></div>
       </div>
       {% endfor %}
     </div>
     {% else %}
     <div class="empty">
       <div class="empty-icon">📵</div>
-      <div>No devices registered yet — appear when offline sync first connects.</div>
+      <div>{{ t('No devices registered yet — appear when offline sync first connects.', 'لا توجد أجهزة مسجلة بعد — تظهر عند أول اتصال للمزامنة دون اتصال.') }}</div>
     </div>
     {% endif %}
   </div>

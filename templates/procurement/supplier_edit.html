@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Edit Supplier{% endblock %}
-{% block page_title %}Edit Supplier{% endblock %}
+{% block title %}{{ t('Edit Supplier', 'تعديل المورد') }}{% endblock %}
+{% block page_title %}{{ t('Edit Supplier', 'تعديل المورد') }}{% endblock %}
 {% block page_sub %}Update supplier information{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('procurement.supplier_detail', supplier_id=supplier.id) }}" class="pf-btn pf-btn-ghost">← Back</a>
+<a href="{{ url_for('procurement.supplier_detail', supplier_id=supplier.id) }}" class="pf-btn pf-btn-ghost">{{ t('← Back', '← رجوع') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -20,44 +20,44 @@
         <input type="text" name="name" class="pf-input" style="width:100%" required value="{{ supplier.name or '' }}">
       </div>
       <div>
-        <label class="pf-label">Contact Person</label>
+        <label class="pf-label">{{ t('Contact Person', 'مسؤول التواصل') }}</label>
         <input type="text" name="contact_person" class="pf-input" style="width:100%" value="{{ supplier.contact_person or '' }}">
       </div>
       <div>
-        <label class="pf-label">Phone</label>
+        <label class="pf-label">{{ t('Phone', 'الهاتف') }}</label>
         <input type="text" name="phone" class="pf-input" style="width:100%" value="{{ supplier.phone or '' }}">
       </div>
       <div>
-        <label class="pf-label">Email</label>
+        <label class="pf-label">{{ t('Email', 'البريد الإلكتروني') }}</label>
         <input type="email" name="email" class="pf-input" style="width:100%" value="{{ supplier.email or '' }}">
       </div>
       <div>
-        <label class="pf-label">Payment Terms</label>
+        <label class="pf-label">{{ t('Payment Terms', 'شروط الدفع') }}</label>
         <select name="payment_terms" class="pf-input" style="width:100%">
-          {% for t in ['Net 30','Net 15','Net 60','Due on Receipt','Prepaid'] %}
-          <option {{ 'selected' if supplier.payment_terms == t }}>{{ t }}</option>
+          {% for pterm in ['Net 30','Net 15','Net 60','Due on Receipt','Prepaid'] %}
+          <option {{ 'selected' if supplier.payment_terms == pterm }}>{{ pterm }}</option>
           {% endfor %}
         </select>
       </div>
       <div style="grid-column:1/-1">
-        <label class="pf-label">Address</label>
+        <label class="pf-label">{{ t('Address', 'العنوان') }}</label>
         <input type="text" name="address" class="pf-input" style="width:100%" value="{{ supplier.address or '' }}">
       </div>
       <div style="grid-column:1/-1">
-        <label class="pf-label">Notes</label>
+        <label class="pf-label">{{ t('Notes', 'ملاحظات') }}</label>
         <textarea name="notes" class="pf-input" style="width:100%;min-height:80px;resize:vertical">{{ supplier.notes or '' }}</textarea>
       </div>
       <div>
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:6px">
           <input type="checkbox" name="is_active" value="1" {{ 'checked' if supplier.is_active }} style="width:18px;height:18px">
-          <span class="pf-label" style="margin:0">Active</span>
+          <span class="pf-label" style="margin:0">{{ t('Active', 'نشط') }}</span>
         </label>
       </div>
     </div>
   </div>
   <div style="display:flex;gap:12px">
-    <button type="submit" class="pf-btn pf-btn-primary">💾 Save Changes</button>
-    <a href="{{ url_for('procurement.supplier_detail', supplier_id=supplier.id) }}" class="pf-btn pf-btn-ghost">Cancel</a>
+    <button type="submit" class="pf-btn pf-btn-primary">{{ t('💾 Save Changes', '💾 حفظ التغييرات') }}</button>
+    <a href="{{ url_for('procurement.supplier_detail', supplier_id=supplier.id) }}" class="pf-btn pf-btn-ghost">{{ t('Cancel', 'إلغاء') }}</a>
   </div>
 </form>
 </div>

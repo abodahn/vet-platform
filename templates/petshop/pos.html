@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Point of Sale{% endblock %}
-{% block page_title %}Point of Sale{% endblock %}
+{% block title %}{{ t('Point of Sale', 'نقطة البيع') }}{% endblock %}
+{% block page_title %}{{ t('Point of Sale', 'نقطة البيع') }}{% endblock %}
 {% block page_sub %}Search products, add to cart, and record payment{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('petshop.orders') }}" class="pf-btn pf-btn-secondary">🧾 Orders</a>
-<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+<a href="{{ url_for('petshop.orders') }}" class="pf-btn pf-btn-secondary">{{ t('🧾 Orders', '🧾 الطلبات') }}</a>
+<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -84,7 +84,7 @@
     <div class="pos-search">
       <input type="search" id="prod-search" placeholder="🔍  Search product by name, SKU, or barcode…" autocomplete="off">
       <div class="cat-tabs">
-        <div class="cat-tab active" data-cat="">All</div>
+        <div class="cat-tab active" data-cat="">{{ t('All', 'الكل') }}</div>
         {% for c in categories %}
         <div class="cat-tab" data-cat="{{ c.id }}">{{ c.name }}</div>
         {% endfor %}
@@ -120,7 +120,7 @@
     <div class="cart-card">
       <div class="cart-head">
         🛒 Cart
-        <button onclick="clearCart()" style="background:none;border:none;color:var(--cl-danger,#dc2626);cursor:pointer;font-size:12px;font-weight:600">Clear</button>
+        <button onclick="clearCart()" style="background:none;border:none;color:var(--cl-danger,#dc2626);cursor:pointer;font-size:12px;font-weight:600">{{ t('Clear', 'مسح') }}</button>
       </div>
 
       <div class="cart-items" id="cart-items">
@@ -131,14 +131,14 @@
       </div>
 
       <div class="cart-totals">
-        <div class="tot-row"><span>Subtotal</span><span id="sub-total">0.00 EGP</span></div>
-        <div class="tot-row"><span>Discount</span>
+        <div class="tot-row"><span>{{ t('Subtotal', 'المجموع الفرعي') }}</span><span id="sub-total">{{ t('0.00 EGP', '0.00 جنيه') }}</span></div>
+        <div class="tot-row"><span>{{ t('Discount', 'الخصم') }}</span>
           <span><input type="number" id="discount-inp" min="0" step="0.5" value="0"
                         style="width:70px;padding:3px 6px;border:1px solid var(--cl-border);border-radius:5px;background:var(--cl-bg);color:var(--cl-text);font-size:12px;text-align:right"
-                        oninput="recalc()"> EGP</span>
+                        oninput="recalc()"> {{ t('EGP', 'جنيه') }}</span>
         </div>
-        <div class="tot-row"><span>Tax</span><span id="tax-total">0.00 EGP</span></div>
-        <div class="tot-row tot-grand"><span>TOTAL</span><span id="grand-total">0.00 EGP</span></div>
+        <div class="tot-row"><span>{{ t('Tax', 'الضريبة') }}</span><span id="tax-total">{{ t('0.00 EGP', '0.00 جنيه') }}</span></div>
+        <div class="tot-row tot-grand"><span>{{ t('TOTAL', 'الإجمالي') }}</span><span id="grand-total">{{ t('0.00 EGP', '0.00 جنيه') }}</span></div>
       </div>
 
       <div class="pay-section">
@@ -161,7 +161,7 @@
         <div id="change-line" style="font-size:13px;font-weight:700;color:#15803d;text-align:right;min-height:18px"></div>
 
         <button class="charge-btn" id="charge-btn" onclick="submitOrder()" disabled>
-          ✅ Charge — <span id="btn-total">0.00</span> EGP
+          ✅ Charge — <span id="btn-total">0.00</span> {{ t('EGP', 'جنيه') }}
         </button>
       </div>
     </div>
@@ -175,7 +175,7 @@
     <div style="font-size:20px;font-weight:800;color:var(--cl-primary);margin-bottom:6px">Sale Complete!</div>
     <div id="receipt-info" style="font-size:14px;color:var(--cl-text-muted);margin-bottom:20px"></div>
     <div style="display:flex;gap:10px;justify-content:center">
-      <a id="receipt-link" href="#" target="_blank" class="pf-btn pf-btn-secondary" style="text-decoration:none">🖨️ Print Receipt</a>
+      <a id="receipt-link" href="#" target="_blank" class="pf-btn pf-btn-secondary" style="text-decoration:none">{{ t('🖨️ Print Receipt', '🖨️ طباعة الإيصال') }}</a>
       <button onclick="newSale()" class="pf-btn pf-btn-primary">+ New Sale</button>
     </div>
   </div>

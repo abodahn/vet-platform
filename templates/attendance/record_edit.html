@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Edit Attendance Record{% endblock %}
-{% block page_title %}Edit Attendance Record{% endblock %}
+{% block title %}{{ t('Edit Attendance Record', 'تعديل سجل الحضور') }}{% endblock %}
+{% block page_title %}{{ t('Edit Attendance Record', 'تعديل سجل الحضور') }}{% endblock %}
 {% block page_sub %}{{ staff_name }} — {{ rec.work_date }}{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('attendance.records_list') }}" class="pf-btn pf-btn-sm">← Records</a>
+  <a href="{{ url_for('attendance.records_list') }}" class="pf-btn pf-btn-sm">{{ t('← Records', '← السجلات') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -12,28 +12,28 @@
   <div class="pf-card">
     <div class="pf-card-header">
       <div>
-        <div class="pf-card-title">✏️ Edit Record</div>
+        <div class="pf-card-title">{{ t('✏️ Edit Record', '✏️ تعديل السجل') }}</div>
         <div class="pf-card-sub">{{ staff_name }} · {{ rec.work_date }}</div>
       </div>
     </div>
     <form method="POST">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div class="pf-form-group">
-          <label class="pf-form-label">Check In Time</label>
+          <label class="pf-form-label">{{ t('Check In Time', 'وقت الدخول') }}</label>
           <input type="time" name="check_in" class="pf-form-control" value="{{ rec.check_in or '' }}">
         </div>
         <div class="pf-form-group">
-          <label class="pf-form-label">Check Out Time</label>
+          <label class="pf-form-label">{{ t('Check Out Time', 'وقت الخروج') }}</label>
           <input type="time" name="check_out" class="pf-form-control" value="{{ rec.check_out or '' }}">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div class="pf-form-group">
-          <label class="pf-form-label">Break (minutes)</label>
+          <label class="pf-form-label">{{ t('Break (minutes)', 'الاستراحة (دقائق)') }}</label>
           <input type="number" name="break_minutes" class="pf-form-control" value="{{ rec.break_minutes or 0 }}" min="0" max="480">
         </div>
         <div class="pf-form-group">
-          <label class="pf-form-label">Status</label>
+          <label class="pf-form-label">{{ t('Status', 'الحالة') }}</label>
           <select name="status" class="pf-form-control">
             {% for st in ['Present','Late','Absent','Leave','Holiday'] %}
             <option value="{{ st }}" {% if rec.status == st %}selected{% endif %}>{{ st }}</option>
@@ -42,12 +42,12 @@
         </div>
       </div>
       <div class="pf-form-group">
-        <label class="pf-form-label">Notes</label>
+        <label class="pf-form-label">{{ t('Notes', 'ملاحظات') }}</label>
         <textarea name="notes" class="pf-form-control" rows="3">{{ rec.notes or '' }}</textarea>
       </div>
       <div style="display:flex;gap:10px;margin-top:8px">
-        <button type="submit" class="pf-btn pf-btn-primary">Save Changes</button>
-        <a href="{{ url_for('attendance.records_list') }}" class="pf-btn pf-btn-sm">Cancel</a>
+        <button type="submit" class="pf-btn pf-btn-primary">{{ t('Save Changes', 'حفظ التغييرات') }}</button>
+        <a href="{{ url_for('attendance.records_list') }}" class="pf-btn pf-btn-sm">{{ t('Cancel', 'إلغاء') }}</a>
       </div>
     </form>
   </div>

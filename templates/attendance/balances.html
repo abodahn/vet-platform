@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Leave Balances{% endblock %}
-{% block page_title %}Leave Balances{% endblock %}
+{% block title %}{{ t('Leave Balances', 'أرصدة الإجازات') }}{% endblock %}
+{% block page_title %}{{ t('Leave Balances', 'أرصدة الإجازات') }}{% endblock %}
 {% block page_sub %}{{ year }} — {{ users|length }} staff members{% endblock %}
 
 {% block topbar_actions %}
@@ -11,8 +11,8 @@
       {% endfor %}
     </select>
   </form>
-  <a href="{{ url_for('attendance.leave_types') }}" class="pf-btn pf-btn-sm">Leave Types</a>
-  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+  <a href="{{ url_for('attendance.leave_types') }}" class="pf-btn pf-btn-sm">{{ t('Leave Types', 'أنواع الإجازات') }}</a>
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -21,7 +21,7 @@
 <div id="balance-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
   <div class="pf-card" style="width:400px;max-width:95vw">
     <div class="pf-card-header">
-      <div class="pf-card-title">⚖️ Set Balance</div>
+      <div class="pf-card-title">{{ t('⚖️ Set Balance', '⚖️ تعيين الرصيد') }}</div>
       <button onclick="closeModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--cl-text-muted)">✕</button>
     </div>
     <form method="POST" action="{{ url_for('attendance.balance_set') }}">
@@ -33,22 +33,22 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
         <div class="pf-form-group">
-          <label class="pf-form-label">Allocated</label>
+          <label class="pf-form-label">{{ t('Allocated', 'المخصص') }}</label>
           <input type="number" name="allocated" id="modal-alloc" class="pf-form-control" step="0.5" min="0">
         </div>
         <div class="pf-form-group">
-          <label class="pf-form-label">Used</label>
+          <label class="pf-form-label">{{ t('Used', 'المستخدم') }}</label>
           <input type="number" name="used" id="modal-used" class="pf-form-control" step="0.5" min="0">
         </div>
         <div class="pf-form-group">
-          <label class="pf-form-label">Pending</label>
+          <label class="pf-form-label">{{ t('Pending', 'قيد الانتظار') }}</label>
           <input type="number" name="pending" id="modal-pending" class="pf-form-control" step="0.5" min="0">
         </div>
       </div>
-      <div style="font-size:12px;color:var(--cl-text-muted);margin-bottom:12px">Remaining = Allocated − Used − Pending</div>
+      <div style="font-size:12px;color:var(--cl-text-muted);margin-bottom:12px">{{ t('Remaining = Allocated − Used − Pending', 'المتبقي = المخصص − المستخدم − المعلق') }}</div>
       <div style="display:flex;gap:10px">
-        <button type="submit" class="pf-btn pf-btn-primary">Save Balance</button>
-        <button type="button" class="pf-btn pf-btn-sm" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="pf-btn pf-btn-primary">{{ t('Save Balance', 'حفظ الرصيد') }}</button>
+        <button type="button" class="pf-btn pf-btn-sm" onclick="closeModal()">{{ t('Cancel', 'إلغاء') }}</button>
       </div>
     </form>
   </div>
@@ -59,13 +59,13 @@
   <div class="pf-card-header">
     <div>
       <div class="pf-card-title">📊 Balance Matrix — {{ year }}</div>
-      <div class="pf-card-sub">Click any cell to set/edit the balance for that staff member</div>
+      <div class="pf-card-sub">{{ t('Click any cell to set/edit the balance for that staff member', 'اضغط على أي خانة لتعيين/تعديل رصيد ذلك الموظف') }}</div>
     </div>
   </div>
   <table class="pf-table" style="min-width:700px">
     <thead>
       <tr>
-        <th style="min-width:160px">Staff Member</th>
+        <th style="min-width:160px">{{ t('Staff Member', 'الموظف') }}</th>
         {% for lt in ltypes %}
         <th style="text-align:center;min-width:120px">
           <span style="display:flex;align-items:center;gap:4px;justify-content:center">
@@ -96,7 +96,7 @@
           <div style="font-size:10px;color:var(--cl-text-muted)">/ {{ '%.1f'|format(b.allocated) }}</div>
           {% else %}
           <div style="color:var(--cl-text-muted);font-size:12px">—</div>
-          <div style="font-size:10px;color:var(--cl-text-muted)">click to set</div>
+          <div style="font-size:10px;color:var(--cl-text-muted)">{{ t('click to set', 'اضغط للتعيين') }}</div>
           {% endif %}
         </td>
         {% endfor %}

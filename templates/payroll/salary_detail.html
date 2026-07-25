@@ -3,15 +3,15 @@
 {% block content %}
 <div class="pf-page-header">
   <div>
-    <h1 class="pf-page-title">💰 Salary Record</h1>
+    <h1 class="pf-page-title">{{ t('💰 Salary Record', '💰 سجل الراتب') }}</h1>
     <p class="pf-page-subtitle">{{ salary.full_name }} — {{ salary.period_year }}-{{ '%02d'|format(salary.period_month) }}</p>
   </div>
   <div class="pf-topbar-actions">
-    <a href="{{ url_for('payroll.salaries_list', year=salary.period_year, month=salary.period_month) }}" class="pf-btn pf-btn-secondary">← Back</a>
+    <a href="{{ url_for('payroll.salaries_list', year=salary.period_year, month=salary.period_month) }}" class="pf-btn pf-btn-secondary">{{ t('← Back', '← رجوع') }}</a>
     {% if salary.status != 'Paid' %}
-    <a href="{{ url_for('payroll.salary_edit', sid=salary.id) }}" class="pf-btn pf-btn-secondary">Edit</a>
+    <a href="{{ url_for('payroll.salary_edit', sid=salary.id) }}" class="pf-btn pf-btn-secondary">{{ t('Edit', 'تعديل') }}</a>
     {% endif %}
-    <a href="{{ url_for('payroll.salary_payslip', sid=salary.id) }}" class="pf-btn pf-btn-primary">Download Payslip PDF</a>
+    <a href="{{ url_for('payroll.salary_payslip', sid=salary.id) }}" class="pf-btn pf-btn-primary">{{ t('Download Payslip PDF', 'تحميل قسيمة الراتب PDF') }}</a>
   </div>
 </div>
 
@@ -28,22 +28,22 @@
     <div style="padding:16px">
       <table class="pf-table">
         <tbody>
-          <tr><td>Role</td><td>{{ salary.role }}</td></tr>
-          <tr><td>Period</td><td>{{ salary.period_year }}-{{ '%02d'|format(salary.period_month) }}</td></tr>
-          <tr><td>Basic Salary</td><td>EGP {{ '{:,.2f}'.format(salary.basic_salary) }}</td></tr>
-          <tr><td>Allowances</td><td>EGP {{ '{:,.2f}'.format(salary.allowances) }}</td></tr>
+          <tr><td>{{ t('Role', 'الدور') }}</td><td>{{ salary.role }}</td></tr>
+          <tr><td>{{ t('Period', 'الفترة') }}</td><td>{{ salary.period_year }}-{{ '%02d'|format(salary.period_month) }}</td></tr>
+          <tr><td>{{ t('Basic Salary', 'الراتب الأساسي') }}</td><td>EGP {{ '{:,.2f}'.format(salary.basic_salary) }}</td></tr>
+          <tr><td>{{ t('Allowances', 'البدلات') }}</td><td>EGP {{ '{:,.2f}'.format(salary.allowances) }}</td></tr>
           <tr><td>Overtime ({{ salary.overtime_hours }}h × EGP {{ salary.overtime_rate }})</td>
               <td>EGP {{ '{:,.2f}'.format(salary.overtime_hours * salary.overtime_rate) }}</td></tr>
-          <tr style="color:#dc2626"><td>Deductions</td><td>EGP {{ '{:,.2f}'.format(salary.deductions) }}</td></tr>
-          <tr style="color:#dc2626"><td>Absence Deduction</td><td>EGP {{ '{:,.2f}'.format(salary.absence_deduction) }}</td></tr>
-          <tr style="color:#dc2626"><td>Tax Deduction</td><td>EGP {{ '{:,.2f}'.format(salary.tax_deduction) }}</td></tr>
-          <tr style="font-weight:700"><td>Gross</td><td>EGP {{ '{:,.2f}'.format(salary.gross) }}</td></tr>
-          <tr style="font-weight:700;font-size:1.1em;color:#16a34a"><td>Net Pay</td><td>EGP {{ '{:,.2f}'.format(salary.net) }}</td></tr>
+          <tr style="color:#dc2626"><td>{{ t('Deductions', 'الاستقطاعات') }}</td><td>EGP {{ '{:,.2f}'.format(salary.deductions) }}</td></tr>
+          <tr style="color:#dc2626"><td>{{ t('Absence Deduction', 'استقطاع الغياب') }}</td><td>EGP {{ '{:,.2f}'.format(salary.absence_deduction) }}</td></tr>
+          <tr style="color:#dc2626"><td>{{ t('Tax Deduction', 'استقطاع الضريبة') }}</td><td>EGP {{ '{:,.2f}'.format(salary.tax_deduction) }}</td></tr>
+          <tr style="font-weight:700"><td>{{ t('Gross', 'الإجمالي') }}</td><td>EGP {{ '{:,.2f}'.format(salary.gross) }}</td></tr>
+          <tr style="font-weight:700;font-size:1.1em;color:#16a34a"><td>{{ t('Net Pay', 'صافي الراتب') }}</td><td>EGP {{ '{:,.2f}'.format(salary.net) }}</td></tr>
         </tbody>
       </table>
       {% if salary.notes %}
       <div style="margin-top:16px;padding:12px;background:#f8fafc;border-radius:8px">
-        <strong>Notes:</strong> {{ salary.notes }}
+        <strong>{{ t('Notes:', 'ملاحظات:') }}</strong> {{ salary.notes }}
       </div>
       {% endif %}
     </div>
@@ -55,10 +55,10 @@
     {% if salary.status == 'Draft' %}
     <div class="pf-card">
       <div style="padding:16px">
-        <h3 style="margin:0 0 12px;font-size:1rem">Approve Salary</h3>
+        <h3 style="margin:0 0 12px;font-size:1rem">{{ t('Approve Salary', 'اعتماد الراتب') }}</h3>
         <form method="post" action="{{ url_for('payroll.salary_approve', sid=salary.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button type="submit" class="pf-btn pf-btn-primary" style="width:100%">✅ Approve</button>
+          <button type="submit" class="pf-btn pf-btn-primary" style="width:100%">{{ t('✅ Approve', '✅ اعتماد') }}</button>
         </form>
       </div>
     </div>
@@ -67,7 +67,7 @@
     {% if salary.status == 'Approved' %}
     <div class="pf-card">
       <div style="padding:16px">
-        <h3 style="margin:0 0 12px;font-size:1rem">Mark as Paid</h3>
+        <h3 style="margin:0 0 12px;font-size:1rem">{{ t('Mark as Paid', 'تعليم كمدفوع') }}</h3>
         <form method="post" action="{{ url_for('payroll.salary_pay', sid=salary.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <select name="payment_method" class="pf-input" style="margin-bottom:8px">
@@ -76,7 +76,7 @@
             {% endfor %}
           </select>
           <input type="date" name="payment_date" class="pf-input" value="{{ today.isoformat() if today else '' }}" style="margin-bottom:8px">
-          <button type="submit" class="pf-btn pf-btn-primary" style="width:100%">💸 Mark Paid</button>
+          <button type="submit" class="pf-btn pf-btn-primary" style="width:100%">{{ t('💸 Mark Paid', '💸 تعليم كمدفوع') }}</button>
         </form>
       </div>
     </div>
@@ -85,7 +85,7 @@
     {% if salary.status == 'Paid' %}
     <div class="pf-card" style="border:2px solid #16a34a">
       <div style="padding:16px">
-        <h3 style="margin:0 0 4px;color:#16a34a">✅ Paid</h3>
+        <h3 style="margin:0 0 4px;color:#16a34a">{{ t('✅ Paid', '✅ مدفوع') }}</h3>
         <p style="margin:0;font-size:.9rem">{{ salary.payment_method }}<br>{{ salary.payment_date }}</p>
         {% if payer %}<p style="margin:4px 0 0;font-size:.85rem;color:#6b7280">By {{ payer.full_name }}</p>{% endif %}
       </div>

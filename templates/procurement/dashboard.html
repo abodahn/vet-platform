@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Procurement Dashboard{% endblock %}
-{% block page_title %}Procurement & Suppliers{% endblock %}
-{% block page_sub %}Purchase orders, suppliers, and receiving{% endblock %}
+{% block title %}{{ t('Procurement Dashboard', 'لوحة المشتريات') }}{% endblock %}
+{% block page_title %}{{ t('Procurement & Suppliers', 'المشتريات والموردون') }}{% endblock %}
+{% block page_sub %}{{ t('Purchase orders, suppliers, and receiving', 'أوامر الشراء والموردون والاستلام') }}{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('procurement.order_new_form') }}" class="pf-btn pf-btn-primary">+ New Order</a>
-  <a href="{{ url_for('procurement.suppliers_list') }}" class="pf-btn pf-btn-secondary">Suppliers</a>
-  <a href="{{ url_for('procurement.orders_list') }}" class="pf-btn pf-btn-ghost">All Orders</a>
+  <a href="{{ url_for('procurement.order_new_form') }}" class="pf-btn pf-btn-primary">{{ t('+ New Order', '+ طلب جديد') }}</a>
+  <a href="{{ url_for('procurement.suppliers_list') }}" class="pf-btn pf-btn-secondary">{{ t('Suppliers', 'الموردون') }}</a>
+  <a href="{{ url_for('procurement.orders_list') }}" class="pf-btn pf-btn-ghost">{{ t('All Orders', 'جميع الطلبات') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -17,24 +17,24 @@
 
   <div class="pf-card" style="text-align:center;padding:1.5rem;">
     <div style="font-size:2rem;font-weight:800;color:var(--pf-primary);">{{ supplier_count }}</div>
-    <div style="color:var(--pf-text-muted);margin-top:.25rem;">Suppliers</div>
-    <a href="{{ url_for('procurement.suppliers_list') }}" style="font-size:.8rem;color:var(--pf-primary);">Manage →</a>
+    <div style="color:var(--pf-text-muted);margin-top:.25rem;">{{ t('Suppliers', 'الموردون') }}</div>
+    <a href="{{ url_for('procurement.suppliers_list') }}" style="font-size:.8rem;color:var(--pf-primary);">{{ t('Manage →', 'إدارة ←') }}</a>
   </div>
 
   <div class="pf-card" style="text-align:center;padding:1.5rem;">
     <div style="font-size:2rem;font-weight:800;color:#f59e0b;">{{ open_po_count }}</div>
-    <div style="color:var(--pf-text-muted);margin-top:.25rem;">Open Orders</div>
-    <a href="{{ url_for('procurement.orders_list') }}?status=Draft" style="font-size:.8rem;color:#f59e0b;">View →</a>
+    <div style="color:var(--pf-text-muted);margin-top:.25rem;">{{ t('Open Orders', 'الطلبات المفتوحة') }}</div>
+    <a href="{{ url_for('procurement.orders_list') }}?status=Draft" style="font-size:.8rem;color:#f59e0b;">{{ t('View →', 'عرض ←') }}</a>
   </div>
 
   <div class="pf-card" style="text-align:center;padding:1.5rem;">
     <div style="font-size:2rem;font-weight:800;color:#10b981;">{{ received_this_month }}</div>
-    <div style="color:var(--pf-text-muted);margin-top:.25rem;">Items Received This Month</div>
+    <div style="color:var(--pf-text-muted);margin-top:.25rem;">{{ t('Items Received This Month', 'الأصناف المستلمة هذا الشهر') }}</div>
   </div>
 
   <div class="pf-card" style="text-align:center;padding:1.5rem;">
     <div style="font-size:2rem;font-weight:800;color:#6366f1;">{{ "%.2f"|format(total_spend) }}</div>
-    <div style="color:var(--pf-text-muted);margin-top:.25rem;">Total Spend EGP (Month)</div>
+    <div style="color:var(--pf-text-muted);margin-top:.25rem;">{{ t('Total Spend EGP (Month)', 'إجمالي الإنفاق بالجنيه (الشهر)') }}</div>
   </div>
 
 </div>
@@ -42,8 +42,8 @@
 <!-- Recent Purchase Orders -->
 <div class="pf-card">
   <div class="pf-card-header">
-    <div class="pf-card-title">Recent Purchase Orders</div>
-    <a href="{{ url_for('procurement.orders_list') }}" class="pf-btn pf-btn-ghost" style="font-size:.85rem;">View All</a>
+    <div class="pf-card-title">{{ t('Recent Purchase Orders', 'أوامر الشراء الأخيرة') }}</div>
+    <a href="{{ url_for('procurement.orders_list') }}" class="pf-btn pf-btn-ghost" style="font-size:.85rem;">{{ t('View All', 'عرض الكل') }}</a>
   </div>
 
   {% if recent_pos %}
@@ -51,12 +51,12 @@
     <table class="pf-table">
       <thead>
         <tr>
-          <th>PO #</th>
-          <th>Supplier</th>
-          <th>Date</th>
-          <th>Items</th>
-          <th>Total (EGP)</th>
-          <th>Status</th>
+          <th>{{ t('PO #', 'أمر شراء') }}</th>
+          <th>{{ t('Supplier', 'المورد') }}</th>
+          <th>{{ t('Date', 'التاريخ') }}</th>
+          <th>{{ t('Items', 'الأصناف') }}</th>
+          <th>{{ t('Total (EGP)', 'الإجمالي (جنيه)') }}</th>
+          <th>{{ t('Status', 'الحالة') }}</th>
           <th></th>
         </tr>
       </thead>
@@ -70,18 +70,18 @@
           <td>{{ "%.2f"|format(po['total_amount'] or 0) }}</td>
           <td>
             {% if po['status'] == 'Received' %}
-              <span class="pf-badge success">Received</span>
+              <span class="pf-badge success">{{ t('Received', 'مستلم') }}</span>
             {% elif po['status'] == 'Sent' %}
-              <span class="pf-badge warning">Sent</span>
+              <span class="pf-badge warning">{{ t('Sent', 'مُرسل') }}</span>
             {% elif po['status'] == 'Cancelled' %}
-              <span class="pf-badge error">Cancelled</span>
+              <span class="pf-badge error">{{ t('Cancelled', 'ملغى') }}</span>
             {% else %}
-              <span class="pf-badge">Draft</span>
+              <span class="pf-badge">{{ t('Draft', 'مسودة') }}</span>
             {% endif %}
           </td>
           <td>
             <a href="{{ url_for('procurement.order_detail', order_id=po['id']) }}"
-               class="pf-btn pf-btn-ghost" style="font-size:.8rem;">View</a>
+               class="pf-btn pf-btn-ghost" style="font-size:.8rem;">{{ t('View', 'عرض') }}</a>
           </td>
         </tr>
         {% endfor %}
@@ -90,8 +90,8 @@
   </div>
   {% else %}
   <div style="padding:2rem;text-align:center;color:var(--pf-text-muted);">
-    No purchase orders yet.
-    <a href="{{ url_for('procurement.order_new_form') }}">Create your first order →</a>
+    {{ t('No purchase orders yet.', 'لا توجد أوامر شراء بعد.') }}
+    <a href="{{ url_for('procurement.order_new_form') }}">{{ t('Create your first order →', 'أنشئ أول طلب ←') }}</a>
   </div>
   {% endif %}
 </div>

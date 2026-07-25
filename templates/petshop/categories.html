@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Categories{% endblock %}
-{% block page_title %}Product Categories{% endblock %}
-{% block page_sub %}Organise your pet shop catalog into categories{% endblock %}
+{% block title %}{{ t('Categories', 'الفئات') }}{% endblock %}
+{% block page_title %}{{ t('Product Categories', 'فئات المنتجات') }}{% endblock %}
+{% block page_sub %}{{ t('Organise your pet shop catalog into categories', 'نظّم كتالوج المتجر في فئات') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('petshop.products') }}" class="pf-btn pf-btn-secondary">📦 Products</a>
-<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">← Dashboard</a>
+<a href="{{ url_for('petshop.products') }}" class="pf-btn pf-btn-secondary">{{ t('📦 Products', '📦 المنتجات') }}</a>
+<a href="{{ url_for('petshop.index') }}" class="pf-btn pf-btn-secondary">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -35,14 +35,14 @@
 <div class="cat-layout">
   <!-- Left: category list -->
   <div class="cat-card">
-    <div class="cat-section-title">🏷️ All Categories</div>
+    <div class="cat-section-title">{{ t('🏷️ All Categories', '🏷️ جميع الفئات') }}</div>
     {% if categories %}
     <table class="tbl">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Description</th>
-          <th style="text-align:center">Products</th>
+          <th>{{ t('Name', 'الاسم') }}</th>
+          <th>{{ t('Description', 'الوصف') }}</th>
+          <th style="text-align:center">{{ t('Products', 'المنتجات') }}</th>
           <th></th>
         </tr>
       </thead>
@@ -61,8 +61,8 @@
               <button type="submit"
                       style="background:#fee2e2;color:#991b1b;border:none;border-radius:6px;
                              padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer"
-                      {% if c.product_count and c.product_count > 0 %}disabled title="Cannot delete: has products"{% endif %}>
-                Delete
+                      {% if c.product_count and c.product_count > 0 %}disabled title="{{ t('Cannot delete: has products', 'لا يمكن الحذف: يحتوي على منتجات') }}"{% endif %}>
+                {{ t('Delete', 'حذف') }}
               </button>
             </form>
           </td>
@@ -73,41 +73,41 @@
     {% else %}
     <div style="text-align:center;padding:40px;color:var(--cl-text-muted)">
       <div style="font-size:36px;margin-bottom:10px">🏷️</div>
-      <div style="font-weight:600">No categories yet</div>
-      <div style="font-size:12px;margin-top:4px">Add your first category using the form →</div>
+      <div style="font-weight:600">{{ t('No categories yet', 'لا توجد فئات بعد') }}</div>
+      <div style="font-size:12px;margin-top:4px">{{ t('Add your first category using the form →', 'أضف أول فئة باستخدام النموذج ←') }}</div>
     </div>
     {% endif %}
   </div>
 
   <!-- Right: add form -->
   <div class="cat-card">
-    <div class="cat-section-title">➕ Add Category</div>
+    <div class="cat-section-title">{{ t('➕ Add Category', '➕ إضافة فئة') }}</div>
     <form method="post">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="action" value="add">
       <div class="form-group">
-        <label class="form-label">Category Name *</label>
-        <input type="text" name="name" class="form-control" required placeholder="e.g. Dog Food">
+        <label class="form-label">{{ t('Category Name *', 'اسم الفئة *') }}</label>
+        <input type="text" name="name" class="form-control" required placeholder="{{ t('e.g. Dog Food', 'مثال: طعام كلاب') }}">
       </div>
       <div class="form-group">
-        <label class="form-label">Name (AR)</label>
-        <input type="text" name="name_ar" class="form-control" dir="rtl" placeholder="Arabic name (optional)">
+        <label class="form-label">{{ t('Name (AR)', 'الاسم (عربي)') }}</label>
+        <input type="text" name="name_ar" class="form-control" dir="rtl" placeholder="{{ t('Arabic name (optional)', 'الاسم بالعربية (اختياري)') }}">
       </div>
       <div class="form-group">
-        <label class="form-label">Description</label>
+        <label class="form-label">{{ t('Description', 'الوصف') }}</label>
         <textarea name="description" class="form-control" rows="3"
-                  placeholder="Brief description…"></textarea>
+                  placeholder="{{ t('Brief description…', 'وصف مختصر…') }}"></textarea>
       </div>
-      <button type="submit" class="btn-add">➕ Add Category</button>
+      <button type="submit" class="btn-add">{{ t('➕ Add Category', '➕ إضافة فئة') }}</button>
     </form>
 
     {% if categories %}
     <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--cl-border)">
-      <div style="font-size:12px;color:var(--cl-text-muted);font-weight:600;margin-bottom:10px">💡 TIPS</div>
+      <div style="font-size:12px;color:var(--cl-text-muted);font-weight:600;margin-bottom:10px">{{ t('💡 TIPS', '💡 نصائح') }}</div>
       <ul style="font-size:12px;color:var(--cl-text-muted);padding-left:16px;line-height:1.8;margin:0">
-        <li>Categories with products cannot be deleted</li>
-        <li>Assign categories when creating/editing products</li>
-        <li>Filter products by category on the products page</li>
+        <li>{{ t('Categories with products cannot be deleted', 'لا يمكن حذف الفئات التي تحتوي على منتجات') }}</li>
+        <li>{{ t('Assign categories when creating/editing products', 'عيّن الفئات عند إنشاء أو تعديل المنتجات') }}</li>
+        <li>{{ t('Filter products by category on the products page', 'صفِّ المنتجات حسب الفئة في صفحة المنتجات') }}</li>
       </ul>
     </div>
     {% endif %}

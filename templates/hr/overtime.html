@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Overtime Log{% endblock %}
-{% block page_title %}Overtime Log{% endblock %}
-{% block page_sub %}Track and approve extra hours worked by staff{% endblock %}
+{% block title %}{{ t('Overtime Log','سجل العمل الإضافي') }}{% endblock %}
+{% block page_title %}{{ t('Overtime Log','سجل العمل الإضافي') }}{% endblock %}
+{% block page_sub %}{{ t('Track and approve extra hours worked by staff','تتبع واعتماد ساعات العمل الإضافية للموظفين') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">HR Dashboard</a>
-<a href="{{ url_for('hr.roster') }}" class="pf-btn pf-btn-secondary">Weekly Roster</a>
+<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('HR Dashboard','لوحة الموارد البشرية') }}</a>
+<a href="{{ url_for('hr.roster') }}" class="pf-btn pf-btn-secondary">{{ t('Weekly Roster','جدول المناوبات الأسبوعي') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -38,17 +38,17 @@
 <div class="ot-kpi">
   <div class="ot-kpi-card">
     <div class="ot-kpi-num" style="color:var(--cl-primary)">{{ rows|length }}</div>
-    <div class="ot-kpi-lbl">Total Records</div>
+    <div class="ot-kpi-lbl">{{ t('Total Records','إجمالي السجلات') }}</div>
   </div>
   <div class="ot-kpi-card">
     <div class="ot-kpi-num" style="color:#16a34a">{{ total_hours }}</div>
-    <div class="ot-kpi-lbl">Approved Hours</div>
+    <div class="ot-kpi-lbl">{{ t('Approved Hours','الساعات المعتمدة') }}</div>
   </div>
   <div class="ot-kpi-card">
     <div class="ot-kpi-num" style="color:#d97706">
       {{ rows | selectattr('status','eq','Pending') | list | length }}
     </div>
-    <div class="ot-kpi-lbl">Pending Approval</div>
+    <div class="ot-kpi-lbl">{{ t('Pending Approval','بانتظار الاعتماد') }}</div>
   </div>
 </div>
 
@@ -56,21 +56,21 @@
 <form method="GET" action="">
   <div class="ot-filters">
     <select name="user_id">
-      <option value="">All Staff</option>
+      <option value="">{{ t('All Staff','جميع الموظفين') }}</option>
       {% for s in staff %}
       <option value="{{ s.id }}" {{ 'selected' if uid_filter==s.id else '' }}>{{ s.full_name }}</option>
       {% endfor %}
     </select>
     <select name="status">
-      <option value="">All Statuses</option>
+      <option value="">{{ t('All Statuses','جميع الحالات') }}</option>
       {% for st in ot_statuses %}
-      <option value="{{ st }}" {{ 'selected' if status_filter==st else '' }}>{{ st }}</option>
+      <option value="{{ st }}" {{ 'selected' if status_filter==st else '' }}>{{ t(st, {'Approved':'معتمد','Rejected':'مرفوض','Pending':'قيد الانتظار'}.get(st,'')) }}</option>
       {% endfor %}
     </select>
-    <input type="date" name="date_from" value="{{ date_from }}" title="From date">
-    <input type="date" name="date_to"   value="{{ date_to }}"   title="To date">
-    <button type="submit">Filter</button>
-    <a href="{{ url_for('hr.overtime_list') }}" class="pf-btn pf-btn-secondary">Clear</a>
+    <input type="date" name="date_from" value="{{ date_from }}" title="{{ t('From date','من تاريخ') }}">
+    <input type="date" name="date_to"   value="{{ date_to }}"   title="{{ t('To date','إلى تاريخ') }}">
+    <button type="submit">{{ t('Filter','تصفية') }}</button>
+    <a href="{{ url_for('hr.overtime_list') }}" class="pf-btn pf-btn-secondary">{{ t('Clear','مسح') }}</a>
   </div>
 </form>
 
@@ -79,13 +79,13 @@
   <table class="ot-table">
     <thead>
       <tr>
-        <th>Staff Member</th>
-        <th>Date</th>
-        <th>Hours</th>
-        <th>Reason</th>
-        <th>Status</th>
-        <th>Approved By</th>
-        <th>Actions</th>
+        <th>{{ t('Staff Member','الموظف') }}</th>
+        <th>{{ t('Date','التاريخ') }}</th>
+        <th>{{ t('Hours','الساعات') }}</th>
+        <th>{{ t('Reason','السبب') }}</th>
+        <th>{{ t('Status','الحالة') }}</th>
+        <th>{{ t('Approved By','اعتمده') }}</th>
+        <th>{{ t('Actions','إجراءات') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -102,22 +102,22 @@
       <td style="color:var(--cl-muted)">{{ r.reason or '—' }}</td>
       <td>
         {% if r.status == 'Approved' %}
-          <span class="ot-badge ot-approved">Approved</span>
+          <span class="ot-badge ot-approved">{{ t('Approved','معتمد') }}</span>
         {% elif r.status == 'Rejected' %}
-          <span class="ot-badge ot-rejected">Rejected</span>
+          <span class="ot-badge ot-rejected">{{ t('Rejected','مرفوض') }}</span>
         {% else %}
-          <span class="ot-badge ot-pending">Pending</span>
+          <span class="ot-badge ot-pending">{{ t('Pending','قيد الانتظار') }}</span>
         {% endif %}
       </td>
       <td style="font-size:12px">{{ r.approver_name or '—' }}</td>
       <td>
         {% if r.status == 'Pending' %}
         <form method="POST" action="{{ url_for('hr.approve_overtime', ot_id=r.id) }}" style="display:inline">
-          <button class="pf-btn pf-btn-primary pf-btn-sm" type="submit">Approve</button>
+          <button class="pf-btn pf-btn-primary pf-btn-sm" type="submit">{{ t('Approve','اعتماد') }}</button>
         </form>
         <form method="POST" action="{{ url_for('hr.reject_overtime', ot_id=r.id) }}" style="display:inline">
           <button class="pf-btn pf-btn-secondary pf-btn-sm" type="submit"
-                  onclick="return confirm('Reject this overtime entry?')">Reject</button>
+                  onclick="return confirm('{{ t('Reject this overtime entry?','رفض سجل العمل الإضافي هذا؟') }}')">{{ t('Reject','رفض') }}</button>
         </form>
         {% else %}
           <span style="color:var(--cl-muted);font-size:12px">—</span>
@@ -131,8 +131,8 @@
 {% else %}
 <div style="text-align:center;padding:60px;color:var(--cl-muted)">
   <div style="font-size:48px;margin-bottom:12px">⏱</div>
-  <div style="font-size:18px;font-weight:600;margin-bottom:8px">No overtime records found</div>
-  <div>Add overtime entries from each staff member's profile page.</div>
+  <div style="font-size:18px;font-weight:600;margin-bottom:8px">{{ t('No overtime records found','لا توجد سجلات عمل إضافي') }}</div>
+  <div>{{ t("Add overtime entries from each staff member's profile page.", 'أضف سجلات العمل الإضافي من صفحة ملف كل موظف.') }}</div>
 </div>
 {% endif %}
 

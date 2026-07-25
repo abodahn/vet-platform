@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Pending Reminders{% endblock %}
-{% block page_title %}Pending Reminders{% endblock %}
-{% block page_sub %}Appointments, follow-ups, and vaccine reminders awaiting action{% endblock %}
+{% block title %}{{ t('Pending Reminders', 'تذكيرات معلقة') }}{% endblock %}
+{% block page_title %}{{ t('Pending Reminders', 'تذكيرات معلقة') }}{% endblock %}
+{% block page_sub %}{{ t('Appointments, follow-ups, and vaccine reminders awaiting action', 'مواعيد ومتابعات وتذكيرات تطعيم بانتظار الإجراء') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">💬 Templates</a>
-<a href="{{ url_for('whatsapp.message_log') }}" class="pf-btn pf-btn-secondary">📋 Message Log</a>
+<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">{{ t('💬 Templates', '💬 القوالب') }}</a>
+<a href="{{ url_for('whatsapp.message_log') }}" class="pf-btn pf-btn-secondary">{{ t('📋 Message Log', '📋 سجل الرسائل') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -56,12 +56,12 @@
   <table class="rem-table">
     <thead>
       <tr>
-        <th>Due Date</th>
-        <th>Owner</th>
-        <th>Pet</th>
-        <th>Type</th>
-        <th>Message</th>
-        <th>Actions</th>
+        <th>{{ t('Due Date', 'تاريخ الاستحقاق') }}</th>
+        <th>{{ t('Owner', 'المالك') }}</th>
+        <th>{{ t('Pet', 'الحيوان') }}</th>
+        <th>{{ t('Type', 'النوع') }}</th>
+        <th>{{ t('Message', 'الرسالة') }}</th>
+        <th>{{ t('Actions', 'إجراءات') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -91,14 +91,14 @@
         <td>
           <div class="action-group">
             <form method="post" action="{{ url_for('whatsapp.mark_reminder_sent', rid=r.id) }}" style="display:inline;">
-              <button type="submit" class="btn-mark" title="Mark as sent without sending WhatsApp">
-                ✓ Mark Sent
+              <button type="submit" class="btn-mark" title="{{ t('Mark as sent without sending WhatsApp', 'تعليم كمرسلة بدون إرسال واتساب') }}">
+                {{ t('✓ Mark Sent', '✓ تعليم كمرسلة') }}
               </button>
             </form>
             <button class="btn-send"
                     onclick="openSendModal('{{ r.whatsapp_phone or '' }}', {{ r.owner_id }}, '{{ (r.message or '')|replace("'","\\'") }}')"
-                    title="Send WhatsApp message">
-              📱 Send WA
+                    title="{{ t('Send WhatsApp message', 'إرسال رسالة واتساب') }}">
+              {{ t('📱 Send WA', '📱 إرسال واتساب') }}
             </button>
           </div>
         </td>
@@ -110,24 +110,24 @@
 {% else %}
 <div class="empty-state">
   <div style="font-size:56px;">🎉</div>
-  <div style="font-size:20px;font-weight:700;margin:12px 0 8px;">No pending reminders</div>
-  <div>All reminders have been handled. Great work!</div>
+  <div style="font-size:20px;font-weight:700;margin:12px 0 8px;">{{ t('No pending reminders', 'لا توجد تذكيرات معلقة') }}</div>
+  <div>{{ t('All reminders have been handled. Great work!', 'تمت معالجة كل التذكيرات. عمل رائع!') }}</div>
 </div>
 {% endif %}
 
 <!-- Send WhatsApp Modal -->
 <div class="send-modal" id="send-modal">
   <div class="send-modal-box">
-    <div class="send-modal-title">📱 Send WhatsApp Message</div>
+    <div class="send-modal-title">{{ t('📱 Send WhatsApp Message', '📱 إرسال رسالة واتساب') }}</div>
     <form method="post" action="{{ url_for('whatsapp.send_message') }}">
-      <label>Phone Number</label>
+      <label>{{ t('Phone Number', 'رقم الهاتف') }}</label>
       <input type="tel" name="phone" id="modal-phone" required placeholder="+20 10 xxxx xxxx">
       <input type="hidden" name="owner_id" id="modal-owner-id">
-      <label>Message</label>
-      <textarea name="custom_message" id="modal-message" required placeholder="Type your message…"></textarea>
+      <label>{{ t('Message', 'الرسالة') }}</label>
+      <textarea name="custom_message" id="modal-message" required placeholder="{{ t('Type your message…', 'اكتب رسالتك…') }}"></textarea>
       <div class="modal-actions">
-        <button type="button" class="btn-modal-cancel" onclick="closeSendModal()">Cancel</button>
-        <button type="submit" class="btn-modal-send">Send Message 📤</button>
+        <button type="button" class="btn-modal-cancel" onclick="closeSendModal()">{{ t('Cancel', 'إلغاء') }}</button>
+        <button type="submit" class="btn-modal-send">{{ t('Send Message 📤', 'إرسال الرسالة 📤') }}</button>
       </div>
     </form>
   </div>

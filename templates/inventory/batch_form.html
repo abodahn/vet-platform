@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Receive Stock{% endblock %}
-{% block page_title %}Receive Stock{% endblock %}
+{% block title %}{{ t('Receive Stock', 'استلام مخزون') }}{% endblock %}
+{% block page_title %}{{ t('Receive Stock', 'استلام مخزون') }}{% endblock %}
 {% block page_sub %}{% if item %}{{ item.name }}{% else %}Select an item{% endif %}{% endblock %}
 
 {% block topbar_actions %}
 {% if item %}
-<a href="{{ url_for('inventory.item_detail', item_id=item.id) }}" class="btn btn-secondary">← Item Detail</a>
+<a href="{{ url_for('inventory.item_detail', item_id=item.id) }}" class="btn btn-secondary">{{ t('← Item Detail', '← تفاصيل الصنف') }}</a>
 {% else %}
-<a href="{{ url_for('inventory.items_list') }}" class="btn btn-secondary">← Items</a>
+<a href="{{ url_for('inventory.items_list') }}" class="btn btn-secondary">{{ t('← Items', '← الأصناف') }}</a>
 {% endif %}
 {% endblock %}
 
@@ -42,47 +42,47 @@
 
     {% if not item %}
     <div class="form-group">
-      <label class="form-label">Item *</label>
-      <input class="form-control" name="item_id" type="number" placeholder="Item ID" required>
+      <label class="form-label">{{ t('Item *', 'الصنف *') }}</label>
+      <input class="form-control" name="item_id" type="number" placeholder="{{ t('Item ID', 'رقم الصنف') }}" required>
     </div>
     {% endif %}
 
-    <div class="form-section-title">Batch Information</div>
+    <div class="form-section-title">{{ t('Batch Information', 'بيانات الدفعة') }}</div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Batch Number</label>
-        <input class="form-control" name="batch_number" type="text" placeholder="e.g. BATCH-2024-001">
+        <label class="form-label">{{ t('Batch Number', 'رقم الدفعة') }}</label>
+        <input class="form-control" name="batch_number" type="text" placeholder="{{ t('e.g. BATCH-2024-001', 'مثال: BATCH-2024-001') }}">
       </div>
       <div class="form-group">
-        <label class="form-label">Lot Number</label>
-        <input class="form-control" name="lot_number" type="text" placeholder="Manufacturer lot">
+        <label class="form-label">{{ t('Lot Number', 'رقم التشغيلة') }}</label>
+        <input class="form-control" name="lot_number" type="text" placeholder="{{ t('Manufacturer lot', 'تشغيلة المُصنّع') }}">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Manufacture Date</label>
+        <label class="form-label">{{ t('Manufacture Date', 'تاريخ التصنيع') }}</label>
         <input class="form-control" name="manufacture_date" type="date">
       </div>
       <div class="form-group">
-        <label class="form-label">Expiry Date</label>
+        <label class="form-label">{{ t('Expiry Date', 'تاريخ الانتهاء') }}</label>
         <input class="form-control" name="expiry_date" type="date">
       </div>
     </div>
 
-    <div class="form-section-title">Stock Details</div>
+    <div class="form-section-title">{{ t('Stock Details', 'تفاصيل المخزون') }}</div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Quantity Received *</label>
+        <label class="form-label">{{ t('Quantity Received *', 'الكمية المستلمة *') }}</label>
         <input class="form-control" name="quantity" type="number" step="0.01" min="0.01" placeholder="0.00" required>
       </div>
       <div class="form-group">
-        <label class="form-label">Unit Cost (EGP)</label>
+        <label class="form-label">{{ t('Unit Cost (EGP)', 'تكلفة الوحدة (جنيه)') }}</label>
         <input class="form-control" name="unit_cost" type="number" step="0.01" min="0" placeholder="0.00">
       </div>
     </div>
 
     <div class="form-group">
-      <label class="form-label">Warehouse</label>
+      <label class="form-label">{{ t('Warehouse', 'المخزن') }}</label>
       <select class="form-control" name="warehouse_id">
         {% for wh in warehouses %}
         <option value="{{ wh.id }}">{{ wh.name }}</option>
@@ -91,14 +91,14 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label">Notes</label>
-      <textarea class="form-control" name="notes" rows="3" placeholder="Supplier info, delivery notes…"></textarea>
+      <label class="form-label">{{ t('Notes', 'ملاحظات') }}</label>
+      <textarea class="form-control" name="notes" rows="3" placeholder="{{ t('Supplier info, delivery notes…', 'بيانات المورد، ملاحظات التسليم…') }}"></textarea>
     </div>
 
     <div style="margin-top:24px; display:flex; gap:12px;">
-      <button type="submit" class="btn-primary">💾 Receive Stock</button>
+      <button type="submit" class="btn-primary">{{ t('💾 Receive Stock', '💾 استلام مخزون') }}</button>
       {% if item %}
-      <a href="{{ url_for('inventory.item_detail', item_id=item.id) }}" style="padding:12px 20px; border:1.5px solid var(--cl-border); border-radius:8px; text-decoration:none; color:var(--cl-text); font-weight:600;">Cancel</a>
+      <a href="{{ url_for('inventory.item_detail', item_id=item.id) }}" style="padding:12px 20px; border:1.5px solid var(--cl-border); border-radius:8px; text-decoration:none; color:var(--cl-text); font-weight:600;">{{ t('Cancel', 'إلغاء') }}</a>
       {% endif %}
     </div>
   </form>

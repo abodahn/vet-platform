@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}WhatsApp Control Center{% endblock %}
-{% block page_title %}WhatsApp Control Center{% endblock %}
-{% block page_sub %}Manage your WhatsApp instance, campaigns, templates & messaging{% endblock %}
+{% block title %}{{ t('WhatsApp Control Center', 'مركز تحكم واتساب') }}{% endblock %}
+{% block page_title %}{{ t('WhatsApp Control Center', 'مركز تحكم واتساب') }}{% endblock %}
+{% block page_sub %}{{ t('Manage your WhatsApp instance, campaigns, templates & messaging', 'إدارة حساب واتساب والحملات والقوالب والمراسلة') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('whatsapp.send_center') }}"    class="pf-btn pf-btn-primary">✉️ Send Message</a>
-<a href="{{ url_for('whatsapp.campaigns_list') }}" class="pf-btn pf-btn-secondary">📣 Campaigns</a>
-<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">📋 Templates</a>
-<a href="{{ url_for('whatsapp.wa_settings') }}"    class="pf-btn pf-btn-ghost">⚙️ Settings</a>
-<a href="{{ url_for('whatsapp.reminder_admin') }}" class="pf-btn pf-btn-secondary">🔔 Reminder Admin</a>
+<a href="{{ url_for('whatsapp.send_center') }}"    class="pf-btn pf-btn-primary">{{ t('✉️ Send Message', '✉️ إرسال رسالة') }}</a>
+<a href="{{ url_for('whatsapp.campaigns_list') }}" class="pf-btn pf-btn-secondary">{{ t('📣 Campaigns', '📣 الحملات') }}</a>
+<a href="{{ url_for('whatsapp.templates_list') }}" class="pf-btn pf-btn-secondary">{{ t('📋 Templates', '📋 القوالب') }}</a>
+<a href="{{ url_for('whatsapp.wa_settings') }}"    class="pf-btn pf-btn-ghost">{{ t('⚙️ Settings', '⚙️ الإعدادات') }}</a>
+<a href="{{ url_for('whatsapp.reminder_admin') }}" class="pf-btn pf-btn-secondary">{{ t('🔔 Reminder Admin', '🔔 إدارة التذكيرات') }}</a>
 {% endblock %}
 
 {% block head_extra %}
@@ -96,19 +96,19 @@
 <div class="stats-strip">
   <div class="stat-card">
     <div class="num" id="stat-status-label">—</div>
-    <div class="lbl">Instance Status</div>
+    <div class="lbl">{{ t('Instance Status', 'حالة الحساب') }}</div>
   </div>
   <div class="stat-card">
     <div class="num">{{ template_count }}</div>
-    <div class="lbl">Active Templates</div>
+    <div class="lbl">{{ t('Active Templates', 'القوالب النشطة') }}</div>
   </div>
   <div class="stat-card">
     <div class="num">{{ reminder_count }}</div>
-    <div class="lbl">Pending Reminders</div>
+    <div class="lbl">{{ t('Pending Reminders', 'تذكيرات معلقة') }}</div>
   </div>
   <div class="stat-card">
     <div class="num" id="stat-queued">—</div>
-    <div class="lbl">Messages Queued</div>
+    <div class="lbl">{{ t('Messages Queued', 'رسائل في الطابور') }}</div>
   </div>
 </div>
 
@@ -123,69 +123,69 @@
       <div style="margin-bottom:16px">
         <span id="status-badge" class="status-badge unknown">
           <span class="status-dot"></span>
-          <span id="status-text">Checking…</span>
+          <span id="status-text">{{ t('Checking…', 'جارٍ الفحص…') }}</span>
         </span>
       </div>
 
       <!-- QR code section (visible when status=qr) -->
       <div id="qr-section" style="display:none">
         <div id="qr-box">
-          <div style="color:var(--muted,#64748b); font-size:.85rem;">Loading QR…</div>
+          <div style="color:var(--muted,#64748b); font-size:.85rem;">{{ t('Loading QR…', 'جارٍ تحميل رمز QR…') }}</div>
         </div>
-        <p id="qr-instruction">Open WhatsApp → Linked Devices → Scan this QR code</p>
+        <p id="qr-instruction">{{ t('Open WhatsApp → Linked Devices → Scan this QR code', 'افتح واتساب ← الأجهزة المرتبطة ← امسح رمز QR') }}</p>
       </div>
 
       <!-- Instance action buttons -->
       <div class="wa-actions">
-        <button class="pf-btn pf-btn-primary"   onclick="waAction('start')">▶ Start</button>
-        <button class="pf-btn pf-btn-secondary"  onclick="waAction('restart')">🔄 Restart</button>
-        <button class="pf-btn pf-btn-ghost"      onclick="waAction('logout')">↩ Logout</button>
-        <button class="pf-btn pf-btn-danger"     onclick="waAction('troubleshoot')">🛠 Fix</button>
-        <button class="pf-btn pf-btn-ghost"      onclick="loadQR()" style="width:100%">📷 Show QR</button>
+        <button class="pf-btn pf-btn-primary"   onclick="waAction('start')">{{ t('▶ Start', '▶ بدء') }}</button>
+        <button class="pf-btn pf-btn-secondary"  onclick="waAction('restart')">{{ t('🔄 Restart', '🔄 إعادة تشغيل') }}</button>
+        <button class="pf-btn pf-btn-ghost"      onclick="waAction('logout')">{{ t('↩ Logout', '↩ تسجيل خروج') }}</button>
+        <button class="pf-btn pf-btn-danger"     onclick="waAction('troubleshoot')">{{ t('🛠 Fix', '🛠 إصلاح') }}</button>
+        <button class="pf-btn pf-btn-ghost"      onclick="loadQR()" style="width:100%">{{ t('📷 Show QR', '📷 عرض QR') }}</button>
       </div>
     </div>
 
     <!-- Screenshot Card -->
     <div class="wa-card" style="margin-bottom:20px">
-      <h3>🖼 Live Screenshot</h3>
-      <div id="ss-box"><em style="color:var(--muted,#64748b);font-size:.85rem">Click to load…</em></div>
+      <h3>{{ t('🖼 Live Screenshot', '🖼 لقطة شاشة مباشرة') }}</h3>
+      <div id="ss-box"><em style="color:var(--muted,#64748b);font-size:.85rem">{{ t('Click to load…', 'اضغط للتحميل…') }}</em></div>
       <button class="pf-btn pf-btn-ghost" style="width:100%;margin-top:12px" onclick="loadScreenshot()">
-        🔄 Refresh Screenshot
+        {{ t('🔄 Refresh Screenshot', '🔄 تحديث اللقطة') }}
       </button>
     </div>
 
     <!-- Queue Settings Card -->
     <div class="wa-card">
-      <h3>⚙️ Queue Settings</h3>
+      <h3>{{ t('⚙️ Queue Settings', '⚙️ إعدادات الطابور') }}</h3>
       <div class="q-grid" id="queue-form">
         <div class="q-field">
-          <label>Min delay (s)</label>
+          <label>{{ t('Min delay (s)', 'أقل تأخير (ث)') }}</label>
           <input type="number" id="q-wf" min="0" placeholder="e.g. 3">
         </div>
         <div class="q-field">
-          <label>Max delay (s)</label>
+          <label>{{ t('Max delay (s)', 'أقصى تأخير (ث)') }}</label>
           <input type="number" id="q-wt" min="0" placeholder="e.g. 8">
         </div>
         <div class="q-field">
-          <label>Sleep after (min)</label>
+          <label>{{ t('Sleep after (min)', 'الإيقاف بعد (أدنى)') }}</label>
           <input type="number" id="q-sf" min="1" placeholder="e.g. 20">
         </div>
         <div class="q-field">
-          <label>Sleep after (max)</label>
+          <label>{{ t('Sleep after (max)', 'الإيقاف بعد (أقصى)') }}</label>
           <input type="number" id="q-st" min="1" placeholder="e.g. 50">
         </div>
         <div class="q-field">
-          <label>Sleep time min (s)</label>
+          <label>{{ t('Sleep time min (s)', 'مدة الإيقاف الدنيا (ث)') }}</label>
           <input type="number" id="q-stf" min="0" placeholder="e.g. 30">
         </div>
         <div class="q-field">
-          <label>Sleep time max (s)</label>
+          <label>{{ t('Sleep time max (s)', 'مدة الإيقاف القصوى (ث)') }}</label>
           <input type="number" id="q-stt" min="0" placeholder="e.g. 60">
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:14px">
-        <button class="pf-btn pf-btn-ghost"    onclick="loadQueueSettings()" style="flex:1">🔄 Load</button>
-        <button class="pf-btn pf-btn-primary"  onclick="saveQueueSettings()" style="flex:1">💾 Save</button>
+        <button class="pf-btn pf-btn-ghost"    onclick="loadQueueSettings()" style="flex:1">{{ t('🔄 Load', '🔄 تحميل') }}</button>
+        <button class="pf-btn pf-btn-primary"  onclick="saveQueueSettings()" style="flex:1">{{ t('💾 Save', '💾 حفظ') }}</button>
       </div>
     </div>
   </div>
@@ -194,9 +194,9 @@
   <div class="wa-card" style="padding:0">
     <div style="padding:20px 20px 0">
       <div class="wa-tabs">
-        <button class="wa-tab active" onclick="showTab('log')">📜 Message Log</button>
-        <button class="wa-tab"       onclick="showTab('messages')">📨 API Messages</button>
-        <button class="wa-tab"       onclick="showTab('details')">ℹ️ Details</button>
+        <button class="wa-tab active" onclick="showTab('log')">{{ t('📜 Message Log', '📜 سجل الرسائل') }}</button>
+        <button class="wa-tab"       onclick="showTab('messages')">{{ t('📨 API Messages', '📨 رسائل API') }}</button>
+        <button class="wa-tab"       onclick="showTab('details')">{{ t('ℹ️ Details', 'ℹ️ التفاصيل') }}</button>
       </div>
     </div>
 
@@ -206,11 +206,11 @@
       <table class="log-table">
         <thead>
           <tr>
-            <th>Time</th>
-            <th>Owner</th>
-            <th>Phone</th>
-            <th>Message</th>
-            <th>Status</th>
+            <th>{{ t('Time', 'الوقت') }}</th>
+            <th>{{ t('Owner', 'المالك') }}</th>
+            <th>{{ t('Phone', 'الهاتف') }}</th>
+            <th>{{ t('Message', 'الرسالة') }}</th>
+            <th>{{ t('Status', 'الحالة') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -222,9 +222,9 @@
             <td title="{{ l.message }}">{{ (l.message or '')[:50] }}</td>
             <td>
               {% if l.status == 'Sent' %}
-                <span class="badge-sent">Sent</span>
+                <span class="badge-sent">{{ t('Sent', 'مُرسل') }}</span>
               {% elif l.status == 'Failed' %}
-                <span class="badge-failed">Failed</span>
+                <span class="badge-failed">{{ t('Failed', 'فشل') }}</span>
               {% else %}
                 <span class="badge-pending">{{ l.status }}</span>
               {% endif %}
@@ -234,29 +234,29 @@
         </tbody>
       </table>
       {% else %}
-        <p style="color:var(--muted,#64748b);padding:20px 0">No messages yet.</p>
+        <p style="color:var(--muted,#64748b);padding:20px 0">{{ t('No messages yet.', 'لا توجد رسائل بعد.') }}</p>
       {% endif %}
       <div style="margin-top:12px">
-        <a href="{{ url_for('whatsapp.message_log') }}" class="pf-btn pf-btn-ghost">View All Logs →</a>
+        <a href="{{ url_for('whatsapp.message_log') }}" class="pf-btn pf-btn-ghost">{{ t('View All Logs →', 'عرض كل السجلات ←') }}</a>
       </div>
     </div>
 
     <!-- Tab: Live API messages -->
     <div id="tab-messages" class="wa-panel" style="padding:0 20px 20px">
       <div style="display:flex;gap:10px;margin-bottom:14px">
-        <button class="pf-btn pf-btn-ghost" onclick="loadApiMessages()">🔄 Refresh</button>
-        <button class="pf-btn pf-btn-secondary" onclick="retryAll()">↩ Retry All Failed</button>
+        <button class="pf-btn pf-btn-ghost" onclick="loadApiMessages()">{{ t('🔄 Refresh', '🔄 تحديث') }}</button>
+        <button class="pf-btn pf-btn-secondary" onclick="retryAll()">{{ t('↩ Retry All Failed', '↩ إعادة محاولة كل الفاشلة') }}</button>
       </div>
       <div id="api-messages-content">
-        <em style="color:var(--muted,#64748b);font-size:.85rem">Click Refresh to load live messages from Wapilot.</em>
+        <em style="color:var(--muted,#64748b);font-size:.85rem">{{ t('Click Refresh to load live messages from Wapilot.', 'اضغط تحديث لتحميل الرسائل المباشرة من Wapilot.') }}</em>
       </div>
     </div>
 
     <!-- Tab: Instance details -->
     <div id="tab-details" class="wa-panel" style="padding:0 20px 20px">
-      <button class="pf-btn pf-btn-ghost" onclick="loadDetails()" style="margin-bottom:14px">🔄 Refresh</button>
+      <button class="pf-btn pf-btn-ghost" onclick="loadDetails()" style="margin-bottom:14px">{{ t('🔄 Refresh', '🔄 تحديث') }}</button>
       <div id="instance-details-content">
-        <em style="color:var(--muted,#64748b);font-size:.85rem">Click Refresh to load instance details.</em>
+        <em style="color:var(--muted,#64748b);font-size:.85rem">{{ t('Click Refresh to load instance details.', 'اضغط تحديث لتحميل بيانات الحساب.') }}</em>
       </div>
     </div>
   </div>

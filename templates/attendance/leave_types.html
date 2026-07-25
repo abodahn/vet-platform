@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Leave Types{% endblock %}
-{% block page_title %}Leave Types{% endblock %}
+{% block title %}{{ t('Leave Types', 'أنواع الإجازات') }}{% endblock %}
+{% block page_title %}{{ t('Leave Types', 'أنواع الإجازات') }}{% endblock %}
 {% block page_sub %}{{ leave_types|length }} types configured{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('attendance.balances') }}" class="pf-btn pf-btn-sm">⚖️ Balances</a>
-  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+  <a href="{{ url_for('attendance.balances') }}" class="pf-btn pf-btn-sm">{{ t('⚖️ Balances', '⚖️ الأرصدة') }}</a>
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -14,12 +14,12 @@
   <!-- Table -->
   <div class="pf-card">
     <div class="pf-card-header">
-      <div class="pf-card-title">🏖 All Leave Types</div>
+      <div class="pf-card-title">{{ t('🏖 All Leave Types', '🏖 جميع أنواع الإجازات') }}</div>
     </div>
     {% if leave_types %}
     <table class="pf-table">
       <thead>
-        <tr><th>Name</th><th>Arabic</th><th>Days/Year</th><th>Type</th><th>Status</th><th></th></tr>
+        <tr><th>{{ t('Name', 'الاسم') }}</th><th>{{ t('Arabic', 'العربية') }}</th><th>{{ t('Days/Year', 'أيام/سنة') }}</th><th>{{ t('Type', 'النوع') }}</th><th>{{ t('Status', 'الحالة') }}</th><th></th></tr>
       </thead>
       <tbody>
         {% for lt in leave_types %}
@@ -33,62 +33,62 @@
           <td style="font-family:var(--cl-font-ar)">{{ lt.name_ar }}</td>
           <td style="font-weight:600">{{ lt.days_per_year }}</td>
           <td>
-            {% if lt.is_paid %}<span class="pf-badge active">Paid</span>
-            {% else %}<span class="pf-badge">Unpaid</span>{% endif %}
+            {% if lt.is_paid %}<span class="pf-badge active">{{ t('Paid', 'مدفوع') }}</span>
+            {% else %}<span class="pf-badge">{{ t('Unpaid', 'بدون أجر') }}</span>{% endif %}
           </td>
           <td>
-            {% if lt.is_active %}<span class="pf-badge active">Active</span>
-            {% else %}<span class="pf-badge" style="background:#f3f4f6;color:#6b7280">Inactive</span>{% endif %}
+            {% if lt.is_active %}<span class="pf-badge active">{{ t('Active', 'نشط') }}</span>
+            {% else %}<span class="pf-badge" style="background:#f3f4f6;color:#6b7280">{{ t('Inactive', 'غير نشط') }}</span>{% endif %}
           </td>
           <td>
             <button class="pf-btn pf-btn-sm"
-              onclick="editLT({{ lt.id }},'{{ lt.name }}','{{ lt.name_ar }}',{{ lt.days_per_year }},{{ lt.is_paid }},'{{ lt.color }}',{{ lt.is_active }})">Edit</button>
+              onclick="editLT({{ lt.id }},'{{ lt.name }}','{{ lt.name_ar }}',{{ lt.days_per_year }},{{ lt.is_paid }},'{{ lt.color }}',{{ lt.is_active }})">{{ t('Edit', 'تعديل') }}</button>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <div style="padding:40px;text-align:center;color:var(--cl-text-muted)">No leave types defined yet.</div>
+    <div style="padding:40px;text-align:center;color:var(--cl-text-muted)">{{ t('No leave types defined yet.', 'لا توجد أنواع إجازات معرّفة بعد.') }}</div>
     {% endif %}
   </div>
 
   <!-- Form -->
   <div class="pf-card">
     <div class="pf-card-header">
-      <div class="pf-card-title" id="form-title">➕ Add Leave Type</div>
+      <div class="pf-card-title" id="form-title">{{ t('➕ Add Leave Type', '➕ إضافة نوع إجازة') }}</div>
     </div>
     <form method="POST" action="{{ url_for('attendance.leave_type_save') }}" id="lt-form">
       <input type="hidden" name="lt_id" id="lt-id" value="">
       <div class="pf-form-group">
-        <label class="pf-form-label">Name (English) <span style="color:#ef4444">*</span></label>
-        <input type="text" name="name" id="lt-name" class="pf-form-control" placeholder="e.g. Annual Leave" required>
+        <label class="pf-form-label">{{ t('Name (English)', 'الاسم (إنجليزي)') }} <span style="color:#ef4444">*</span></label>
+        <input type="text" name="name" id="lt-name" class="pf-form-control" placeholder="{{ t('e.g. Annual Leave', 'مثال: إجازة سنوية') }}" required>
       </div>
       <div class="pf-form-group">
-        <label class="pf-form-label">Name (Arabic)</label>
+        <label class="pf-form-label">{{ t('Name (Arabic)', 'الاسم (عربي)') }}</label>
         <input type="text" name="name_ar" id="lt-name-ar" class="pf-form-control" placeholder="e.g. إجازة سنوية" dir="rtl">
       </div>
       <div class="pf-form-group">
-        <label class="pf-form-label">Days Per Year</label>
+        <label class="pf-form-label">{{ t('Days Per Year', 'الأيام في السنة') }}</label>
         <input type="number" name="days_per_year" id="lt-days" class="pf-form-control" value="21" min="0" max="365" step="0.5">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="pf-form-group">
-          <label class="pf-form-label">Color</label>
+          <label class="pf-form-label">{{ t('Color', 'اللون') }}</label>
           <input type="color" name="color" id="lt-color" class="pf-form-control" value="#6366f1" style="height:40px;padding:4px">
         </div>
         <div class="pf-form-group" style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
-            <input type="checkbox" name="is_paid" id="lt-paid" value="1" checked> Paid Leave
+            <input type="checkbox" name="is_paid" id="lt-paid" value="1" checked> {{ t('Paid Leave', 'إجازة مدفوعة') }}
           </label>
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
-            <input type="checkbox" name="is_active" id="lt-active" value="1" checked> Active
+            <input type="checkbox" name="is_active" id="lt-active" value="1" checked> {{ t('Active', 'نشط') }}
           </label>
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:8px">
-        <button type="submit" class="pf-btn pf-btn-primary" id="form-submit-btn">Add Type</button>
-        <button type="button" class="pf-btn pf-btn-sm" onclick="resetForm()">Reset</button>
+        <button type="submit" class="pf-btn pf-btn-primary" id="form-submit-btn">{{ t('Add Type', 'إضافة نوع') }}</button>
+        <button type="button" class="pf-btn pf-btn-sm" onclick="resetForm()">{{ t('Reset', 'إعادة تعيين') }}</button>
       </div>
     </form>
   </div>

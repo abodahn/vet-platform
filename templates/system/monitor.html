@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}System Monitor{% endblock %}
-{% block page_title %}System Monitor{% endblock %}
-{% block page_sub %}Production health — database, sync, logs, devices, backup{% endblock %}
+{% block title %}{{ t('System Monitor', 'مراقبة النظام') }}{% endblock %}
+{% block page_title %}{{ t('System Monitor', 'مراقبة النظام') }}{% endblock %}
+{% block page_sub %}{{ t('Production health — database, sync, logs, devices, backup', 'سلامة بيئة الإنتاج — قاعدة البيانات والمزامنة والسجلات والأجهزة والنسخ الاحتياطي') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('system.sync_dashboard') }}" class="pf-btn pf-btn-primary">⚡ Sync Dashboard</a>
-<a href="{{ url_for('system.diagnostics') }}" class="pf-btn pf-btn-secondary">🔬 Diagnostics</a>
-<a href="{{ url_for('system.audit_log') }}" class="pf-btn pf-btn-secondary">📋 Audit Log</a>
-<button class="pf-btn pf-btn-secondary" onclick="location.reload()">↻ Refresh</button>
+<a href="{{ url_for('system.sync_dashboard') }}" class="pf-btn pf-btn-primary">{{ t('⚡ Sync Dashboard', '⚡ لوحة المزامنة') }}</a>
+<a href="{{ url_for('system.diagnostics') }}" class="pf-btn pf-btn-secondary">{{ t('🔬 Diagnostics', '🔬 التشخيص') }}</a>
+<a href="{{ url_for('system.audit_log') }}" class="pf-btn pf-btn-secondary">{{ t('📋 Audit Log', '📋 سجل المراجعة') }}</a>
+<button class="pf-btn pf-btn-secondary" onclick="location.reload()">{{ t('↻ Refresh', '↻ تحديث') }}</button>
 {% endblock %}
 
 {% block head_extra %}
@@ -148,49 +148,49 @@
     <div class="mon-card c-blue">
       <div class="mon-icon">🗄️</div>
       <div class="mon-value">{{ sys_info.db_size_mb }} MB</div>
-      <div class="mon-label">Database Size</div>
+      <div class="mon-label">{{ t('Database Size', 'حجم قاعدة البيانات') }}</div>
       <div class="mon-sub">{{ sys_info.db_size_kb }} KB on disk</div>
     </div>
     <div class="mon-card c-green">
       <div class="mon-icon">✅</div>
       <div class="mon-value">{{ "{:,}".format(sync_stats.synced) }}</div>
-      <div class="mon-label">Synced Records</div>
-      <div class="mon-sub">offline ops committed</div>
+      <div class="mon-label">{{ t('Synced Records', 'السجلات المتزامنة') }}</div>
+      <div class="mon-sub">{{ t('offline ops committed', 'عمليات دون اتصال مُثبتة') }}</div>
     </div>
     <div class="mon-card c-amber">
       <div class="mon-icon">⏳</div>
       <div class="mon-value">{{ sync_stats.pending }}</div>
-      <div class="mon-label">Pending Sync</div>
-      <div class="mon-sub">awaiting upload</div>
+      <div class="mon-label">{{ t('Pending Sync', 'مزامنة معلقة') }}</div>
+      <div class="mon-sub">{{ t('awaiting upload', 'بانتظار الرفع') }}</div>
     </div>
     <div class="mon-card {{ 'c-red' if sync_stats.failed > 0 else 'c-green' }}">
       <div class="mon-icon">{{ '❌' if sync_stats.failed > 0 else '✔️' }}</div>
       <div class="mon-value">{{ sync_stats.failed }}</div>
-      <div class="mon-label">Sync Failures</div>
-      <div class="mon-sub">max 5 retries</div>
+      <div class="mon-label">{{ t('Sync Failures', 'إخفاقات المزامنة') }}</div>
+      <div class="mon-sub">{{ t('max 5 retries', 'بحد أقصى 5 محاولات') }}</div>
     </div>
     <div class="mon-card c-purple">
       <div class="mon-icon">⚠️</div>
       <div class="mon-value">{{ sync_stats.conflicts }}</div>
-      <div class="mon-label">Conflicts</div>
-      <div class="mon-sub">need resolution</div>
+      <div class="mon-label">{{ t('Conflicts', 'التعارضات') }}</div>
+      <div class="mon-sub">{{ t('need resolution', 'تحتاج إلى حل') }}</div>
     </div>
     <div class="mon-card {{ 'c-red' if error_count_24h > 10 else 'c-amber' if error_count_24h > 0 else 'c-green' }}">
       <div class="mon-icon">{{ '🔴' if error_count_24h > 10 else '🟡' if error_count_24h > 0 else '🟢' }}</div>
       <div class="mon-value">{{ error_count_24h }}</div>
-      <div class="mon-label">Errors (24h)</div>
-      <div class="mon-sub">server-side errors</div>
+      <div class="mon-label">{{ t('Errors (24h)', 'الأخطاء (24 ساعة)') }}</div>
+      <div class="mon-sub">{{ t('server-side errors', 'أخطاء من جانب الخادم') }}</div>
     </div>
     <div class="mon-card c-teal">
       <div class="mon-icon">📱</div>
       <div class="mon-value">{{ active_devices }}</div>
-      <div class="mon-label">Active Devices</div>
+      <div class="mon-label">{{ t('Active Devices', 'الأجهزة النشطة') }}</div>
       <div class="mon-sub">{{ total_devices }} total registered</div>
     </div>
     <div class="mon-card c-slate">
       <div class="mon-icon">📁</div>
       <div class="mon-value">{{ log_total_mb }} MB</div>
-      <div class="mon-label">Log Files</div>
+      <div class="mon-label">{{ t('Log Files', 'ملفات السجل') }}</div>
       <div class="mon-sub">{{ log_files_info|length }} files · {{ retention_days }}d retention</div>
     </div>
   </div>
@@ -199,36 +199,36 @@
   <div class="two-col">
     <div class="sec">
       <div class="sec-hdr">
-        <div class="sec-title">⚡ Sync Queue</div>
-        <a href="{{ url_for('system.sync_dashboard') }}" class="pf-btn pf-btn-primary" style="font-size:12px;padding:6px 14px">Open Dashboard →</a>
+        <div class="sec-title">{{ t('⚡ Sync Queue', '⚡ طابور المزامنة') }}</div>
+        <a href="{{ url_for('system.sync_dashboard') }}" class="pf-btn pf-btn-primary" style="font-size:12px;padding:6px 14px">{{ t('Open Dashboard →', 'فتح اللوحة ←') }}</a>
       </div>
       <div class="sync-mini">
-        <div class="sync-card pending"><div class="sync-num">{{ sync_stats.pending }}</div><div class="sync-lbl">Pending</div></div>
-        <div class="sync-card synced"><div class="sync-num">{{ sync_stats.synced }}</div><div class="sync-lbl">Synced</div></div>
-        <div class="sync-card failed"><div class="sync-num">{{ sync_stats.failed }}</div><div class="sync-lbl">Failed</div></div>
-        <div class="sync-card conflict"><div class="sync-num">{{ sync_stats.conflicts }}</div><div class="sync-lbl">Conflicts</div></div>
+        <div class="sync-card pending"><div class="sync-num">{{ sync_stats.pending }}</div><div class="sync-lbl">{{ t('Pending', 'قيد الانتظار') }}</div></div>
+        <div class="sync-card synced"><div class="sync-num">{{ sync_stats.synced }}</div><div class="sync-lbl">{{ t('Synced', 'متزامن') }}</div></div>
+        <div class="sync-card failed"><div class="sync-num">{{ sync_stats.failed }}</div><div class="sync-lbl">{{ t('Failed', 'فشل') }}</div></div>
+        <div class="sync-card conflict"><div class="sync-num">{{ sync_stats.conflicts }}</div><div class="sync-lbl">{{ t('Conflicts', 'التعارضات') }}</div></div>
       </div>
       {% if sync_stats.failed > 0 or sync_stats.conflicts > 0 %}
       <div class="alert-danger">
         ⚠️ {{ sync_stats.failed }} failed · {{ sync_stats.conflicts }} conflict(s) need attention.
-        <a href="{{ url_for('system.sync_dashboard') }}" style="margin-left:8px;text-decoration:underline;">Resolve →</a>
+        <a href="{{ url_for('system.sync_dashboard') }}" style="margin-left:8px;text-decoration:underline;">{{ t('Resolve →', 'حل ←') }}</a>
       </div>
       {% endif %}
     </div>
 
     <div class="sec">
       <div class="sec-hdr">
-        <div class="sec-title">🚀 Platform Version</div>
+        <div class="sec-title">{{ t('🚀 Platform Version', '🚀 إصدار المنصة') }}</div>
         <span style="display:inline-flex;align-items:center;padding:5px 14px;background:linear-gradient(135deg,#0B7A6B,#0D9488);color:#fff;border-radius:20px;font-size:12px;font-weight:700;">
           v{{ sys_info.app_version }}
         </span>
       </div>
-      <div class="kv-row"><span class="kv-key">Version</span><span class="kv-val">{{ sys_info.app_version }}</span></div>
-      <div class="kv-row"><span class="kv-key">Build</span><span class="kv-val">{{ sys_info.build_number }}</span></div>
-      <div class="kv-row"><span class="kv-key">Release Date</span><span class="kv-val">{{ sys_info.release_date }}</span></div>
+      <div class="kv-row"><span class="kv-key">{{ t('Version', 'الإصدار') }}</span><span class="kv-val">{{ sys_info.app_version }}</span></div>
+      <div class="kv-row"><span class="kv-key">{{ t('Build', 'البناء') }}</span><span class="kv-val">{{ sys_info.build_number }}</span></div>
+      <div class="kv-row"><span class="kv-key">{{ t('Release Date', 'تاريخ الإصدار') }}</span><span class="kv-val">{{ sys_info.release_date }}</span></div>
       <div class="kv-row"><span class="kv-key">Python</span><span class="kv-val">{{ sys_info.python_version }}</span></div>
       <div class="kv-row"><span class="kv-key">Flask</span><span class="kv-val">{{ sys_info.flask_version }}</span></div>
-      <div class="kv-row"><span class="kv-key">Platform</span><span class="kv-val" style="font-size:10px;">{{ sys_info.platform[:50] }}</span></div>
+      <div class="kv-row"><span class="kv-key">{{ t('Platform', 'المنصة') }}</span><span class="kv-val" style="font-size:10px;">{{ sys_info.platform[:50] }}</span></div>
     </div>
   </div>
 
@@ -236,12 +236,12 @@
   <div class="two-col">
     <div class="sec">
       <div class="sec-hdr">
-        <div class="sec-title">🗄️ Database</div>
+        <div class="sec-title">{{ t('🗄️ Database', '🗄️ قاعدة البيانات') }}</div>
         <span class="ibadge ibadge-ok">PostgreSQL</span>
       </div>
-      <div class="kv-row"><span class="kv-key">Size</span><span class="kv-val">{{ sys_info.db_size_mb }} MB ({{ sys_info.db_size_kb }} KB)</span></div>
-      <div class="kv-row"><span class="kv-key">Path</span><span class="kv-val">{{ sys_info.db_path|truncate(42,True,'...') }}</span></div>
-      <div style="margin-top:16px;font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">Records by Module</div>
+      <div class="kv-row"><span class="kv-key">{{ t('Size', 'الحجم') }}</span><span class="kv-val">{{ sys_info.db_size_mb }} MB ({{ sys_info.db_size_kb }} KB)</span></div>
+      <div class="kv-row"><span class="kv-key">{{ t('Path', 'المسار') }}</span><span class="kv-val">{{ sys_info.db_path|truncate(42,True,'...') }}</span></div>
+      <div style="margin-top:16px;font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">{{ t('Records by Module', 'السجلات حسب الوحدة') }}</div>
       <div class="pill-grid">
         {% for table, count in row_counts.items() %}
         <div class="pill">
@@ -254,31 +254,31 @@
 
     <div class="sec">
       <div class="sec-hdr">
-        <div class="sec-title">💾 Backup Status</div>
+        <div class="sec-title">{{ t('💾 Backup Status', '💾 حالة النسخ الاحتياطي') }}</div>
         <div class="sec-actions">
-          <a href="{{ url_for('system.backup') }}" class="pf-btn pf-btn-secondary" style="font-size:12px;padding:6px 12px">All Backups</a>
+          <a href="{{ url_for('system.backup') }}" class="pf-btn pf-btn-secondary" style="font-size:12px;padding:6px 12px">{{ t('All Backups', 'جميع النسخ') }}</a>
           <form method="post" action="{{ url_for('system.backup_run') }}" onsubmit="return confirm('Run backup now?')" style="display:inline">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-            <button class="pf-btn pf-btn-primary" style="font-size:12px;padding:6px 12px">💾 Now</button>
+            <button class="pf-btn pf-btn-primary" style="font-size:12px;padding:6px 12px">{{ t('💾 Now', '💾 الآن') }}</button>
           </form>
         </div>
       </div>
       {% if latest_backup %}
-        <div class="kv-row"><span class="kv-key">Last Backup</span><span class="kv-val">{{ (latest_backup.created_at or '')[:16] }}</span></div>
-        <div class="kv-row"><span class="kv-key">File</span><span class="kv-val">{{ (latest_backup.filename or '')[:32] }}</span></div>
-        <div class="kv-row"><span class="kv-key">Size</span><span class="kv-val">{{ latest_backup.size_kb }} KB</span></div>
+        <div class="kv-row"><span class="kv-key">{{ t('Last Backup', 'آخر نسخة احتياطية') }}</span><span class="kv-val">{{ (latest_backup.created_at or '')[:16] }}</span></div>
+        <div class="kv-row"><span class="kv-key">{{ t('File', 'الملف') }}</span><span class="kv-val">{{ (latest_backup.filename or '')[:32] }}</span></div>
+        <div class="kv-row"><span class="kv-key">{{ t('Size', 'الحجم') }}</span><span class="kv-val">{{ latest_backup.size_kb }} KB</span></div>
         <div class="kv-row">
-          <span class="kv-key">Integrity</span>
+          <span class="kv-key">{{ t('Integrity', 'السلامة') }}</span>
           <span class="kv-val"><span class="ibadge {{ 'ibadge-ok' if latest_backup.integrity == 'ok' else 'ibadge-err' }}">{{ latest_backup.integrity or '?' }}</span></span>
         </div>
       {% else %}
         <div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">
           <div style="font-size:28px;margin-bottom:8px;">💾</div>
-          No backups yet. Daily backup runs at 02:00 UTC.
+          {{ t('No backups yet. Daily backup runs at 02:00 UTC.', 'لا توجد نسخ بعد. يعمل النسخ اليومي الساعة 02:00 UTC.') }}
         </div>
       {% endif %}
       <div style="margin-top:14px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--text-muted);border:1px solid var(--border);">
-        <strong style="color:var(--text);">Schedule:</strong> Backup 02:00 · WhatsApp 09:00 · Log cleanup 03:00 UTC
+        <strong style="color:var(--text);">{{ t('Schedule:', 'الجدولة:') }}</strong> Backup 02:00 · WhatsApp 09:00 · Log cleanup 03:00 UTC
       </div>
     </div>
   </div>
@@ -287,7 +287,7 @@
   <div class="two-col">
     <div class="sec">
       <div class="sec-hdr">
-        <div class="sec-title">📁 Log Files</div>
+        <div class="sec-title">{{ t('📁 Log Files', '📁 ملفات السجل') }}</div>
         <span style="font-size:12px;color:var(--text-muted);">{{ retention_days }}-day auto-delete · 03:00 UTC</span>
       </div>
       {% if log_files_info %}
@@ -307,27 +307,27 @@
       {% else %}
         <div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">
           <div style="font-size:28px;margin-bottom:8px;">📭</div>
-          Log files appear after the first API requests.
+          {{ t('Log files appear after the first API requests.', 'تظهر ملفات السجل بعد أول طلبات API.') }}
         </div>
       {% endif %}
     </div>
 
     <div class="sec">
       <div class="sec-hdr">
-        <div class="sec-title">📱 Registered Devices</div>
+        <div class="sec-title">{{ t('📱 Registered Devices', '📱 الأجهزة المسجلة') }}</div>
         <span class="ibadge ibadge-info">{{ total_devices }} total</span>
       </div>
       {% if total_devices == 0 %}
         <div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">
           <div style="font-size:28px;margin-bottom:8px;">📵</div>
-          No devices yet — appear when offline sync connects.
+          {{ t('No devices yet — appear when offline sync connects.', 'لا توجد أجهزة بعد — تظهر عند اتصال المزامنة دون اتصال.') }}
         </div>
       {% else %}
-        <div class="kv-row"><span class="kv-key">Online (last 1h)</span><span class="kv-val" style="font-size:18px;font-weight:800;color:#16a34a;">{{ active_devices }}</span></div>
-        <div class="kv-row"><span class="kv-key">Total Registered</span><span class="kv-val">{{ total_devices }}</span></div>
+        <div class="kv-row"><span class="kv-key">{{ t('Online (last 1h)', 'متصل (آخر ساعة)') }}</span><span class="kv-val" style="font-size:18px;font-weight:800;color:#16a34a;">{{ active_devices }}</span></div>
+        <div class="kv-row"><span class="kv-key">{{ t('Total Registered', 'إجمالي المسجل') }}</span><span class="kv-val">{{ total_devices }}</span></div>
         <div style="margin-top:14px;">
           <a href="{{ url_for('system.sync_dashboard') }}#devices" class="pf-btn pf-btn-secondary" style="font-size:12px;width:100%;text-align:center;display:block;">
-            View All Devices →
+            {{ t('View All Devices →', 'عرض كل الأجهزة ←') }}
           </a>
         </div>
       {% endif %}
@@ -337,10 +337,10 @@
   {# ─── RECENT SERVER LOGS ─── #}
   <div class="sec">
     <div class="sec-hdr">
-      <div class="sec-title">📝 Recent Server Logs</div>
+      <div class="sec-title">{{ t('📝 Recent Server Logs', '📝 أحدث سجلات الخادم') }}</div>
       <div class="sec-actions">
         {% if error_count_24h > 0 %}<span class="ibadge ibadge-err">{{ error_count_24h }} errors in 24h</span>{% endif %}
-        <a href="{{ url_for('system.audit_log') }}" class="pf-btn pf-btn-secondary" style="font-size:12px;padding:6px 12px">Full Audit Log</a>
+        <a href="{{ url_for('system.audit_log') }}" class="pf-btn pf-btn-secondary" style="font-size:12px;padding:6px 12px">{{ t('Full Audit Log', 'سجل المراجعة الكامل') }}</a>
       </div>
     </div>
     {% if recent_logs %}
@@ -348,8 +348,8 @@
       <table class="log-tbl">
         <thead>
           <tr>
-            <th>Time</th><th>Level</th><th>Module</th><th>Endpoint</th>
-            <th>Status</th><th>ms</th><th>User</th><th>Error</th>
+            <th>{{ t('Time', 'الوقت') }}</th><th>{{ t('Level', 'المستوى') }}</th><th>{{ t('Module', 'الوحدة') }}</th><th>{{ t('Endpoint', 'نقطة النهاية') }}</th>
+            <th>{{ t('Status', 'الحالة') }}</th><th>ms</th><th>{{ t('User', 'المستخدم') }}</th><th>{{ t('Error', 'خطأ') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -372,7 +372,7 @@
     {% else %}
     <div style="text-align:center;padding:36px;color:var(--text-muted);">
       <div style="font-size:36px;margin-bottom:10px;">📭</div>
-      No server logs yet — appear after the first API requests.
+      {{ t('No server logs yet — appear after the first API requests.', 'لا توجد سجلات خادم بعد — تظهر بعد أول طلبات API.') }}
     </div>
     {% endif %}
   </div>
@@ -381,7 +381,7 @@
   {% if legacy_enabled %}
   <div class="sec">
     <div class="sec-hdr">
-      <div class="sec-title">🔗 Legacy App Status</div>
+      <div class="sec-title">{{ t('🔗 Legacy App Status', '🔗 حالة التطبيق القديم') }}</div>
     </div>
     <div style="display:flex;align-items:center;gap:16px;padding:12px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--border);">
       <div>
@@ -389,7 +389,7 @@
         <div style="font-family:monospace;font-size:14px;color:var(--c-primary);">{{ legacy_url }}</div>
       </div>
       <button class="pf-btn pf-btn-secondary" style="font-size:12px;padding:6px 16px;" onclick="checkLegacy()">
-        Check Status
+        {{ t('Check Status', 'فحص الحالة') }}
       </button>
       <span id="legacy-result" style="font-size:13px;font-weight:700;"></span>
     </div>

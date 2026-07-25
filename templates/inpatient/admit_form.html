@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Admit Patient{% endblock %}
+{% block title %}{{ t('Admit Patient', 'تنويم مريض') }}{% endblock %}
 {% block content %}
 <div class="pf-page-header">
   <div>
-    <h1 class="pf-page-title">🏥 Admit Patient</h1>
+    <h1 class="pf-page-title">{{ t('🏥 Admit Patient', '🏥 تنويم مريض') }}</h1>
   </div>
   <div class="pf-topbar-actions">
-    <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">← Back</a>
+    <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('← Back', '← رجوع') }}</a>
   </div>
 </div>
 
@@ -16,9 +16,9 @@
     <div class="pf-form-grid">
 
       <div class="pf-form-group" style="grid-column:1/-1">
-        <label class="pf-label">Pet *</label>
+        <label class="pf-label">{{ t('Pet *', 'الحيوان *') }}</label>
         <select name="pet_id" id="petSelect" class="pf-input" required onchange="fillOwner(this)">
-          <option value="">— select pet —</option>
+          <option value="">{{ t('— select pet —', '— اختر الحيوان —') }}</option>
           {% for p in all_pets %}
           <option value="{{ p.id }}" data-owner="{{ p.owner_id }}" data-owner-name="{{ p.owner_name }}"
             {% if pet and pet.id == p.id %}selected{% endif %}>
@@ -30,44 +30,44 @@
       </div>
 
       <div class="pf-form-group">
-        <label class="pf-label">Admitting Doctor</label>
+        <label class="pf-label">{{ t('Admitting Doctor', 'طبيب التنويم') }}</label>
         <select name="admitting_doctor" class="pf-input">
-          <option value="">— select doctor —</option>
+          <option value="">{{ t('— select doctor —', '— اختر الطبيب —') }}</option>
           {% for d in doctors %}
           <option value="{{ d.full_name }}">{{ d.full_name }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="pf-form-group">
-        <label class="pf-label">Admission Date *</label>
+        <label class="pf-label">{{ t('Admission Date *', 'تاريخ التنويم *') }}</label>
         <input type="date" name="admission_date" class="pf-input" value="{{ today_date }}" required>
       </div>
 
       <div class="pf-form-group">
-        <label class="pf-label">Ward</label>
+        <label class="pf-label">{{ t('Ward', 'العنبر') }}</label>
         <select name="ward" class="pf-input">
           {% for w in wards %}<option>{{ w }}</option>{% endfor %}
         </select>
       </div>
       <div class="pf-form-group">
-        <label class="pf-label">Room / Cage Number</label>
+        <label class="pf-label">{{ t('Room / Cage Number', 'رقم الغرفة / القفص') }}</label>
         <input type="text" name="room_number" class="pf-input" placeholder="e.g. A-3">
       </div>
 
       <div class="pf-form-group">
-        <label class="pf-label">Daily Rate (EGP)</label>
+        <label class="pf-label">{{ t('Daily Rate (EGP)', 'السعر اليومي (جنيه)') }}</label>
         <input type="number" step="0.01" name="daily_rate" class="pf-input" value="0">
       </div>
 
       <div class="pf-form-group" style="grid-column:1/-1">
-        <label class="pf-label">Reason for Admission *</label>
-        <textarea name="reason" class="pf-input" rows="3" required placeholder="Chief complaint, reason for hospitalization..."></textarea>
+        <label class="pf-label">{{ t('Reason for Admission *', 'سبب التنويم *') }}</label>
+        <textarea name="reason" class="pf-input" rows="3" required placeholder="{{ t('Chief complaint, reason for hospitalization...', 'الشكوى الرئيسية، سبب التنويم...') }}"></textarea>
       </div>
     </div>
 
     <div style="display:flex;gap:12px;margin-top:24px">
-      <button type="submit" class="pf-btn pf-btn-primary">🏥 Admit Patient</button>
-      <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">Cancel</a>
+      <button type="submit" class="pf-btn pf-btn-primary">{{ t('🏥 Admit Patient', '🏥 تنويم مريض') }}</button>
+      <a href="{{ url_for('inpatient.dashboard') }}" class="pf-btn pf-btn-secondary">{{ t('Cancel', 'إلغاء') }}</a>
     </div>
   </form>
 </div>

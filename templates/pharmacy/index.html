@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Pharmacy Queue{% endblock %}
-{% block page_title %}Pharmacy Dispensing Queue{% endblock %}
-{% block page_sub %}Prescriptions awaiting dispensing{% endblock %}
+{% block title %}{{ t('Pharmacy Queue', 'قائمة الصيدلية') }}{% endblock %}
+{% block page_title %}{{ t('Pharmacy Dispensing Queue', 'قائمة صرف الصيدلية') }}{% endblock %}
+{% block page_sub %}{{ t('Prescriptions awaiting dispensing', 'وصفات بانتظار الصرف') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('pharmacy.history') }}" class="pf-btn pf-btn-secondary">Dispensing History</a>
-<a href="{{ url_for('pharmacy.narcotics') }}" class="pf-btn pf-btn-secondary" style="color:#7c3aed;border-color:#7c3aed">Narcotics Register</a>
+<a href="{{ url_for('pharmacy.history') }}" class="pf-btn pf-btn-secondary">{{ t('Dispensing History', 'سجل الصرف') }}</a>
+<a href="{{ url_for('pharmacy.narcotics') }}" class="pf-btn pf-btn-secondary" style="color:#7c3aed;border-color:#7c3aed">{{ t('Narcotics Register', 'سجل المخدرات') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -15,13 +15,13 @@
     <thead>
       <tr>
         <th>#</th>
-        <th>Pet / Owner</th>
-        <th>Doctor</th>
-        <th>Visit Date</th>
-        <th>Items</th>
-        <th>Status</th>
-        <th>Created</th>
-        <th>Action</th>
+        <th>{{ t('Pet / Owner', 'الحيوان / المالك') }}</th>
+        <th>{{ t('Doctor', 'الطبيب') }}</th>
+        <th>{{ t('Visit Date', 'تاريخ الزيارة') }}</th>
+        <th>{{ t('Items', 'الأصناف') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
+        <th>{{ t('Created', 'تاريخ الإنشاء') }}</th>
+        <th>{{ t('Action', 'الإجراء') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -52,7 +52,7 @@
         <td style="font-size:12px">{{ rx.created_at[:10] if rx.created_at else '—' }}</td>
         <td>
           <a href="{{ url_for('pharmacy.rx_detail', rx_id=rx.id) }}"
-             class="pf-btn pf-btn-sm pf-btn-primary">Dispense</a>
+             class="pf-btn pf-btn-sm pf-btn-primary">{{ t('Dispense', 'صرف') }}</a>
         </td>
       </tr>
       {% endfor %}
@@ -62,8 +62,8 @@
 {% else %}
 <div class="pf-card pf-empty" style="padding:60px;text-align:center">
   <div style="font-size:48px;margin-bottom:12px">💊</div>
-  <div style="font-size:16px;font-weight:600">Queue is clear</div>
-  <div style="color:var(--cl-text-light);margin-top:6px">All prescriptions have been dispensed.</div>
+  <div style="font-size:16px;font-weight:600">{{ t('Queue is clear', 'قائمة الانتظار فارغة') }}</div>
+  <div style="color:var(--cl-text-light);margin-top:6px">{{ t('All prescriptions have been dispensed.', 'تم صرف جميع الوصفات.') }}</div>
 </div>
 {% endif %}
 {% endblock %}

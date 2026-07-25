@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Attendance Report{% endblock %}
-{% block page_title %}Monthly Attendance Report{% endblock %}
+{% block title %}{{ t('Attendance Report', 'تقرير الحضور') }}{% endblock %}
+{% block page_title %}{{ t('Monthly Attendance Report', 'تقرير الحضور الشهري') }}{% endblock %}
 {% block page_sub %}{{ month_name }} {{ year }}{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
+  <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">{{ t('← Dashboard', '← لوحة التحكم') }}</a>
 {% endblock %}
 
 {% block content %}
@@ -13,7 +13,7 @@
 <div class="pf-card" style="margin-bottom:16px">
   <form method="GET" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
     <div class="pf-form-group" style="margin:0;min-width:100px">
-      <label class="pf-form-label">Year</label>
+      <label class="pf-form-label">{{ t('Year', 'السنة') }}</label>
       <select name="year" class="pf-form-control">
         {% for y in range(2024, 2028) %}
         <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
@@ -21,7 +21,7 @@
       </select>
     </div>
     <div class="pf-form-group" style="margin:0;min-width:130px">
-      <label class="pf-form-label">Month</label>
+      <label class="pf-form-label">{{ t('Month', 'الشهر') }}</label>
       <select name="month" class="pf-form-control">
         {% for m in range(1, 13) %}
         <option value="{{ m }}" {% if m == month %}selected{% endif %}>
@@ -32,16 +32,16 @@
     </div>
     {% if is_manager %}
     <div class="pf-form-group" style="margin:0;min-width:180px">
-      <label class="pf-form-label">Staff</label>
+      <label class="pf-form-label">{{ t('Staff', 'الموظف') }}</label>
       <select name="user_id" class="pf-form-control">
-        <option value="">All Staff</option>
+        <option value="">{{ t('All Staff', 'جميع الموظفين') }}</option>
         {% for s in staff_list %}
         <option value="{{ s.id }}" {% if selected_uid == s.id|string %}selected{% endif %}>{{ s.full_name }}</option>
         {% endfor %}
       </select>
     </div>
     {% endif %}
-    <button type="submit" class="pf-btn pf-btn-primary">Generate</button>
+    <button type="submit" class="pf-btn pf-btn-primary">{{ t('Generate', 'إنشاء') }}</button>
   </form>
 </div>
 
@@ -54,19 +54,19 @@
     <div style="font-size:11px;color:var(--cl-text-muted);margin-bottom:10px">{{ s.role }}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div style="background:#dcfce7;border-radius:4px;padding:8px;text-align:center">
-        <div style="font-size:10px;color:#166534">Present</div>
+        <div style="font-size:10px;color:#166534">{{ t('Present', 'حاضر') }}</div>
         <div style="font-weight:700;color:#166534;font-size:18px">{{ s.present }}</div>
       </div>
       <div style="background:#fee2e2;border-radius:4px;padding:8px;text-align:center">
-        <div style="font-size:10px;color:#991b1b">Absent</div>
+        <div style="font-size:10px;color:#991b1b">{{ t('Absent', 'غائب') }}</div>
         <div style="font-weight:700;color:#991b1b;font-size:18px">{{ s.absent }}</div>
       </div>
       <div style="background:#fef3c7;border-radius:4px;padding:8px;text-align:center">
-        <div style="font-size:10px;color:#92400e">Late</div>
+        <div style="font-size:10px;color:#92400e">{{ t('Late', 'متأخر') }}</div>
         <div style="font-weight:700;color:#92400e;font-size:18px">{{ s.late }}</div>
       </div>
       <div style="background:#ede9fe;border-radius:4px;padding:8px;text-align:center">
-        <div style="font-size:10px;color:#5b21b6">Total Hrs</div>
+        <div style="font-size:10px;color:#5b21b6">{{ t('Total Hrs', 'إجمالي الساعات') }}</div>
         <div style="font-weight:700;color:#5b21b6;font-size:18px">{{ '%.0f'|format(s.total_hours) }}</div>
       </div>
     </div>
@@ -85,7 +85,7 @@
     </div>
   </div>
   <table class="pf-table">
-    <thead><tr><th>Staff</th><th>Type</th><th>Period</th><th>Days</th></tr></thead>
+    <thead><tr><th>{{ t('Staff', 'الموظف') }}</th><th>{{ t('Type', 'النوع') }}</th><th>{{ t('Period', 'الفترة') }}</th><th>{{ t('Days', 'الأيام') }}</th></tr></thead>
     <tbody>
       {% for lr in approved_leaves %}
       <tr>
@@ -112,8 +112,8 @@
   <table class="pf-table">
     <thead>
       <tr>
-        {% if is_manager %}<th>Staff</th>{% endif %}
-        <th>Date</th><th>Day</th><th>In</th><th>Out</th><th>Break</th><th>Hours</th><th>Status</th>
+        {% if is_manager %}<th>{{ t('Staff', 'الموظف') }}</th>{% endif %}
+        <th>{{ t('Date', 'التاريخ') }}</th><th>{{ t('Day', 'اليوم') }}</th><th>{{ t('In', 'دخول') }}</th><th>{{ t('Out', 'خروج') }}</th><th>{{ t('Break', 'الاستراحة') }}</th><th>{{ t('Hours', 'الساعات') }}</th><th>{{ t('Status', 'الحالة') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -133,10 +133,10 @@
         <td>{{ r.break_minutes or 0 }}m</td>
         <td style="font-weight:600">{{ '%.1f'|format(r.hours_worked or 0) }}h</td>
         <td>
-          {% if r.status == 'Present' %}<span class="pf-badge active">Present</span>
-          {% elif r.status == 'Late' %}<span class="pf-badge" style="background:#fef3c7;color:#92400e">Late</span>
-          {% elif r.status == 'Absent' %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b">Absent</span>
-          {% elif r.status == 'Leave' %}<span class="pf-badge beta">Leave</span>
+          {% if r.status == 'Present' %}<span class="pf-badge active">{{ t('Present', 'حاضر') }}</span>
+          {% elif r.status == 'Late' %}<span class="pf-badge" style="background:#fef3c7;color:#92400e">{{ t('Late', 'متأخر') }}</span>
+          {% elif r.status == 'Absent' %}<span class="pf-badge" style="background:#fee2e2;color:#991b1b">{{ t('Absent', 'غائب') }}</span>
+          {% elif r.status == 'Leave' %}<span class="pf-badge beta">{{ t('Leave', 'إجازة') }}</span>
           {% else %}<span class="pf-badge">{{ r.status }}</span>{% endif %}
         </td>
       </tr>
