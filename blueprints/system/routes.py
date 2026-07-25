@@ -3,13 +3,15 @@ System Monitor Blueprint
 """
 import os
 import sys
+import glob
 import platform as _platform
-from datetime import date
+from datetime import date, datetime, timedelta
 from flask import render_template, request, redirect, url_for, session, flash, current_app, jsonify
 from . import system_bp
 from blueprints.auth.routes import login_required, role_required
 import models.database as db
 import models.backup as bk
+from models.sync import get_sync_status_summary, resolve_conflict
 
 
 def _db_path():
@@ -26,6 +28,8 @@ def index():
 @role_required("super_admin", "clinic_owner", "support_admin")
 def monitor():
     db_path = _db_path()
+
+    # ── DB size ──────────────────────────────────────────────────
     db_size_bytes = 0
     try:
         db_size_bytes = os.path.getsize(db_path)
@@ -33,7 +37,8 @@ def monitor():
         pass
     db_size_kb = round(db_size_bytes / 1024, 1)
     db_size_mb = round(db_size_bytes / (1024 * 1024), 2)
-    # Row counts
+
+    # ── Row counts ───────────────────────────────────────────────
     tables = ["owners", "pets", "appointments", "visits", "invoices", "items",
               "users", "reminders", "whatsapp_log", "audit_log", "batches", "payments"]
     row_counts = {}
@@ -43,29 +48,118 @@ def monitor():
             row_counts[t] = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
         except Exception:
             row_counts[t] = 0
-    # Recent app logs
-    app_logs = [dict(r) for r in conn.execute(
-        "SELECT * FROM app_logs ORDER BY timestamp DESC LIMIT 20"
-    ).fetchall()]
+
+    # ── Recent backend logs (from new production table) ───────────
+    recent_logs = []
+    try:
+        rows = conn.execute(
+            "SELECT * FROM backend_logs ORDER BY timestamp DESC LIMIT 25"
+        ).fetchall()
+        recent_logs = [dict(r) for r in rows]
+    except Exception:
+        # Fallback to old app_logs table if backend_logs not ready
+        try:
+            recent_logs = [dict(r) for r in conn.execute(
+                "SELECT * FROM app_logs ORDER BY timestamp DESC LIMIT 25"
+            ).fetchall()]
+        except Exception:
+            pass
+
+    # ── Error count last 24h ──────────────────────────────────────
+    error_count_24h = 0
+    try:
+        cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+        error_count_24h = conn.execute(
+            "SELECT COUNT(*) FROM backend_logs WHERE level IN ('ERROR','CRITICAL') AND timestamp >= ?",
+            (cutoff,)
+        ).fetchone()[0]
+    except Exception:
+        pass
+
+    # ── Active devices ────────────────────────────────────────────
+    active_devices = 0
+    try:
+        cutoff_dev = (datetime.utcnow() - timedelta(hours=1)).isoformat()
+        active_devices = conn.execute(
+            "SELECT COUNT(*) FROM devices WHERE last_online_at >= ? AND is_active=1",
+            (cutoff_dev,)
+        ).fetchone()[0]
+    except Exception:
+        pass
+
+    total_devices = 0
+    try:
+        total_devices = conn.execute(
+            "SELECT COUNT(*) FROM devices WHERE is_active=1"
+        ).fetchone()[0]
+    except Exception:
+        pass
+
     conn.close()
-    legacy_url = current_app.config.get("LEGACY_APP_URL", "http://localhost:5000")
+
+    # ── Sync stats ────────────────────────────────────────────────
+    sync_stats = {"pending": 0, "synced": 0, "failed": 0, "conflicts": 0}
+    try:
+        sync_stats = get_sync_status_summary()
+    except Exception:
+        pass
+
+    # ── Log files ─────────────────────────────────────────────────
+    log_dir = os.path.join(os.path.dirname(db_path), "logs", "backend")
+    log_files_info = []
+    log_total_mb = 0.0
+    retention_days = int(os.environ.get("LOG_FILE_RETENTION_DAYS", 7))
+    try:
+        if os.path.isdir(log_dir):
+            files = sorted(glob.glob(os.path.join(log_dir, "*.log")), reverse=True)
+            for f in files[:10]:
+                size_kb = round(os.path.getsize(f) / 1024, 1)
+                log_total_mb += size_kb / 1024
+                mtime = datetime.fromtimestamp(os.path.getmtime(f))
+                age_days = (datetime.utcnow() - mtime).days
+                log_files_info.append({
+                    "name": os.path.basename(f),
+                    "size_kb": size_kb,
+                    "age_days": age_days,
+                    "expires_in": max(0, retention_days - age_days),
+                })
+    except Exception:
+        pass
+    log_total_mb = round(log_total_mb, 2)
+
+    # ── System info ───────────────────────────────────────────────
+    legacy_url     = current_app.config.get("LEGACY_APP_URL", "http://localhost:5000")
+    legacy_enabled = current_app.config.get("LEGACY_APP_ENABLED", False)
     sys_info = {
-        "python_version": sys.version.split()[0],
-        "platform":       _platform.platform(),
-        "flask_version":  _get_flask_version(),
-        "db_size_kb":     db_size_kb,
-        "db_size_mb":     db_size_mb,
-        "db_path":        db_path,
+        "python_version":  sys.version.split()[0],
+        "platform":        _platform.platform(),
+        "flask_version":   _get_flask_version(),
+        "db_size_kb":      db_size_kb,
+        "db_size_mb":      db_size_mb,
+        "db_path":         db_path,
+        "app_version":     os.environ.get("APP_VERSION", "1.0.0"),
+        "build_number":    os.environ.get("BUILD_NUMBER", "production_final_v1"),
+        "release_date":    os.environ.get("RELEASE_DATE", "2026-05-24"),
     }
+
     latest_backup = bk.get_latest_backup()
+
     return render_template(
         "system/monitor.html",
         sys_info=sys_info,
         row_counts=row_counts,
-        app_logs=app_logs,
+        recent_logs=recent_logs,
         legacy_url=legacy_url,
+        legacy_enabled=legacy_enabled,
         latest_backup=latest_backup,
-        active="system",
+        sync_stats=sync_stats,
+        error_count_24h=error_count_24h,
+        active_devices=active_devices,
+        total_devices=total_devices,
+        log_files_info=log_files_info,
+        log_total_mb=log_total_mb,
+        retention_days=retention_days,
+        active="monitor",
     )
 
 
@@ -273,21 +367,171 @@ def diagnostics():
 
 
 # ─────────────────────────────────────────────
+# SYNC DASHBOARD
+# ─────────────────────────────────────────────
+
+@system_bp.route("/sync")
+@role_required("super_admin", "clinic_owner", "support_admin")
+def sync_dashboard():
+    conn = db.get_db()
+
+    # Filters
+    f_status   = request.args.get("status", "")
+    f_device   = request.args.get("device", "")
+    f_entity   = request.args.get("entity", "")
+
+    # ── Sync queue ────────────────────────────────────────────────
+    queue_items = []
+    try:
+        q = "SELECT * FROM sync_queue WHERE 1=1"
+        params = []
+        if f_status: q += " AND status=?";      params.append(f_status)
+        if f_device: q += " AND device_id=?";   params.append(f_device)
+        if f_entity: q += " AND entity_name=?"; params.append(f_entity)
+        q += " ORDER BY created_at DESC LIMIT 100"
+        queue_items = [dict(r) for r in conn.execute(q, params).fetchall()]
+    except Exception:
+        pass
+
+    # ── Conflicts ─────────────────────────────────────────────────
+    conflicts = []
+    try:
+        conflicts = [dict(r) for r in conn.execute(
+            "SELECT * FROM sync_conflicts WHERE resolution_status='PENDING' ORDER BY created_at DESC LIMIT 50"
+        ).fetchall()]
+    except Exception:
+        pass
+
+    # ── Devices ───────────────────────────────────────────────────
+    devices = []
+    try:
+        devices = [dict(r) for r in conn.execute(
+            "SELECT * FROM devices ORDER BY last_online_at DESC LIMIT 50"
+        ).fetchall()]
+    except Exception:
+        pass
+
+    # ── Filter options ────────────────────────────────────────────
+    device_ids = []
+    entity_names = []
+    try:
+        device_ids  = [r[0] for r in conn.execute("SELECT DISTINCT device_id FROM sync_queue").fetchall()]
+        entity_names = [r[0] for r in conn.execute("SELECT DISTINCT entity_name FROM sync_queue").fetchall()]
+    except Exception:
+        pass
+
+    # ── Status summary ────────────────────────────────────────────
+    sync_stats = {"pending": 0, "synced": 0, "failed": 0, "conflicts": 0}
+    try:
+        sync_stats = get_sync_status_summary()
+    except Exception:
+        pass
+
+    conn.close()
+    return render_template(
+        "system/sync.html",
+        queue_items=queue_items,
+        conflicts=conflicts,
+        devices=devices,
+        sync_stats=sync_stats,
+        device_ids=device_ids,
+        entity_names=entity_names,
+        f_status=f_status,
+        f_device=f_device,
+        f_entity=f_entity,
+        active="sync",
+    )
+
+
+@system_bp.route("/sync/conflicts/<conflict_id>/resolve", methods=["POST"])
+@role_required("super_admin", "clinic_owner", "support_admin")
+def sync_resolve_conflict(conflict_id):
+    keep = request.form.get("keep", "server")
+    try:
+        resolve_conflict(
+            conflict_id=conflict_id,
+            resolved_by=session["user"]["id"],
+            keep=keep,
+        )
+        db.log_audit(
+            username=session["user"]["username"],
+            role=session["user"]["role"],
+            action="resolve_conflict",
+            module="system",
+            entity_type="sync_conflict",
+            entity_id=conflict_id,
+            details=f"Resolved sync conflict — kept: {keep}",
+        )
+        flash(f"Conflict resolved. Kept: {keep} version.", "success")
+    except Exception as e:
+        flash(f"Error resolving conflict: {e}", "danger")
+    return redirect(url_for("system.sync_dashboard"))
+
+
+# ─────────────────────────────────────────────
 # ROLES & PERMISSIONS
 # ─────────────────────────────────────────────
+
+_SYSTEM_ROLE_PERMS = {
+    "super_admin":     ["patients","appointments","visits","pharmacy","invoicing","inventory","procurement","reports","whatsapp","catalog","grooming","boarding","hr","attendance","accounting","ai","system","backup","audit","settings"],
+    "clinic_owner":    ["patients","appointments","visits","pharmacy","invoicing","inventory","procurement","reports","whatsapp","catalog","grooming","boarding","hr","attendance","accounting","ai","system","backup","audit","settings"],
+    "branch_manager":  ["patients","appointments","visits","pharmacy","invoicing","inventory","procurement","reports","whatsapp","catalog","grooming","boarding","hr","attendance","accounting","ai"],
+    "doctor":          ["patients","appointments","visits","pharmacy","reports","whatsapp","ai"],
+    "nurse":           ["patients","appointments","visits","reports"],
+    "receptionist":    ["patients","appointments","invoicing","whatsapp"],
+    "pharmacist":      ["pharmacy","inventory","procurement"],
+    "groomer":         ["patients","appointments","grooming"],
+    "hr":              ["hr","attendance","reports"],
+    "support_admin":   ["system","backup","audit","settings","reports"],
+    "staff":           ["patients","appointments"],
+}
+
+_SYSTEM_ROLE_COLORS = {
+    "super_admin":    "#7c3aed",
+    "clinic_owner":   "#0b7a6b",
+    "branch_manager": "#1d4ed8",
+    "doctor":         "#0891b2",
+    "nurse":          "#059669",
+    "receptionist":   "#d97706",
+    "pharmacist":     "#7c3aed",
+    "groomer":        "#db2777",
+    "hr":             "#64748b",
+    "support_admin":  "#dc2626",
+    "staff":          "#94a3b8",
+}
 
 @system_bp.route("/roles")
 @role_required("super_admin", "clinic_owner", "support_admin")
 def roles_list():
     roles = db.list_roles()
-    users = db.list_users()
+    # Only load user counts — NOT full user rows (users loaded lazily via /roles/users)
+    conn = db.get_db()
+    count_rows = conn.execute(
+        "SELECT role, COUNT(*) as cnt FROM users GROUP BY role"
+    ).fetchall()
+    conn.close()
+    user_counts = {r["role"]: r["cnt"] for r in count_rows}
     return render_template(
         "system/roles.html",
         roles=roles,
-        users=users,
+        user_counts=user_counts,
         all_permissions=db.ALL_PERMISSIONS,
+        system_role_perms=_SYSTEM_ROLE_PERMS,
+        system_role_colors=_SYSTEM_ROLE_COLORS,
         active="roles",
     )
+
+
+@system_bp.route("/roles/users")
+@role_required("super_admin", "clinic_owner", "support_admin")
+def roles_users_api():
+    """JSON endpoint — called lazily when Staff Access tab is opened."""
+    conn = db.get_db()
+    rows = [dict(r) for r in conn.execute(
+        "SELECT id, username, full_name, role, is_active FROM users ORDER BY full_name LIMIT 300"
+    ).fetchall()]
+    conn.close()
+    return jsonify(rows)
 
 
 @system_bp.route("/roles/create", methods=["POST"])

@@ -3,18 +3,33 @@ Public API — exposed to the Vercel website (no CSRF, no session required).
 Rate-limited by the platform security layer.
 """
 
+import os
+import logging
 from flask import request, jsonify, make_response
 from datetime import date as _date
 import models.database as db
+import models.security as sec
 from . import public_api_bp
+
+logger = logging.getLogger(__name__)
+
+# Allowed CORS origin — restrict to your website domain in production.
+# Set CORS_ALLOWED_ORIGIN env var to your Vercel/website URL.
+# Default "*" works for local dev but MUST be restricted in production.
+_CORS_ORIGIN = os.environ.get("CORS_ALLOWED_ORIGIN", "*")
+
+# Emergency contact — set EMERGENCY_PHONE env var in production
+_EMERGENCY_PHONE = os.environ.get("EMERGENCY_PHONE", "")
 
 
 # ── CORS helper ─────────────────────────────────────────────────────────────
 
 def _cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Origin"] = _CORS_ORIGIN
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Api-Key"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    if _CORS_ORIGIN != "*":
+        response.headers["Vary"] = "Origin"
     return response
 
 
@@ -27,6 +42,17 @@ def _apply_cors(response):
 @public_api_bp.route("/<path:p>", methods=["OPTIONS"])
 def options_handler(p):
     return _cors(make_response("", 204))
+
+
+# ── Rate limit helper for public endpoints ───────────────────────────────────
+
+def _check_rate_limit():
+    """Returns a 429 response if rate limited, else None."""
+    ip = sec.get_real_ip(request)
+    limited, wait = sec.is_rate_limited(ip)
+    if limited:
+        return jsonify({"ok": False, "error": "Too many requests. Please try again later."}), 429
+    return None
 
 
 # ── GET /api/public/health ───────────────────────────────────────────────────
@@ -57,7 +83,8 @@ def services():
         ]
         return jsonify(result)
     except Exception as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        logger.error(f"Public API /services error: {exc}", exc_info=True)
+        return jsonify({"ok": False, "error": "Service temporarily unavailable."}), 500
     finally:
         conn.close()
 
@@ -66,6 +93,9 @@ def services():
 
 @public_api_bp.route("/book", methods=["POST"])
 def book():
+    rl = _check_rate_limit()
+    if rl:
+        return rl
     data = request.get_json(silent=True) or {}
 
     owner_name = (data.get("ownerName") or "").strip()
@@ -165,7 +195,8 @@ def book():
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        logger.error(f"Public API /book error: {exc}", exc_info=True)
+        return jsonify({"ok": False, "error": "Booking failed. Please try again or call us directly."}), 500
     finally:
         conn.close()
 
@@ -174,6 +205,9 @@ def book():
 
 @public_api_bp.route("/contact", methods=["POST"])
 def contact():
+    rl = _check_rate_limit()
+    if rl:
+        return rl
     data = request.get_json(silent=True) or {}
 
     name    = (data.get("name") or "").strip()
@@ -221,7 +255,8 @@ def contact():
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        logger.error(f"Public API /contact error: {exc}", exc_info=True)
+        return jsonify({"ok": False, "error": "Message could not be saved. Please call us directly."}), 500
     finally:
         conn.close()
 
@@ -230,6 +265,9 @@ def contact():
 
 @public_api_bp.route("/emergency", methods=["POST"])
 def emergency():
+    rl = _check_rate_limit()
+    if rl:
+        return rl
     data = request.get_json(silent=True) or {}
 
     owner_name  = (data.get("ownerName") or "").strip()
@@ -290,9 +328,11 @@ def emergency():
         appointment_id = cur.lastrowid
 
         conn.commit()
+        # Phone number comes from env var — never hardcoded
+        phone_msg = f" Please call {_EMERGENCY_PHONE} immediately." if _EMERGENCY_PHONE else ""
         return jsonify({
             "ok": True,
-            "message": "Emergency received. Please call +201096393136 immediately.",
+            "message": f"Emergency received. Our team will contact you shortly.{phone_msg}",
         })
 
     except Exception as exc:
@@ -300,6 +340,7 @@ def emergency():
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        logger.error(f"Public API /emergency error: {exc}", exc_info=True)
+        return jsonify({"ok": False, "error": "Emergency registration failed. Please call us directly."}), 500
     finally:
         conn.close()

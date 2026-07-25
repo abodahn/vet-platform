@@ -693,7 +693,7 @@ function v3LoadAIInsights() {
   var csrf = (document.querySelector('meta[name=csrf-token]') || {}).content || '';
   fetch('/ai/insights', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     body: JSON.stringify({ topic: 'daily_summary' })
   })
   .then(function(r) { return r.json(); })

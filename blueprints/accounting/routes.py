@@ -246,39 +246,23 @@ def cash_flow():
 
     movements = []
 
-    # Money in — payments table (received_at is the real column)
+    # Money in — use invoices (vet payments table belongs to Waslny taxi app, not vet app)
     try:
-        pay_rows = [dict(r) for r in conn.execute(
-            """SELECT SUBSTRING(received_at::text, 1, 10) AS tx_date,
-                      amount,
-                      COALESCE(method, 'Cash') AS payment_method,
-                      COALESCE(reference, 'Invoice Payment') AS description,
+        inv_pay = [dict(r) for r in conn.execute(
+            """SELECT SUBSTRING(issue_date::text, 1, 10) AS tx_date,
+                      paid_amount AS amount,
+                      'Cash' AS payment_method,
+                      COALESCE(invoice_number, 'Invoice') AS description,
                       'in' AS direction
-               FROM payments
-               WHERE SUBSTRING(received_at::text, 1, 10) >= ?
-                 AND SUBSTRING(received_at::text, 1, 10) <= ?
-               ORDER BY received_at""",
+               FROM invoices
+               WHERE status IN ('Paid','Partial')
+                 AND SUBSTRING(issue_date::text, 1, 10) >= ?
+                 AND SUBSTRING(issue_date::text, 1, 10) <= ?""",
             (date_from, date_to)
         ).fetchall()]
-        movements.extend(pay_rows)
+        movements.extend(inv_pay)
     except Exception:
-        # Fallback: use paid invoices
-        try:
-            inv_pay = [dict(r) for r in conn.execute(
-                """SELECT SUBSTRING(issue_date::text, 1, 10) AS tx_date,
-                          paid_amount AS amount,
-                          'Cash' AS payment_method,
-                          COALESCE(invoice_number, 'Invoice') AS description,
-                          'in' AS direction
-                   FROM invoices
-                   WHERE status IN ('Paid','Partial')
-                     AND SUBSTRING(issue_date::text, 1, 10) >= ?
-                     AND SUBSTRING(issue_date::text, 1, 10) <= ?""",
-                (date_from, date_to)
-            ).fetchall()]
-            movements.extend(inv_pay)
-        except Exception:
-            pass
+        pass
 
     # Money out — expenses
     try:
@@ -472,34 +456,23 @@ def daily_closing():
                 flash(f"Error saving note: {e}", "danger")
         return redirect(url_for("accounting.daily_closing"))
 
-    # Today's summary
+    # Today's summary — use invoices (vet payments table belongs to Waslny taxi app)
     try:
         today_revenue = float(conn.execute(
-            """SELECT COALESCE(SUM(amount), 0) FROM payments
-               WHERE SUBSTRING(received_at::text, 1, 10) = ?""",
+            """SELECT COALESCE(SUM(paid_amount), 0) FROM invoices
+               WHERE status IN ('Paid','Partial')
+                 AND SUBSTRING(issue_date::text, 1, 10) = ?""",
             (today,)
         ).fetchone()[0] or 0)
         tx_count_in = conn.execute(
-            "SELECT COUNT(*) FROM payments WHERE SUBSTRING(received_at::text, 1, 10) = ?",
+            """SELECT COUNT(*) FROM invoices
+               WHERE status IN ('Paid','Partial')
+                 AND SUBSTRING(issue_date::text, 1, 10) = ?""",
             (today,)
         ).fetchone()[0]
     except Exception:
-        try:
-            today_revenue = float(conn.execute(
-                """SELECT COALESCE(SUM(paid_amount), 0) FROM invoices
-                   WHERE status IN ('Paid','Partial')
-                     AND SUBSTRING(issue_date::text, 1, 10) = ?""",
-                (today,)
-            ).fetchone()[0] or 0)
-            tx_count_in = conn.execute(
-                """SELECT COUNT(*) FROM invoices
-                   WHERE status IN ('Paid','Partial')
-                     AND SUBSTRING(issue_date::text, 1, 10) = ?""",
-                (today,)
-            ).fetchone()[0]
-        except Exception:
-            today_revenue = 0.0
-            tx_count_in = 0
+        today_revenue = 0.0
+        tx_count_in = 0
 
     try:
         today_expenses = float(conn.execute(

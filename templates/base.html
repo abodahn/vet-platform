@@ -116,6 +116,15 @@
             <span class="v3-nav-icon"><i class="bi bi-person-badge"></i></span>
             <span>{{ t('Doctor Workspace', 'مساحة الطبيب') }}</span>
           </a>
+          <a href="{{ url_for('imaging.index') }}" class="v3-nav-item">
+            <span class="v3-nav-icon"><i class="bi bi-camera"></i></span>
+            <span>{{ t('Imaging', 'التصوير الطبي') }}</span>
+          </a>
+          <a href="{{ url_for('imaging.analyzer') }}" class="v3-nav-item"
+             style="background:linear-gradient(135deg,rgba(244,63,94,.08),rgba(168,85,247,.08));border-left:2px solid #a855f7;">
+            <span class="v3-nav-icon" style="color:#a855f7;"><i class="bi bi-stars"></i></span>
+            <span style="color:#a855f7;font-weight:700;">{{ t('AI Photo Analyzer', 'محلل الصور AI') }}</span>
+          </a>
         </div>
       </div>
 
@@ -338,8 +347,15 @@
       <div class="v3-topbar-right">
         {% block topbar_actions %}{% endblock %}
 
-        <!-- Offline indicator -->
-        <span class="v3-online-dot" id="v3-online-dot" title="Online"></span>
+        <!-- Connection + Sync status -->
+        <div class="v3-conn-status" id="v3-conn-status" title="Connection status">
+          <span class="v3-online-dot" id="v3-online-dot"></span>
+          <span class="v3-conn-label" id="v3-conn-label">Online</span>
+        </div>
+        <button class="v3-topbar-btn v3-sync-btn" id="v3-sync-btn" onclick="v3SyncNow()" title="{{ t('Sync pending data','مزامنة البيانات المعلقة') }}" style="display:none" aria-label="Sync">
+          <svg viewBox="0 0 20 20" fill="none" width="16" height="16" id="v3-sync-icon"><path d="M4 10a6 6 0 016-6 6 6 0 014.24 1.76M16 10a6 6 0 01-6 6 6 6 0 01-4.24-1.76" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4 6V10H8M16 14v-4h-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span id="v3-sync-count" class="v3-sync-badge" style="display:none">0</span>
+        </button>
 
         <!-- Notifications -->
         {% if current_user %}
@@ -423,109 +439,139 @@
 ═══════════════════════════════════════════════════ -->
 {% if current_user %}
 <style>
-/* Petsy FAB */
+/* ── Petsy V4 — Lively FAB ───────────────────────────────── */
 #petsy-fab-global {
   position: fixed; bottom: 28px; right: 28px; z-index: 1050;
-  width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
-  background: linear-gradient(135deg, #0D2B24 0%, #1B6B5C 100%);
-  box-shadow: 0 6px 24px rgba(27,107,92,.55);
+  width: 64px; height: 64px; border-radius: 50%; border: none; cursor: grab;
+  background: linear-gradient(135deg, #f43f5e 0%, #a855f7 50%, #6366f1 100%);
+  box-shadow: 0 8px 28px rgba(168,85,247,.55), 0 2px 8px rgba(244,63,94,.3);
   display: flex; align-items: center; justify-content: center;
-  padding: 10px; transition: transform .2s, box-shadow .2s; outline: none;
+  padding: 12px; outline: none; user-select: none;
+  animation: petsy-idle 3.6s ease-in-out infinite;
+  transform-origin: center bottom;
 }
-#petsy-fab-global:hover { transform: scale(1.1); box-shadow: 0 8px 32px rgba(27,107,92,.75); }
-#petsy-fab-global::before {
-  content: ""; position: absolute; inset: -5px; border-radius: 50%;
-  border: 2px solid rgba(27,107,92,.4);
-  animation: petsy-pulse 2.4s ease-out infinite;
-}
-@keyframes petsy-pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.55); opacity: 0; } }
-#petsy-fab-global svg { width: 100%; height: 100%; }
+#petsy-fab-global:active { cursor: grabbing; }
+#petsy-fab-global svg { width: 100%; height: 100%; pointer-events: none; filter: drop-shadow(0 1px 3px rgba(0,0,0,.3)); }
 
-/* Petsy hint tooltip */
-#petsy-hint {
-  position: fixed; bottom: 100px; right: 22px; z-index: 1051;
-  background: #0D2B24; color: #fff; padding: 9px 14px;
-  border-radius: 12px; font-size: .82rem; font-weight: 600;
-  box-shadow: 0 4px 16px rgba(0,0,0,.25); white-space: nowrap; pointer-events: none;
-  animation: petsy-pop .4s ease;
+/* Wild idle bounce — never sits still */
+@keyframes petsy-idle {
+  0%   { transform: translateY(0)    rotate(0deg)   scale(1);    }
+  10%  { transform: translateY(-10px) rotate(-6deg)  scale(1.08); }
+  20%  { transform: translateY(-3px)  rotate(4deg)   scale(1.03); }
+  30%  { transform: translateY(-14px) rotate(-3deg)  scale(1.10); }
+  40%  { transform: translateY(-2px)  rotate(6deg)   scale(1.04); }
+  50%  { transform: translateY(-8px)  rotate(-5deg)  scale(1.07); }
+  60%  { transform: translateY(0)     rotate(3deg)   scale(1.02); }
+  70%  { transform: translateY(-12px) rotate(-4deg)  scale(1.09); }
+  80%  { transform: translateY(-4px)  rotate(5deg)   scale(1.05); }
+  90%  { transform: translateY(-7px)  rotate(-2deg)  scale(1.06); }
+  100% { transform: translateY(0)    rotate(0deg)   scale(1);    }
 }
-#petsy-hint::after {
-  content: ""; position: absolute; bottom: -7px; right: 18px;
-  border: 7px solid transparent; border-top-color: #0D2B24; border-bottom: none;
+
+/* Excited burst — triggered every ~10s */
+@keyframes petsy-excited {
+  0%   { transform: scale(1)    rotate(0deg);   }
+  15%  { transform: scale(1.25) rotate(-15deg); }
+  30%  { transform: scale(0.88) rotate(12deg);  }
+  45%  { transform: scale(1.20) rotate(-10deg); }
+  60%  { transform: scale(0.92) rotate(8deg);   }
+  75%  { transform: scale(1.15) rotate(-6deg);  }
+  88%  { transform: scale(1.04) rotate(3deg);   }
+  100% { transform: scale(1)    rotate(0deg);   }
 }
-@keyframes petsy-pop { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+#petsy-fab-global.petsy-go-wild {
+  animation: petsy-excited .7s ease-in-out, petsy-idle 3.6s ease-in-out infinite .7s;
+}
+
+/* Conic rainbow pulse ring */
+#petsy-fab-global::before {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  background: conic-gradient(from 0deg, #f43f5e, #fb923c, #facc15, #4ade80, #60a5fa, #a855f7, #f43f5e);
+  opacity: .35; animation: petsy-ring 2.5s linear infinite;
+  z-index: -1;
+}
+@keyframes petsy-ring { to { transform: rotate(360deg); } }
+
+/* Open state — dim slightly */
+#petsy-fab-global.is-open {
+  animation: petsy-idle 5s ease-in-out infinite;
+  opacity: .72; transform: scale(.9);
+}
 
 /* Petsy panel */
 #petsy-panel-global {
-  position: fixed; bottom: 100px; right: 26px; z-index: 10000;
-  width: 380px; height: 560px; border-radius: 18px; overflow: hidden;
-  box-shadow: 0 16px 48px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.06);
-  backdrop-filter: blur(2px);
+  position: fixed; bottom: 104px; right: 26px; z-index: 10000;
+  width: 380px; height: 560px; border-radius: 20px; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3), 0 0 0 1px rgba(255,255,255,.08);
+  backdrop-filter: blur(4px);
   display: none; flex-direction: column;
-  transition: opacity .25s, transform .25s;
-  opacity: 0; transform: scale(.9) translateY(16px);
+  transition: opacity .3s cubic-bezier(.34,1.56,.64,1), transform .3s cubic-bezier(.34,1.56,.64,1);
+  opacity: 0; transform: scale(.88) translateY(20px);
 }
 #petsy-panel-global.open {
   display: flex; opacity: 1; transform: scale(1) translateY(0);
 }
 #petsy-panel-global iframe { width: 100%; flex: 1; border: none; pointer-events: auto; }
 
-/* Panel header */
+/* Panel header — matching gradient */
 .petsy-panel-header {
   display: flex; align-items: center; gap: 8px;
-  padding: 12px 14px; background: linear-gradient(135deg, #0D2B24, #1B3A30);
-  border-bottom: 1px solid rgba(255,255,255,.08);
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #f43f5e, #a855f7, #6366f1);
+  border-bottom: 1px solid rgba(255,255,255,.12);
   flex-shrink: 0;
 }
 .petsy-panel-title {
-  flex: 1; font-size: .88rem; font-weight: 700; color: #fff; letter-spacing: .01em;
+  flex: 1; font-size: .9rem; font-weight: 700; color: #fff; letter-spacing: .02em;
+  text-shadow: 0 1px 4px rgba(0,0,0,.2);
 }
 #petsy-minimize-btn, #petsy-close-btn {
   width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
-  background: rgba(255,255,255,.12); color: #fff; font-size: 14px;
+  background: rgba(255,255,255,.18); color: #fff; font-size: 14px;
   display: flex; align-items: center; justify-content: center;
-  transition: background .15s;
+  transition: background .15s, transform .15s;
 }
-#petsy-minimize-btn:hover, #petsy-close-btn:hover { background: rgba(255,255,255,.22); }
+#petsy-minimize-btn:hover, #petsy-close-btn:hover { background: rgba(255,255,255,.32); transform: scale(1.1); }
+
+/* Emoji particles */
+.petsy-particle {
+  position: fixed; pointer-events: none; font-size: 22px; z-index: 10001;
+  animation: petsy-float 1s ease-out forwards;
+}
+@keyframes petsy-float {
+  0%   { opacity: 1; transform: translate(0,0) scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: translate(var(--px),var(--py)) scale(0.5) rotate(var(--pr)); }
+}
 
 @media (max-width: 480px) {
-  #petsy-panel-global { width: calc(100vw - 16px); right: 8px; height: 78vh; bottom: 94px; }
+  #petsy-panel-global { width: calc(100vw - 16px); right: 8px; height: 78vh; bottom: 96px; }
   #petsy-fab-global { right: 16px; bottom: 20px; }
 }
 </style>
 
-<!-- FAB -->
-<button id="petsy-fab-global" onclick="petsyToggle()" title="{{ t('Chat with Aleefy Assistant', 'تحدث مع مساعد اليفي') }}">
-  <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
-    <ellipse cx="18" cy="14" rx="9" ry="12" transform="rotate(-20,18,14)" fill="white" opacity=".35"/>
-    <ellipse cx="62" cy="14" rx="9" ry="12" transform="rotate(20,62,14)" fill="white" opacity=".35"/>
-    <ellipse cx="18" cy="15" rx="5" ry="7" transform="rotate(-20,18,15)" fill="#C9A84C" opacity=".8"/>
-    <ellipse cx="62" cy="15" rx="5" ry="7" transform="rotate(20,62,15)" fill="#C9A84C" opacity=".8"/>
-    <rect x="6" y="14" width="68" height="50" rx="18" fill="white" opacity=".18"/>
-    <circle cx="28" cy="32" r="7" fill="white"/>
-    <circle cx="52" cy="32" r="7" fill="white"/>
-    <circle cx="29" cy="33" r="4" fill="#0D2B24"/>
-    <circle cx="53" cy="33" r="4" fill="#0D2B24"/>
-    <circle cx="31" cy="31" r="1.5" fill="white"/>
-    <circle cx="55" cy="31" r="1.5" fill="white"/>
-    <ellipse cx="40" cy="43" rx="5" ry="3.5" fill="white" opacity=".5"/>
-    <path d="M32 49 Q40 57 48 49" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-    <ellipse cx="22" cy="44" rx="5" ry="3" fill="rgba(201,168,76,0.6)"/>
-    <ellipse cx="58" cy="44" rx="5" ry="3" fill="rgba(201,168,76,0.6)"/>
-    <line x1="8" y1="42" x2="26" y2="44" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linecap="round"/>
-    <line x1="8" y1="46" x2="26" y2="46" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linecap="round"/>
-    <line x1="72" y1="42" x2="54" y2="44" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linecap="round"/>
-    <line x1="72" y1="46" x2="54" y2="46" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linecap="round"/>
+<!-- FAB — paw print SVG -->
+<button id="petsy-fab-global" title="{{ t('Chat with Petsy AI', 'تحدث مع بيتسي الذكي') }}">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <!-- Main pad -->
+    <ellipse cx="50" cy="62" rx="26" ry="22" fill="white" opacity=".92"/>
+    <!-- Toe beans -->
+    <ellipse cx="26" cy="38" rx="10" ry="13" fill="white" opacity=".85"/>
+    <ellipse cx="44" cy="28" rx="9"  ry="12" fill="white" opacity=".85"/>
+    <ellipse cx="62" cy="28" rx="9"  ry="12" fill="white" opacity=".85"/>
+    <ellipse cx="77" cy="38" rx="10" ry="13" fill="white" opacity=".85"/>
+    <!-- Inner pad color -->
+    <ellipse cx="50" cy="62" rx="18" ry="15" fill="rgba(244,63,94,.35)"/>
+    <ellipse cx="26" cy="38" rx="6"  ry="8"  fill="rgba(168,85,247,.3)"/>
+    <ellipse cx="44" cy="28" rx="5.5" ry="7.5" fill="rgba(168,85,247,.3)"/>
+    <ellipse cx="62" cy="28" rx="5.5" ry="7.5" fill="rgba(168,85,247,.3)"/>
+    <ellipse cx="77" cy="38" rx="6"  ry="8"  fill="rgba(168,85,247,.3)"/>
   </svg>
 </button>
 
-<!-- Hint bubble (auto-hides after 5s) -->
-<div id="petsy-hint">🐾 {{ t("Hi! I'm Petsy — ask me anything!", "مرحباً! أنا بيتسي — اسألني أي شيء!") }}</div>
-
-<!-- Panel (no backdrop — only X closes it) -->
+<!-- Panel -->
 <div id="petsy-panel-global">
   <div class="petsy-panel-header">
-    <span class="petsy-panel-title">Aleefy Assistant 🐾</span>
+    <span class="petsy-panel-title">🐾 Petsy AI Assistant</span>
     <button id="petsy-minimize-btn" onclick="petsyMinimize()" title="{{ t('Minimize','تصغير') }}">—</button>
     <button id="petsy-close-btn" onclick="petsyClose()" title="{{ t('Close','إغلاق') }}">&times;</button>
   </div>
@@ -533,90 +579,169 @@
 </div>
 
 <script>
-/* ── Petsy V3 ────────────────────────────────────────────── */
+/* ── Petsy V4 ────────────────────────────────────────────── */
 (function(){
   var open=false, minimized=false, loaded=false;
-  var fab=null, panel=null, iframe=null;
-  var dragging=false, startX=0, startY=0, origLeft=0, origBottom=0;
-  var fabPosX=null, fabPosY=null;
+  var fab=document.getElementById('petsy-fab-global');
+  var panel=document.getElementById('petsy-panel-global');
+  var iframe=document.getElementById('petsy-iframe');
   var PANEL_W=380, PANEL_H=560;
+  var dragging=false, _moved=false, startX=0, startY=0, origLeft=0, origBottom=0;
 
-  /* Auto-hide hint after 5s */
-  setTimeout(function(){
-    var h=document.getElementById('petsy-hint');
-    if(h){h.style.transition='opacity .4s';h.style.opacity='0';setTimeout(function(){h.style.display='none'},400);}
-  },5000);
-
-  function getEls(){
-    if(!fab)fab=document.getElementById('petsy-fab-global');
-    if(!panel)panel=document.getElementById('petsy-panel-global');
-    if(!iframe)iframe=document.getElementById('petsy-iframe');
+  /* ── Sound — fun boing via Web Audio ── */
+  function playBoing(){
+    try{
+      var ctx=new(window.AudioContext||window.webkitAudioContext)();
+      var o=ctx.createOscillator(),g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.type='sine';
+      o.frequency.setValueAtTime(280,ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(520,ctx.currentTime+.08);
+      o.frequency.exponentialRampToValueAtTime(340,ctx.currentTime+.18);
+      o.frequency.exponentialRampToValueAtTime(600,ctx.currentTime+.28);
+      g.gain.setValueAtTime(.38,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.45);
+      o.start(ctx.currentTime);o.stop(ctx.currentTime+.45);
+    }catch(e){}
   }
 
+  /* ── Particles burst ── */
+  function burst(){
+    var r=fab.getBoundingClientRect();
+    var cx=r.left+r.width/2, cy=r.top+r.height/2;
+    var emojis=['🐾','✨','💜','🌟','🐶','💖','🎉'];
+    emojis.forEach(function(em,i){
+      var el=document.createElement('span');
+      el.className='petsy-particle'; el.textContent=em;
+      var angle=((i/emojis.length)*360-90)*Math.PI/180;
+      var dist=65+Math.random()*30;
+      el.style.left=cx+'px'; el.style.top=cy+'px';
+      el.style.setProperty('--px',(Math.cos(angle)*dist)+'px');
+      el.style.setProperty('--py',(Math.sin(angle)*dist)+'px');
+      el.style.setProperty('--pr',(Math.random()*160-80)+'deg');
+      el.style.animationDelay=(i*40)+'ms';
+      document.body.appendChild(el);
+      setTimeout(function(){el.remove();},1200);
+    });
+  }
+
+  /* ── Panel positioning — above FAB ── */
+  function positionPanel(){
+    var r=fab.getBoundingClientRect();
+    var vw=window.innerWidth, vh=window.innerHeight;
+    var pw=Math.min(PANEL_W, vw-16);
+    var ph=Math.min(PANEL_H, vh-100);
+    /* horizontal: prefer same right edge as FAB, clamp */
+    var panelRight=vw-r.right;
+    if(panelRight+pw>vw-8) panelRight=8;
+    /* vertical: above FAB */
+    var panelBottom=vh-r.top+8;
+    if(panelBottom+ph>vh-8) panelBottom=8;
+    panel.style.right=panelRight+'px'; panel.style.bottom=panelBottom+'px';
+    panel.style.left='auto'; panel.style.top='auto';
+    panel.style.width=pw+'px'; panel.style.height=ph+'px';
+  }
+
+  /* ── Open / Close ── */
   window.petsyOpen=function(){
-    getEls();if(open)return;
-    open=true;minimized=false;
-    var h=document.getElementById('petsy-hint');if(h)h.style.display='none';
+    if(open)return;
+    open=true; minimized=false;
+    positionPanel();
     if(!loaded){iframe.src='{{ url_for("petsy.embed") }}';loaded=true;}
-    panel.classList.add('open');
-    panel.style.height=PANEL_H+'px';
-    if(fab){fab.style.opacity='.55';fab.style.transform='scale(.88)';}
+    panel.style.display='flex';
+    requestAnimationFrame(function(){ panel.classList.add('open'); });
+    fab.classList.add('is-open');
+    burst(); playBoing();
     localStorage.setItem('petsy-open','1');
   };
   window.petsyClose=function(){
-    getEls();if(!open)return;
-    open=false;minimized=false;
+    if(!open)return;
+    open=false; minimized=false;
     panel.classList.remove('open');
-    if(fab){fab.style.opacity='';fab.style.transform='';}
+    fab.classList.remove('is-open');
+    setTimeout(function(){ if(!open) panel.style.display='none'; },320);
     localStorage.setItem('petsy-open','0');
   };
   window.petsyMinimize=function(){
-    getEls();if(!open)return;
+    if(!open)return;
     minimized=!minimized;
-    if(minimized){panel.style.height='52px';}
-    else{panel.style.height=PANEL_H+'px';}
-    var btn=document.getElementById('petsy-minimize-btn');
-    if(btn)btn.textContent=minimized?'□':'—';
+    panel.style.height=minimized?'52px':PANEL_H+'px';
+    document.getElementById('petsy-minimize-btn').textContent=minimized?'□':'—';
   };
   window.petsyToggle=function(){
-    if(open)return; /* FAB only opens; X closes */
-    petsyOpen();
+    open ? petsyClose() : petsyOpen();
   };
 
-  /* Drag FAB */
-  document.addEventListener('DOMContentLoaded',function(){
-    getEls();if(!fab)return;
-    function onDown(cx,cy){
-      dragging=true;
-      var r=fab.getBoundingClientRect();
-      startX=cx;startY=cy;
-      origLeft=r.left;origBottom=window.innerHeight-r.bottom;
-      fabPosX=r.left+r.width/2;fabPosY=r.top+r.height/2;
-      fab.classList.add('dragging');fab.style.transition='none';
+  /* ── Drag + click separation ── */
+  function onDown(cx,cy){
+    _moved=false; dragging=true;
+    var r=fab.getBoundingClientRect();
+    startX=cx; startY=cy;
+    origLeft=r.left; origBottom=window.innerHeight-r.bottom;
+    fab.style.transition='none'; fab.style.animationPlayState='paused';
+  }
+  function onMove(cx,cy){
+    if(!dragging)return;
+    var dx=cx-startX, dy=cy-startY;
+    if(Math.hypot(dx,dy)>12) _moved=true;
+    if(!_moved)return;
+    var vw=window.innerWidth,vh=window.innerHeight,sz=64;
+    var nx=Math.max(8,Math.min(vw-sz-8,origLeft+dx));
+    var ny=Math.max(8,Math.min(vh-sz-8,origBottom-dy));
+    fab.style.left=nx+'px'; fab.style.bottom=ny+'px';
+    fab.style.right='auto'; fab.style.top='auto';
+    if(open) positionPanel();
+  }
+  function onUp(cx,cy){
+    if(!dragging)return;
+    dragging=false;
+    fab.style.animationPlayState='running';
+    fab.style.transition='';
+    if(!_moved) petsyToggle();
+    else snapEdge();
+  }
+
+  /* Snap to nearest edge */
+  function snapEdge(){
+    var r=fab.getBoundingClientRect();
+    var vw=window.innerWidth, sz=64, gap=16;
+    var toRight=vw-(r.left+sz);
+    if(r.left < toRight){
+      fab.style.left=gap+'px'; fab.style.right='auto';
+    } else {
+      fab.style.left='auto'; fab.style.right=gap+'px';
     }
-    function onMove(cx,cy){
-      if(!dragging)return;
-      var vw=window.innerWidth,vh=window.innerHeight,sz=60;
-      var nx=Math.max(8,Math.min(vw-sz-8,origLeft+(cx-startX)));
-      var ny=Math.max(8,Math.min(vh-sz-8,origBottom-(cy-startY)));
-      fab.style.left=nx+'px';fab.style.bottom=ny+'px';fab.style.right='auto';fab.style.top='auto';
-      fabPosX=nx+sz/2;fabPosY=vh-ny-sz/2;
-    }
-    function onUp(cx,cy){
-      if(!dragging)return;
-      dragging=false;fab.classList.remove('dragging');fab.style.transition='';
-      if(Math.hypot(cx-startX,cy-startY)<6)petsyToggle();
-    }
+    fab.style.transition='left .25s,right .25s';
+    if(open) setTimeout(positionPanel,260);
+  }
+
+  /* Attach events after DOM ready */
+  function attachDrag(){
     fab.addEventListener('mousedown',function(e){if(e.button!==0)return;onDown(e.clientX,e.clientY);e.preventDefault();});
     document.addEventListener('mousemove',function(e){onMove(e.clientX,e.clientY);});
-    document.addEventListener('mouseup',function(e){onUp(e.clientX,e.clientY);});
+    document.addEventListener('mouseup',function(e){if(dragging)onUp(e.clientX,e.clientY);});
     fab.addEventListener('touchstart',function(e){var t=e.touches[0];onDown(t.clientX,t.clientY);},{passive:true});
-    fab.addEventListener('touchmove',function(e){var t=e.touches[0];onMove(t.clientX,t.clientY);e.preventDefault();},{passive:false});
+    fab.addEventListener('touchmove',function(e){if(dragging){var t=e.touches[0];onMove(t.clientX,t.clientY);e.preventDefault();}},{passive:false});
     fab.addEventListener('touchend',function(e){var t=e.changedTouches[0];onUp(t.clientX,t.clientY);});
-  });
+  }
 
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',attachDrag);
+  } else { attachDrag(); }
+
+  /* ── Excited burst every ~10s ── */
+  setInterval(function(){
+    if(!open){
+      fab.classList.remove('petsy-go-wild');
+      void fab.offsetWidth; /* reflow */
+      fab.classList.add('petsy-go-wild');
+      setTimeout(function(){ fab.classList.remove('petsy-go-wild'); },700);
+    }
+  },10000);
+
+  /* ── Keyboard ── */
   document.addEventListener('keydown',function(e){
-    if(e.altKey&&(e.key==='p'||e.key==='P')){e.preventDefault();open?petsyClose():petsyOpen();}
+    if(e.altKey&&(e.key==='p'||e.key==='P')){e.preventDefault();petsyToggle();}
     if(e.key==='Escape'&&open)petsyClose();
   });
 })();
@@ -701,17 +826,6 @@
     if(ov)ov.classList.remove('show');
   };
 
-  /* ── Nav group collapse ── */
-  document.querySelectorAll('.v3-nav-toggle').forEach(function(btn){
-    btn.addEventListener('click',function(){
-      var grp=this.closest('.v3-nav-group');
-      if(grp){
-        var expanded=grp.classList.toggle('collapsed');
-        this.setAttribute('aria-expanded',String(!expanded));
-      }
-    });
-  });
-
   /* ── Active nav highlighting ── */
   var path=window.location.pathname;
   document.querySelectorAll('.v3-nav-item').forEach(function(a){
@@ -758,16 +872,255 @@
     },ms);
   });
 
-  /* ── Online/Offline indicator ── */
-  var dot=document.getElementById('v3-online-dot');
-  var banner=document.getElementById('v3-offline-banner');
-  function setOnline(on){
-    if(dot){dot.className='v3-online-dot'+(on?'':' offline');dot.title=on?'Online':'Offline';}
-    if(banner){banner.style.display=on?'none':'flex';}
-  }
-  setOnline(navigator.onLine);
-  window.addEventListener('online',function(){setOnline(true);});
-  window.addEventListener('offline',function(){setOnline(false);});
+  /* ── Production: Online/Offline + Sync Status Engine ── */
+  (function(){
+    var dot    = document.getElementById('v3-online-dot');
+    var label  = document.getElementById('v3-conn-label');
+    var banner = document.getElementById('v3-offline-banner');
+    var syncBtn= document.getElementById('v3-sync-btn');
+    var syncCnt= document.getElementById('v3-sync-count');
+    var syncIco= document.getElementById('v3-sync-icon');
+
+    // ── IndexedDB offline queue key ──────────────────────────
+    var IDB_NAME='aleefy_offline';var IDB_VER=1;var IDB_STORE='sync_queue';
+    var _idb=null;
+    function openIDB(cb){
+      if(_idb){cb(_idb);return;}
+      try{
+        var req=indexedDB.open(IDB_NAME,IDB_VER);
+        req.onupgradeneeded=function(e){
+          var db=e.target.result;
+          if(!db.objectStoreNames.contains(IDB_STORE))
+            db.createObjectStore(IDB_STORE,{keyPath:'local_uuid'});
+        };
+        req.onsuccess=function(e){_idb=e.target.result;cb(_idb);};
+        req.onerror=function(){cb(null);};
+      }catch(e){cb(null);}
+    }
+
+    // ── Pending count from IndexedDB ─────────────────────────
+    function getPendingCount(cb){
+      openIDB(function(db){
+        if(!db){cb(0);return;}
+        try{
+          var tx=db.transaction(IDB_STORE,'readonly');
+          var req=tx.objectStore(IDB_STORE).count();
+          req.onsuccess=function(){cb(req.result||0);};
+          req.onerror=function(){cb(0);};
+        }catch(e){cb(0);}
+      });
+    }
+
+    // ── Save action to offline queue ─────────────────────────
+    window.v3QueueOffline=function(entityName,operation,payload,priority){
+      openIDB(function(db){
+        if(!db)return;
+        var item={
+          local_uuid: crypto.randomUUID?crypto.randomUUID():(Math.random().toString(36).substr(2)+Date.now()),
+          entity_name:entityName, operation_type:operation,
+          payload:payload, priority:priority||5,
+          created_offline_at:new Date().toISOString()
+        };
+        try{
+          var tx=db.transaction(IDB_STORE,'readwrite');
+          tx.objectStore(IDB_STORE).put(item);
+        }catch(e){}
+        updateSyncBadge();
+      });
+    };
+
+    // ── Flush queue to server ────────────────────────────────
+    function flushQueue(onDone){
+      openIDB(function(db){
+        if(!db){if(onDone)onDone(0);return;}
+        try{
+          var tx=db.transaction(IDB_STORE,'readonly');
+          var req=tx.objectStore(IDB_STORE).getAll();
+          req.onsuccess=function(){
+            var items=req.result||[];
+            if(!items.length){if(onDone)onDone(0);return;}
+            // Get device_id (stored in localStorage)
+            var devId=localStorage.getItem('aleefy_device_id');
+            if(!devId){
+              devId='dev_'+(Math.random().toString(36).substr(2,12));
+              localStorage.setItem('aleefy_device_id',devId);
+            }
+            fetch('/api/v1/sync/push',{
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({device_id:devId,items:items})
+            })
+            .then(function(r){return r.json();})
+            .then(function(res){
+              if(res.success){
+                // Clear successfully queued items
+                var tx2=_idb.transaction(IDB_STORE,'readwrite');
+                var st=tx2.objectStore(IDB_STORE);
+                items.forEach(function(it){
+                  var r2=res.data&&res.data.results&&res.data.results.find(function(x){return x.local_uuid===it.local_uuid;});
+                  if(!r2||r2.status==='queued')st.delete(it.local_uuid);
+                });
+                if(onDone)onDone(items.length);
+              } else {
+                if(onDone)onDone(-1);
+              }
+            })
+            .catch(function(){if(onDone)onDone(-1);});
+          };
+          req.onerror=function(){if(onDone)onDone(0);};
+        }catch(e){if(onDone)onDone(0);}
+      });
+    }
+
+    // ── Update sync badge ────────────────────────────────────
+    function updateSyncBadge(){
+      getPendingCount(function(n){
+        if(!syncBtn)return;
+        if(n>0){
+          syncBtn.style.display='flex';
+          if(syncCnt){syncCnt.style.display='inline-flex';syncCnt.textContent=n>99?'99+':n;}
+        } else {
+          syncBtn.style.display='none';
+          if(syncCnt)syncCnt.style.display='none';
+        }
+      });
+    }
+
+    // ── Set UI state ─────────────────────────────────────────
+    var STATES={
+      online:  {cls:'',       text:'Online',       bannerShow:false},
+      offline: {cls:'offline',text:'Offline',      bannerShow:true },
+      syncing: {cls:'syncing',text:'Syncing…',     bannerShow:false},
+      synced:  {cls:'synced', text:'Synced',       bannerShow:false},
+      failed:  {cls:'failed', text:'Sync Failed',  bannerShow:false},
+    };
+    function setState(state){
+      var s=STATES[state]||STATES.online;
+      if(dot)  dot.className='v3-online-dot '+(s.cls||'');
+      if(label)label.textContent=s.text;
+      if(banner)banner.style.display=s.bannerShow?'flex':'none';
+      if(syncIco)syncIco.style.animation=state==='syncing'?'v3-spin 1s linear infinite':'';
+    }
+
+    // ── Manual sync button ───────────────────────────────────
+    window.v3SyncNow=function(){
+      if(!navigator.onLine){v3Toast('No internet connection','warning');return;}
+      setState('syncing');
+      flushQueue(function(n){
+        if(n>0){
+          setState('synced');
+          v3Toast('Synced '+n+' item'+(n===1?'':'s')+' successfully','success');
+          updateSyncBadge();
+          setTimeout(function(){setState('online');},3000);
+        } else if(n===0){
+          setState('online');
+          v3Toast('Nothing to sync','info');
+        } else {
+          setState('failed');
+          v3Toast('Sync failed — will retry when online','danger');
+          setTimeout(function(){setState('online');},4000);
+        }
+      });
+    };
+
+    // ── Online / Offline events ───────────────────────────────
+    function onCameOnline(){
+      setState('online');
+      updateSyncBadge();
+      // Auto-sync pending items
+      getPendingCount(function(n){
+        if(n>0){
+          setState('syncing');
+          flushQueue(function(synced){
+            if(synced>0){
+              setState('synced');
+              v3Toast('Auto-synced '+synced+' offline item'+(synced===1?'':'s'),'success');
+              updateSyncBadge();
+              setTimeout(function(){setState('online');},3000);
+            } else {
+              setState('online');
+            }
+          });
+        }
+      });
+    }
+
+    function onWentOffline(){
+      setState('offline');
+      updateSyncBadge();
+    }
+
+    // Init
+    setState(navigator.onLine?'online':'offline');
+    updateSyncBadge();
+    window.addEventListener('online', onCameOnline);
+    window.addEventListener('offline',onWentOffline);
+
+    // ── Frontend error logger ─────────────────────────────────
+    var _feLogBuffer=[];
+    var _feFlushTimer=null;
+    function feLog(level,message,extra){
+      var entry=Object.assign({
+        level:level, message:String(message),
+        page_url:window.location.href,
+        network_status:navigator.onLine?'online':'offline',
+        correlation_id:(Math.random().toString(36).substr(2,16)),
+        session_id:sessionStorage.getItem('aleefy_session')||(function(){
+          var s=Math.random().toString(36).substr(2,16);
+          sessionStorage.setItem('aleefy_session',s);return s;
+        })()
+      }, extra||{});
+      _feLogBuffer.push(entry);
+      if(!navigator.onLine){
+        // Store in localStorage until online
+        try{
+          var stored=JSON.parse(localStorage.getItem('aleefy_fe_logs')||'[]');
+          stored.push(entry);
+          if(stored.length>200)stored=stored.slice(-200);
+          localStorage.setItem('aleefy_fe_logs',JSON.stringify(stored));
+        }catch(e){}
+        return;
+      }
+      clearTimeout(_feFlushTimer);
+      _feFlushTimer=setTimeout(flushFeLogs,2000);
+    }
+    function flushFeLogs(){
+      // Also flush stored offline logs
+      try{
+        var offline=JSON.parse(localStorage.getItem('aleefy_fe_logs')||'[]');
+        if(offline.length){_feLogBuffer=_feLogBuffer.concat(offline);localStorage.removeItem('aleefy_fe_logs');}
+      }catch(e){}
+      if(!_feLogBuffer.length)return;
+      var batch=_feLogBuffer.splice(0,50);
+      fetch('/api/v1/logs/frontend',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({logs:batch})
+      }).catch(function(){
+        // Re-queue failed logs
+        _feLogBuffer=batch.concat(_feLogBuffer);
+      });
+    }
+    window.addEventListener('online',flushFeLogs);
+
+    // ── Global JS error capture ───────────────────────────────
+    window.addEventListener('error',function(e){
+      feLog('ERROR',e.message,{
+        event_name:'js_error',
+        error_stack:e.error?e.error.stack:'',
+        component_name:e.filename,
+      });
+    });
+    window.addEventListener('unhandledrejection',function(e){
+      feLog('ERROR','Unhandled promise rejection: '+(e.reason&&e.reason.message||e.reason),{
+        event_name:'promise_rejection',
+      });
+    });
+
+    // Expose globally
+    window.v3FeLog=feLog;
+
+  })();
 
   /* ── Mobile: hide hamburger on wide screens ── */
   function checkWidth(){

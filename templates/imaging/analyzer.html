@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block title %}AI Photo Analyzer{% endblock %}
+{% block page_title %}🔬 AI Animal Photo Analyzer{% endblock %}
+{% block page_sub %}Upload any animal photo — Gemini Vision will assess the condition and give veterinary recommendations{% endblock %}
+
+{% block head_extra %}
+<style>
+.analyzer-wrap { max-width: 860px; margin: 0 auto; }
+
+.drop-zone {
+  border: 2.5px dashed var(--cl-primary);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--cl-primary) 5%, var(--cl-bg));
+  padding: 50px 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative;
+}
+.drop-zone.dragover { background: color-mix(in srgb, var(--cl-primary) 12%, var(--cl-bg)); border-color: var(--cl-accent); }
+.drop-icon { font-size: 3.5rem; margin-bottom: 12px; }
+.drop-text { font-size: 1.05rem; font-weight: 600; color: var(--cl-text); }
+.drop-hint { font-size: 0.85rem; color: var(--cl-muted); margin-top: 6px; }
+#file-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+.preview-box {
+  display: none; margin-top: 18px;
+  border-radius: 14px; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+  position: relative;
+}
+.preview-box img { width: 100%; max-height: 400px; object-fit: contain; background: #111; display: block; }
+.preview-badge {
+  position: absolute; top: 10px; right: 10px;
+  background: rgba(0,0,0,.55); color:#fff; border-radius:20px;
+  padding: 4px 12px; font-size: .8rem; font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.note-area { margin-top: 14px; }
+.note-area textarea {
+  width: 100%; resize: vertical; min-height: 70px;
+  padding: 10px 14px; border: 1.5px solid var(--cl-border); border-radius: 10px;
+  background: var(--cl-bg); color: var(--cl-text); font-size: .92rem;
+  box-sizing: border-box;
+}
+.note-area textarea:focus { outline: none; border-color: var(--cl-primary); }
+
+.analyze-btn {
+  display: block; width: 100%; margin-top: 16px;
+  padding: 14px; border: none; border-radius: 12px; cursor: pointer;
+  font-size: 1.05rem; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, #f43f5e, #a855f7, #6366f1);
+  transition: opacity .2s, transform .1s; letter-spacing: .02em;
+}
+.analyze-btn:hover { opacity: .9; transform: translateY(-1px); }
+.analyze-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+
+.loading-bar {
+  display: none; margin-top: 18px; text-align: center;
+  padding: 22px; background: var(--cl-surface); border-radius: 12px;
+  border: 1px solid var(--cl-border);
+}
+.loading-dots span {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--cl-primary); margin: 0 4px;
+  animation: dot-bounce .9s infinite ease-in-out;
+}
+.loading-dots span:nth-child(2) { animation-delay: .15s; }
+.loading-dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes dot-bounce { 0%,80%,100%{transform:scale(.6)} 40%{transform:scale(1)} }
+
+.result-card {
+  display: none; margin-top: 22px;
+  background: var(--cl-surface); border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.1);
+  overflow: hidden;
+}
+.result-header {
+  padding: 16px 22px;
+  background: linear-gradient(135deg, #f43f5e, #a855f7, #6366f1);
+  color: #fff; font-weight: 700; font-size: 1rem;
+  display: flex; align-items: center; gap: 10px;
+}
+.result-body { padding: 22px; }
+.result-body h1,.result-body h2,.result-body h3 { color: var(--cl-text); margin: 1em 0 .4em; }
+.result-body ul,.result-body ol { padding-left: 20px; }
+.result-body li { margin-bottom: 4px; }
+.result-body strong { color: var(--cl-primary); }
+.result-body p { line-height: 1.7; color: var(--cl-text); }
+.result-body code { background: var(--cl-bg); padding: 2px 6px; border-radius: 4px; }
+
+.severity-badge {
+  display: inline-block; padding: 4px 14px; border-radius: 20px;
+  font-size: .82rem; font-weight: 700; margin-left: 8px;
+}
+.sev-minor    { background: #dcfce7; color: #166534; }
+.sev-moderate { background: #fef9c3; color: #854d0e; }
+.sev-urgent   { background: #fee2e2; color: #991b1b; }
+.sev-emergency{ background: #7f1d1d; color: #fff; animation: pulse-red 1.2s infinite; }
+@keyframes pulse-red { 50% { background: #dc2626; } }
+
+.save-section {
+  display: none; padding: 16px 22px; background: color-mix(in srgb, var(--cl-primary) 5%, var(--cl-surface));
+  border-top: 1px solid var(--cl-border); gap: 12px; align-items: center; flex-wrap: wrap;
+}
+.save-section select {
+  flex: 1; min-width: 160px; padding: 9px 12px;
+  border: 1.5px solid var(--cl-border); border-radius: 8px;
+  background: var(--cl-bg); color: var(--cl-text); font-size: .9rem;
+}
+.save-btn {
+  padding: 9px 20px; border: none; border-radius: 8px; cursor: pointer;
+  background: var(--cl-primary); color: #fff; font-weight: 700; font-size: .9rem;
+  transition: opacity .15s;
+}
+.save-btn:hover { opacity: .85; }
+
+.history-mini { margin-top: 30px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="analyzer-wrap">
+
+  {% if not api_key_set %}
+  <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:1.5px solid #f59e0b;border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;gap:12px;align-items:flex-start;">
+    <span style="font-size:1.4rem;flex-shrink:0;">💡</span>
+    <div style="font-size:.87rem;color:#78350f;line-height:1.7;">
+      <strong style="color:#92400e;">Vision uses freellmapi + Google Gemini as backup.</strong><br>
+      If analysis fails, add a free Google key to <code>START_PLATFORM.bat</code>:<br>
+      <code style="background:rgba(0,0,0,.1);padding:2px 8px;border-radius:4px;">set GOOGLE_API_KEY=AIza...</code>
+      &nbsp;→&nbsp;
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#b45309;font-weight:700;">Get free key ↗</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Upload card -->
+  <div class="v3-card" style="padding: 26px;">
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="image/*">
+      <div class="drop-icon">🐾</div>
+      <div class="drop-text">Drop an animal photo here or click to browse</div>
+      <div class="drop-hint">Supports JPG, PNG, WebP · Max 10 MB · Works with any animal species</div>
+    </div>
+
+    <div class="preview-box" id="preview-box">
+      <img id="preview-img" src="" alt="Preview">
+      <div class="preview-badge" id="preview-badge"></div>
+    </div>
+
+    <div class="note-area">
+      <textarea id="note-input" placeholder="Optional: describe what you observed — e.g. 'limping since yesterday', 'skin wound on left leg', 'lethargy and not eating' (in English or Arabic)"></textarea>
+    </div>
+
+    <button class="analyze-btn" id="analyze-btn" disabled onclick="runAnalysis()">
+      🔬 Analyze with Gemini Vision AI
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-bar" id="loading-bar">
+    <div class="loading-dots"><span></span><span></span><span></span></div>
+    <div style="margin-top:12px;font-weight:600;color:var(--cl-muted)">Analyzing image with AI... this takes 5–15 seconds</div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-card" id="result-card">
+    <div class="result-header">
+      <span>🩺 Veterinary AI Assessment</span>
+      <span id="sev-badge" class="severity-badge"></span>
+    </div>
+    <div class="result-body" id="result-body"></div>
+    <div class="save-section" id="save-section" style="display:flex;">
+      <span style="font-size:.9rem;font-weight:600;color:var(--cl-muted);">Save to patient record:</span>
+      <select id="save-pet-select">
+        <option value="">— select pet —</option>
+        {% for p in pets %}<option value="{{ p.id }}">{{ p.pet_name }} ({{ p.species }})</option>{% endfor %}
+      </select>
+      <button class="save-btn" onclick="saveResult()">💾 Save to Record</button>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var _file = null;
+var _result = "";
+var _pets = {{ pets | tojson }};
+
+// Populate save-pet dropdown from server data
+(function(){
+  var sel = document.getElementById('save-pet-select');
+  // already populated via Jinja, nothing to do
+})();
+
+/* ── Drop zone ── */
+var dz = document.getElementById('drop-zone');
+var fi = document.getElementById('file-input');
+dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', function(){ dz.classList.remove('dragover'); });
+dz.addEventListener('drop', function(e){
+  e.preventDefault(); dz.classList.remove('dragover');
+  if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+});
+fi.addEventListener('change', function(){ if(fi.files[0]) setFile(fi.files[0]); });
+
+function setFile(f){
+  if(f.size > 10*1024*1024){ alert('File too large (max 10 MB)'); return; }
+  _file = f;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var pb = document.getElementById('preview-box');
+    var pi = document.getElementById('preview-img');
+    var badge = document.getElementById('preview-badge');
+    pi.src = e.target.result;
+    badge.textContent = (f.size/1024/1024).toFixed(1)+' MB';
+    pb.style.display = 'block';
+  };
+  reader.readAsDataURL(f);
+  document.getElementById('analyze-btn').disabled = false;
+  // hide old result
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('loading-bar').style.display = 'none';
+}
+
+var _csrf = '{{ csrf_token }}';
+
+/* ── Run Analysis ── */
+function runAnalysis(){
+  if(!_file){ alert('Please select a photo first.'); return; }
+  var note = document.getElementById('note-input').value.trim();
+  var fd = new FormData();
+  fd.append('photo', _file);
+  fd.append('note', note);
+  fd.append('_csrf_token', _csrf);
+
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('loading-bar').style.display = 'block';
+  document.getElementById('result-card').style.display = 'none';
+
+  fetch('{{ url_for("imaging.analyzer_run") }}', { method: 'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      document.getElementById('loading-bar').style.display = 'none';
+      document.getElementById('analyze-btn').disabled = false;
+      if(data.error){ alert('Error: '+data.error); return; }
+      _result = data.result;
+      showResult(_result);
+    })
+    .catch(function(e){
+      document.getElementById('loading-bar').style.display = 'none';
+      document.getElementById('analyze-btn').disabled = false;
+      alert('Network error: ' + e.message);
+    });
+}
+
+function showResult(text){
+  // Simple markdown-to-html
+  var html = text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^#{1,3} (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+  html = '<p>' + html + '</p>';
+
+  document.getElementById('result-body').innerHTML = html;
+
+  // Detect severity
+  var badge = document.getElementById('sev-badge');
+  if(/🚨|Emergency/i.test(text)){
+    badge.textContent = '🚨 EMERGENCY'; badge.className = 'severity-badge sev-emergency';
+  } else if(/🔴|Urgent/i.test(text)){
+    badge.textContent = '🔴 Urgent'; badge.className = 'severity-badge sev-urgent';
+  } else if(/🟡|Moderate/i.test(text)){
+    badge.textContent = '🟡 Moderate'; badge.className = 'severity-badge sev-moderate';
+  } else {
+    badge.textContent = '🟢 Minor'; badge.className = 'severity-badge sev-minor';
+  }
+
+  document.getElementById('result-card').style.display = 'block';
+  document.getElementById('save-section').style.display = 'flex';
+}
+
+/* ── Save to pet record ── */
+function saveResult(){
+  var petId = document.getElementById('save-pet-select').value;
+  if(!petId){ alert('Please select a pet to save the result to.'); return; }
+  fetch('{{ url_for("imaging.analyzer_save") }}', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json', 'X-CSRF-Token': _csrf},
+    body: JSON.stringify({ pet_id: parseInt(petId), result: _result, filename: _file ? _file.name : '' })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.ok){
+      alert('✅ Saved to pet record successfully!');
+      window.location.href = '/imaging/pet/' + petId;
+    } else {
+      alert('Error saving: ' + (data.error || 'unknown'));
+    }
+  });
+}
+</script>
+{% endblock %}

@@ -5,6 +5,7 @@ All files stored on filesystem, served only through authenticated routes.
 import os
 import uuid
 import mimetypes
+import logging
 from flask import (
     send_file, request, redirect, url_for, flash, session,
     jsonify, current_app, render_template, abort
@@ -14,11 +15,40 @@ from . import uploads_bp
 from blueprints.auth.routes import login_required
 from models.database import get_db, log_audit
 
+logger = logging.getLogger(__name__)
+
 ALLOWED_EXTENSIONS = {
     "image": {"jpg", "jpeg", "png", "gif", "webp"},
     "document": {"pdf", "doc", "docx", "xls", "xlsx"},
     "all": {"jpg", "jpeg", "png", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx"},
 }
+
+# Allowed entity_type values — validated against this whitelist to prevent path traversal
+ALLOWED_ENTITY_TYPES = frozenset(["pet", "visit", "staff", "supplier", "invoice", "lab"])
+
+# Magic-byte signatures for MIME validation (no python-magic required)
+_MAGIC = {
+    b"\xff\xd8\xff":       "image/jpeg",
+    b"\x89PNG\r\n\x1a\n": "image/png",
+    b"GIF87a":             "image/gif",
+    b"GIF89a":             "image/gif",
+    b"RIFF":               "image/webp",    # partial — webp has RIFF....WEBP
+    b"%PDF":               "application/pdf",
+    b"PK\x03\x04":        "application/zip",  # docx/xlsx are zip-based
+}
+
+def _validate_mime_from_bytes(file_obj) -> str | None:
+    """Read first 16 bytes and return detected MIME type, or None if unrecognised."""
+    header = file_obj.read(16)
+    file_obj.seek(0)  # rewind for actual save
+    for sig, mime in _MAGIC.items():
+        if header[:len(sig)] == sig:
+            # Extra check: WEBP has 'WEBP' at offset 8
+            if sig == b"RIFF":
+                if header[8:12] != b"WEBP":
+                    return None  # Not a WEBP — skip
+            return mime
+    return None
 
 # Entity → which roles can access
 _ACCESS = {
@@ -54,6 +84,14 @@ def upload():
     category    = request.form.get("category", "general")
     caption     = request.form.get("caption", "")
 
+    # Validate entity_type against whitelist — prevents path traversal
+    if entity_type not in ALLOWED_ENTITY_TYPES:
+        logger.warning(
+            f"Upload blocked: invalid entity_type={entity_type!r} "
+            f"from user={session.get('user',{}).get('username')}"
+        )
+        return jsonify({"error": "Invalid entity type"}), 400
+
     if not _can_access(entity_type):
         return jsonify({"error": "Access denied"}), 403
 
@@ -70,28 +108,62 @@ def upload():
         flash("File type not allowed.", "error")
         return redirect(request.referrer or "/")
 
-    # Store file
-    ext = f.filename.rsplit(".", 1)[-1].lower()
+    # Validate file header bytes — do not trust browser-provided content_type
+    detected_mime = _validate_mime_from_bytes(f.stream)
+    ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
+    # Map ext → acceptable MIME families
+    _EXT_MIME_MAP = {
+        "jpg": "image/jpeg", "jpeg": "image/jpeg",
+        "png": "image/png", "gif": "image/gif", "webp": "image/webp",
+        "pdf": "application/pdf",
+        # Office docs are zip-based (PK header)
+        "docx": "application/zip", "xlsx": "application/zip",
+        "doc": None, "xls": None,  # legacy binary — no reliable magic-byte check
+    }
+    expected_mime = _EXT_MIME_MAP.get(ext)
+    if expected_mime and detected_mime and detected_mime != expected_mime:
+        logger.warning(
+            f"Upload MIME mismatch: ext={ext}, detected={detected_mime}, "
+            f"user={session.get('user',{}).get('username')}"
+        )
+        flash("File content does not match its extension. Upload rejected.", "error")
+        return redirect(request.referrer or "/")
+
+    # Generate a safe UUID-based stored filename — no path separators possible
     stored_name = f"{uuid.uuid4().hex}.{ext}"
+    # Paranoia check: stored_name must not contain directory separators
+    if os.sep in stored_name or "/" in stored_name or "\\" in stored_name:
+        logger.error(f"Stored filename contained path separator: {stored_name!r}")
+        return jsonify({"error": "Invalid filename generated"}), 500
+
     folder = os.path.join(_upload_path(), entity_type)
     os.makedirs(folder, exist_ok=True)
     filepath = os.path.join(folder, stored_name)
     f.save(filepath)
     size = os.path.getsize(filepath)
 
-    # Record in DB
+    # Determine MIME for DB record — prefer detected, fall back to guess
+    final_mime = (
+        detected_mime
+        or mimetypes.guess_type(f.filename)[0]
+        or "application/octet-stream"
+    )
+
+    # Record in DB — use cur.lastrowid for PostgreSQL compatibility (not last_insert_rowid())
     conn = get_db()
-    with conn:
-        conn.execute(
-            """INSERT INTO attachments(entity_type,entity_id,filename,original_name,
-               mime_type,size_bytes,category,caption,uploaded_by)
-               VALUES(?,?,?,?,?,?,?,?,?)""",
-            (entity_type, entity_id, stored_name,
-             secure_filename(f.filename),
-             f.content_type or mimetypes.guess_type(f.filename)[0] or "application/octet-stream",
-             size, category, caption, session["user"]["username"]))
-        att_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-    conn.close()
+    try:
+        with conn:
+            cur = conn.execute(
+                """INSERT INTO attachments(entity_type,entity_id,filename,original_name,
+                   mime_type,size_bytes,category,caption,uploaded_by)
+                   VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (entity_type, entity_id, stored_name,
+                 secure_filename(f.filename),
+                 final_mime,
+                 size, category, caption, session["user"]["username"]))
+            att_id = cur.lastrowid
+    finally:
+        conn.close()
 
     log_audit(username=session["user"]["username"], role=session["user"]["role"],
               action="file_upload", module="uploads",
@@ -101,18 +173,37 @@ def upload():
     return redirect(request.referrer or "/")
 
 
+def _safe_attachment_path(att) -> str | None:
+    """Validate DB-stored entity_type and filename before building a filesystem path.
+    Returns the absolute path, or None if validation fails.
+    """
+    entity_type = att["entity_type"]
+    filename    = att["filename"]
+    # entity_type must be in the known whitelist
+    if entity_type not in ALLOWED_ENTITY_TYPES:
+        logger.warning(f"serve: entity_type not in whitelist: {entity_type!r}")
+        return None
+    # filename must not contain path separators or parent-dir traversal
+    if os.sep in filename or "/" in filename or "\\" in filename or ".." in filename:
+        logger.warning(f"serve: unsafe filename in DB: {filename!r}")
+        return None
+    return os.path.join(_upload_path(), entity_type, filename)
+
+
 @uploads_bp.route("/file/<int:att_id>")
 @login_required
 def serve(att_id):
     conn = get_db()
-    att = conn.execute("SELECT * FROM attachments WHERE id=?", (att_id,)).fetchone()
+    att = conn.execute("SELECT * FROM attachments WHERE id=%s", (att_id,)).fetchone()
     conn.close()
     if not att:
         abort(404)
     if not _can_access(att["entity_type"]):
         abort(403)
 
-    filepath = os.path.join(_upload_path(), att["entity_type"], att["filename"])
+    filepath = _safe_attachment_path(att)
+    if not filepath:
+        abort(400)
     if not os.path.exists(filepath):
         abort(404)
     return send_file(filepath,
@@ -124,13 +215,13 @@ def serve(att_id):
 @login_required
 def delete(att_id):
     conn = get_db()
-    att = conn.execute("SELECT * FROM attachments WHERE id=?", (att_id,)).fetchone()
+    att = conn.execute("SELECT * FROM attachments WHERE id=%s", (att_id,)).fetchone()
     if att and _can_access(att["entity_type"]):
-        filepath = os.path.join(_upload_path(), att["entity_type"], att["filename"])
-        if os.path.exists(filepath):
+        filepath = _safe_attachment_path(att)
+        if filepath and os.path.exists(filepath):
             os.remove(filepath)
         with conn:
-            conn.execute("DELETE FROM attachments WHERE id=?", (att_id,))
+            conn.execute("DELETE FROM attachments WHERE id=%s", (att_id,))
         log_audit(username=session["user"]["username"], role=session["user"]["role"],
                   action="file_delete", module="uploads", entity_id=str(att_id))
         flash("File deleted.", "success")
@@ -141,11 +232,11 @@ def delete(att_id):
 @uploads_bp.route("/list/<entity_type>/<int:entity_id>")
 @login_required
 def list_attachments(entity_type, entity_id):
-    if not _can_access(entity_type):
+    if entity_type not in ALLOWED_ENTITY_TYPES or not _can_access(entity_type):
         return jsonify([])
     conn = get_db()
     rows = conn.execute(
-        "SELECT * FROM attachments WHERE entity_type=? AND entity_id=? ORDER BY uploaded_at DESC",
+        "SELECT * FROM attachments WHERE entity_type=%s AND entity_id=%s ORDER BY uploaded_at DESC",
         (entity_type, str(entity_id))).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])

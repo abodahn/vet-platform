@@ -3,42 +3,76 @@
 {% block title %}{{ staff.full_name or staff.username }} — Staff Detail{% endblock %}
 
 {% block page_title %}{{ staff.full_name or staff.username }}{% endblock %}
-{% block page_sub %}Staff profile and activity log{% endblock %}
+{% block page_sub %}Staff profile, performance, attendance & payroll{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.staff_edit', user_id=staff.id) }}" class="pf-btn pf-btn-primary">✏️ Edit</a>
+<a href="{{ url_for('hr.staff_edit', user_id=staff.id) }}" class="pf-btn pf-btn-primary">Edit</a>
+<a href="{{ url_for('hr.performance_new') }}" class="pf-btn pf-btn-secondary">+ Review</a>
 <a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">← Back</a>
 {% endblock %}
 
 {% block head_extra %}
 <style>
-.profile-grid { display:grid; grid-template-columns:320px 1fr; gap:24px; align-items:start; }
-.profile-card { background:var(--cl-surface); border-radius:14px; padding:28px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
-.profile-avatar { width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:800; color:#fff; margin:0 auto 16px; }
-.profile-name { text-align:center; font-size:20px; font-weight:700; margin-bottom:4px; }
-.profile-role-badge { display:block; text-align:center; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; color:#fff; margin:0 auto 20px; width:fit-content; }
-.profile-info-row { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--cl-border); font-size:14px; }
-.profile-info-row:last-child { border-bottom:none; }
-.profile-info-label { color:var(--cl-muted); font-size:12px; font-weight:600; text-transform:uppercase; min-width:80px; }
-.reset-pw-form { background:var(--cl-bg); border-radius:10px; padding:16px; margin-top:20px; }
-.reset-pw-form h4 { font-size:14px; font-weight:600; margin-bottom:12px; color:var(--cl-danger); }
-.reset-pw-form input { width:100%; padding:9px 12px; border:1.5px solid var(--cl-border); border-radius:7px; background:var(--cl-surface); color:var(--cl-text); font-size:13px; margin-bottom:8px; box-sizing:border-box; }
-.reset-pw-form button { width:100%; padding:9px; background:var(--cl-danger); color:#fff; border:none; border-radius:7px; font-weight:600; cursor:pointer; font-size:13px; }
-.activity-card { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
-.activity-title { font-size:16px; font-weight:700; color:var(--cl-primary); margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid var(--cl-border); }
-.audit-table { width:100%; border-collapse:collapse; font-size:13px; }
-.audit-table th { text-align:left; padding:10px 12px; background:var(--cl-bg); font-weight:600; color:var(--cl-muted); font-size:12px; text-transform:uppercase; }
-.audit-table td { padding:10px 12px; border-bottom:1px solid var(--cl-border); }
+.detail-layout { display:grid; grid-template-columns:300px 1fr; gap:22px; align-items:start; }
+.d-card { background:var(--cl-surface); border-radius:14px; padding:22px; box-shadow:0 2px 10px rgba(0,0,0,.07); margin-bottom:18px; }
+.d-card-title { font-size:14px; font-weight:700; color:var(--cl-primary); margin-bottom:14px; padding-bottom:10px; border-bottom:2px solid var(--cl-border); }
+.profile-avatar { width:76px; height:76px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:800; color:#fff; margin:0 auto 14px; }
+.profile-name { text-align:center; font-size:19px; font-weight:700; margin-bottom:4px; }
+.profile-badge { display:block; text-align:center; padding:4px 14px; border-radius:20px; font-size:12px; font-weight:600; color:#fff; margin:0 auto 18px; width:fit-content; }
+.info-row { display:flex; align-items:flex-start; gap:8px; padding:8px 0; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.info-row:last-child { border-bottom:none; }
+.info-label { color:var(--cl-muted); font-size:11px; font-weight:700; text-transform:uppercase; min-width:90px; padding-top:1px; }
+.info-val { flex:1; }
+.kpi-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.kpi-mini { background:var(--cl-bg); border-radius:8px; padding:10px 12px; text-align:center; }
+.kpi-mini-num { font-size:1.5rem; font-weight:800; line-height:1; }
+.kpi-mini-lbl { font-size:11px; color:var(--cl-muted); font-weight:600; margin-top:2px; }
+.stars { display:inline-flex; gap:2px; }
+.star-f { color:#f59e0b; }
+.star-e { color:#d1d5db; }
+.review-row, .sal-row, .leave-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.review-row:last-child, .sal-row:last-child, .leave-row:last-child { border-bottom:none; }
+.mini-badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.shift-info-box { background:var(--cl-bg); border-radius:10px; padding:14px; margin-bottom:14px; }
+.reset-pw-form { background:var(--cl-bg); border-radius:10px; padding:14px; margin-top:14px; }
+.reset-pw-form h4 { font-size:13px; font-weight:600; margin-bottom:10px; color:#dc2626; }
+.reset-pw-form input { width:100%; padding:8px 11px; border:1.5px solid var(--cl-border); border-radius:7px; background:var(--cl-surface); color:var(--cl-text); font-size:13px; margin-bottom:8px; box-sizing:border-box; }
+.reset-pw-form button { width:100%; padding:8px; background:#dc2626; color:#fff; border:none; border-radius:7px; font-weight:600; cursor:pointer; font-size:13px; }
+.audit-table { width:100%; border-collapse:collapse; font-size:12px; }
+.audit-table th { text-align:left; padding:9px 11px; background:var(--cl-bg); font-weight:600; color:var(--cl-muted); font-size:11px; text-transform:uppercase; }
+.audit-table td { padding:9px 11px; border-bottom:1px solid var(--cl-border); }
 .audit-table tr:last-child td { border-bottom:none; }
-.action-chip { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.action-chip { display:inline-block; padding:1px 7px; border-radius:4px; font-size:10px; font-weight:600; }
 .action-login   { background:#dbeafe; color:#1d4ed8; }
 .action-logout  { background:#f3f4f6; color:#374151; }
 .action-create  { background:#dcfce7; color:#166534; }
 .action-update  { background:#fef3c7; color:#92400e; }
 .action-delete  { background:#fee2e2; color:#991b1b; }
 .action-default { background:#e0e7ff; color:#3730a3; }
-.empty-audit { text-align:center; padding:40px; color:var(--cl-muted); }
-@media(max-width:900px){ .profile-grid{ grid-template-columns:1fr; } }
+/* warnings */
+.warn-row { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.warn-row:last-child { border-bottom:none; }
+.warn-type { display:inline-block; padding:2px 9px; border-radius:4px; font-size:11px; font-weight:700; min-width:80px; text-align:center; }
+.wt-verbal   { background:#fef3c7; color:#92400e; }
+.wt-written  { background:#fed7aa; color:#9a3412; }
+.wt-final    { background:#fee2e2; color:#991b1b; }
+.wt-suspension { background:#7f1d1d; color:#fff; }
+/* add-form panels */
+.add-form-panel { background:var(--cl-bg); border-radius:10px; padding:14px; margin-top:12px; }
+.add-form-panel h5 { font-size:12px; font-weight:700; color:var(--cl-muted); text-transform:uppercase; margin-bottom:10px; }
+.add-form-panel input, .add-form-panel select, .add-form-panel textarea {
+  width:100%; padding:8px 10px; border:1.5px solid var(--cl-border); border-radius:7px;
+  background:var(--cl-surface); color:var(--cl-text); font-size:13px; margin-bottom:8px; box-sizing:border-box;
+}
+.add-form-panel textarea { min-height:60px; resize:vertical; }
+.add-form-panel button { padding:7px 16px; background:var(--cl-primary); color:#fff; border:none; border-radius:7px; font-weight:600; cursor:pointer; font-size:13px; }
+/* cert */
+.cert-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.cert-row:last-child { border-bottom:none; }
+/* note */
+.note-row { padding:10px 0; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.note-row:last-child { border-bottom:none; }
+@media(max-width:960px){ .detail-layout{ grid-template-columns:1fr; } }
 </style>
 {% endblock %}
 
@@ -52,60 +86,41 @@
 {% set role_color = color_map.get(staff.role, '#6b7280') %}
 {% set initials = (staff.full_name or staff.username or 'U')[:2]|upper %}
 
-<div class="profile-grid">
+<div class="detail-layout">
 
-  <!-- Left: Profile Card -->
+  <!-- ── LEFT SIDEBAR ──────────────────────────────────────────────────── -->
   <div>
-    <div class="profile-card">
-      <div class="profile-avatar" style="background:{{ role_color }};">{{ initials }}</div>
+
+    <!-- Profile Card -->
+    <div class="d-card">
+      <div class="profile-avatar" style="background:{{ role_color }}">{{ initials }}</div>
       <div class="profile-name">{{ staff.full_name or staff.username }}</div>
       {% if staff.full_name_ar %}
-      <div style="text-align:center;color:var(--cl-muted);font-size:14px;margin-bottom:8px;direction:rtl;">{{ staff.full_name_ar }}</div>
+      <div style="text-align:center;color:var(--cl-muted);font-size:13px;margin-bottom:6px;direction:rtl">{{ staff.full_name_ar }}</div>
       {% endif %}
-      <span class="profile-role-badge" style="background:{{ role_color }};">
-        {{ staff.role.replace('_',' ').title() }}
-      </span>
+      <span class="profile-badge" style="background:{{ role_color }}">{{ staff.role.replace('_',' ').title() }}</span>
 
-      <div class="profile-info-row">
-        <span class="profile-info-label">Username</span>
-        <code style="background:var(--cl-bg);padding:2px 8px;border-radius:4px;">{{ staff.username }}</code>
+      <div class="info-row"><span class="info-label">Username</span><code style="background:var(--cl-bg);padding:1px 6px;border-radius:4px;font-size:12px">{{ staff.username }}</code></div>
+      <div class="info-row"><span class="info-label">Status</span>
+        {% if staff.is_active %}<span style="color:#166534;font-weight:600">Active</span>
+        {% else %}<span style="color:#991b1b;font-weight:600">Inactive</span>{% endif %}
       </div>
-      <div class="profile-info-row">
-        <span class="profile-info-label">Status</span>
-        {% if staff.is_active %}
-          <span style="color:#166534;font-weight:600;">● Active</span>
-        {% else %}
-          <span style="color:#991b1b;font-weight:600;">● Inactive</span>
-        {% endif %}
-      </div>
-      {% if staff.email %}
-      <div class="profile-info-row">
-        <span class="profile-info-label">Email</span>
-        <span>{{ staff.email }}</span>
-      </div>
-      {% endif %}
-      {% if staff.phone %}
-      <div class="profile-info-row">
-        <span class="profile-info-label">Phone</span>
-        <span>{{ staff.phone }}</span>
-      </div>
-      {% endif %}
-      <div class="profile-info-row">
-        <span class="profile-info-label">Branch</span>
-        <span>{{ staff.branch_name or '—' }}</span>
-      </div>
-      <div class="profile-info-row">
-        <span class="profile-info-label">Last Login</span>
-        <span style="color:var(--cl-muted);font-size:13px;">{{ staff.last_login_at[:16] if staff.last_login_at else 'Never' }}</span>
-      </div>
-      <div class="profile-info-row">
-        <span class="profile-info-label">Created</span>
-        <span style="color:var(--cl-muted);font-size:13px;">{{ staff.created_at[:10] if staff.created_at else '—' }}</span>
-      </div>
+      {% if staff.job_title %}<div class="info-row"><span class="info-label">Job Title</span><span class="info-val">{{ staff.job_title }}</span></div>{% endif %}
+      {% if staff.contract_type %}<div class="info-row"><span class="info-label">Contract</span><span class="info-val">{{ staff.contract_type }}</span></div>{% endif %}
+      {% if staff.hire_date %}<div class="info-row"><span class="info-label">Hired</span><span class="info-val">{{ staff.hire_date }}</span></div>{% endif %}
+      {% if staff.gender %}<div class="info-row"><span class="info-label">Gender</span><span class="info-val">{{ staff.gender }}</span></div>{% endif %}
+      {% if staff.dob %}<div class="info-row"><span class="info-label">Date of Birth</span><span class="info-val">{{ staff.dob }}</span></div>{% endif %}
+      {% if staff.email %}<div class="info-row"><span class="info-label">Email</span><span class="info-val">{{ staff.email }}</span></div>{% endif %}
+      {% if staff.phone %}<div class="info-row"><span class="info-label">Phone</span><span class="info-val">{{ staff.phone }}</span></div>{% endif %}
+      {% if staff.national_id %}<div class="info-row"><span class="info-label">National ID</span><span class="info-val">{{ staff.national_id }}</span></div>{% endif %}
+      {% if staff.emergency_contact %}<div class="info-row"><span class="info-label">Emergency</span><span class="info-val">{{ staff.emergency_contact }}{% if staff.emergency_phone %} · {{ staff.emergency_phone }}{% endif %}</span></div>{% endif %}
+      <div class="info-row"><span class="info-label">Branch</span><span class="info-val">{{ staff.branch_name or '—' }}</span></div>
+      <div class="info-row"><span class="info-label">Last Login</span><span class="info-val" style="color:var(--cl-muted);font-size:12px">{{ staff.last_login_at[:16] if staff.last_login_at else 'Never' }}</span></div>
+      <div class="info-row"><span class="info-label">Created</span><span class="info-val" style="color:var(--cl-muted);font-size:12px">{{ staff.created_at[:10] if staff.created_at else '—' }}</span></div>
 
       <!-- Reset Password -->
       <div class="reset-pw-form">
-        <h4>🔑 Reset Password</h4>
+        <h4>Reset Password</h4>
         <form method="post" action="{{ url_for('hr.staff_reset_password', user_id=staff.id) }}"
               onsubmit="return confirm('Reset password for {{ staff.username }}?')">
           <input type="password" name="new_password" placeholder="New password (min 6 chars)" required minlength="6">
@@ -113,14 +128,358 @@
         </form>
       </div>
     </div>
+
+    <!-- Work Shift Card -->
+    <div class="d-card">
+      <div class="d-card-title">Work Shift</div>
+      {% if shift_info %}
+      <div class="shift-info-box">
+        <div style="font-weight:700;font-size:15px">{{ shift_info.name }}</div>
+        <div style="color:var(--cl-muted);font-size:13px;margin-top:4px">
+          {{ shift_info.start_time }} – {{ shift_info.end_time }}
+          {% if shift_info.effective_from %} · From {{ shift_info.effective_from }}{% endif %}
+        </div>
+        {% if shift_info.days_of_week %}<div style="font-size:12px;margin-top:4px;color:var(--cl-muted)">{{ shift_info.days_of_week }}</div>{% endif %}
+      </div>
+      {% else %}
+      <p style="color:var(--cl-muted);font-size:13px;margin-bottom:12px">No shift assigned.</p>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('hr.staff_assign_shift', user_id=staff.id) }}">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <select name="shift_id" class="pf-form-control" style="padding:8px 10px;border:1.5px solid var(--cl-border);border-radius:8px;background:var(--cl-bg);color:var(--cl-text);font-size:13px">
+            <option value="">— Remove Shift —</option>
+            {% for sh in all_shifts %}
+            <option value="{{ sh.id }}" {% if shift_info and shift_info.shift_id == sh.id %}selected{% endif %}>
+              {{ sh.name }} ({{ sh.start_time }}–{{ sh.end_time }})
+            </option>
+            {% endfor %}
+          </select>
+          <input type="date" name="effective_from" style="padding:8px 10px;border:1.5px solid var(--cl-border);border-radius:8px;background:var(--cl-bg);color:var(--cl-text);font-size:13px" placeholder="Effective from">
+          <button type="submit" class="pf-btn pf-btn-primary" style="font-size:13px">Update Shift</button>
+        </div>
+      </form>
+    </div>
+
   </div>
 
-  <!-- Right: Activity Log -->
+  <!-- ── RIGHT MAIN ────────────────────────────────────────────────────── -->
   <div>
-    <div class="activity-card">
-      <div class="activity-title">📋 Recent Activity (Last 50 Events)</div>
+
+    <!-- This Month Attendance -->
+    {% if att_summary %}
+    <div class="d-card">
+      <div class="d-card-title">Attendance This Month</div>
+      <div class="kpi-row">
+        <div class="kpi-mini">
+          <div class="kpi-mini-num" style="color:#16a34a">{{ att_summary.present or 0 }}</div>
+          <div class="kpi-mini-lbl">Present</div>
+        </div>
+        <div class="kpi-mini">
+          <div class="kpi-mini-num" style="color:#d97706">{{ att_summary.late or 0 }}</div>
+          <div class="kpi-mini-lbl">Late</div>
+        </div>
+        <div class="kpi-mini">
+          <div class="kpi-mini-num" style="color:#dc2626">{{ att_summary.absent or 0 }}</div>
+          <div class="kpi-mini-lbl">Absent</div>
+        </div>
+        <div class="kpi-mini">
+          <div class="kpi-mini-num" style="color:#0891b2">{{ '%.1f'|format(att_summary.total_hours or 0) }}</div>
+          <div class="kpi-mini-lbl">Hours</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;text-align:right">
+        <a href="{{ url_for('attendance.records_list', user_id=staff.id) }}" style="font-size:12px;color:var(--cl-primary)">Full attendance history →</a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Leave Balances -->
+    {% if leave_balances %}
+    <div class="d-card">
+      <div class="d-card-title">Leave Balances (This Year)</div>
+      {% for lb in leave_balances %}
+      <div class="leave-row">
+        <div style="flex:1;font-weight:600">{{ lb.name or 'Annual' }}</div>
+        <div>
+          <span style="font-weight:700;color:var(--cl-primary)">{{ lb.used or 0 }}</span>
+          <span style="color:var(--cl-muted)"> / {{ lb.allocated or 0 }} days used</span>
+        </div>
+        <div>
+          {% set remaining = (lb.allocated or 0) - (lb.used or 0) %}
+          <span class="mini-badge" style="background:{{ '#dcfce7' if remaining > 0 else '#fee2e2' }};color:{{ '#166534' if remaining > 0 else '#991b1b' }}">
+            {{ remaining }} left
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+      <div style="margin-top:10px;text-align:right">
+        <a href="{{ url_for('attendance.leaves_list', user_id=staff.id) }}" style="font-size:12px;color:var(--cl-primary)">View leave requests →</a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Performance Reviews -->
+    <div class="d-card">
+      <div class="d-card-title">
+        Performance Reviews
+        <a href="{{ url_for('hr.performance_new') }}" style="float:right;font-size:12px;color:var(--cl-primary);font-weight:500">+ Add</a>
+      </div>
+      {% if reviews %}
+      {% for r in reviews %}
+      <div class="review-row">
+        <div style="flex:1">
+          <div style="font-weight:600">{{ r.period }}</div>
+          <div style="font-size:11px;color:var(--cl-muted)">{{ r.reviewed_at or r.created_at[:10] if r.created_at else '' }}</div>
+        </div>
+        <div class="stars">
+          {% if r.rating %}
+          {% for i in range(1,6) %}
+          <span class="{{ 'star-f' if i <= r.rating else 'star-e' }}">&#9733;</span>
+          {% endfor %}
+          {% else %}<span style="color:var(--cl-muted);font-size:12px">No rating</span>{% endif %}
+        </div>
+        <div>
+          {% if r.status == 'Draft' %}<span class="mini-badge" style="background:#f3f4f6;color:#374151">Draft</span>
+          {% elif r.status == 'Submitted' %}<span class="mini-badge" style="background:#dbeafe;color:#1e40af">Submitted</span>
+          {% elif r.status == 'Acknowledged' %}<span class="mini-badge" style="background:#dcfce7;color:#166534">Acknowledged</span>
+          {% endif %}
+        </div>
+        <a href="{{ url_for('hr.performance_detail', rev_id=r.id) }}" class="pf-btn pf-btn-sm" style="font-size:11px">View</a>
+      </div>
+      {% endfor %}
+      <div style="margin-top:10px;text-align:right">
+        <a href="{{ url_for('hr.performance_list', user_id=staff.id) }}" style="font-size:12px;color:var(--cl-primary)">All reviews →</a>
+      </div>
+      {% else %}
+      <p style="color:var(--cl-muted);text-align:center;padding:20px 0;font-size:13px">No performance reviews yet.</p>
+      {% endif %}
+    </div>
+
+    <!-- Salary History -->
+    {% if salary_history %}
+    <div class="d-card">
+      <div class="d-card-title">Salary History (Last 6 Months)</div>
+      {% for s in salary_history %}
+      {% set sc = {'Paid':'#16a34a','Approved':'#0891b2','Draft':'#6b7280'} %}
+      <div class="sal-row">
+        <div style="flex:1">
+          <div style="font-weight:600">{{ s.period_year }}-{{ '%02d'|format(s.period_month) }}</div>
+        </div>
+        <div style="font-size:13px">
+          <span style="color:#dc2626">Basic: EGP {{ '{:,.0f}'.format(s.basic_salary or 0) }}</span>
+        </div>
+        <div style="font-size:13px;font-weight:700;color:#16a34a">EGP {{ '{:,.0f}'.format(s.net or 0) }}</div>
+        <span class="mini-badge" style="background:{{ sc.get(s.status,'#6b7280') }}22;color:{{ sc.get(s.status,'#6b7280') }}">{{ s.status }}</span>
+        <a href="{{ url_for('payroll.salary_detail', sid=s.id) }}" class="pf-btn pf-btn-sm" style="font-size:11px">View</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Warnings / Disciplinary -->
+    <div class="d-card">
+      <div class="d-card-title">
+        Disciplinary Record
+        {% if warnings %}<span style="float:right;font-size:12px;color:{% if warnings|length > 2 %}#dc2626{% else %}#d97706{% endif %}">{{ warnings|length }} on record</span>{% endif %}
+      </div>
+
+      {% set wt_cls = {'Verbal':'wt-verbal','Written':'wt-written','Final Warning':'wt-final','Suspension':'wt-suspension'} %}
+      {% if warnings %}
+        {% for w in warnings %}
+        <div class="warn-row">
+          <div>
+            <span class="warn-type {{ wt_cls.get(w.warning_type,'wt-verbal') }}">{{ w.warning_type }}</span>
+          </div>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">{{ w.reason or '—' }}</div>
+            {% if w.action_taken %}<div style="font-size:11px;color:var(--cl-muted)">Action: {{ w.action_taken }}</div>{% endif %}
+            <div style="font-size:11px;color:var(--cl-muted)">{{ w.issued_date }} · by {{ w.issued_by_name or 'Manager' }}{% if w.acknowledged %} · <span style="color:#166534">Acknowledged</span>{% endif %}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            {% if not w.acknowledged %}
+            <form method="post" action="{{ url_for('hr.acknowledge_warning', user_id=staff.id, warn_id=w.id) }}">
+              <button type="submit" class="pf-btn pf-btn-sm" style="font-size:10px;padding:3px 8px">Ack</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('hr.delete_warning', user_id=staff.id, warn_id=w.id) }}"
+                  onsubmit="return confirm('Delete this warning?')">
+              <button type="submit" class="pf-btn pf-btn-sm" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#991b1b">Del</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:var(--cl-muted);font-size:13px;text-align:center;padding:10px 0">No disciplinary records.</p>
+      {% endif %}
+
+      <div class="add-form-panel">
+        <h5>Issue Warning</h5>
+        <form method="post" action="{{ url_for('hr.add_warning', user_id=staff.id) }}">
+          <select name="warning_type">
+            {% for wt in ['Verbal','Written','Final Warning','Suspension'] %}
+            <option value="{{ wt }}">{{ wt }}</option>
+            {% endfor %}
+          </select>
+          <textarea name="reason" placeholder="Reason for warning…" required></textarea>
+          <input type="text" name="action_taken" placeholder="Action taken (optional)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <input type="date" name="issued_date" placeholder="Issue date">
+            <input type="date" name="expiry_date" placeholder="Expiry date (optional)">
+          </div>
+          <button type="submit">Issue Warning</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Certifications & Training -->
+    <div class="d-card">
+      <div class="d-card-title">
+        Certifications & Training
+        <a href="{{ url_for('hr.certifications_list') }}" style="float:right;font-size:12px;color:var(--cl-primary)">All staff →</a>
+      </div>
+
+      {% if certifications %}
+        {% for c in certifications %}
+        <div class="cert-row">
+          <div style="flex:1">
+            <div style="font-weight:600">{{ c.cert_name }}</div>
+            <div style="font-size:11px;color:var(--cl-muted)">
+              {{ c.issued_by or '' }}{% if c.cert_number %} · #{{ c.cert_number }}{% endif %}
+              {% if c.issue_date %} · Issued {{ c.issue_date }}{% endif %}
+            </div>
+          </div>
+          <div style="text-align:right">
+            {% if c.expiry_date %}
+              {% set today_str = today %}
+              <div style="font-size:12px;font-weight:600;color:{% if c.expiry_date < today_str %}#dc2626{% else %}#16a34a{% endif %}">
+                Exp: {{ c.expiry_date }}
+              </div>
+            {% else %}
+              <div style="font-size:11px;color:var(--cl-muted)">No expiry</div>
+            {% endif %}
+            <span class="mini-badge" style="background:{% if c.status=='Active' %}#dcfce7{% elif c.status=='Expired' %}#fee2e2{% else %}#f3f4f6{% endif %};color:{% if c.status=='Active' %}#166534{% elif c.status=='Expired' %}#991b1b{% else %}#374151{% endif %}">{{ c.status }}</span>
+          </div>
+          <form method="post" action="{{ url_for('hr.delete_certification', user_id=staff.id, cert_id=c.id) }}"
+                onsubmit="return confirm('Remove this certification?')" style="margin-left:4px">
+            <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--cl-muted);font-size:14px;padding:0">✕</button>
+          </form>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:var(--cl-muted);font-size:13px;text-align:center;padding:10px 0">No certifications added yet.</p>
+      {% endif %}
+
+      <div class="add-form-panel">
+        <h5>Add Certification / Training</h5>
+        <form method="post" action="{{ url_for('hr.add_certification', user_id=staff.id) }}">
+          <input type="text" name="cert_name" placeholder="Certification / course name *" required>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <input type="text" name="issued_by" placeholder="Issuing body">
+            <input type="text" name="cert_number" placeholder="Certificate number">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <input type="date" name="issue_date" placeholder="Issue date">
+            <input type="date" name="expiry_date" placeholder="Expiry date">
+          </div>
+          <select name="status">
+            <option value="Active">Active</option>
+            <option value="Pending">Pending</option>
+            <option value="Expired">Expired</option>
+          </select>
+          <input type="text" name="notes" placeholder="Notes (optional)">
+          <button type="submit">Add Certification</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- HR Notes (Private) -->
+    <div class="d-card">
+      <div class="d-card-title">HR Notes <span style="font-size:11px;color:var(--cl-muted);font-weight:400">(private — managers only)</span></div>
+
+      {% if hr_notes %}
+        {% for n in hr_notes %}
+        <div class="note-row">
+          <div style="font-size:13px;line-height:1.5">{{ n.note }}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+            <span style="font-size:11px;color:var(--cl-muted)">{{ n.author_name or 'Manager' }} · {{ n.created_at[:16] if n.created_at else '' }}</span>
+            <form method="post" action="{{ url_for('hr.delete_note', user_id=staff.id, note_id=n.id) }}"
+                  onsubmit="return confirm('Delete this note?')">
+              <button type="submit" style="background:none;border:none;cursor:pointer;color:var(--cl-muted);font-size:12px;padding:0">Delete</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:var(--cl-muted);font-size:13px;text-align:center;padding:10px 0">No notes yet.</p>
+      {% endif %}
+
+      <div class="add-form-panel">
+        <h5>Add Note</h5>
+        <form method="post" action="{{ url_for('hr.add_note', user_id=staff.id) }}">
+          <textarea name="note" placeholder="Add a private HR note about this employee…" required></textarea>
+          <button type="submit">Save Note</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Overtime Log -->
+    <div class="d-card">
+      <div class="d-card-title">
+        Overtime / Extra Hours
+        <a href="{{ url_for('hr.overtime_list') }}?user_id={{ staff.id }}" style="float:right;font-size:12px;color:var(--cl-primary)">View All</a>
+      </div>
+
+      {% set staff_ot = [] %}
+      {% if overtime is defined %}{% set staff_ot = overtime %}{% endif %}
+
+      {% if staff_ot %}
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px">
+        <thead>
+          <tr style="background:var(--cl-bg)">
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">Date</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">Hours</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">Reason</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:var(--cl-muted)">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for ot in staff_ot[:5] %}
+        <tr style="border-top:1px solid var(--cl-border)">
+          <td style="padding:7px 10px">{{ ot.work_date }}</td>
+          <td style="padding:7px 10px;font-weight:700">{{ ot.hours }}h</td>
+          <td style="padding:7px 10px;color:var(--cl-muted)">{{ ot.reason or '—' }}</td>
+          <td style="padding:7px 10px">
+            {% if ot.status == 'Approved' %}
+              <span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Approved</span>
+            {% elif ot.status == 'Rejected' %}
+              <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Rejected</span>
+            {% else %}
+              <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">Pending</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <div class="add-form-panel">
+        <h5>Log Overtime</h5>
+        <form method="post" action="{{ url_for('hr.add_overtime', user_id=staff.id) }}">
+          <input type="date" name="work_date" value="{{ today.isoformat() if today else '' }}" required>
+          <input type="number" name="hours" step="0.5" min="0.5" max="24" placeholder="Hours (e.g. 2.5)" required>
+          <input type="text" name="reason" placeholder="Reason / project / event">
+          <button type="submit">Log Overtime</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="d-card">
+      <div class="d-card-title">Recent Activity (Last 30 Events)</div>
       {% if audit %}
-      <div style="overflow-x:auto;">
+      <div style="overflow-x:auto">
         <table class="audit-table">
           <thead>
             <tr>
@@ -133,31 +492,29 @@
           </thead>
           <tbody>
             {% for log in audit %}
-            {% set action_class = {
+            {% set ac = {
               'login':'action-login','logout':'action-logout',
               'create':'action-create','update':'action-update','delete':'action-delete'
             }.get(log.action, 'action-default') %}
             <tr>
-              <td style="white-space:nowrap;color:var(--cl-muted);">{{ log.timestamp[:16] if log.timestamp else '—' }}</td>
-              <td><span class="action-chip {{ action_class }}">{{ log.action or '—' }}</span></td>
-              <td style="color:var(--cl-muted);">{{ log.module or '—' }}</td>
-              <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ log.details or '' }}">
-                {{ log.details or '—' }}
-              </td>
-              <td style="color:var(--cl-muted);font-size:12px;">{{ log.ip or '—' }}</td>
+              <td style="white-space:nowrap;color:var(--cl-muted)">{{ log.timestamp[:16] if log.timestamp else '—' }}</td>
+              <td><span class="action-chip {{ ac }}">{{ log.action or '—' }}</span></td>
+              <td style="color:var(--cl-muted)">{{ log.module or '—' }}</td>
+              <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ log.details or '' }}">{{ log.details or '—' }}</td>
+              <td style="color:var(--cl-muted)">{{ log.ip or '—' }}</td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
       {% else %}
-      <div class="empty-audit">
-        <div style="font-size:36px;">📭</div>
-        <div>No activity recorded yet for this user.</div>
+      <div style="text-align:center;padding:40px;color:var(--cl-muted)">
+        <div style="font-size:32px;margin-bottom:8px">📭</div>
+        No activity recorded yet.
       </div>
       {% endif %}
     </div>
-  </div>
 
+  </div>
 </div>
 {% endblock %}

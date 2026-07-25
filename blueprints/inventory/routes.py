@@ -4,7 +4,7 @@ Inventory / Pharmacy Blueprint — Aleefy Platform
 
 from flask import (
     render_template, request, redirect, url_for,
-    session, flash, abort,
+    session, flash, abort, jsonify,
 )
 from datetime import date
 from . import inventory_bp
@@ -411,3 +411,151 @@ def movements():
         item_id=item_id,
         mv_type=mv_type,
     )
+
+
+# ─────────────────────────────────────────────
+# STOCK TRANSFER BETWEEN WAREHOUSES/BRANCHES
+# ─────────────────────────────────────────────
+
+@inventory_bp.route("/transfer", methods=["GET", "POST"])
+@login_required
+def transfer():
+    conn = db.get_db()
+    user = session["user"]
+    _allowed = ("super_admin", "clinic_owner", "branch_manager", "inventory_mgr", "pharmacist")
+    if user.get("role") not in _allowed:
+        conn.close()
+        flash("Access denied.", "error")
+        return redirect(url_for("inventory.dashboard"))
+
+    warehouses = [dict(r) for r in conn.execute(
+        "SELECT * FROM warehouses ORDER BY name"
+    ).fetchall()]
+
+    if request.method == "POST":
+        f           = request.form
+        batch_id    = f.get("batch_id", type=int)
+        to_wh_id    = f.get("to_warehouse_id", type=int)
+        qty_str     = f.get("quantity", "0").strip()
+        note        = f.get("notes", "").strip()
+
+        try:
+            qty = float(qty_str)
+            assert qty > 0
+        except Exception:
+            flash("Invalid quantity.", "error")
+            conn.close()
+            return redirect(url_for("inventory.transfer"))
+
+        batch = conn.execute("SELECT * FROM batches WHERE id=?", (batch_id,)).fetchone()
+        if not batch:
+            flash("Batch not found.", "error")
+            conn.close()
+            return redirect(url_for("inventory.transfer"))
+
+        if batch["quantity"] < qty:
+            flash(f"Insufficient stock: only {batch['quantity']} available.", "error")
+            conn.close()
+            return redirect(url_for("inventory.transfer"))
+
+        to_wh = conn.execute("SELECT * FROM warehouses WHERE id=?", (to_wh_id,)).fetchone()
+        if not to_wh or to_wh_id == batch["warehouse_id"]:
+            flash("Select a different destination warehouse.", "error")
+            conn.close()
+            return redirect(url_for("inventory.transfer"))
+
+        item_id = batch["item_id"]
+
+        try:
+            with conn:
+                # Deduct from source batch
+                conn.execute("UPDATE batches SET quantity=quantity-? WHERE id=?", (qty, batch_id))
+
+                # Find or create matching batch at destination
+                existing = conn.execute("""
+                    SELECT id FROM batches
+                    WHERE item_id=? AND warehouse_id=? AND batch_number=?
+                      AND (expiry_date=? OR (expiry_date IS NULL AND ? IS NULL))
+                """, (item_id, to_wh_id, batch["batch_number"],
+                      batch["expiry_date"], batch["expiry_date"])).fetchone()
+
+                if existing:
+                    conn.execute("UPDATE batches SET quantity=quantity+? WHERE id=?",
+                                 (qty, existing["id"]))
+                    dest_batch_id = existing["id"]
+                else:
+                    conn.execute("""
+                        INSERT INTO batches
+                            (item_id, warehouse_id, batch_number, expiry_date,
+                             quantity, unit_cost, received_date)
+                        VALUES (?,?,?,?,?,?,?)
+                    """, (item_id, to_wh_id,
+                          batch["batch_number"], batch["expiry_date"],
+                          qty, batch.get("unit_cost", 0),
+                          date.today().isoformat()))
+                    dest_batch_id = conn.execute("SELECT lastval()").fetchone()[0]
+
+                # Record movement (out)
+                conn.execute("""
+                    INSERT INTO stock_movements
+                        (item_id, batch_id, movement_type, quantity,
+                         reference_type, notes, created_by)
+                    VALUES (?,?,'Transfer',-?,?,?,?)
+                """, (item_id, batch_id, qty,
+                      "transfer", f"Transfer to warehouse {to_wh['name']}. {note}",
+                      user["username"]))
+
+                # Record movement (in)
+                conn.execute("""
+                    INSERT INTO stock_movements
+                        (item_id, batch_id, movement_type, quantity,
+                         reference_type, notes, created_by)
+                    VALUES (?,?,'Transfer',?,?,?,?)
+                """, (item_id, dest_batch_id, qty,
+                      "transfer", f"Transfer from warehouse {batch['warehouse_id']}. {note}",
+                      user["username"]))
+
+                db.log_audit(username=user["username"], role=user["role"],
+                             action="stock_transfer", module="inventory",
+                             entity_type="batches", entity_id=str(batch_id),
+                             details=f"qty={qty} to wh={to_wh_id}")
+
+            flash(f"Transferred {qty} units to {to_wh['name']} successfully.", "success")
+        except Exception as e:
+            flash(f"Transfer failed: {e}", "error")
+
+        conn.close()
+        return redirect(url_for("inventory.transfer"))
+
+    # GET — load items for the form
+    items = [dict(r) for r in conn.execute(
+        "SELECT i.id, i.name, i.unit, ic.name AS category FROM items i LEFT JOIN item_categories ic ON ic.id=i.category_id WHERE i.is_active=1 ORDER BY i.name"
+    ).fetchall()]
+    conn.close()
+
+    return render_template("inventory/transfer.html",
+        active="inventory",
+        page_title="Stock Transfer",
+        items=items,
+        warehouses=warehouses,
+    )
+
+
+@inventory_bp.route("/transfer/batches-json")
+@login_required
+def transfer_batches_json():
+    """AJAX: batches for a given item with stock > 0."""
+    item_id = request.args.get("item_id", type=int)
+    if not item_id:
+        return jsonify([])
+    conn = db.get_db()
+    batches = [dict(r) for r in conn.execute("""
+        SELECT b.id, b.batch_number, b.expiry_date, b.quantity, b.unit_cost,
+               w.name warehouse_name, b.warehouse_id
+        FROM batches b
+        LEFT JOIN warehouses w ON w.id=b.warehouse_id
+        WHERE b.item_id=? AND b.quantity > 0
+        ORDER BY b.expiry_date ASC NULLS LAST
+    """, (item_id,)).fetchall()]
+    conn.close()
+    return jsonify(batches)

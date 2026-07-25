@@ -5,7 +5,8 @@
 
 {% block topbar_actions %}
 <a href="{{ url_for('finance.invoices_list') }}" class="btn btn-secondary no-print">← {{ t('Invoices', 'الفواتير') }}</a>
-<a href="{{ url_for('finance.invoice_print', inv_id=invoice.id) }}" target="_blank" class="btn btn-primary no-print">🖨 {{ t('Print / PDF', 'طباعة / PDF') }}</a>
+<a href="{{ url_for('finance.invoice_print', inv_id=invoice.id) }}" target="_blank" class="btn btn-secondary no-print">🖨 {{ t('Print', 'طباعة') }}</a>
+<a href="{{ url_for('finance.invoice_pdf', inv_id=invoice.id) }}" class="btn btn-primary no-print">⬇ {{ t('Download PDF', 'تحميل PDF') }}</a>
 {% if invoice.status not in ('Paid','Cancelled') %}
 <a href="{{ url_for('finance.invoice_edit', inv_id=invoice.id) }}" class="btn btn-secondary no-print">✏️ {{ t('Edit', 'تعديل') }}</a>
 {% endif %}

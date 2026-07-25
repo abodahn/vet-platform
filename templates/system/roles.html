@@ -2,225 +2,303 @@
 
 {% block title %}Roles & Permissions{% endblock %}
 {% block page_title %}Roles & Permissions{% endblock %}
-{% block page_sub %}Define roles, set module access, and assign staff roles{% endblock %}
+{% block page_sub %}All roles grouped by department · click a role to see its permissions{% endblock %}
 
 {% block topbar_actions %}
-<button class="pf-btn pf-btn-primary" onclick="document.getElementById('modal-create').style.display='flex'">
-  + New Role
-</button>
+<button class="pf-btn pf-btn-primary" onclick="openCreateModal()">+ New Custom Role</button>
 {% endblock %}
 
 {% block head_extra %}
 <style>
-.roles-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:20px; margin-bottom:32px; }
-.role-card { background:var(--cl-surface); border-radius:14px; box-shadow:var(--cl-shadow-card); overflow:hidden; }
-.role-card-header { padding:16px 20px; display:flex; align-items:center; gap:12px; }
-.role-color-dot { width:14px; height:14px; border-radius:50%; flex-shrink:0; }
-.role-name { font-size:15px; font-weight:700; flex:1; }
-.role-name-ar { font-size:12px; color:var(--cl-text-muted); margin-top:2px; }
-.role-card-body { padding:0 20px 16px; }
-.perm-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
-.perm-chip { font-size:11px; font-weight:600; padding:3px 10px; border-radius:999px;
-             background:var(--cl-primary-subtle); color:var(--cl-primary); }
-.perm-chip.none { background:var(--cl-surface-2); color:var(--cl-text-muted); }
-.role-actions { display:flex; gap:8px; }
-.btn-sm { padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:none; }
-.btn-edit { background:var(--cl-primary-subtle); color:var(--cl-primary); }
-.btn-del  { background:var(--cl-danger-bg); color:var(--cl-danger); }
-.btn-edit:hover { background:var(--cl-primary); color:#fff; }
-.btn-del:hover  { background:var(--cl-danger); color:#fff; }
-.user-count { font-size:11px; color:var(--cl-text-muted); margin-top:2px; }
+/* ── Tabs ── */
+.rp-tabs { display:flex; gap:4px; background:var(--bg); border-radius:12px; padding:5px;
+           margin-bottom:28px; width:fit-content; }
+.rp-tab  { padding:9px 24px; border-radius:9px; font-size:13px; font-weight:700;
+           cursor:pointer; border:none; background:transparent; color:var(--text-muted); transition:.15s; }
+.rp-tab.active { background:var(--surface); color:var(--c-primary); box-shadow:var(--sh-sm); }
+.rp-tab:hover:not(.active) { color:var(--text); }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
 
-/* Users table */
-.section-card { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:var(--cl-shadow-card); margin-bottom:20px; }
-.section-title { font-size:15px; font-weight:700; color:var(--cl-primary); margin-bottom:16px;
-                 padding-bottom:10px; border-bottom:2px solid var(--cl-border); }
-.users-table { width:100%; border-collapse:collapse; font-size:13px; }
-.users-table th { text-align:left; padding:9px 12px; background:var(--cl-bg); font-weight:600;
-                  color:var(--cl-text-muted); font-size:12px; text-transform:uppercase; }
-.users-table td { padding:9px 12px; border-bottom:1px solid var(--cl-border); vertical-align:middle; }
-.users-table tr:last-child td { border-bottom:none; }
-.role-badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
-.avatar { width:32px; height:32px; border-radius:50%; background:var(--cl-primary); color:#fff;
-          display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+/* ── Category section ── */
+.cat-section { margin-bottom:24px; }
+.cat-label { font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase;
+             color:var(--text-muted); padding:0 4px; margin-bottom:8px; display:flex;
+             align-items:center; gap:10px; }
+.cat-label::after { content:''; flex:1; height:1px; background:var(--border); }
 
-/* Modal */
-.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000;
-                 align-items:center; justify-content:center; padding:20px; }
-.modal-box { background:var(--cl-surface); border-radius:18px; width:100%; max-width:640px;
-             max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+/* ── Role row ── */
+.role-row { display:flex; align-items:center; gap:14px; padding:12px 18px;
+            background:var(--surface); border-radius:12px; margin-bottom:6px;
+            border:1.5px solid var(--border); cursor:pointer; transition:.15s; user-select:none; }
+.role-row:hover { border-color:var(--c-primary); box-shadow:0 2px 8px rgba(11,122,107,.1); }
+.role-row.open  { border-color:var(--c-primary); border-radius:12px 12px 0 0; border-bottom-color:transparent; }
+.role-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+.role-info { flex:1; min-width:0; }
+.role-name-main { font-size:14px; font-weight:700; }
+.role-name-key  { font-size:11px; font-family:monospace; color:var(--text-muted); margin-top:1px; }
+.role-meta { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.meta-pill { font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px;
+             background:var(--bg); color:var(--text-muted); border:1px solid var(--border); }
+.meta-pill.users { color:var(--c-primary); background:rgba(11,122,107,.08); border-color:rgba(11,122,107,.2); }
+.badge-builtin { font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px;
+                 background:rgba(100,116,139,.1); color:var(--text-muted); }
+.role-chevron { font-size:11px; color:var(--text-muted); transition:.2s; flex-shrink:0; }
+.role-row.open .role-chevron { transform:rotate(180deg); color:var(--c-primary); }
+
+/* ── Role detail expand ── */
+.role-detail { display:none; background:var(--bg); border:1.5px solid var(--c-primary);
+               border-top:none; border-radius:0 0 12px 12px; padding:16px 20px; margin-bottom:6px; }
+.role-detail.open { display:block; }
+.perm-wrap { display:flex; flex-wrap:wrap; gap:6px; }
+.ptag { display:inline-flex; align-items:center; gap:5px; padding:4px 10px;
+        border-radius:7px; font-size:11px; font-weight:600; }
+.ptag.on  { background:rgba(11,122,107,.1); color:var(--c-primary); }
+.ptag.off { background:var(--surface); color:var(--text-muted); opacity:.4; }
+.detail-footer { display:flex; gap:8px; margin-top:14px; padding-top:12px;
+                 border-top:1px solid var(--border); align-items:center; }
+.detail-note { font-size:11px; color:var(--text-muted); flex:1; }
+
+/* ── Buttons ── */
+.btn-sm { padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600;
+          cursor:pointer; border:none; transition:.15s; }
+.btn-edit-s { background:rgba(11,122,107,.1); color:var(--c-primary); }
+.btn-del-s  { background:var(--c-danger-bg); color:var(--c-danger); }
+.btn-edit-s:hover { background:var(--c-primary); color:#fff; }
+.btn-del-s:hover  { background:var(--c-danger); color:#fff; }
+
+/* ── Staff tab ── */
+.staff-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+.sa-table { width:100%; border-collapse:collapse; font-size:13px; }
+.sa-table th { padding:9px 12px; text-align:left; font-size:11px; font-weight:800;
+               text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted);
+               background:var(--bg); border-bottom:2px solid var(--border); }
+.sa-table td { padding:10px 12px; border-bottom:1px solid var(--border);
+               background:var(--surface); color:var(--text); vertical-align:middle; }
+.sa-table tbody tr:last-child td { border-bottom:none; }
+.sa-table tbody tr:hover td { background:var(--surface-hover,rgba(0,0,0,.025)); }
+[data-theme="dark"] .sa-table th { background:var(--bg); color:var(--text-muted); border-bottom-color:var(--border); }
+[data-theme="dark"] .sa-table td { background:var(--surface); color:var(--text); border-bottom-color:var(--border); }
+[data-theme="dark"] .sa-table tbody tr:hover td { background:rgba(255,255,255,.04); }
+.avatar { width:32px; height:32px; border-radius:50%; background:var(--c-primary); color:#fff;
+          display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; flex-shrink:0; }
+.rbadge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px;
+          font-weight:700; background:rgba(11,122,107,.1); color:var(--c-primary); }
+
+/* ── Pagination ── */
+.pager { display:flex; align-items:center; gap:5px; margin-top:14px; justify-content:flex-end; }
+.pager-btn { padding:5px 11px; border-radius:7px; border:1.5px solid var(--border);
+             background:var(--surface); color:var(--text); font-size:12px; font-weight:600;
+             cursor:pointer; transition:.15s; }
+.pager-btn:hover:not([disabled]) { border-color:var(--c-primary); color:var(--c-primary); }
+.pager-btn.cur { background:var(--c-primary); color:#fff; border-color:var(--c-primary); }
+.pager-btn[disabled] { opacity:.35; cursor:default; }
+.pager-info { font-size:12px; color:var(--text-muted); padding:0 6px; }
+
+/* ── Modals ── */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+                 z-index:1000; align-items:center; justify-content:center; padding:20px; }
+.modal-box { background:var(--surface); border-radius:18px; width:100%; max-width:640px;
+             max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+[data-theme="dark"] .modal-box { background:var(--surface); }
 .modal-head { padding:22px 28px 0; display:flex; justify-content:space-between; align-items:center; }
-.modal-head h3 { font-size:18px; font-weight:800; color:var(--cl-primary); margin:0; }
-.modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--cl-text-muted); }
+.modal-head h3 { font-size:17px; font-weight:800; color:var(--c-primary); margin:0; }
+.modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-muted); }
 .modal-body { padding:20px 28px 28px; }
-.form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.form-row  { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .form-group { margin-bottom:16px; }
-.form-label { display:block; font-size:12px; font-weight:700; color:var(--cl-text-muted);
+.form-label { display:block; font-size:11px; font-weight:800; color:var(--text-muted);
               text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
-.form-control { width:100%; padding:10px 12px; border:1.5px solid var(--cl-border); border-radius:10px;
-                background:var(--cl-bg); color:var(--cl-text); font-size:13px; box-sizing:border-box; }
-.form-control:focus { outline:none; border-color:var(--cl-primary); }
-.perm-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px; }
+.form-control { width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:10px;
+                background:var(--bg); color:var(--text); font-size:13px; box-sizing:border-box; transition:.15s; }
+.form-control:focus { outline:none; border-color:var(--c-primary); }
+[data-theme="dark"] .form-control { background:var(--bg); color:var(--text); border-color:var(--border); }
+.perm-grid-modal { display:grid; grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); gap:7px; }
 .perm-check { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px;
-              background:var(--cl-bg); cursor:pointer; font-size:12px; font-weight:500;
-              border:1.5px solid var(--cl-border); transition:.15s; }
-.perm-check:hover { border-color:var(--cl-primary); background:var(--cl-primary-subtle); }
-.perm-check input[type=checkbox] { width:14px; height:14px; accent-color:var(--cl-primary); }
-.perm-check input:checked + span { color:var(--cl-primary); font-weight:700; }
-.modal-foot { display:flex; justify-content:flex-end; gap:10px; padding-top:12px; border-top:1px solid var(--cl-border); margin-top:4px; }
-.btn-cancel { padding:10px 20px; border-radius:10px; border:1.5px solid var(--cl-border);
-              background:var(--cl-surface); color:var(--cl-text); font-size:13px; font-weight:600; cursor:pointer; }
+              background:var(--bg); cursor:pointer; font-size:12px; font-weight:500;
+              border:1.5px solid var(--border); transition:.15s; }
+.perm-check:hover { border-color:var(--c-primary); background:rgba(11,122,107,.08); }
+.perm-check input:checked + span { color:var(--c-primary); font-weight:700; }
+[data-theme="dark"] .perm-check { background:var(--bg); border-color:var(--border); color:var(--text); }
+.modal-foot { display:flex; justify-content:flex-end; gap:10px; padding-top:14px;
+              border-top:1px solid var(--border); margin-top:4px; }
+.btn-cancel { padding:10px 20px; border-radius:10px; border:1.5px solid var(--border);
+              background:var(--surface); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; }
 .btn-save   { padding:10px 24px; border-radius:10px; border:none;
-              background:var(--cl-primary); color:#fff; font-size:13px; font-weight:700; cursor:pointer; }
-.btn-save:hover   { background:var(--cl-primary-dark); }
-.btn-cancel:hover { background:var(--cl-bg); }
+              background:var(--c-primary); color:#fff; font-size:13px; font-weight:700; cursor:pointer; }
+.btn-save:hover   { background:var(--c-primary-d); }
+.btn-cancel:hover { background:var(--bg); }
 </style>
 {% endblock %}
 
 {% block content %}
 
-{# ── Built-in roles note ── #}
-<div style="background:var(--cl-info-bg);border-left:4px solid var(--cl-info);
-            border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--cl-info);">
-  <strong>Built-in system roles:</strong>
-  super_admin · clinic_owner · branch_manager · doctor · receptionist · pharmacist · groomer · hr · support_admin · staff
-  — These are enforced in code. Custom roles below are for display grouping and future fine-grained access.
+{# ── Tabs ── #}
+<div class="rp-tabs">
+  <button class="rp-tab active" id="tab-roles" onclick="switchTab('roles')">Roles & Permissions</button>
+  <button class="rp-tab"        id="tab-staff" onclick="switchTab('staff')">Staff Access</button>
 </div>
 
-{# ── Roles cards ── #}
-<div class="roles-grid">
-  {% for role in roles %}
-  <div class="role-card">
-    <div class="role-card-header" style="border-left:5px solid {{ role.color or '#1a3a6b' }}">
-      <span class="role-color-dot" style="background:{{ role.color or '#1a3a6b' }}"></span>
-      <div style="flex:1">
-        <div class="role-name">{{ role.display_name or role.name }}</div>
-        {% if role.display_name_ar %}
-        <div class="role-name-ar">{{ role.display_name_ar }}</div>
-        {% endif %}
-        <div class="user-count">
-          ID: {{ role.name }} ·
-          {{ users | selectattr('role','equalto',role.name) | list | length }} user(s)
-        </div>
-      </div>
+{# ══════════════════════════════════════
+   TAB 1 — Roles categorized
+   ══════════════════════════════════════ #}
+<div class="tab-panel active" id="panel-roles">
+
+{% macro role_row(key, label, color, perms, ucount, is_system, role_id=None, display_ar='') %}
+<div>
+  <div class="role-row" onclick="toggleRole('rd-{{ key }}{{ '-' ~ role_id if role_id else '' }}')">
+    <span class="role-dot" style="background:{{ color }}"></span>
+    <div class="role-info">
+      <div class="role-name-main">{{ label }}{% if display_ar %}&nbsp;<span style="font-size:12px;font-weight:400;color:var(--text-muted)">· {{ display_ar }}</span>{% endif %}</div>
+      <div class="role-name-key">{{ key }}</div>
     </div>
-    <div class="role-card-body">
-      <div class="perm-chips">
-        {% if role.permissions %}
-          {% for p in role.permissions %}
-          <span class="perm-chip">{{ p }}</span>
-          {% endfor %}
-        {% else %}
-          <span class="perm-chip none">No permissions set</span>
-        {% endif %}
-      </div>
-      <div class="role-actions">
-        <button class="btn-sm btn-edit"
-          onclick="openEdit({{ role.id }}, '{{ role.name }}', '{{ role.display_name }}',
-                            '{{ role.display_name_ar or '' }}', '{{ role.color or '#1a3a6b' }}',
-                            {{ role.permissions | tojson }})">
-          ✏️ Edit
-        </button>
-        {% if session.user.role == 'super_admin' %}
-        <form method="post" action="{{ url_for('system.role_delete', role_id=role.id) }}"
-              style="display:inline"
-              onsubmit="return confirm('Delete role {{ role.display_name }}? Users with this role will NOT be deleted.')">
-          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-          <button type="submit" class="btn-sm btn-del">🗑 Delete</button>
-        </form>
-        {% endif %}
-      </div>
+    <div class="role-meta">
+      <span class="meta-pill {% if ucount > 0 %}users{% endif %}">{{ ucount }} user{{ 's' if ucount != 1 else '' }}</span>
+      <span class="meta-pill">{{ perms|length }} perm{{ 's' if perms|length != 1 else '' }}</span>
+      {% if is_system %}<span class="badge-builtin">built-in</span>{% endif %}
+      <span class="role-chevron">▼</span>
     </div>
   </div>
+  <div class="role-detail" id="rd-{{ key }}{{ '-' ~ role_id if role_id else '' }}"
+       data-perms="{{ perms | tojson | e }}"
+       data-system="{{ 'true' if is_system else 'false' }}">
+    <div class="perm-wrap" id="pw-{{ key }}{{ '-' ~ role_id if role_id else '' }}">
+      {# permissions injected by JS on first open — no DOM cost on page load #}
+    </div>
+    <div class="detail-footer">
+      {% if is_system %}
+        <span class="detail-note">System roles are enforced in code and cannot be modified.</span>
+      {% else %}
+        <button class="btn-sm btn-edit-s"
+          onclick="event.stopPropagation();openEdit({{ role_id }},'{{ key }}','{{ label }}','{{ display_ar }}','{{ color }}',{{ perms|tojson }})">
+          Edit Role
+        </button>
+        {% if session.user.role == 'super_admin' %}
+        <form method="post" action="{{ url_for('system.role_delete', role_id=role_id) }}" style="display:inline"
+              onsubmit="event.stopPropagation();return confirm('Delete role {{ label }}?')">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-sm btn-del-s">Delete</button>
+        </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{# MANAGEMENT #}
+<div class="cat-section">
+  <div class="cat-label">Management</div>
+  {{ role_row('super_admin',    'Super Admin',    system_role_colors['super_admin'],    system_role_perms['super_admin'],    user_counts.get('super_admin',0),    True) }}
+  {{ role_row('clinic_owner',   'Clinic Owner',   system_role_colors['clinic_owner'],   system_role_perms['clinic_owner'],   user_counts.get('clinic_owner',0),   True) }}
+  {{ role_row('branch_manager', 'Branch Manager', system_role_colors['branch_manager'], system_role_perms['branch_manager'], user_counts.get('branch_manager',0), True) }}
+</div>
+
+{# CLINICAL #}
+<div class="cat-section">
+  <div class="cat-label">Clinical</div>
+  {{ role_row('doctor', 'Doctor / Vet', system_role_colors['doctor'], system_role_perms['doctor'], user_counts.get('doctor',0), True) }}
+  {{ role_row('nurse',  'Nurse',        system_role_colors['nurse'],  system_role_perms['nurse'],  user_counts.get('nurse',0),  True) }}
+</div>
+
+{# FRONT DESK #}
+<div class="cat-section">
+  <div class="cat-label">Front Desk</div>
+  {{ role_row('receptionist', 'Receptionist', system_role_colors['receptionist'], system_role_perms['receptionist'], user_counts.get('receptionist',0), True) }}
+</div>
+
+{# PHARMACY & STOCK #}
+<div class="cat-section">
+  <div class="cat-label">Pharmacy &amp; Stock</div>
+  {{ role_row('pharmacist', 'Pharmacist', system_role_colors['pharmacist'], system_role_perms['pharmacist'], user_counts.get('pharmacist',0), True) }}
+</div>
+
+{# SERVICES #}
+<div class="cat-section">
+  <div class="cat-label">Services</div>
+  {{ role_row('groomer', 'Groomer', system_role_colors['groomer'], system_role_perms['groomer'], user_counts.get('groomer',0), True) }}
+</div>
+
+{# SYSTEM & IT #}
+<div class="cat-section">
+  <div class="cat-label">System &amp; IT</div>
+  {{ role_row('hr',            'HR',            system_role_colors['hr'],            system_role_perms['hr'],            user_counts.get('hr',0),            True) }}
+  {{ role_row('support_admin', 'Support Admin',  system_role_colors['support_admin'], system_role_perms['support_admin'], user_counts.get('support_admin',0), True) }}
+  {{ role_row('staff',         'Staff',          system_role_colors['staff'],         system_role_perms['staff'],         user_counts.get('staff',0),         True) }}
+</div>
+
+{# CUSTOM ROLES #}
+<div class="cat-section">
+  <div class="cat-label">Custom Roles ({{ roles|length }})</div>
+  {% for role in roles %}
+    {{ role_row(role.name, role.display_name or role.name,
+                role.color or '#1a3a6b',
+                role.permissions or [],
+                user_counts.get(role.name, 0),
+                False,
+                role.id,
+                role.display_name_ar or '') }}
   {% else %}
-  <div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--cl-text-muted);">
-    <div style="font-size:40px;margin-bottom:10px">🔐</div>
-    No custom roles yet. Click <strong>+ New Role</strong> to create one.
+  <div style="text-align:center;padding:32px;color:var(--text-muted);background:var(--surface);
+              border-radius:12px;border:2px dashed var(--border);font-size:13px">
+    No custom roles yet — click <strong>+ New Custom Role</strong> to create one.
   </div>
   {% endfor %}
 </div>
 
-{# ── Users & Role Assignment ── #}
-<div class="section-card">
-  <div class="section-title">👥 Staff & Role Assignment</div>
-  <div style="overflow-x:auto">
-    <table class="users-table">
-      <thead>
-        <tr>
-          <th>User</th>
-          <th>Username</th>
-          <th>Current Role</th>
-          <th>Email</th>
-          <th>Status</th>
-          <th>Assign Role</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for u in users %}
-        <tr>
-          <td>
-            <div style="display:flex;align-items:center;gap:10px">
-              <div class="avatar">{{ (u.full_name or u.username or 'U')[:2] | upper }}</div>
-              <span style="font-weight:600">{{ u.full_name or u.username }}</span>
-            </div>
-          </td>
-          <td style="font-family:monospace;color:var(--cl-text-muted)">{{ u.username }}</td>
-          <td>
-            <span class="role-badge"
-              style="background:{{ u.role | replace('super_admin','#fde68a') | replace('doctor','#dbeafe') | replace('receptionist','#dcfce7') | replace('pharmacist','#ede9fe') | replace('staff','#f1f5f9') }};
-                     color:#1e2a3a">
-              {{ u.role }}
-            </span>
-          </td>
-          <td style="color:var(--cl-text-muted)">{{ u.email or '—' }}</td>
-          <td>
-            {% if u.is_active %}
-            <span style="color:var(--cl-success);font-weight:700;font-size:12px">● Active</span>
-            {% else %}
-            <span style="color:var(--cl-danger);font-weight:700;font-size:12px">● Inactive</span>
-            {% endif %}
-          </td>
-          <td>
-            <form method="post" action="{{ url_for('system.role_assign') }}" style="display:flex;gap:6px;align-items:center">
-              <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-              <input type="hidden" name="user_id" value="{{ u.id }}">
-              <select name="role" class="form-control" style="width:160px;padding:6px 8px;font-size:12px">
-                {% for sys_role in ['super_admin','clinic_owner','branch_manager','doctor',
-                                    'receptionist','pharmacist','groomer','hr','support_admin','staff'] %}
-                <option value="{{ sys_role }}" {% if u.role == sys_role %}selected{% endif %}>{{ sys_role }}</option>
-                {% endfor %}
-                {% for r in roles %}
-                <option value="{{ r.name }}" {% if u.role == r.name %}selected{% endif %}>{{ r.display_name }} (custom)</option>
-                {% endfor %}
-              </select>
-              <button type="submit" class="btn-sm btn-edit" style="white-space:nowrap">Save</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
+</div>{# /panel-roles #}
 
-{# ── Permission Matrix ── #}
-<div class="section-card">
-  <div class="section-title">🔑 Permission Reference</div>
-  <div class="perm-grid" style="gap:10px">
-    {% for key, label in all_permissions %}
-    <div style="padding:10px 14px;background:var(--cl-bg);border-radius:10px;border:1px solid var(--cl-border)">
-      <div style="font-size:11px;font-family:monospace;color:var(--cl-primary);font-weight:700">{{ key }}</div>
-      <div style="font-size:12px;color:var(--cl-text-muted);margin-top:2px">{{ label }}</div>
+
+{# ══════════════════════════════════════
+   TAB 2 — Staff Access (lazy-loaded)
+   ══════════════════════════════════════ #}
+<div class="tab-panel" id="panel-staff">
+  <div class="staff-bar">
+    <input id="sa-search" type="search" class="form-control" placeholder="Search name or username…"
+           style="max-width:260px" oninput="saFilter()">
+    <select id="sa-role" class="form-control" style="max-width:190px" onchange="saFilter()">
+      <option value="">All roles</option>
+      {% for k in ['super_admin','clinic_owner','branch_manager','doctor','nurse',
+                   'receptionist','pharmacist','groomer','hr','support_admin','staff'] %}
+      <option value="{{ k }}">{{ k }}</option>
+      {% endfor %}
+      {% for r in roles %}
+      <option value="{{ r.name }}">{{ r.display_name }} (custom)</option>
+      {% endfor %}
+    </select>
+    <select id="sa-status" class="form-control" style="max-width:130px" onchange="saFilter()">
+      <option value="">Any status</option>
+      <option value="1">Active</option>
+      <option value="0">Inactive</option>
+    </select>
+    <span style="font-size:12px;color:var(--text-muted);margin-left:auto" id="sa-label">—</span>
+  </div>
+
+  <div id="sa-loading" style="text-align:center;padding:60px;color:var(--text-muted)">
+    <div style="font-size:32px;margin-bottom:10px">⏳</div>Loading staff list…
+  </div>
+
+  <div id="sa-wrap" style="display:none">
+    <div style="overflow-x:auto;background:var(--surface);border-radius:14px;border:1px solid var(--border)">
+      <table class="sa-table">
+        <thead>
+          <tr>
+            <th>Staff Member</th><th>Username</th><th>Current Role</th><th>Status</th><th>Assign Role</th>
+          </tr>
+        </thead>
+        <tbody id="sa-tbody"></tbody>
+      </table>
     </div>
-    {% endfor %}
+    <div class="pager" id="sa-pager"></div>
   </div>
-</div>
+</div>{# /panel-staff #}
 
-{# ── Create Modal ── #}
+
+{# ══════════════════════════════════════ CREATE MODAL ══════════════════════════════════════ #}
 <div id="modal-create" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal-box">
     <div class="modal-head">
-      <h3>➕ New Role</h3>
+      <h3>New Custom Role</h3>
       <button class="modal-close" onclick="document.getElementById('modal-create').style.display='none'">×</button>
     </div>
     <div class="modal-body">
@@ -228,9 +306,9 @@
         <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Role Key (no spaces) *</label>
+            <label class="form-label">Role Key *</label>
             <input type="text" name="name" class="form-control" placeholder="e.g. head_nurse" required
-                   pattern="[a-z0-9_]+" title="Lowercase letters, numbers and underscores only">
+                   pattern="[a-z0-9_]+" title="Lowercase, numbers, underscores only">
           </div>
           <div class="form-group">
             <label class="form-label">Display Name (EN) *</label>
@@ -249,7 +327,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Permissions</label>
-          <div class="perm-grid">
+          <div class="perm-grid-modal">
             {% for key, label in all_permissions %}
             <label class="perm-check">
               <input type="checkbox" name="permissions" value="{{ key }}">
@@ -267,11 +345,11 @@
   </div>
 </div>
 
-{# ── Edit Modal ── #}
+{# ══════════════════════════════════════ EDIT MODAL ══════════════════════════════════════ #}
 <div id="modal-edit" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal-box">
     <div class="modal-head">
-      <h3>✏️ Edit Role</h3>
+      <h3>Edit Custom Role</h3>
       <button class="modal-close" onclick="document.getElementById('modal-edit').style.display='none'">×</button>
     </div>
     <div class="modal-body">
@@ -280,17 +358,17 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Role Key</label>
-            <input type="text" id="edit-name-display" class="form-control" disabled style="opacity:.6">
+            <input type="text" id="edit-key" class="form-control" disabled style="opacity:.55">
           </div>
           <div class="form-group">
             <label class="form-label">Display Name (EN) *</label>
-            <input type="text" id="edit-display" name="display_name" class="form-control" required>
+            <input type="text" id="edit-name" name="display_name" class="form-control" required>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Display Name (AR)</label>
-            <input type="text" id="edit-display-ar" name="display_name_ar" class="form-control" dir="rtl">
+            <input type="text" id="edit-ar" name="display_name_ar" class="form-control" dir="rtl">
           </div>
           <div class="form-group">
             <label class="form-label">Badge Color</label>
@@ -299,7 +377,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Permissions</label>
-          <div class="perm-grid" id="edit-perm-grid">
+          <div class="perm-grid-modal" id="edit-perm-grid">
             {% for key, label in all_permissions %}
             <label class="perm-check">
               <input type="checkbox" name="permissions" value="{{ key }}" data-perm="{{ key }}">
@@ -321,24 +399,151 @@
 
 {% block scripts %}
 <script>
-function openEdit(id, name, displayName, displayAr, color, permissions) {
-  var form = document.getElementById('form-edit');
-  form.action = '/system/roles/' + id + '/edit';
-  document.getElementById('edit-name-display').value = name;
-  document.getElementById('edit-display').value = displayName;
-  document.getElementById('edit-display-ar').value = displayAr;
+var ROLE_ASSIGN_URL = "{{ url_for('system.role_assign') }}";
+var CSRF            = "{{ csrf_token }}";
+
+/* ── Tabs ── */
+var _staffLoaded = false;
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.rp-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.getElementById('panel-'+name).classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'staff' && !_staffLoaded) loadStaff();
+}
+
+/* ── All permissions list from Jinja ── */
+var ALL_PERMS = {{ all_permissions | tojson }};  // [[key, label], ...]
+
+/* ── Accordion ── */
+function toggleRole(id) {
+  var detail = document.getElementById(id);
+  if (!detail) return;
+  var row = detail.previousElementSibling;
+  var isOpen = detail.classList.contains('open');
+  // close all
+  document.querySelectorAll('.role-detail.open').forEach(function(d){
+    d.classList.remove('open');
+    if (d.previousElementSibling) d.previousElementSibling.classList.remove('open');
+  });
+  if (!isOpen) {
+    detail.classList.add('open');
+    if (row) row.classList.add('open');
+    // Lazy-render permissions on first open
+    var pw = detail.querySelector('.perm-wrap');
+    if (pw && !pw.dataset.rendered) {
+      var granted = JSON.parse(detail.dataset.perms || '[]');
+      pw.innerHTML = ALL_PERMS.map(function(p){
+        var on = granted.indexOf(p[0]) !== -1;
+        return '<span class="ptag '+(on?'on':'off')+'">'+(on?'✓':'—')+' '+p[1]+'</span>';
+      }).join('');
+      pw.dataset.rendered = '1';
+    }
+  }
+}
+
+/* ── Modals ── */
+function openCreateModal() { document.getElementById('modal-create').style.display='flex'; }
+function openEdit(id, key, name, ar, color, perms) {
+  document.getElementById('form-edit').action = '/system/roles/'+id+'/edit';
+  document.getElementById('edit-key').value   = key;
+  document.getElementById('edit-name').value  = name;
+  document.getElementById('edit-ar').value    = ar;
   document.getElementById('edit-color').value = color;
-  // Reset all checkboxes
-  document.querySelectorAll('#edit-perm-grid input[type=checkbox]').forEach(function(cb) {
-    cb.checked = permissions.indexOf(cb.dataset.perm) !== -1;
+  document.querySelectorAll('#edit-perm-grid input[type=checkbox]').forEach(function(cb){
+    cb.checked = perms.indexOf(cb.dataset.perm) !== -1;
   });
   document.getElementById('modal-edit').style.display = 'flex';
 }
-// Select all / none helper
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') {
+document.addEventListener('keydown', function(e){
+  if (e.key==='Escape')
     document.querySelectorAll('.modal-overlay').forEach(function(m){ m.style.display='none'; });
-  }
 });
+
+/* ════════════════════════════════════════
+   Staff tab — lazy load + filter + page
+   ════════════════════════════════════════ */
+var _allUsers = [];
+var _SA_PAGE  = 1;
+var _SA_PER   = 25;
+
+var _roleOpts = (function(){
+  var sys = ['super_admin','clinic_owner','branch_manager','doctor','nurse',
+             'receptionist','pharmacist','groomer','hr','support_admin','staff'];
+  var opts = sys.map(function(r){ return '<option value="'+r+'">'+r+'</option>'; }).join('');
+  var cKeys   = {{ roles | map(attribute='name')         | list | tojson }};
+  var cLabels = {{ roles | map(attribute='display_name') | list | tojson }};
+  cKeys.forEach(function(k,i){ opts += '<option value="'+k+'">'+cLabels[i]+'</option>'; });
+  return opts;
+})();
+
+function loadStaff() {
+  fetch('/system/roles/users', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      _allUsers    = data;
+      _staffLoaded = true;
+      document.getElementById('sa-loading').style.display = 'none';
+      document.getElementById('sa-wrap').style.display    = 'block';
+      saFilter();
+    })
+    .catch(function(){
+      document.getElementById('sa-loading').innerHTML =
+        '<div style="color:var(--c-danger);padding:40px">Failed to load staff — please refresh.</div>';
+    });
+}
+
+function saFilter() { _SA_PAGE = 1; saRender(); }
+
+function saRender() {
+  var q      = (document.getElementById('sa-search').value||'').toLowerCase();
+  var role   = document.getElementById('sa-role').value;
+  var status = document.getElementById('sa-status').value;
+  var filtered = _allUsers.filter(function(u){
+    if (q) { var h=((u.full_name||'')+' '+(u.username||'')).toLowerCase(); if(h.indexOf(q)===-1) return false; }
+    if (role && u.role !== role) return false;
+    if (status !== '' && String(u.is_active ? '1':'0') !== status) return false;
+    return true;
+  });
+  var lbl = document.getElementById('sa-label');
+  if (lbl) lbl.textContent = filtered.length + ' staff member' + (filtered.length===1?'':'s');
+  var page = filtered.slice((_SA_PAGE-1)*_SA_PER, _SA_PAGE*_SA_PER);
+  var tbody = document.getElementById('sa-tbody');
+  tbody.innerHTML = page.map(function(u){
+    var ini  = ((u.full_name||u.username||'U').substring(0,2)).toUpperCase();
+    var stat = u.is_active
+      ? '<span style="color:var(--c-success);font-weight:700;font-size:12px">&#9679; Active</span>'
+      : '<span style="color:var(--c-danger);font-weight:700;font-size:12px">&#9679; Inactive</span>';
+    var opts = _roleOpts.replace('value="'+u.role+'"','value="'+u.role+'" selected');
+    return '<tr>'+
+      '<td><div style="display:flex;align-items:center;gap:10px">'+
+        '<div class="avatar">'+ini+'</div>'+
+        '<span style="font-weight:600">'+(u.full_name||u.username)+'</span></div></td>'+
+      '<td style="font-family:monospace;font-size:12px;color:var(--text-muted)">'+u.username+'</td>'+
+      '<td><span class="rbadge">'+u.role+'</span></td>'+
+      '<td>'+stat+'</td>'+
+      '<td><form method="post" action="'+ROLE_ASSIGN_URL+'" style="display:flex;gap:6px;align-items:center">'+
+        '<input type="hidden" name="_csrf_token" value="'+CSRF+'">'+
+        '<input type="hidden" name="user_id" value="'+u.id+'">'+
+        '<select name="role" class="form-control" style="width:165px;padding:5px 8px;font-size:12px">'+opts+'</select>'+
+        '<button type="submit" class="btn-sm btn-edit-s">Save</button>'+
+      '</form></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">No staff found.</td></tr>';
+  renderPager(filtered.length);
+}
+
+function renderPager(total) {
+  var pages = Math.max(1, Math.ceil(total/_SA_PER));
+  var el = document.getElementById('sa-pager');
+  if (!el || pages<=1) { if(el) el.innerHTML=''; return; }
+  var h = '<button class="pager-btn" '+(_SA_PAGE<=1?'disabled':'')+' onclick="goPg('+(_SA_PAGE-1)+')">&#8249;</button>';
+  var s=Math.max(1,Math.min(_SA_PAGE-3,pages-6)), e=Math.min(pages,s+6);
+  for(var p=s;p<=e;p++) h+='<button class="pager-btn'+(_SA_PAGE===p?' cur':'')+'" onclick="goPg('+p+')">'+p+'</button>';
+  h+='<button class="pager-btn"'+(_SA_PAGE>=pages?' disabled':'')+' onclick="goPg('+(_SA_PAGE+1)+')">&#8250;</button>';
+  h+='<span class="pager-info">'+(((_SA_PAGE-1)*_SA_PER)+1)+'&ndash;'+Math.min(_SA_PAGE*_SA_PER,total)+' of '+total+'</span>';
+  el.innerHTML = h;
+}
+function goPg(p){ _SA_PAGE=p; saRender(); }
 </script>
 {% endblock %}

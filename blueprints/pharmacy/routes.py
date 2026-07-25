@@ -242,6 +242,72 @@ def dispense(rx_id):
     return redirect(url_for("pharmacy.rx_detail", rx_id=rx_id))
 
 
+@pharmacy_bp.route("/narcotics")
+@login_required
+def narcotics():
+    """Controlled / narcotics drug register — all dispensing events for is_controlled items."""
+    if not _can_dispense():
+        flash("Access denied.", "error")
+        return redirect(url_for("pharmacy.index"))
+
+    conn = get_db()
+    date_from = request.args.get("date_from", (date.today().replace(day=1)).isoformat())
+    date_to   = request.args.get("date_to",   date.today().isoformat())
+    item_id   = request.args.get("item_id",   "", type=str)
+
+    params = [date_from, date_to]
+    item_clause = ""
+    if item_id:
+        item_clause = " AND dl.item_id=?"
+        params.append(int(item_id))
+
+    records = [dict(r) for r in conn.execute(f"""
+        SELECT dl.id, dl.dispensed_at, dl.quantity,
+               dl.dispensed_by, dl.notes,
+               i.name item_name, i.unit, ic.name AS category,
+               b.batch_number, b.expiry_date,
+               p.pet_name, p.species,
+               o.full_name owner_name,
+               pr.id prescription_id,
+               v.doctor_name
+        FROM dispensing_log dl
+        JOIN items i ON i.id = dl.item_id
+        LEFT JOIN batches b ON b.id = dl.batch_id
+        LEFT JOIN item_categories ic ON ic.id = i.category_id
+        JOIN pets p ON p.id = dl.pet_id
+        JOIN owners o ON o.id = (SELECT owner_id FROM pets WHERE id=dl.pet_id)
+        JOIN prescription_items pi ON pi.id = dl.prescription_item_id
+        JOIN prescriptions pr ON pr.id = pi.prescription_id
+        JOIN visits v ON v.id = dl.visit_id
+        WHERE i.is_controlled = 1
+          AND DATE(dl.dispensed_at) BETWEEN ? AND ?
+          {item_clause}
+        ORDER BY dl.dispensed_at DESC
+        LIMIT 500
+    """, params).fetchall()]
+
+    # KPIs
+    total_events = len(records)
+    total_qty    = sum(float(r.get("quantity") or 0) for r in records)
+
+    # Controlled items for filter
+    controlled_items = [dict(r) for r in conn.execute(
+        "SELECT id, name FROM items WHERE is_controlled=1 AND is_active=1 ORDER BY name"
+    ).fetchall()]
+    conn.close()
+
+    return render_template("pharmacy/narcotics.html",
+        active="pharmacy",
+        records=records,
+        date_from=date_from,
+        date_to=date_to,
+        item_id_filter=item_id,
+        controlled_items=controlled_items,
+        total_events=total_events,
+        total_qty=total_qty,
+    )
+
+
 @pharmacy_bp.route("/label/<int:rx_id>/<int:pi_id>")
 @login_required
 def label(rx_id, pi_id):

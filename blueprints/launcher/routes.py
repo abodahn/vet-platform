@@ -492,9 +492,9 @@ def _grouped(modules: list) -> list:
 
 @launcher_bp.route("/")
 def index():
-    # Show animated landing page for guests; dashboard for logged-in users
+    # Guests go straight to login — no public landing page
     if not session.get("user"):
-        return render_template("landing.html")
+        return redirect(url_for("auth.login"))
     user    = session["user"]
     role    = user.get("role", "")
     modules = _visible_modules(role)

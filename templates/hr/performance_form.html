@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}{% if editing %}Edit Review{% else %}New Performance Review{% endif %}{% endblock %}
+{% block page_title %}{% if editing %}Edit Performance Review{% else %}New Performance Review{% endif %}{% endblock %}
+{% block page_sub %}{% if editing %}Update evaluation for {{ form.get('staff_name','') }}{% else %}Create a new staff evaluation{% endif %}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('hr.performance_list') }}" class="pf-btn pf-btn-secondary">← Back to Reviews</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.form-card { background:var(--cl-surface); border-radius:14px; padding:28px; margin-bottom:22px; box-shadow:0 2px 10px rgba(0,0,0,.07); }
+.form-card-title { font-size:15px; font-weight:700; color:var(--cl-primary); margin-bottom:18px; padding-bottom:10px; border-bottom:2px solid var(--cl-border); }
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.form-group { display:flex; flex-direction:column; gap:5px; }
+.form-group.full { grid-column:1/-1; }
+.form-group label { font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.5px; }
+.form-group input, .form-group select, .form-group textarea {
+  padding:10px 13px; border:1.5px solid var(--cl-border); border-radius:8px;
+  background:var(--cl-bg); color:var(--cl-text); font-size:14px;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:var(--cl-primary); }
+.form-group textarea { resize:vertical; min-height:80px; }
+.star-rating { display:flex; gap:6px; flex-direction:row-reverse; justify-content:flex-end; }
+.star-rating input { display:none; }
+.star-rating label { font-size:2rem; cursor:pointer; color:#d1d5db; transition:color .1s; }
+.star-rating input:checked ~ label,
+.star-rating label:hover, .star-rating label:hover ~ label { color:#f59e0b; }
+.form-actions { display:flex; gap:12px; justify-content:flex-end; }
+.btn-save   { padding:11px 28px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; }
+.btn-cancel { padding:11px 20px; background:var(--cl-bg); color:var(--cl-text); border:1.5px solid var(--cl-border); border-radius:8px; font-size:15px; font-weight:500; text-decoration:none; }
+@media(max-width:600px){ .form-grid{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+
+  <div class="form-card">
+    <div class="form-card-title">Review Details</div>
+    <div class="form-grid">
+
+      <div class="form-group">
+        <label>Staff Member *</label>
+        <select name="user_id" required>
+          <option value="">— Select Staff —</option>
+          {% for s in staff_list %}
+          <option value="{{ s.id }}" {% if form.get('user_id')|string == s.id|string %}selected{% endif %}>
+            {{ s.full_name }} ({{ s.role.replace('_',' ').title() }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Review Period *</label>
+        <input type="text" name="period" value="{{ form.get('period','') }}"
+               placeholder="e.g. 2025-Q2 or 2025-H1" required>
+      </div>
+
+      <div class="form-group">
+        <label>Review Date</label>
+        <input type="date" name="reviewed_at" value="{{ form.get('reviewed_at','') }}">
+      </div>
+
+      <div class="form-group">
+        <label>Status</label>
+        <select name="status">
+          {% for st in ['Draft','Submitted','Acknowledged'] %}
+          <option value="{{ st }}" {% if form.get('status','Draft') == st %}selected{% endif %}>{{ st }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="form-card-title">Overall Rating</div>
+    <div class="star-rating">
+      {% for v in [5,4,3,2,1] %}
+      <input type="radio" name="rating" id="star{{ v }}" value="{{ v }}"
+             {% if form.get('rating')|int == v %}checked{% endif %}>
+      <label for="star{{ v }}" title="{{ v }} star{{ 's' if v != 1 }}">&#9733;</label>
+      {% endfor %}
+    </div>
+    <p style="font-size:13px;color:var(--cl-muted);margin-top:8px">Click a star to rate (1 = Needs Improvement, 5 = Outstanding)</p>
+  </div>
+
+  <div class="form-card">
+    <div class="form-card-title">Evaluation Details</div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+
+      <div class="form-group">
+        <label>Strengths</label>
+        <textarea name="strengths" placeholder="What does this staff member do exceptionally well?">{{ form.get('strengths','') }}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Areas for Improvement</label>
+        <textarea name="improvements" placeholder="What areas need development?">{{ form.get('improvements','') }}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Goals for Next Period</label>
+        <textarea name="goals" placeholder="Specific, measurable goals for the next review cycle">{{ form.get('goals','') }}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Additional Comments</label>
+        <textarea name="comments" placeholder="Any other notes or observations…">{{ form.get('comments','') }}</textarea>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="{{ url_for('hr.performance_list') }}" class="btn-cancel">Cancel</a>
+    <button type="submit" class="btn-save">
+      {% if editing %}Save Changes{% else %}Create Review{% endif %}
+    </button>
+  </div>
+
+</form>
+{% endblock %}

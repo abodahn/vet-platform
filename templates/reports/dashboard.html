@@ -146,7 +146,7 @@
         {% endif %}
         {% if loop.index % 5 == 0 %}
         <text x="{{ x + bar_w/2 }}" y="{{ base_y + 12 }}" text-anchor="middle" class="bar-label">
-          {{ d.date[5:] if d.date else '' }}
+          {{ (d.date | string)[5:] if d.date else '' }}
         </text>
         {% endif %}
       {% endfor %}

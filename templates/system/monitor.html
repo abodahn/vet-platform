@@ -2,224 +2,414 @@
 
 {% block title %}System Monitor{% endblock %}
 {% block page_title %}System Monitor{% endblock %}
-{% block page_sub %}Platform health, database stats, and runtime information{% endblock %}
+{% block page_sub %}Production health — database, sync, logs, devices, backup{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('system.diagnostics') }}" class="pf-btn pf-btn-primary">🔬 Run Diagnostics</a>
+<a href="{{ url_for('system.sync_dashboard') }}" class="pf-btn pf-btn-primary">⚡ Sync Dashboard</a>
+<a href="{{ url_for('system.diagnostics') }}" class="pf-btn pf-btn-secondary">🔬 Diagnostics</a>
 <a href="{{ url_for('system.audit_log') }}" class="pf-btn pf-btn-secondary">📋 Audit Log</a>
-<a href="{{ url_for('system.settings') }}" class="pf-btn pf-btn-secondary">⚙️ Settings</a>
+<button class="pf-btn pf-btn-secondary" onclick="location.reload()">↻ Refresh</button>
 {% endblock %}
 
 {% block head_extra %}
 <style>
-.monitor-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-bottom:28px; }
-.mon-card { background:var(--cl-surface); border-radius:12px; padding:20px; box-shadow:0 2px 10px rgba(0,0,0,.07); border-left:5px solid var(--cl-primary); }
-.mon-card.green  { border-left-color:#22c55e; }
-.mon-card.amber  { border-left-color:#f59e0b; }
-.mon-card.blue   { border-left-color:#3b82f6; }
-.mon-card.teal   { border-left-color:#14b8a6; }
-.mon-icon { font-size:26px; margin-bottom:8px; }
-.mon-value { font-size:22px; font-weight:800; color:var(--cl-primary); line-height:1; margin-bottom:4px; }
-.mon-label { font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.4px; }
-.mon-sub { font-size:11px; color:var(--cl-muted); margin-top:4px; }
-.section-card { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:20px; }
-.section-title { font-size:15px; font-weight:700; color:var(--cl-primary); margin-bottom:16px; padding-bottom:10px; border-bottom:2px solid var(--cl-border); }
-.sys-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:0; }
-.sys-info-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--cl-border); font-size:13px; }
-.sys-info-row:last-child { border-bottom:none; }
-.sys-info-key { color:var(--cl-muted); font-weight:600; }
-.sys-info-val { font-weight:500; font-family:monospace; font-size:13px; }
-.counts-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
-.count-pill { background:var(--cl-bg); border-radius:10px; padding:14px; text-align:center; }
-.count-num { font-size:22px; font-weight:800; color:var(--cl-primary); }
-.count-name { font-size:12px; color:var(--cl-muted); text-transform:capitalize; margin-top:2px; }
-.log-table { width:100%; border-collapse:collapse; font-size:13px; }
-.log-table th { text-align:left; padding:9px 12px; background:var(--cl-bg); font-weight:600; color:var(--cl-muted); font-size:12px; text-transform:uppercase; }
-.log-table td { padding:9px 12px; border-bottom:1px solid var(--cl-border); }
-.log-table tr:last-child td { border-bottom:none; }
-.sev-INFO    { background:#dbeafe; color:#1d4ed8; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; }
-.sev-WARNING { background:#fef3c7; color:#92400e; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; }
-.sev-ERROR   { background:#fee2e2; color:#991b1b; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; }
-.legacy-check { display:flex; align-items:center; gap:14px; padding:16px; background:var(--cl-bg); border-radius:10px; }
-.legacy-url { font-family:monospace; font-size:14px; color:var(--cl-primary); }
-.check-btn { padding:8px 18px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
-.check-result { font-size:13px; margin-left:8px; font-weight:600; }
+/*
+  All colours use v3.css token names:
+    --bg  --surface  --surface-raised  --surface-hover
+    --border  --text  --text-muted  --c-primary  --sh-sm
+  These flip automatically when [data-theme="dark"] is applied to <html>.
+  Semantic status chips add their own [data-theme="dark"] overrides below.
+*/
+
+.mon-page { display:flex; flex-direction:column; gap:20px; }
+
+/* Stat cards */
+.mon-stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(195px,1fr)); gap:14px; }
+.mon-card {
+  background:var(--surface); color:var(--text);
+  border-radius:14px; padding:18px 20px; box-shadow:var(--sh-sm);
+  border-left:4px solid var(--c-primary);
+  display:flex; flex-direction:column; gap:4px;
+}
+.mon-card.c-green  { border-left-color:#22c55e; }
+.mon-card.c-amber  { border-left-color:#f59e0b; }
+.mon-card.c-red    { border-left-color:#ef4444; }
+.mon-card.c-blue   { border-left-color:#3b82f6; }
+.mon-card.c-teal   { border-left-color:#14b8a6; }
+.mon-card.c-purple { border-left-color:#8b5cf6; }
+.mon-card.c-slate  { border-left-color:#64748b; }
+.mon-icon  { font-size:22px; line-height:1; margin-bottom:4px; }
+.mon-value { font-size:26px; font-weight:800; color:var(--text); line-height:1; }
+.mon-label { font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; }
+.mon-sub   { font-size:11px; color:var(--text-muted); margin-top:2px; }
+
+/* Section cards */
+.sec { background:var(--surface); color:var(--text); border-radius:14px; padding:22px 24px; box-shadow:var(--sh-sm); }
+.sec-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border); gap:12px; flex-wrap:wrap; }
+.sec-title { font-size:14px; font-weight:700; color:var(--c-primary); display:flex; align-items:center; gap:8px; }
+.sec-actions { display:flex; gap:8px; }
+
+/* Two column layout */
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media(max-width:900px){ .two-col { grid-template-columns:1fr; } }
+
+/* Key-value rows */
+.kv-row { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; color:var(--text); }
+.kv-row:last-child { border-bottom:none; }
+.kv-key { color:var(--text-muted); font-weight:600; }
+.kv-val { font-family:monospace; font-size:12px; font-weight:600; max-width:55%; text-align:right; word-break:break-all; color:var(--text); }
+
+/* Pill counts */
+.pill-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; }
+.pill { background:var(--bg); color:var(--text); border-radius:10px; padding:14px; text-align:center; border:1px solid var(--border); }
+.pill-num { font-size:22px; font-weight:800; color:var(--c-primary); }
+.pill-lbl { font-size:11px; color:var(--text-muted); text-transform:capitalize; margin-top:3px; font-weight:600; }
+
+/* Inline badges — light + dark variants */
+.ibadge { display:inline-flex; align-items:center; padding:2px 9px; border-radius:6px; font-size:11px; font-weight:700; }
+.ibadge-ok   { background:#dcfce7; color:#166534; }
+.ibadge-warn { background:#fef3c7; color:#92400e; }
+.ibadge-err  { background:#fee2e2; color:#991b1b; }
+.ibadge-info { background:#dbeafe; color:#1d4ed8; }
+[data-theme="dark"] .ibadge-ok   { background:rgba(22,163,74,.2);  color:#86efac; }
+[data-theme="dark"] .ibadge-warn { background:rgba(217,119,6,.2);  color:#fcd34d; }
+[data-theme="dark"] .ibadge-err  { background:rgba(220,38,38,.2);  color:#fca5a5; }
+[data-theme="dark"] .ibadge-info { background:rgba(37,99,235,.2);  color:#93c5fd; }
+
+/* Log table — explicit color on every cell to beat browser defaults */
+.log-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.log-tbl thead { background:var(--bg); }
+.log-tbl th { text-align:left; padding:8px 10px; background:var(--bg); color:var(--text-muted); font-weight:700; font-size:11px; text-transform:uppercase; border-bottom:2px solid var(--border); }
+.log-tbl td { padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; color:var(--text); background:var(--surface); }
+.log-tbl tr:last-child td { border-bottom:none; }
+.log-tbl tbody tr:hover td { background:var(--surface-hover); }
+/* explicit dark overrides so browser default white cannot win */
+[data-theme="dark"] .log-tbl th { background:var(--bg); color:var(--text-muted); border-bottom-color:var(--border); }
+[data-theme="dark"] .log-tbl td { background:var(--surface); color:var(--text); border-bottom-color:var(--border); }
+[data-theme="dark"] .log-tbl tbody tr:hover td { background:var(--surface-hover); }
+
+/* Level badge */
+.lvl { display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:800; }
+.lvl-INFO     { background:#dbeafe; color:#1d4ed8; }
+.lvl-WARNING  { background:#fef3c7; color:#92400e; }
+.lvl-ERROR    { background:#fee2e2; color:#991b1b; }
+.lvl-CRITICAL { background:#7c3aed; color:#fff; }
+.lvl-DEBUG    { background:#f1f5f9; color:#475569; }
+[data-theme="dark"] .lvl-INFO     { background:rgba(37,99,235,.25);   color:#93c5fd; }
+[data-theme="dark"] .lvl-WARNING  { background:rgba(217,119,6,.25);   color:#fcd34d; }
+[data-theme="dark"] .lvl-ERROR    { background:rgba(220,38,38,.25);   color:#fca5a5; }
+[data-theme="dark"] .lvl-DEBUG    { background:rgba(100,116,139,.25); color:#94a3b8; }
+
+/* Status code */
+.sc { display:inline-block; padding:1px 7px; border-radius:4px; font-size:11px; font-weight:700; }
+.sc-ok   { background:#dcfce7; color:#166534; }
+.sc-warn { background:#fef3c7; color:#92400e; }
+.sc-err  { background:#fee2e2; color:#991b1b; }
+[data-theme="dark"] .sc-ok   { background:rgba(22,163,74,.2);  color:#86efac; }
+[data-theme="dark"] .sc-warn { background:rgba(217,119,6,.2);  color:#fcd34d; }
+[data-theme="dark"] .sc-err  { background:rgba(220,38,38,.2);  color:#fca5a5; }
+
+/* Sync mini cards */
+.sync-mini { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+@media(max-width:700px){ .sync-mini { grid-template-columns:repeat(2,1fr); } }
+.sync-card { border-radius:10px; padding:14px; text-align:center; }
+.sync-card.pending  { background:#fffbeb; }
+.sync-card.synced   { background:#f0fdf4; }
+.sync-card.failed   { background:#fff1f2; }
+.sync-card.conflict { background:#faf5ff; }
+[data-theme="dark"] .sync-card.pending  { background:rgba(217,119,6,.12); }
+[data-theme="dark"] .sync-card.synced   { background:rgba(22,163,74,.12); }
+[data-theme="dark"] .sync-card.failed   { background:rgba(220,38,38,.12); }
+[data-theme="dark"] .sync-card.conflict { background:rgba(139,92,246,.12); }
+.sync-num { font-size:26px; font-weight:800; }
+.sync-card.pending  .sync-num { color:#d97706; }
+.sync-card.synced   .sync-num { color:#16a34a; }
+.sync-card.failed   .sync-num { color:#dc2626; }
+.sync-card.conflict .sync-num { color:#7c3aed; }
+.sync-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-top:4px; color:var(--text-muted); }
+
+/* Log file rows */
+.lf-row { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-radius:8px; background:var(--bg); color:var(--text); margin-bottom:6px; font-size:13px; border:1px solid var(--border); }
+.lf-row:last-child { margin-bottom:0; }
+.lf-name { font-family:monospace; font-size:12px; font-weight:600; color:var(--text); }
+.lf-meta { display:flex; gap:10px; align-items:center; color:var(--text-muted); font-size:12px; }
+
+/* Alert banner */
+.alert-danger { margin-top:14px; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:600; background:rgba(220,38,38,.08); color:#dc2626; border:1px solid rgba(220,38,38,.2); }
+[data-theme="dark"] .alert-danger { background:rgba(220,38,38,.15); color:#fca5a5; border-color:rgba(220,38,38,.3); }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="mon-page">
 
-<!-- System Health Cards -->
-<div class="monitor-grid">
-  <div class="mon-card">
-    <div class="mon-icon">🗄️</div>
-    <div class="mon-value">{{ sys_info.db_size_mb }} MB</div>
-    <div class="mon-label">Database Size</div>
-    <div class="mon-sub">{{ sys_info.db_size_kb }} KB total</div>
+  {# ─── 8 STAT CARDS ─── #}
+  <div class="mon-stats">
+    <div class="mon-card c-blue">
+      <div class="mon-icon">🗄️</div>
+      <div class="mon-value">{{ sys_info.db_size_mb }} MB</div>
+      <div class="mon-label">Database Size</div>
+      <div class="mon-sub">{{ sys_info.db_size_kb }} KB on disk</div>
+    </div>
+    <div class="mon-card c-green">
+      <div class="mon-icon">✅</div>
+      <div class="mon-value">{{ "{:,}".format(sync_stats.synced) }}</div>
+      <div class="mon-label">Synced Records</div>
+      <div class="mon-sub">offline ops committed</div>
+    </div>
+    <div class="mon-card c-amber">
+      <div class="mon-icon">⏳</div>
+      <div class="mon-value">{{ sync_stats.pending }}</div>
+      <div class="mon-label">Pending Sync</div>
+      <div class="mon-sub">awaiting upload</div>
+    </div>
+    <div class="mon-card {{ 'c-red' if sync_stats.failed > 0 else 'c-green' }}">
+      <div class="mon-icon">{{ '❌' if sync_stats.failed > 0 else '✔️' }}</div>
+      <div class="mon-value">{{ sync_stats.failed }}</div>
+      <div class="mon-label">Sync Failures</div>
+      <div class="mon-sub">max 5 retries</div>
+    </div>
+    <div class="mon-card c-purple">
+      <div class="mon-icon">⚠️</div>
+      <div class="mon-value">{{ sync_stats.conflicts }}</div>
+      <div class="mon-label">Conflicts</div>
+      <div class="mon-sub">need resolution</div>
+    </div>
+    <div class="mon-card {{ 'c-red' if error_count_24h > 10 else 'c-amber' if error_count_24h > 0 else 'c-green' }}">
+      <div class="mon-icon">{{ '🔴' if error_count_24h > 10 else '🟡' if error_count_24h > 0 else '🟢' }}</div>
+      <div class="mon-value">{{ error_count_24h }}</div>
+      <div class="mon-label">Errors (24h)</div>
+      <div class="mon-sub">server-side errors</div>
+    </div>
+    <div class="mon-card c-teal">
+      <div class="mon-icon">📱</div>
+      <div class="mon-value">{{ active_devices }}</div>
+      <div class="mon-label">Active Devices</div>
+      <div class="mon-sub">{{ total_devices }} total registered</div>
+    </div>
+    <div class="mon-card c-slate">
+      <div class="mon-icon">📁</div>
+      <div class="mon-value">{{ log_total_mb }} MB</div>
+      <div class="mon-label">Log Files</div>
+      <div class="mon-sub">{{ log_files_info|length }} files · {{ retention_days }}d retention</div>
+    </div>
   </div>
-  <div class="mon-card green">
-    <div class="mon-icon">🐍</div>
-    <div class="mon-value" style="color:#166534;">{{ sys_info.python_version }}</div>
-    <div class="mon-label">Python Version</div>
-  </div>
-  <div class="mon-card blue">
-    <div class="mon-icon">⚗️</div>
-    <div class="mon-value" style="color:#1d4ed8;">{{ sys_info.flask_version }}</div>
-    <div class="mon-label">Flask Version</div>
-  </div>
-  <div class="mon-card teal">
-    <div class="mon-icon">📋</div>
-    <div class="mon-value" style="color:#0f766e;">{{ row_counts.values() | sum }}</div>
-    <div class="mon-label">Total Records</div>
-    <div class="mon-sub">across {{ row_counts|length }} monitored tables</div>
-  </div>
-</div>
 
-<!-- System Info -->
-<div class="section-card">
-  <div class="section-title">🖥️ Runtime Information</div>
-  <div style="display:flex;flex-direction:column;gap:0;">
-    <div class="sys-info-row">
-      <span class="sys-info-key">Platform</span>
-      <span class="sys-info-val">{{ sys_info.platform }}</span>
-    </div>
-    <div class="sys-info-row">
-      <span class="sys-info-key">Python</span>
-      <span class="sys-info-val">{{ sys_info.python_version }}</span>
-    </div>
-    <div class="sys-info-row">
-      <span class="sys-info-key">Flask</span>
-      <span class="sys-info-val">{{ sys_info.flask_version }}</span>
-    </div>
-    <div class="sys-info-row">
-      <span class="sys-info-key">Database Path</span>
-      <span class="sys-info-val" style="font-size:12px;word-break:break-all;">{{ sys_info.db_path }}</span>
-    </div>
-    <div class="sys-info-row">
-      <span class="sys-info-key">DB Size</span>
-      <span class="sys-info-val">{{ sys_info.db_size_mb }} MB ({{ sys_info.db_size_kb }} KB)</span>
-    </div>
-  </div>
-</div>
-
-<!-- Row Counts by Module -->
-<div class="section-card">
-  <div class="section-title">📊 Records by Module</div>
-  <div class="counts-grid">
-    {% for table, count in row_counts.items() %}
-    <div class="count-pill">
-      <div class="count-num">{{ "{:,}".format(count) }}</div>
-      <div class="count-name">{{ table.replace('_',' ') }}</div>
-    </div>
-    {% endfor %}
-  </div>
-</div>
-
-<!-- Backup Status -->
-<div class="section-card">
-  <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
-    <span>💾 Backup Status</span>
-    <div style="display:flex;gap:8px">
-      <a href="{{ url_for('system.backup') }}" class="check-btn" style="text-decoration:none;font-size:12px;padding:6px 14px">View All Backups</a>
-      <form method="post" action="{{ url_for('system.backup_run') }}" style="display:inline"
-            onsubmit="return confirm('Run a manual backup now?')">
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-        <button class="check-btn" style="font-size:12px;padding:6px 14px">💾 Backup Now</button>
-      </form>
-    </div>
-  </div>
-  {% if latest_backup %}
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:4px">
-    <div class="count-pill">
-      <div class="count-num" style="font-size:14px;word-break:break-all">{{ latest_backup.filename[:24] }}…</div>
-      <div class="count-name">Latest Backup</div>
-    </div>
-    <div class="count-pill">
-      <div class="count-num">{{ latest_backup.size_kb }} KB</div>
-      <div class="count-name">Backup Size</div>
-    </div>
-    <div class="count-pill">
-      <div class="count-num" style="color:{{ '#166534' if latest_backup.integrity == 'ok' else '#991b1b' }}">
-        {{ latest_backup.integrity or '?' }}
+  {# ─── SYNC + VERSION ─── #}
+  <div class="two-col">
+    <div class="sec">
+      <div class="sec-hdr">
+        <div class="sec-title">⚡ Sync Queue</div>
+        <a href="{{ url_for('system.sync_dashboard') }}" class="pf-btn pf-btn-primary" style="font-size:12px;padding:6px 14px">Open Dashboard →</a>
       </div>
-      <div class="count-name">Integrity Check</div>
+      <div class="sync-mini">
+        <div class="sync-card pending"><div class="sync-num">{{ sync_stats.pending }}</div><div class="sync-lbl">Pending</div></div>
+        <div class="sync-card synced"><div class="sync-num">{{ sync_stats.synced }}</div><div class="sync-lbl">Synced</div></div>
+        <div class="sync-card failed"><div class="sync-num">{{ sync_stats.failed }}</div><div class="sync-lbl">Failed</div></div>
+        <div class="sync-card conflict"><div class="sync-num">{{ sync_stats.conflicts }}</div><div class="sync-lbl">Conflicts</div></div>
+      </div>
+      {% if sync_stats.failed > 0 or sync_stats.conflicts > 0 %}
+      <div class="alert-danger">
+        ⚠️ {{ sync_stats.failed }} failed · {{ sync_stats.conflicts }} conflict(s) need attention.
+        <a href="{{ url_for('system.sync_dashboard') }}" style="margin-left:8px;text-decoration:underline;">Resolve →</a>
+      </div>
+      {% endif %}
     </div>
-    <div class="count-pill">
-      <div class="count-num" style="font-size:14px">{{ latest_backup.created_at[:16] if latest_backup.created_at else '—' }}</div>
-      <div class="count-name">Last Run</div>
-    </div>
-  </div>
-  {% else %}
-  <div style="padding:16px;color:var(--cl-muted);font-size:13px">
-    No backups yet. Click "Backup Now" to create the first backup. Daily automated backup runs at 02:00.
-  </div>
-  {% endif %}
-</div>
 
-<!-- Legacy App Status -->
-<div class="section-card">
-  <div class="section-title">🔗 Legacy App Status</div>
-  <div class="legacy-check">
-    <div>
-      <div style="font-size:12px;color:var(--cl-muted);margin-bottom:4px;">Legacy App URL</div>
-      <div class="legacy-url">{{ legacy_url }}</div>
+    <div class="sec">
+      <div class="sec-hdr">
+        <div class="sec-title">🚀 Platform Version</div>
+        <span style="display:inline-flex;align-items:center;padding:5px 14px;background:linear-gradient(135deg,#0B7A6B,#0D9488);color:#fff;border-radius:20px;font-size:12px;font-weight:700;">
+          v{{ sys_info.app_version }}
+        </span>
+      </div>
+      <div class="kv-row"><span class="kv-key">Version</span><span class="kv-val">{{ sys_info.app_version }}</span></div>
+      <div class="kv-row"><span class="kv-key">Build</span><span class="kv-val">{{ sys_info.build_number }}</span></div>
+      <div class="kv-row"><span class="kv-key">Release Date</span><span class="kv-val">{{ sys_info.release_date }}</span></div>
+      <div class="kv-row"><span class="kv-key">Python</span><span class="kv-val">{{ sys_info.python_version }}</span></div>
+      <div class="kv-row"><span class="kv-key">Flask</span><span class="kv-val">{{ sys_info.flask_version }}</span></div>
+      <div class="kv-row"><span class="kv-key">Platform</span><span class="kv-val" style="font-size:10px;">{{ sys_info.platform[:50] }}</span></div>
     </div>
-    <button class="check-btn" onclick="checkLegacy()">🔍 Check Status</button>
-    <span class="check-result" id="legacy-result"></span>
   </div>
-</div>
 
-<!-- Recent App Logs -->
-<div class="section-card">
-  <div class="section-title">📝 Recent Application Logs</div>
-  {% if app_logs %}
-  <div style="overflow-x:auto;">
-    <table class="log-table">
-      <thead>
-        <tr>
-          <th>Time</th>
-          <th>Severity</th>
-          <th>Module</th>
-          <th>Message</th>
-          <th>User</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for log in app_logs %}
-        <tr>
-          <td style="white-space:nowrap;color:var(--cl-muted);">{{ log.timestamp[:16] if log.timestamp else '—' }}</td>
-          <td><span class="sev-{{ log.severity or 'INFO' }}">{{ log.severity or 'INFO' }}</span></td>
-          <td style="color:var(--cl-muted);">{{ log.module or '—' }}</td>
-          <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ log.message or '' }}">
-            {{ log.message or '—' }}
-          </td>
-          <td style="color:var(--cl-muted);">{{ log.username or '—' }}</td>
-        </tr>
+  {# ─── DATABASE + BACKUP ─── #}
+  <div class="two-col">
+    <div class="sec">
+      <div class="sec-hdr">
+        <div class="sec-title">🗄️ Database</div>
+        <span class="ibadge ibadge-ok">PostgreSQL</span>
+      </div>
+      <div class="kv-row"><span class="kv-key">Size</span><span class="kv-val">{{ sys_info.db_size_mb }} MB ({{ sys_info.db_size_kb }} KB)</span></div>
+      <div class="kv-row"><span class="kv-key">Path</span><span class="kv-val">{{ sys_info.db_path|truncate(42,True,'...') }}</span></div>
+      <div style="margin-top:16px;font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">Records by Module</div>
+      <div class="pill-grid">
+        {% for table, count in row_counts.items() %}
+        <div class="pill">
+          <div class="pill-num">{{ "{:,}".format(count) }}</div>
+          <div class="pill-lbl">{{ table.replace('_',' ') }}</div>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-hdr">
+        <div class="sec-title">💾 Backup Status</div>
+        <div class="sec-actions">
+          <a href="{{ url_for('system.backup') }}" class="pf-btn pf-btn-secondary" style="font-size:12px;padding:6px 12px">All Backups</a>
+          <form method="post" action="{{ url_for('system.backup_run') }}" onsubmit="return confirm('Run backup now?')" style="display:inline">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <button class="pf-btn pf-btn-primary" style="font-size:12px;padding:6px 12px">💾 Now</button>
+          </form>
+        </div>
+      </div>
+      {% if latest_backup %}
+        <div class="kv-row"><span class="kv-key">Last Backup</span><span class="kv-val">{{ (latest_backup.created_at or '')[:16] }}</span></div>
+        <div class="kv-row"><span class="kv-key">File</span><span class="kv-val">{{ (latest_backup.filename or '')[:32] }}</span></div>
+        <div class="kv-row"><span class="kv-key">Size</span><span class="kv-val">{{ latest_backup.size_kb }} KB</span></div>
+        <div class="kv-row">
+          <span class="kv-key">Integrity</span>
+          <span class="kv-val"><span class="ibadge {{ 'ibadge-ok' if latest_backup.integrity == 'ok' else 'ibadge-err' }}">{{ latest_backup.integrity or '?' }}</span></span>
+        </div>
+      {% else %}
+        <div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">
+          <div style="font-size:28px;margin-bottom:8px;">💾</div>
+          No backups yet. Daily backup runs at 02:00 UTC.
+        </div>
+      {% endif %}
+      <div style="margin-top:14px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--text-muted);border:1px solid var(--border);">
+        <strong style="color:var(--text);">Schedule:</strong> Backup 02:00 · WhatsApp 09:00 · Log cleanup 03:00 UTC
+      </div>
+    </div>
   </div>
-  {% else %}
-  <div style="text-align:center;padding:32px;color:var(--cl-muted);">
-    <div style="font-size:32px;margin-bottom:8px;">📭</div>
-    No application logs recorded yet
+
+  {# ─── LOG FILES + DEVICES ─── #}
+  <div class="two-col">
+    <div class="sec">
+      <div class="sec-hdr">
+        <div class="sec-title">📁 Log Files</div>
+        <span style="font-size:12px;color:var(--text-muted);">{{ retention_days }}-day auto-delete · 03:00 UTC</span>
+      </div>
+      {% if log_files_info %}
+        {% for lf in log_files_info %}
+        <div class="lf-row">
+          <span class="lf-name">{{ lf.name }}</span>
+          <span class="lf-meta">
+            <span>{{ lf.size_kb }} KB</span>
+            <span>{{ lf.age_days }}d old</span>
+            <span class="ibadge {{ 'ibadge-ok' if lf.expires_in > 1 else 'ibadge-warn' }}">{{ lf.expires_in }}d left</span>
+          </span>
+        </div>
+        {% endfor %}
+        <div style="margin-top:10px;font-size:12px;color:var(--text-muted);text-align:right;">
+          Total: {{ log_total_mb }} MB across {{ log_files_info|length }} file(s)
+        </div>
+      {% else %}
+        <div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">
+          <div style="font-size:28px;margin-bottom:8px;">📭</div>
+          Log files appear after the first API requests.
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="sec">
+      <div class="sec-hdr">
+        <div class="sec-title">📱 Registered Devices</div>
+        <span class="ibadge ibadge-info">{{ total_devices }} total</span>
+      </div>
+      {% if total_devices == 0 %}
+        <div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">
+          <div style="font-size:28px;margin-bottom:8px;">📵</div>
+          No devices yet — appear when offline sync connects.
+        </div>
+      {% else %}
+        <div class="kv-row"><span class="kv-key">Online (last 1h)</span><span class="kv-val" style="font-size:18px;font-weight:800;color:#16a34a;">{{ active_devices }}</span></div>
+        <div class="kv-row"><span class="kv-key">Total Registered</span><span class="kv-val">{{ total_devices }}</span></div>
+        <div style="margin-top:14px;">
+          <a href="{{ url_for('system.sync_dashboard') }}#devices" class="pf-btn pf-btn-secondary" style="font-size:12px;width:100%;text-align:center;display:block;">
+            View All Devices →
+          </a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ─── RECENT SERVER LOGS ─── #}
+  <div class="sec">
+    <div class="sec-hdr">
+      <div class="sec-title">📝 Recent Server Logs</div>
+      <div class="sec-actions">
+        {% if error_count_24h > 0 %}<span class="ibadge ibadge-err">{{ error_count_24h }} errors in 24h</span>{% endif %}
+        <a href="{{ url_for('system.audit_log') }}" class="pf-btn pf-btn-secondary" style="font-size:12px;padding:6px 12px">Full Audit Log</a>
+      </div>
+    </div>
+    {% if recent_logs %}
+    <div style="overflow-x:auto;">
+      <table class="log-tbl">
+        <thead>
+          <tr>
+            <th>Time</th><th>Level</th><th>Module</th><th>Endpoint</th>
+            <th>Status</th><th>ms</th><th>User</th><th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in recent_logs %}
+          {% set sc = log.status_code or 0 %}
+          <tr>
+            <td style="white-space:nowrap;">{{ (log.timestamp or '')[:16] }}</td>
+            <td><span class="lvl lvl-{{ log.level or 'INFO' }}">{{ log.level or 'INFO' }}</span></td>
+            <td>{{ log.module_name or log.module or '—' }}</td>
+            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:11px;" title="{{ log.endpoint or '' }}">{{ log.endpoint or '—' }}</td>
+            <td><span class="sc {{ 'sc-ok' if sc < 300 else 'sc-warn' if sc < 500 else 'sc-err' }}">{{ sc or '—' }}</span></td>
+            <td>{% if log.duration_ms %}{{ log.duration_ms }}{% else %}—{% endif %}</td>
+            <td>{{ log.username or '—' }}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#dc2626;font-size:11px;" title="{{ log.error_message or '' }}">{{ log.error_message or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:36px;color:var(--text-muted);">
+      <div style="font-size:36px;margin-bottom:10px;">📭</div>
+      No server logs yet — appear after the first API requests.
+    </div>
+    {% endif %}
+  </div>
+
+  {# ─── LEGACY APP — only shown when LEGACY_APP_ENABLED=1 ─── #}
+  {% if legacy_enabled %}
+  <div class="sec">
+    <div class="sec-hdr">
+      <div class="sec-title">🔗 Legacy App Status</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;padding:12px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--border);">
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">URL</div>
+        <div style="font-family:monospace;font-size:14px;color:var(--c-primary);">{{ legacy_url }}</div>
+      </div>
+      <button class="pf-btn pf-btn-secondary" style="font-size:12px;padding:6px 16px;" onclick="checkLegacy()">
+        Check Status
+      </button>
+      <span id="legacy-result" style="font-size:13px;font-weight:700;"></span>
+    </div>
   </div>
   {% endif %}
+
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 function checkLegacy(){
-  var btn = document.querySelector('.check-btn');
-  var result = document.getElementById('legacy-result');
-  btn.textContent = '⏳ Checking…';
-  btn.disabled = true;
-  result.textContent = '';
-  fetch('{{ legacy_url }}/', { method:'GET', mode:'no-cors', cache:'no-cache' })
-    .then(function(){ result.textContent = '✅ Reachable'; result.style.color='#166534'; })
-    .catch(function(){ result.textContent = '❌ Unreachable'; result.style.color='#dc2626'; })
-    .finally(function(){ btn.textContent = '🔍 Check Status'; btn.disabled = false; });
+  var btn=document.querySelector('[onclick="checkLegacy()"]');
+  var res=document.getElementById('legacy-result');
+  btn.textContent='Checking…'; btn.disabled=true; res.textContent='';
+  fetch('{{ legacy_url }}/',{method:'GET',mode:'no-cors',cache:'no-cache'})
+    .then(function(){ res.textContent='Reachable'; res.style.color='#16a34a'; })
+    .catch(function(){ res.textContent='Unreachable'; res.style.color='#dc2626'; })
+    .finally(function(){ btn.textContent='Check Status'; btn.disabled=false; });
 }
+setTimeout(function(){ location.reload(); },60000);
 </script>
 {% endblock %}

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Performance Review — {{ review.staff_name }}{% endblock %}
+{% block page_title %}Performance Review{% endblock %}
+{% block page_sub %}{{ review.staff_name }} — Period: {{ review.period }}{% endblock %}
+
+{% block topbar_actions %}
+{% if review.status != 'Acknowledged' %}
+<a href="{{ url_for('hr.performance_edit', rev_id=review.id) }}" class="pf-btn pf-btn-primary">Edit</a>
+{% endif %}
+<a href="{{ url_for('hr.performance_list') }}" class="pf-btn pf-btn-secondary">← Back</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.rev-layout { display:grid; grid-template-columns:1fr 280px; gap:24px; align-items:start; }
+.rev-card   { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:0 2px 10px rgba(0,0,0,.07); margin-bottom:18px; }
+.rev-title  { font-size:15px; font-weight:700; color:var(--cl-primary); margin-bottom:14px; padding-bottom:10px; border-bottom:2px solid var(--cl-border); }
+.rev-field  { margin-bottom:14px; }
+.rev-field-label { font-size:11px; font-weight:700; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.6px; margin-bottom:4px; }
+.rev-field-value { font-size:14px; line-height:1.6; }
+.stars-big { display:inline-flex; gap:4px; }
+.star-filled { color:#f59e0b; font-size:1.6rem; }
+.star-empty  { color:#d1d5db; font-size:1.6rem; }
+.status-chip { display:inline-block; padding:4px 14px; border-radius:20px; font-size:12px; font-weight:600; }
+.chip-draft  { background:#f3f4f6; color:#374151; }
+.chip-submitted { background:#dbeafe; color:#1e40af; }
+.chip-acknowledged { background:#dcfce7; color:#166534; }
+.ack-form   { background:var(--cl-bg); border-radius:10px; padding:16px; margin-top:8px; }
+@media(max-width:800px){ .rev-layout{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rev-layout">
+
+  <!-- Left: Review Content -->
+  <div>
+    <div class="rev-card">
+      <div class="rev-title">Overall Rating</div>
+      {% if review.rating %}
+      <div class="stars-big">
+        {% for i in range(1,6) %}
+        <span class="{{ 'star-filled' if i <= review.rating else 'star-empty' }}">&#9733;</span>
+        {% endfor %}
+      </div>
+      <span style="font-size:1.4rem;font-weight:700;margin-left:10px;color:var(--cl-text)">{{ review.rating }}/5</span>
+      {% else %}
+      <p style="color:var(--cl-muted)">No rating given yet.</p>
+      {% endif %}
+    </div>
+
+    {% if review.strengths %}
+    <div class="rev-card">
+      <div class="rev-title">Strengths</div>
+      <div class="rev-field-value" style="white-space:pre-line">{{ review.strengths }}</div>
+    </div>
+    {% endif %}
+
+    {% if review.improvements %}
+    <div class="rev-card">
+      <div class="rev-title">Areas for Improvement</div>
+      <div class="rev-field-value" style="white-space:pre-line">{{ review.improvements }}</div>
+    </div>
+    {% endif %}
+
+    {% if review.goals %}
+    <div class="rev-card">
+      <div class="rev-title">Goals for Next Period</div>
+      <div class="rev-field-value" style="white-space:pre-line">{{ review.goals }}</div>
+    </div>
+    {% endif %}
+
+    {% if review.comments %}
+    <div class="rev-card">
+      <div class="rev-title">Additional Comments</div>
+      <div class="rev-field-value" style="white-space:pre-line">{{ review.comments }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: Sidebar -->
+  <div>
+    <div class="rev-card">
+      <div class="rev-title">Review Info</div>
+
+      <div class="rev-field">
+        <div class="rev-field-label">Staff</div>
+        <div class="rev-field-value">
+          <a href="{{ url_for('hr.staff_detail', user_id=review.user_id) }}" style="color:var(--cl-primary)">
+            {{ review.staff_name or '—' }}
+          </a>
+        </div>
+      </div>
+
+      <div class="rev-field">
+        <div class="rev-field-label">Period</div>
+        <div class="rev-field-value" style="font-weight:700">{{ review.period }}</div>
+      </div>
+
+      <div class="rev-field">
+        <div class="rev-field-label">Reviewer</div>
+        <div class="rev-field-value">{{ review.reviewer_name or '—' }}</div>
+      </div>
+
+      <div class="rev-field">
+        <div class="rev-field-label">Review Date</div>
+        <div class="rev-field-value">{{ review.reviewed_at or '—' }}</div>
+      </div>
+
+      <div class="rev-field">
+        <div class="rev-field-label">Status</div>
+        <div>
+          {% if review.status == 'Draft' %}
+            <span class="status-chip chip-draft">Draft</span>
+          {% elif review.status == 'Submitted' %}
+            <span class="status-chip chip-submitted">Submitted</span>
+          {% elif review.status == 'Acknowledged' %}
+            <span class="status-chip chip-acknowledged">Acknowledged</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="rev-field">
+        <div class="rev-field-label">Created</div>
+        <div class="rev-field-value" style="font-size:12px;color:var(--cl-muted)">
+          {{ review.created_at[:10] if review.created_at else '—' }}
+        </div>
+      </div>
+    </div>
+
+    {% if review.status == 'Submitted' %}
+    <div class="rev-card">
+      <div class="rev-title">Acknowledge</div>
+      <p style="font-size:13px;color:var(--cl-muted);margin-bottom:12px">
+        Has the employee reviewed and acknowledged this evaluation?
+      </p>
+      <div class="ack-form">
+        <form method="post" action="{{ url_for('hr.performance_acknowledge', rev_id=review.id) }}"
+              onsubmit="return confirm('Mark this review as acknowledged by the employee?')">
+          <button type="submit" class="pf-btn pf-btn-primary" style="width:100%">
+            Mark as Acknowledged
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if review.status != 'Acknowledged' %}
+    <div class="rev-card">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <a href="{{ url_for('hr.performance_edit', rev_id=review.id) }}" class="pf-btn pf-btn-primary" style="text-align:center">Edit Review</a>
+        <a href="{{ url_for('hr.performance_new') }}" class="pf-btn pf-btn-secondary" style="text-align:center">New Review</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

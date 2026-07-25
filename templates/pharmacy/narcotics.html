@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Narcotics Register{% endblock %}
+{% block page_title %}Narcotics &amp; Controlled Drugs Register{% endblock %}
+{% block page_sub %}Audit log of all controlled substance dispensing events{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('pharmacy.index') }}" class="pf-btn pf-btn-secondary">Dispensing Queue</a>
+<a href="{{ url_for('pharmacy.history') }}" class="pf-btn pf-btn-secondary">Full History</a>
+<button onclick="window.print()" class="pf-btn pf-btn-primary">Print Register</button>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.narc-kpi { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:22px; }
+.narc-kpi-card { background:var(--cl-surface); border-radius:12px; padding:16px 20px; box-shadow:0 2px 8px rgba(0,0,0,.06); text-align:center; }
+.narc-kpi-num { font-size:2.2rem; font-weight:800; line-height:1; }
+.narc-kpi-lbl { font-size:11px; color:var(--cl-muted); font-weight:600; text-transform:uppercase; margin-top:4px; }
+
+.narc-filters { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; align-items:flex-end; }
+.narc-filters select, .narc-filters input { padding:8px 12px; border:1px solid var(--cl-border); border-radius:8px; background:var(--cl-surface); color:var(--cl-text); font-size:13px; }
+.narc-filters button { padding:8px 18px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; }
+
+.narc-table { width:100%; border-collapse:collapse; background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.07); }
+.narc-table th { background:#7c3aed; color:#fff; padding:10px 14px; font-size:11px; font-weight:600; text-transform:uppercase; text-align:left; }
+.narc-table td { padding:10px 14px; border-bottom:1px solid var(--cl-border); font-size:13px; vertical-align:middle; }
+.narc-table tr:last-child td { border-bottom:none; }
+.narc-table tr:hover td { background:var(--cl-bg); }
+.narc-table .qty-cell { font-weight:700; font-size:15px; color:#7c3aed; }
+
+.narc-notice { background:#faf5ff; border:1px solid #d8b4fe; border-radius:10px; padding:12px 16px; margin-bottom:20px; font-size:13px; color:#5b21b6; }
+
+@media print {
+  .pf-sidebar, .topbar, .pf-topbar, .narc-filters, .pf-btn { display:none !important; }
+  body { background:#fff; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="narc-notice">
+  <strong>Regulatory Notice:</strong> This register records all dispensing events for controlled and narcotic substances.
+  It must be maintained accurately and is subject to regulatory inspection. Entries are auto-generated from dispensing records.
+</div>
+
+<!-- KPIs -->
+<div class="narc-kpi">
+  <div class="narc-kpi-card">
+    <div class="narc-kpi-num" style="color:#7c3aed">{{ total_events }}</div>
+    <div class="narc-kpi-lbl">Dispensing Events</div>
+  </div>
+  <div class="narc-kpi-card">
+    <div class="narc-kpi-num" style="color:#dc2626">{{ "%.2f"|format(total_qty) }}</div>
+    <div class="narc-kpi-lbl">Total Units Dispensed</div>
+  </div>
+  <div class="narc-kpi-card">
+    <div class="narc-kpi-num" style="color:var(--cl-primary)">{{ controlled_items|length }}</div>
+    <div class="narc-kpi-lbl">Controlled Substances</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="GET" action="">
+  <div class="narc-filters">
+    <div>
+      <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">From</label>
+      <input type="date" name="date_from" value="{{ date_from }}">
+    </div>
+    <div>
+      <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">To</label>
+      <input type="date" name="date_to" value="{{ date_to }}">
+    </div>
+    <div>
+      <label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">Substance</label>
+      <select name="item_id">
+        <option value="">All Controlled Substances</option>
+        {% for ci in controlled_items %}
+        <option value="{{ ci.id }}" {{ 'selected' if item_id_filter==ci.id|string else '' }}>{{ ci.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="padding-top:16px">
+      <button type="submit">Filter</button>
+    </div>
+    <div style="padding-top:16px">
+      <a href="{{ url_for('pharmacy.narcotics') }}" class="pf-btn pf-btn-secondary">Reset</a>
+    </div>
+  </div>
+</form>
+
+{% if records %}
+<div style="overflow-x:auto">
+  <table class="narc-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date &amp; Time</th>
+        <th>Substance / Drug</th>
+        <th>Batch</th>
+        <th>Qty</th>
+        <th>Patient</th>
+        <th>Owner</th>
+        <th>Doctor</th>
+        <th>Dispensed By</th>
+        <th>RX Ref</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in records %}{% set i = loop.index %}
+    <tr>
+      <td style="color:var(--cl-muted);font-size:11px">{{ i }}</td>
+      <td style="white-space:nowrap;font-size:12px">
+        <div>{{ r.dispensed_at[:10] if r.dispensed_at else '' }}</div>
+        <div style="color:var(--cl-muted)">{{ r.dispensed_at[11:16] if r.dispensed_at and r.dispensed_at|length > 10 else '' }}</div>
+      </td>
+      <td>
+        <div style="font-weight:600;color:#7c3aed">{{ r.item_name }}</div>
+        <div style="font-size:11px;color:var(--cl-muted)">{{ r.unit or '' }} | {{ r.category or '' }}</div>
+      </td>
+      <td style="font-size:12px">
+        <div>{{ r.batch_number or '—' }}</div>
+        {% if r.expiry_date %}
+        <div style="font-size:10px;color:var(--cl-muted)">Exp: {{ r.expiry_date }}</div>
+        {% endif %}
+      </td>
+      <td class="qty-cell">{{ r.quantity }}</td>
+      <td>
+        <div style="font-weight:600">{{ r.pet_name }}</div>
+        <div style="font-size:11px;color:var(--cl-muted)">{{ r.species or '' }}</div>
+      </td>
+      <td style="font-size:12px">{{ r.owner_name }}</td>
+      <td style="font-size:12px">{{ r.doctor_name or '—' }}</td>
+      <td style="font-size:12px;font-weight:600">{{ r.dispensed_by or '—' }}</td>
+      <td>
+        <a href="{{ url_for('pharmacy.rx_detail', rx_id=r.prescription_id) }}"
+           style="color:var(--cl-primary);text-decoration:none;font-size:12px">#{{ r.prescription_id }}</a>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:60px;color:var(--cl-muted)">
+  <div style="font-size:48px;margin-bottom:12px">&#128138;</div>
+  <div style="font-size:18px;font-weight:600;margin-bottom:8px">No controlled drug dispensing events found</div>
+  <div>Events appear here automatically when controlled substances are dispensed via prescriptions.</div>
+</div>
+{% endif %}
+
+{% endblock %}

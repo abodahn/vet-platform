@@ -124,6 +124,9 @@ def create_app(cfg=None) -> Flask:
     from blueprints.telemedicine import telemedicine_bp
     app.register_blueprint(telemedicine_bp)
 
+    from blueprints.imaging import imaging_bp
+    app.register_blueprint(imaging_bp)
+
     # ── Upload directory ─────────────────────────────────────────────────────
     uploads_path = os.path.join(os.path.dirname(app.config["DATABASE_PATH"]), "uploads")
     os.makedirs(uploads_path, exist_ok=True)
@@ -150,7 +153,7 @@ def create_app(cfg=None) -> Flask:
             elif request.path.startswith("/petsy/chat"):
                 pass  # Petsy public widget endpoint — rate-limited, no CSRF
             elif not sec.validate_csrf():
-                logger.warning(f"CSRF validation failed: {request.path} from {request.remote_addr}")
+                logger.warning(f"CSRF validation failed: {request.path} from {sec.get_real_ip(request)}")
                 return render_template("error.html", code=403, msg="Invalid or missing security token. Please go back and try again."), 403
 
     # ── Context processor ────────────────────────────────────────────────────
@@ -212,14 +215,31 @@ def create_app(cfg=None) -> Flask:
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://meet.jit.si; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
-            "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; "
-            "img-src 'self' data: https://cdn.jsdelivr.net; "
-            "connect-src 'self' http://localhost:3001; "
-            "frame-src 'self' https://meet.jit.si;"
+            "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "img-src 'self' data: https://cdn.jsdelivr.net blob:; "
+            "connect-src 'self' http://localhost:3001 https://localhost:3001 ws://localhost:3001; "
+            "frame-src 'self' https://meet.jit.si; "
+            "frame-ancestors 'self';"
+        )
+        # HSTS — only set over HTTPS (Koyeb/Render/Cloudflare terminate TLS)
+        if request.is_secure or request.headers.get("X-Forwarded-Proto") == "https":
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
+        # Permissions policy — disable unused browser features
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
         )
         # Remove server fingerprint
         response.headers["Server"] = "PAH-Platform"
         return response
+
+    # ── Global 500 handler — never leak stack traces in production ───────────
+    @app.errorhandler(500)
+    def _500(e):
+        logger.error(f"Internal server error: {e}", exc_info=True)
+        return render_template("error.html", code=500,
+                               msg="An internal error occurred. Please try again."), 500
 
     return app
 

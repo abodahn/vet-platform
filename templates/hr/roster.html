@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Weekly Roster{% endblock %}
+{% block page_title %}Weekly Roster{% endblock %}
+{% block page_sub %}Visual schedule — who works which shift each day{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">HR Dashboard</a>
+<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">Staff List</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.roster-nav { display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+.roster-nav .week-label { font-size:18px; font-weight:700; flex:1; }
+.roster-nav a.pf-btn { white-space:nowrap; }
+
+.roster-grid { display:grid; grid-template-columns:200px repeat(7,1fr); gap:2px; background:var(--cl-border); border-radius:10px; overflow:hidden; }
+.roster-header { background:var(--cl-primary); color:#fff; padding:10px 8px; font-size:11px; font-weight:700; text-align:center; text-transform:uppercase; }
+.roster-shift-label { background:var(--cl-surface); padding:10px 12px; font-size:12px; font-weight:600; display:flex; flex-direction:column; gap:3px; }
+.roster-shift-label .shift-time { font-size:10px; color:var(--cl-muted); }
+.roster-cell { background:var(--cl-surface); padding:6px 5px; min-height:50px; }
+.staff-chip { display:flex; align-items:center; gap:4px; font-size:11px; padding:3px 6px; border-radius:16px; margin-bottom:3px; background:rgba(0,0,0,.06); }
+.staff-chip .dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.chip-present { background:#dcfce7; }
+.chip-late    { background:#fef3c7; }
+.chip-absent  { background:#fee2e2; }
+.chip-leave   { background:#dbeafe; }
+.chip-off     { opacity:.45; }
+
+.roster-legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:16px; font-size:12px; }
+.legend-item { display:flex; align-items:center; gap:5px; }
+.legend-dot  { width:12px; height:12px; border-radius:50%; }
+
+.unassigned-section { margin-top:28px; }
+.ua-chip { display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:4px 10px; border-radius:20px; background:var(--cl-surface); border:1px solid var(--cl-border); margin:3px; }
+
+/* Today highlight */
+.today-col { background:#f0fdf4 !important; }
+
+.day-name { font-weight:700; }
+.day-date { font-size:10px; font-weight:400; opacity:.85; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% set day_names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+{% set today_str = today.isoformat() if today else '' %}
+
+<!-- Week navigation -->
+<div class="roster-nav">
+  <a href="{{ url_for('hr.roster', week=prev_week) }}" class="pf-btn pf-btn-secondary">&larr; Prev Week</a>
+  <div class="week-label">
+    Week of {{ week_start.strftime('%d %b %Y') }} &ndash; {{ week_days[-1].strftime('%d %b %Y') }}
+  </div>
+  <a href="{{ url_for('hr.roster', week=next_week) }}" class="pf-btn pf-btn-secondary">Next Week &rarr;</a>
+  <a href="{{ url_for('hr.roster') }}" class="pf-btn pf-btn-primary">Today</a>
+</div>
+
+<!-- Build lookup: shift_id -> list of assignments -->
+{% set shift_map = {} %}
+{% for a in assignments %}
+  {% if a.shift_id not in shift_map %}
+    {% set _ = shift_map.update({a.shift_id: []}) %}
+  {% endif %}
+  {% set _ = shift_map[a.shift_id].append(a) %}
+{% endfor %}
+
+{% if shifts %}
+<div style="overflow-x:auto">
+  <div class="roster-grid" style="min-width:760px">
+    <!-- Header row -->
+    <div class="roster-header">Shift / Staff</div>
+    {% for d in week_days %}
+    <div class="roster-header {{ 'today-col' if d.isoformat()==today_str else '' }}" style="{{ 'border-bottom:2px solid #22c55e' if d.isoformat()==today_str else '' }}">
+      <div class="day-name">{{ day_names[loop.index0] }}</div>
+      <div class="day-date">{{ d.strftime('%d %b') }}</div>
+    </div>
+    {% endfor %}
+
+    <!-- One row per shift -->
+    {% for shift in shifts %}
+    {% set s_staff = shift_map.get(shift.id, []) %}
+    {% set days_active = (shift.days_of_week or '1,2,3,4,5').split(',') %}
+    <div class="roster-shift-label" style="border-left:4px solid {{ shift.color or '#6b7280' }}">
+      <span style="color:{{ shift.color or 'var(--cl-primary)' }}">{{ shift.name }}</span>
+      <span class="shift-time">{{ shift.start_time or '' }} - {{ shift.end_time or '' }}</span>
+      <span class="shift-time">{{ s_staff|length }} staff</span>
+    </div>
+    {% for d in week_days %}
+    {% set day_num = d.isoweekday()|string %}
+    {% set is_work_day = day_num in days_active %}
+    <div class="roster-cell {{ 'today-col' if d.isoformat()==today_str else '' }}"
+         style="{{ 'background:#f9fafb' if not is_work_day else '' }}">
+      {% if not is_work_day %}
+        <div style="font-size:10px;color:var(--cl-muted);text-align:center;padding-top:10px">Off</div>
+      {% else %}
+        {% for a in s_staff %}
+        {% set att = att_map.get((a.user_id, d.isoformat()), {}) %}
+        {% set on_leave = (a.user_id, d.isoformat()) in leave_users %}
+        {% if on_leave %}
+          <div class="staff-chip chip-leave">
+            <span class="dot" style="background:#3b82f6"></span>
+            {{ a.full_name.split(' ')[0] }} (Leave)
+          </div>
+        {% elif att %}
+          {% if att.status == 'Present' %}
+            <div class="staff-chip chip-present">
+              <span class="dot" style="background:#16a34a"></span>
+              {{ a.full_name.split(' ')[0] }}
+            </div>
+          {% elif att.status == 'Late' %}
+            <div class="staff-chip chip-late">
+              <span class="dot" style="background:#d97706"></span>
+              {{ a.full_name.split(' ')[0] }} (Late)
+            </div>
+          {% else %}
+            <div class="staff-chip chip-absent">
+              <span class="dot" style="background:#dc2626"></span>
+              {{ a.full_name.split(' ')[0] }}
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="staff-chip chip-off">
+            <span class="dot" style="background:#9ca3af"></span>
+            {{ a.full_name.split(' ')[0] }}
+          </div>
+        {% endif %}
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="roster-legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#16a34a"></div> Present</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#d97706"></div> Late</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#dc2626"></div> Absent</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> On Leave</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#9ca3af"></div> No record yet</div>
+</div>
+
+{% else %}
+<div style="text-align:center;padding:60px;color:var(--cl-muted)">
+  <div style="font-size:48px;margin-bottom:12px">📅</div>
+  <div style="font-size:18px;font-weight:600;margin-bottom:8px">No shifts configured</div>
+  <div>Go to <a href="{{ url_for('attendance.shifts_list') }}" style="color:var(--cl-primary)">Attendance &rarr; Shifts</a> to create shifts first.</div>
+</div>
+{% endif %}
+
+{% if unassigned %}
+<div class="unassigned-section">
+  <div style="font-size:15px;font-weight:700;margin-bottom:10px;color:var(--cl-muted)">Staff without shift assignment ({{ unassigned|length }})</div>
+  {% for s in unassigned %}
+  <a href="{{ url_for('hr.staff_detail', user_id=s.id) }}" class="ua-chip" style="text-decoration:none;color:var(--cl-text)">
+    {{ s.full_name }}
+    <span style="font-size:10px;color:var(--cl-muted)">{{ s.role.replace('_',' ').title() }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

@@ -3,7 +3,7 @@ CRM Blueprint — Owners & Pets
 Aleefy Platform
 """
 
-from flask import render_template, request, redirect, url_for, flash, session, jsonify
+from flask import render_template, request, redirect, url_for, flash, session, jsonify, make_response
 from . import crm_bp
 from blueprints.auth.routes import login_required
 import models.database as db
@@ -459,6 +459,9 @@ def pet_new():
             "allergies":          request.form.get("allergies", "").strip(),
             "chronic_conditions": request.form.get("chronic_conditions", "").strip(),
             "diet_notes":         request.form.get("diet_notes", "").strip(),
+            "insurance_provider": request.form.get("insurance_provider", "").strip(),
+            "policy_number":      request.form.get("policy_number", "").strip(),
+            "policy_expiry":      request.form.get("policy_expiry", "").strip() or None,
             "notes":              request.form.get("notes", "").strip(),
         }
         if not data["pet_name"]:
@@ -574,6 +577,9 @@ def pet_edit(pet_id):
             "neutered":           1 if request.form.get("neutered") else 0,
             "allergies":          request.form.get("allergies", "").strip(),
             "chronic_conditions": request.form.get("chronic_conditions", "").strip(),
+            "insurance_provider": request.form.get("insurance_provider", "").strip(),
+            "policy_number":      request.form.get("policy_number", "").strip(),
+            "policy_expiry":      request.form.get("policy_expiry", "").strip() or None,
             "notes":              request.form.get("notes", "").strip(),
         }
         if not data["pet_name"]:
@@ -584,12 +590,17 @@ def pet_edit(pet_id):
 
         db.update_pet(pet_id, data)
 
-        # Save diet_notes
+        # Save diet_notes + insurance fields directly (may not be in update_pet)
         diet_notes = request.form.get("diet_notes", "").strip()
         try:
             conn = get_db()
             with conn:
-                conn.execute("UPDATE pets SET diet_notes=? WHERE id=?", (diet_notes, pet_id))
+                conn.execute(
+                    """UPDATE pets SET diet_notes=?, insurance_provider=?,
+                       policy_number=?, policy_expiry=? WHERE id=?""",
+                    (diet_notes, data["insurance_provider"], data["policy_number"],
+                     data["policy_expiry"], pet_id)
+                )
             conn.close()
         except Exception:
             pass
@@ -613,3 +624,150 @@ def pet_edit(pet_id):
         active="crm",
         page_title=f"Edit — {pet['pet_name']}",
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# PET MEDICAL HISTORY PDF
+# ─────────────────────────────────────────────────────────────
+
+@crm_bp.route("/pets/<int:pet_id>/history.pdf")
+@login_required
+def pet_history_pdf(pet_id):
+    from fpdf import FPDF
+
+    pet = db.get_pet(pet_id)
+    if not pet:
+        flash("Pet not found.", "danger")
+        return redirect(url_for("crm.owners_list"))
+
+    owner = db.get_owner(pet["owner_id"])
+    conn  = get_db()
+
+    visits = [dict(r) for r in conn.execute("""
+        SELECT v.*, COUNT(pi.id) rx_items
+        FROM visits v
+        LEFT JOIN prescriptions pr ON pr.visit_id=v.id
+        LEFT JOIN prescription_items pi ON pi.prescription_id=pr.id
+        WHERE v.pet_id=?
+        GROUP BY v.id
+        ORDER BY v.visit_date DESC
+    """, (pet_id,)).fetchall()]
+
+    vaccinations = [dict(r) for r in conn.execute("""
+        SELECT * FROM vaccinations WHERE pet_id=? ORDER BY administered_at DESC
+    """, (pet_id,)).fetchall()]
+
+    clinic = db.get_clinic()
+    conn.close()
+
+    age_str = _calc_age(pet.get("dob")) or "Unknown"
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # Clinic header
+    pdf.set_font("Helvetica", "B", 16)
+    clinic_name = (clinic.get("clinic_name") or "Animal Hospital") if clinic else "Animal Hospital"
+    pdf.cell(0, 10, clinic_name, ln=True, align="C")
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 6, "Patient Medical History Report", ln=True, align="C")
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 5, f"Generated: {date.today().strftime('%d %b %Y')}", ln=True, align="C")
+    pdf.ln(4)
+
+    # Divider
+    pdf.set_draw_color(30, 120, 90)
+    pdf.set_line_width(0.8)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(4)
+
+    # Patient info block
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.set_text_color(30, 80, 60)
+    pdf.cell(0, 8, f"Patient: {pet['pet_name']}", ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(0, 0, 0)
+    species = pet.get('species', '')
+    breed   = pet.get('breed', '')
+    pdf.cell(95, 6, f"Species: {species}  |  Breed: {breed}", ln=False)
+    pdf.cell(95, 6, f"Sex: {pet.get('sex','Unknown')}  |  Age: {age_str}", ln=True)
+    pdf.cell(95, 6, f"Microchip: {pet.get('microchip_id') or 'N/A'}", ln=False)
+    neutered = "Yes" if pet.get("neutered") else "No"
+    pdf.cell(95, 6, f"Neutered/Spayed: {neutered}", ln=True)
+    if pet.get("allergies"):
+        pdf.set_text_color(180, 0, 0)
+        pdf.cell(0, 6, f"ALLERGIES: {pet['allergies']}", ln=True)
+        pdf.set_text_color(0, 0, 0)
+    if pet.get("chronic_conditions"):
+        pdf.cell(0, 6, f"Chronic Conditions: {pet['chronic_conditions']}", ln=True)
+
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(30, 80, 60)
+    pdf.cell(0, 7, "Owner Information", ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(95, 6, f"Name: {owner.get('full_name','')}", ln=False)
+    pdf.cell(95, 6, f"Phone: {owner.get('phone','')}", ln=True)
+
+    pdf.ln(4)
+    pdf.set_line_width(0.3)
+    pdf.set_draw_color(180, 180, 180)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(4)
+
+    # Vaccinations
+    if vaccinations:
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(30, 80, 60)
+        pdf.cell(0, 8, f"Vaccination Records ({len(vaccinations)})", ln=True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(220, 240, 230)
+        pdf.cell(60, 6, "Vaccine", border=1, fill=True)
+        pdf.cell(35, 6, "Date Given", border=1, fill=True)
+        pdf.cell(35, 6, "Next Due", border=1, fill=True)
+        pdf.cell(60, 6, "Batch / Notes", border=1, fill=True, ln=True)
+        pdf.set_font("Helvetica", "", 9)
+        for v in vaccinations:
+            pdf.cell(60, 5, str(v.get("vaccine_name") or "")[:40], border=1)
+            pdf.cell(35, 5, str(v.get("administered_at") or "")[:10], border=1)
+            pdf.cell(35, 5, str(v.get("next_due_at") or "")[:10], border=1)
+            batch_note = str(v.get("batch_number") or "") + " " + str(v.get("notes") or "")
+            pdf.cell(60, 5, batch_note.strip()[:40], border=1, ln=True)
+        pdf.ln(5)
+
+    # Visit history
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(30, 80, 60)
+    pdf.cell(0, 8, f"Visit History ({len(visits)} visits)", ln=True)
+    pdf.set_text_color(0, 0, 0)
+
+    for v in visits:
+        pdf.set_font("Helvetica", "B", 10)
+        visit_type = str(v.get("visit_type") or "Visit")
+        visit_date = str(v.get("visit_date") or "")
+        doctor     = str(v.get("doctor_name") or "")
+        pdf.cell(0, 7, f"{visit_date}  -  {visit_type}  (Dr. {doctor})", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+        weight = v.get("weight_kg")
+        if weight:
+            pdf.cell(0, 5, f"  Weight: {weight} kg", ln=True)
+        if v.get("chief_complaint"):
+            pdf.cell(0, 5, f"  Complaint: {str(v['chief_complaint'])[:100]}", ln=True)
+        if v.get("diagnosis"):
+            pdf.cell(0, 5, f"  Diagnosis: {str(v['diagnosis'])[:100]}", ln=True)
+        if v.get("treatment"):
+            pdf.cell(0, 5, f"  Treatment: {str(v['treatment'])[:100]}", ln=True)
+        if v.get("notes"):
+            pdf.cell(0, 5, f"  Notes: {str(v['notes'])[:80]}", ln=True)
+        pdf.set_draw_color(220, 220, 220)
+        pdf.line(14, pdf.get_y(), 196, pdf.get_y())
+        pdf.ln(3)
+
+    resp = make_response(bytes(pdf.output()))
+    resp.headers["Content-Type"] = "application/pdf"
+    pet_name_safe = (pet["pet_name"] or "pet").replace(" ", "_")
+    resp.headers["Content-Disposition"] = f"attachment; filename={pet_name_safe}_medical_history.pdf"
+    return resp

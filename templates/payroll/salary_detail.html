@@ -9,8 +9,9 @@
   <div class="pf-topbar-actions">
     <a href="{{ url_for('payroll.salaries_list', year=salary.period_year, month=salary.period_month) }}" class="pf-btn pf-btn-secondary">← Back</a>
     {% if salary.status != 'Paid' %}
-    <a href="{{ url_for('payroll.salary_edit', sid=salary.id) }}" class="pf-btn pf-btn-secondary">✏ Edit</a>
+    <a href="{{ url_for('payroll.salary_edit', sid=salary.id) }}" class="pf-btn pf-btn-secondary">Edit</a>
     {% endif %}
+    <a href="{{ url_for('payroll.salary_payslip', sid=salary.id) }}" class="pf-btn pf-btn-primary">Download Payslip PDF</a>
   </div>
 </div>
 

@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Stock Transfer{% endblock %}
+{% block page_title %}Stock Transfer{% endblock %}
+{% block page_sub %}Move stock between warehouses or branches{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('inventory.dashboard') }}" class="pf-btn pf-btn-secondary">Inventory Dashboard</a>
+<a href="{{ url_for('inventory.movements') }}" class="pf-btn pf-btn-secondary">Movement Log</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.transfer-layout { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+@media(max-width:768px){ .transfer-layout { grid-template-columns:1fr; } }
+
+.tf-card { background:var(--cl-surface); border-radius:14px; padding:24px; box-shadow:0 2px 10px rgba(0,0,0,.07); }
+.tf-card h3 { font-size:15px; font-weight:700; margin:0 0 18px; padding-bottom:10px; border-bottom:1px solid var(--cl-border); }
+
+.tf-field { margin-bottom:16px; }
+.tf-field label { display:block; font-size:12px; font-weight:600; margin-bottom:5px; color:var(--cl-muted); text-transform:uppercase; }
+.tf-field select, .tf-field input, .tf-field textarea {
+  width:100%; padding:9px 12px; border:1px solid var(--cl-border);
+  border-radius:8px; background:var(--cl-bg); color:var(--cl-text);
+  font-size:13px; box-sizing:border-box;
+}
+.tf-field select:focus, .tf-field input:focus { outline:none; border-color:var(--cl-primary); }
+
+.batch-info { background:var(--cl-bg); border:1px solid var(--cl-border); border-radius:8px; padding:12px; margin-top:8px; font-size:12px; display:none; }
+.batch-info.visible { display:block; }
+.batch-info .bi-row { display:flex; justify-content:space-between; margin-bottom:5px; }
+.batch-info .bi-label { color:var(--cl-muted); }
+.batch-info .bi-val { font-weight:600; }
+.bi-stock { font-size:18px; font-weight:800; color:var(--cl-primary); }
+
+.tf-arrow { display:flex; align-items:center; justify-content:center; font-size:32px; color:var(--cl-primary); padding-top:40px; }
+@media(max-width:768px){ .tf-arrow { transform:rotate(90deg); padding:10px 0; } }
+
+.tf-submit { width:100%; padding:12px; background:var(--cl-primary); color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; margin-top:8px; }
+.tf-submit:hover { opacity:.9; }
+.tf-submit:disabled { opacity:.5; cursor:not-allowed; }
+
+.recent-transfers { margin-top:28px; }
+.rt-table { width:100%; border-collapse:collapse; background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.rt-table th { background:var(--cl-primary); color:#fff; padding:9px 14px; font-size:11px; font-weight:600; text-transform:uppercase; text-align:left; }
+.rt-table td { padding:9px 14px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.rt-table tr:last-child td { border-bottom:none; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<form method="POST" action="{{ url_for('inventory.transfer') }}" id="transferForm">
+  <div class="transfer-layout">
+
+    <!-- From side -->
+    <div class="tf-card">
+      <h3>From — Source</h3>
+
+      <div class="tf-field">
+        <label>Item / Product</label>
+        <select id="itemSelect" onchange="loadBatches(this.value)" required>
+          <option value="">Select item...</option>
+          {% for item in items %}
+          <option value="{{ item.id }}">{{ item.name }}
+            {% if item.unit %} ({{ item.unit }}){% endif %}
+            {% if item.category %} — {{ item.category }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="tf-field">
+        <label>Source Batch</label>
+        <select id="batchSelect" name="batch_id" onchange="showBatchInfo(this)" required disabled>
+          <option value="">Select item first...</option>
+        </select>
+        <div class="batch-info" id="batchInfo">
+          <div class="bi-row">
+            <span class="bi-label">Batch No:</span>
+            <span class="bi-val" id="biBatch">—</span>
+          </div>
+          <div class="bi-row">
+            <span class="bi-label">Expiry:</span>
+            <span class="bi-val" id="biExpiry">—</span>
+          </div>
+          <div class="bi-row">
+            <span class="bi-label">Warehouse:</span>
+            <span class="bi-val" id="biWarehouse">—</span>
+          </div>
+          <div class="bi-row">
+            <span class="bi-label">Available Stock:</span>
+            <span class="bi-stock" id="biStock">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tf-field">
+        <label>Quantity to Transfer</label>
+        <input type="number" name="quantity" id="qtyInput" step="0.01" min="0.01"
+               placeholder="Enter quantity" required>
+      </div>
+
+      <div class="tf-field">
+        <label>Transfer Note (optional)</label>
+        <textarea name="notes" rows="2" placeholder="Reason or reference..."></textarea>
+      </div>
+    </div>
+
+    <!-- Arrow -->
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+      <div style="font-size:36px;color:var(--cl-primary)">&#8594;</div>
+
+      <!-- To side -->
+      <div class="tf-card" style="width:100%;box-sizing:border-box">
+        <h3>To — Destination</h3>
+        <div class="tf-field">
+          <label>Destination Warehouse</label>
+          <select name="to_warehouse_id" required>
+            <option value="">Select warehouse...</option>
+            {% for wh in warehouses %}
+            <option value="{{ wh.id }}">{{ wh.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="tf-submit" id="submitBtn">
+          Transfer Stock &rarr;
+        </button>
+      </div>
+    </div>
+
+  </div>
+</form>
+
+<script>
+const batchData = {};
+
+async function loadBatches(itemId) {
+  const sel = document.getElementById('batchSelect');
+  document.getElementById('batchInfo').classList.remove('visible');
+  sel.innerHTML = '<option value="">Loading...</option>';
+  sel.disabled = true;
+
+  if (!itemId) {
+    sel.innerHTML = '<option value="">Select item first...</option>';
+    return;
+  }
+
+  const resp = await fetch(`{{ url_for('inventory.transfer_batches_json') }}?item_id=${itemId}`);
+  const batches = await resp.json();
+
+  sel.innerHTML = '<option value="">Select batch...</option>';
+  batches.forEach(b => {
+    batchData[b.id] = b;
+    const label = `${b.batch_number || 'No batch#'} | Wh: ${b.warehouse_name} | Qty: ${b.quantity}${b.expiry_date ? ' | Exp: '+b.expiry_date : ''}`;
+    sel.innerHTML += `<option value="${b.id}">${label}</option>`;
+  });
+
+  if (batches.length === 0) {
+    sel.innerHTML = '<option value="">No stock available</option>';
+  }
+  sel.disabled = false;
+}
+
+function showBatchInfo(sel) {
+  const info = document.getElementById('batchInfo');
+  const id   = parseInt(sel.value);
+  if (!id || !batchData[id]) {
+    info.classList.remove('visible');
+    return;
+  }
+  const b = batchData[id];
+  document.getElementById('biBatch').textContent     = b.batch_number || 'N/A';
+  document.getElementById('biExpiry').textContent    = b.expiry_date || 'No expiry';
+  document.getElementById('biWarehouse').textContent = b.warehouse_name;
+  document.getElementById('biStock').textContent     = b.quantity;
+  document.getElementById('qtyInput').max            = b.quantity;
+  info.classList.add('visible');
+}
+
+document.getElementById('transferForm').addEventListener('submit', function(e) {
+  const qty   = parseFloat(document.getElementById('qtyInput').value || 0);
+  const batch = document.getElementById('batchSelect').value;
+  const id    = parseInt(batch);
+  if (id && batchData[id] && qty > batchData[id].quantity) {
+    e.preventDefault();
+    alert(`Quantity exceeds available stock (${batchData[id].quantity})`);
+  }
+});
+</script>
+
+{% endblock %}

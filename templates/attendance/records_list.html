@@ -4,7 +4,8 @@
 {% block page_sub %}{{ date_from }} to {{ date_to }} — {{ records|length }} records{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('attendance.checkin') }}" class="pf-btn pf-btn-primary pf-btn-sm">⏱ Check In/Out</a>
+  <a href="{{ url_for('attendance.checkin') }}" class="pf-btn pf-btn-primary pf-btn-sm">Check In/Out</a>
+  <a href="{{ url_for('attendance.export_xlsx') }}?date_from={{ date_from }}&date_to={{ date_to }}{% if request.args.get('user_id') %}&user_id={{ request.args.get('user_id') }}{% endif %}" class="pf-btn pf-btn-secondary pf-btn-sm">Export Excel</a>
   <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-sm">← Dashboard</a>
 {% endblock %}
 

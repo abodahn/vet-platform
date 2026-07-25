@@ -290,6 +290,47 @@ def vaccination_new():
     )
 
 
+@clinical_bp.route("/vaccinations/<int:vacc_id>/certificate")
+@login_required
+def vaccination_certificate(vacc_id):
+    """Download a vaccination certificate as PDF."""
+    from flask import Response, abort as flask_abort
+    from models.pdf_generator import generate_vaccination_certificate_pdf
+    conn = db.get_db()
+    row = conn.execute(
+        """SELECT v.*, p.pet_name, p.species, p.breed, p.sex, p.dob, p.microchip_id,
+                  p.owner_id,
+                  o.full_name AS owner_name, o.phone AS owner_phone, o.address AS owner_address
+           FROM vaccinations v
+           JOIN pets p ON p.id = v.pet_id
+           JOIN owners o ON o.id = p.owner_id
+           WHERE v.id = ?""",
+        (vacc_id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        flask_abort(404)
+    vacc = dict(row)
+    pet  = {k: vacc.get(k) for k in ("pet_name","species","breed","sex","dob","microchip_id",
+                                      "owner_name","owner_phone","owner_address")}
+    clinic = db.get_clinic()
+    try:
+        pdf_bytes = generate_vaccination_certificate_pdf(vacc=vacc, pet=pet, clinic=clinic)
+        pet_slug  = (vacc["pet_name"] or "pet").replace(" ", "_")
+        fname     = f"vacc_cert_{pet_slug}_{vacc_id}.pdf"
+        return Response(
+            pdf_bytes,
+            mimetype="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+        )
+    except RuntimeError as e:
+        flash(str(e), "error")
+        return redirect(url_for("clinical.vaccinations"))
+    except Exception as e:
+        flash(f"Certificate generation failed: {e}", "error")
+        return redirect(url_for("clinical.vaccinations"))
+
+
 # ── Surgery routes ────────────────────────────────────────────────────────────
 
 @clinical_bp.route("/surgeries")

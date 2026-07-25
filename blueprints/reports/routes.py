@@ -36,14 +36,18 @@ def dashboard():
 @login_required
 def clinical():
     conn = db.get_db()
+    since_30 = (date.today() - timedelta(days=30)).isoformat()
     visits_by_type = [dict(r) for r in conn.execute(
-        "SELECT visit_type, COUNT(*) as count FROM visits WHERE visit_date >= date('now', '-30 days') GROUP BY visit_type ORDER BY count DESC"
+        "SELECT visit_type, COUNT(*) as count FROM visits WHERE visit_date >= ? GROUP BY visit_type ORDER BY count DESC",
+        (since_30,)
     ).fetchall()]
     top_diagnoses = [dict(r) for r in conn.execute(
-        "SELECT diagnosis, COUNT(*) as count FROM diagnoses WHERE created_at >= datetime('now', '-30 days') GROUP BY diagnosis ORDER BY count DESC LIMIT 10"
+        "SELECT diagnosis, COUNT(*) as count FROM diagnoses WHERE created_at >= ? GROUP BY diagnosis ORDER BY count DESC LIMIT 10",
+        (since_30,)
     ).fetchall()]
     doctor_workload = [dict(r) for r in conn.execute(
-        "SELECT doctor_name, COUNT(*) as visits FROM visits WHERE visit_date >= date('now', '-30 days') GROUP BY doctor_name ORDER BY visits DESC"
+        "SELECT doctor_name, COUNT(*) as visits FROM visits WHERE visit_date >= ? GROUP BY doctor_name ORDER BY visits DESC",
+        (since_30,)
     ).fetchall()]
     conn.close()
     max_visits = max((r["count"] for r in visits_by_type), default=1)
@@ -66,16 +70,18 @@ def financial():
     date_to   = request.args.get("date_to",   date.today().isoformat())
     summary = db.get_finance_summary(date_from, date_to)
     revenue_by_day = db.get_revenue_by_day(30)
-    # Payment methods breakdown
+    # Payment methods breakdown — derived from invoices (paid_amount by payment_method)
     conn = db.get_db()
-    payment_methods = [dict(r) for r in conn.execute(
-        "SELECT method, COUNT(*) as count, COALESCE(SUM(amount),0) as total FROM payments WHERE received_at BETWEEN ? AND ? GROUP BY method ORDER BY total DESC",
-        (date_from + " 00:00:00", date_to + " 23:59:59")
-    ).fetchall()]
+    # payment_method column not present; aggregate all paid invoices as one group
+    row = conn.execute(
+        """SELECT COUNT(*) AS count, COALESCE(SUM(paid_amount), 0) AS total
+           FROM invoices
+           WHERE issue_date BETWEEN ? AND ?
+             AND status IN ('Paid', 'Partial')""",
+        (date_from, date_to)
+    ).fetchone()
     conn.close()
-    total_paid = sum(p["total"] for p in payment_methods) or 1
-    for p in payment_methods:
-        p["pct"] = round(p["total"] / total_paid * 100, 1)
+    payment_methods = [{"method": "All Payments", "count": row["count"], "total": float(row["total"] or 0), "pct": 100.0}]
     return render_template(
         "reports/financial.html",
         summary=summary,
@@ -108,9 +114,9 @@ def inventory_report():
            LEFT JOIN item_categories ic ON ic.id=i.category_id
            LEFT JOIN batches b ON b.item_id=i.id
            WHERE i.is_active=1
-           GROUP BY i.id
-           HAVING stock_qty <= i.reorder_level
-           ORDER BY stock_qty ASC LIMIT 50"""
+           GROUP BY i.id, i.name, i.sku, i.unit, i.reorder_level, ic.name
+           HAVING COALESCE(SUM(b.quantity),0) <= i.reorder_level
+           ORDER BY COALESCE(SUM(b.quantity),0) ASC LIMIT 50"""
     ).fetchall()]
     # Expiry alerts
     today = date.today().isoformat()
@@ -206,10 +212,10 @@ def doctor_revenue():
     by_doctor = [dict(r) for r in conn.execute(
         """SELECT i.doctor_name,
                   COUNT(DISTINCT i.id)           AS invoice_count,
-                  COALESCE(SUM(i.net_amount), 0) AS total_invoiced,
-                  COALESCE(SUM(CASE WHEN i.status='Paid' THEN i.net_amount ELSE 0 END),0) AS collected,
+                  COALESCE(SUM(i.total), 0)      AS total_invoiced,
+                  COALESCE(SUM(CASE WHEN i.status='Paid' THEN i.total ELSE 0 END),0) AS collected,
                   COALESCE(SUM(CASE WHEN i.status!='Paid' AND i.status!='Cancelled'
-                                    THEN i.net_amount ELSE 0 END), 0)  AS pending
+                                    THEN i.total ELSE 0 END), 0)  AS pending
            FROM invoices i
            WHERE i.issue_date BETWEEN ? AND ?
              AND i.status != 'Cancelled'
@@ -290,14 +296,15 @@ def financial_compare():
     revenue_by_day = db.get_revenue_by_day(delta + 1 if delta < 90 else 30)
 
     conn = db.get_db()
-    payment_methods = [dict(r) for r in conn.execute(
-        "SELECT method, COUNT(*) as count, COALESCE(SUM(amount),0) as total FROM payments WHERE received_at BETWEEN ? AND ? GROUP BY method ORDER BY total DESC",
-        (date_from + " 00:00:00", date_to + " 23:59:59")
-    ).fetchall()]
+    row = conn.execute(
+        """SELECT COUNT(*) AS count, COALESCE(SUM(paid_amount), 0) AS total
+           FROM invoices
+           WHERE issue_date BETWEEN ? AND ?
+             AND status IN ('Paid', 'Partial')""",
+        (date_from, date_to)
+    ).fetchone()
     conn.close()
-    total_paid_pm = sum(p["total"] for p in payment_methods) or 1
-    for p in payment_methods:
-        p["pct"] = round(p["total"] / total_paid_pm * 100, 1)
+    payment_methods = [{"method": "All Payments", "count": row["count"], "total": float(row["total"] or 0), "pct": 100.0}]
 
     return render_template(
         "reports/financial.html",

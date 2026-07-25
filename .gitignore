@@ -17,8 +17,10 @@ build/
 venv/
 
 # ── Database files ────────────────────────────────────────
+*.db
 data/*.db
 data/backups/
+data/
 *.sqlite3
 
 # ── Logs ─────────────────────────────────────────────────
@@ -34,3 +36,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# ── Runtime logs from launcher scripts (contain seeded credentials) ──
+startup.log
+startup_err.log
+logs/*.log*

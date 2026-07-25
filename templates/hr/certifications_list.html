@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Certifications & Training{% endblock %}
+{% block page_title %}Certifications & Training{% endblock %}
+{% block page_sub %}Track staff licenses, certifications, and training across all team members{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">HR Dashboard</a>
+<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">Staff List</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.cert-filters { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
+.cert-filters select, .cert-filters input { padding:8px 12px; border:1px solid var(--cl-border); border-radius:8px; background:var(--cl-surface); color:var(--cl-text); font-size:13px; }
+.cert-filters button { padding:8px 16px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; cursor:pointer; }
+.cert-table { width:100%; border-collapse:collapse; background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.07); }
+.cert-table th { background:var(--cl-primary); color:#fff; padding:11px 14px; text-align:left; font-size:12px; font-weight:600; text-transform:uppercase; }
+.cert-table td { padding:11px 14px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+.cert-table tr:last-child td { border-bottom:none; }
+.cert-table tr:hover td { background:var(--cl-bg); }
+.exp-badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+.exp-active  { background:#dcfce7; color:#166534; }
+.exp-soon    { background:#fef3c7; color:#92400e; }
+.exp-expired { background:#fee2e2; color:#991b1b; }
+.exp-none    { background:#f3f4f6; color:#6b7280; }
+.summary-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+.sum-card { background:var(--cl-surface); border-radius:10px; padding:14px 18px; box-shadow:0 2px 8px rgba(0,0,0,.06); text-align:center; }
+.sum-num  { font-size:2rem; font-weight:800; line-height:1; }
+.sum-lbl  { font-size:11px; color:var(--cl-muted); font-weight:600; text-transform:uppercase; margin-top:3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% set active_certs  = certs | selectattr('status','eq','Active') | list %}
+{% set expired_certs = certs | selectattr('status','eq','Expired') | list %}
+{% set expiring_soon = [] %}
+{% for c in active_certs %}
+  {% if c.days_left is not none and c.days_left >= 0 and c.days_left <= 30 %}
+    {% set _ = expiring_soon.append(c) %}
+  {% endif %}
+{% endfor %}
+
+<!-- Summary Row -->
+<div class="summary-row">
+  <div class="sum-card">
+    <div class="sum-num" style="color:#16a34a">{{ active_certs|length }}</div>
+    <div class="sum-lbl">Active</div>
+  </div>
+  <div class="sum-card">
+    <div class="sum-num" style="color:#d97706">{{ expiring_soon|length }}</div>
+    <div class="sum-lbl">Expiring Soon</div>
+  </div>
+  <div class="sum-card">
+    <div class="sum-num" style="color:#dc2626">{{ expired_certs|length }}</div>
+    <div class="sum-lbl">Expired</div>
+  </div>
+  <div class="sum-card">
+    <div class="sum-num" style="color:var(--cl-primary)">{{ certs|length }}</div>
+    <div class="sum-lbl">Total Records</div>
+  </div>
+</div>
+
+{% if certs %}
+<div style="overflow-x:auto">
+  <table class="cert-table">
+    <thead>
+      <tr>
+        <th>Staff Member</th>
+        <th>Certification / Training</th>
+        <th>Cert Number</th>
+        <th>Issuing Body</th>
+        <th>Issue Date</th>
+        <th>Expiry Date</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in certs %}
+      {% set color_map = {
+        'super_admin':'#dc2626','clinic_owner':'#7c3aed','branch_manager':'#1d4ed8',
+        'doctor':'#0891b2','nurse':'#0d9488','reception':'#ca8a04',
+        'groomer':'#be185d','boarding_staff':'#6b7280','pharmacist':'#7c3aed'
+      } %}
+      {% set rc = color_map.get(c.role,'#6b7280') %}
+      <tr>
+        <td>
+          <a href="{{ url_for('hr.staff_detail', user_id=c.uid) }}" style="color:var(--cl-primary);font-weight:600;text-decoration:none">
+            {{ c.full_name or '—' }}
+          </a>
+          <div style="font-size:11px;color:var(--cl-muted)">{{ c.role.replace('_',' ').title() }}</div>
+        </td>
+        <td style="font-weight:600">{{ c.cert_name }}</td>
+        <td style="font-size:12px;color:var(--cl-muted)">{{ c.cert_number or '—' }}</td>
+        <td style="font-size:12px">{{ c.issued_by or '—' }}</td>
+        <td style="font-size:12px">{{ c.issue_date or '—' }}</td>
+        <td>
+          {% if c.expiry_date %}
+            <span style="font-weight:600">{{ c.expiry_date }}</span>
+          {% else %}
+            <span style="color:var(--cl-muted)">No expiry</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if c.status == 'Expired' or (c.days_left is not none and c.days_left < 0) %}
+            <span class="exp-badge exp-expired">Expired</span>
+          {% elif c.days_left is not none and c.days_left <= 30 %}
+            <span class="exp-badge exp-soon">Expiring in {{ c.days_left }}d</span>
+          {% elif c.status == 'Pending' %}
+            <span class="exp-badge exp-none">Pending</span>
+          {% else %}
+            <span class="exp-badge exp-active">Active{% if c.days_left is not none %} · {{ c.days_left }}d{% endif %}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:60px;color:var(--cl-muted)">
+  <div style="font-size:48px;margin-bottom:12px">🏅</div>
+  <div style="font-size:18px;font-weight:600;margin-bottom:8px">No certifications recorded</div>
+  <div>Open a staff profile to add their certifications and licenses.</div>
+</div>
+{% endif %}
+{% endblock %}

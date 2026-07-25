@@ -2,11 +2,12 @@
 Attendance & Leave Management — Aleefy Platform
 Full HR attendance: check-in/out, shifts, leaves, balances, reports.
 """
-from flask import render_template, request, redirect, url_for, flash, session, jsonify
+from flask import render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from datetime import date, datetime, timedelta
 from . import attendance_bp
 from blueprints.auth.routes import login_required
 from models.database import get_db
+from models.excel_export import make_workbook
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -786,6 +787,54 @@ def holiday_delete(hid):
     conn.close()
     flash("Holiday removed.", "success")
     return redirect(url_for("attendance.holidays"))
+
+
+# ── EXCEL EXPORT ─────────────────────────────────────────────────────────────
+
+@attendance_bp.route("/export/xlsx")
+@login_required
+def export_xlsx():
+    conn      = get_db()
+    user      = session["user"]
+    date_from = request.args.get("date_from", (date.today() - timedelta(days=29)).isoformat())
+    date_to   = request.args.get("date_to",   date.today().isoformat())
+    uid       = request.args.get("user_id", "")
+
+    q = """SELECT ar.work_date, u.full_name, u.role, ar.check_in, ar.check_out,
+                  ar.break_minutes, ar.hours_worked, ar.status, ar.notes
+           FROM attendance_records ar JOIN users u ON u.id=ar.user_id
+           WHERE ar.work_date BETWEEN ? AND ?"""
+    params = [date_from, date_to]
+    if not _allowed_manager(user):
+        q += " AND ar.user_id=?"; params.append(user["id"])
+    elif uid:
+        q += " AND ar.user_id=?"; params.append(uid)
+    q += " ORDER BY ar.work_date DESC, u.full_name"
+
+    rows_raw = conn.execute(q, params).fetchall()
+    conn.close()
+
+    headers = ["Date", "Staff Name", "Role", "Check-In", "Check-Out",
+               "Break (min)", "Hours Worked", "Status", "Notes"]
+    rows = [
+        [r["work_date"], r["full_name"], r["role"],
+         str(r["check_in"] or ""), str(r["check_out"] or ""),
+         r["break_minutes"] or 0, round(float(r["hours_worked"] or 0), 2),
+         r["status"] or "", r["notes"] or ""]
+        for r in rows_raw
+    ]
+    try:
+        buf = make_workbook(
+            title=f"Attendance {date_from} to {date_to}",
+            headers=headers, rows=rows, sheet_name="Attendance",
+        )
+        fname = f"attendance_{date_from}_{date_to}.xlsx"
+        return send_file(buf,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True, download_name=fname)
+    except RuntimeError as e:
+        flash(str(e), "danger")
+        return redirect(url_for("attendance.records_list"))
 
 
 # ── JSON API ──────────────────────────────────────────────────────────────────

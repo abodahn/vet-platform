@@ -107,6 +107,7 @@
           <th>Next Due</th>
           <th>Administered By</th>
           <th>Site</th>
+          <th>Certificate</th>
         </tr>
       </thead>
       <tbody>
@@ -138,6 +139,14 @@
           </td>
           <td style="font-size:0.85rem">{{ v.administered_by or '—' }}</td>
           <td style="font-size:0.83rem;color:var(--text-muted)">{{ v.site or '—' }}</td>
+          <td>
+            <a href="{{ url_for('clinical.vaccination_certificate', vacc_id=v.id) }}"
+               class="pf-btn pf-btn-secondary"
+               style="font-size:0.75rem;padding:0.2rem 0.55rem;white-space:nowrap"
+               title="Download PDF Certificate">
+              PDF
+            </a>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

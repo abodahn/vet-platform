@@ -14,16 +14,23 @@ except ImportError:
     _OpenAI = None
     _OPENAI_AVAILABLE = False
 
+import logging as _logging
 from flask import render_template, request, redirect, url_for, session, flash, jsonify
 from . import ai_bp
 from blueprints.auth.routes import login_required
 import models.database as db
+import models.security as _sec
 
-# ── AI config — read from environment (falls back to local freellmapi) ────────
+_logger = _logging.getLogger(__name__)
+
+# ── AI config — read from environment only (no hardcoded key fallback) ───────
 import os as _os
 FREELLM_BASE_URL = _os.environ.get("AI_BASE_URL", "http://localhost:3001/v1")
-FREELLM_API_KEY  = _os.environ.get("AI_API_KEY",  "freellmapi-4ddad5d50504e98e27a4001eb5422e23a89cc957233ea3d0")
+FREELLM_API_KEY  = _os.environ.get("AI_API_KEY",  "")   # Must be set via env var
 FREELLM_MODEL    = _os.environ.get("AI_MODEL",    "gemini-2.5-flash")
+
+# Maximum length for user chat messages (prevents token abuse)
+AI_MAX_MESSAGE_LENGTH = 2000
 
 
 # ── System prompts ────────────────────────────────────────────────────────────
@@ -281,7 +288,39 @@ def index():
 @ai_bp.route("/context/visit/<int:visit_id>")
 @login_required
 def context_visit(visit_id: int):
-    """Return patient context for a visit as JSON (used by the visit detail panel)."""
+    """Return patient context for a visit as JSON (used by the visit detail panel).
+    IDOR guard: only roles with clinical access may fetch visit context.
+    """
+    user = session["user"]
+    role = user.get("role", "")
+    CLINICAL_ROLES = {"super_admin", "clinic_owner", "branch_manager", "doctor", "nurse"}
+    if role not in CLINICAL_ROLES:
+        _logger.warning(
+            f"IDOR attempt: user {user.get('username')} (role={role}) "
+            f"tried to access visit context for visit_id={visit_id}"
+        )
+        return jsonify({"error": "Access denied"}), 403
+
+    # Additional guard: branch-restricted roles may only see visits in their branch
+    user_branch = user.get("branch_id") or user.get("branch")
+    if role == "doctor" and user_branch:
+        conn = db.get_db()
+        try:
+            row = conn.execute(
+                "SELECT branch FROM visits WHERE id=%s LIMIT 1", (visit_id,)
+            ).fetchone()
+            if row and row["branch"] and str(row["branch"]) != str(user_branch):
+                _logger.warning(
+                    f"Branch IDOR attempt: user {user.get('username')} "
+                    f"(branch={user_branch}) tried to access visit {visit_id} "
+                    f"from branch {row['branch']}"
+                )
+                return jsonify({"error": "Access denied"}), 403
+        except Exception:
+            pass  # If branch check fails, allow (don't block doctors on schema diffs)
+        finally:
+            conn.close()
+
     ctx = _build_patient_context(visit_id)
     return jsonify({"context": ctx, "visit_id": visit_id})
 
@@ -293,12 +332,22 @@ def chat():
     user_id = user["id"]
     user_role = user.get("role", "")
 
+    # Rate limit authenticated chat to prevent token abuse
+    ip = _sec.get_real_ip(request)
+    limited, wait = _sec.is_rate_limited(ip)
+    if limited:
+        return jsonify({"error": "Too many requests. Please wait before sending another message."}), 429
+
     data = request.get_json(silent=True) or {}
     message = (data.get("message") or "").strip()
     visit_id = data.get("visit_id")   # optional — set by visit detail panel
 
     if not message:
         return jsonify({"error": "Empty message"}), 400
+
+    # Enforce message length limit to prevent token-cost abuse
+    if len(message) > AI_MAX_MESSAGE_LENGTH:
+        return jsonify({"error": f"Message too long. Maximum {AI_MAX_MESSAGE_LENGTH} characters."}), 400
 
     # Build patient context if a visit is specified
     patient_ctx = ""
@@ -376,7 +425,7 @@ def insights():
     try:
         appts_today  = _q("SELECT COUNT(*) FROM appointments WHERE SUBSTRING(appt_date::text,1,10)=?", (today,))
         open_visits  = _q("SELECT COUNT(*) FROM visits WHERE status='Open'")
-        rev_today    = _q("SELECT COALESCE(SUM(amount),0) FROM payments WHERE SUBSTRING(received_at::text,1,10)=?", (today,))
+        rev_today    = _q("SELECT COALESCE(SUM(paid_amount),0) FROM invoices WHERE SUBSTRING(issue_date::text,1,10)=? AND status IN ('Paid','Partial')", (today,))
         unpaid_count = _q("SELECT COUNT(*) FROM invoices WHERE status='Unpaid'")
         unpaid_total = _q("SELECT COALESCE(SUM(due_amount),0) FROM invoices WHERE status='Unpaid'")
         low_stock    = _q("""

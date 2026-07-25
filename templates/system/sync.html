@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Sync Dashboard{% endblock %}
+{% block page_title %}Sync Dashboard{% endblock %}
+{% block page_sub %}Offline queue management · conflict resolution · device registry{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">← System Monitor</a>
+<button class="pf-btn pf-btn-secondary" onclick="location.reload()">↻ Refresh</button>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+/*
+  All surface/text colours use v3.css tokens:
+    --bg  --surface  --surface-raised  --surface-hover
+    --border  --text  --text-muted  --c-primary  --sh-sm
+  Status chips carry their own [data-theme="dark"] overrides.
+*/
+.sync-page { display:flex; flex-direction:column; gap:20px; }
+
+/* Stat chips */
+.stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+@media(max-width:700px){ .stat-row { grid-template-columns:repeat(2,1fr); } }
+.stat-chip { border-radius:14px; padding:18px 20px; text-align:center; box-shadow:var(--sh-sm); border:1px solid var(--border); }
+.chip-pending  { background:#fffbeb; }
+.chip-synced   { background:#f0fdf4; }
+.chip-failed   { background:#fff1f2; }
+.chip-conflict { background:#faf5ff; }
+[data-theme="dark"] .chip-pending  { background:rgba(217,119,6,.12);  border-color:rgba(217,119,6,.25); }
+[data-theme="dark"] .chip-synced   { background:rgba(22,163,74,.12);  border-color:rgba(22,163,74,.25); }
+[data-theme="dark"] .chip-failed   { background:rgba(220,38,38,.12);  border-color:rgba(220,38,38,.25); }
+[data-theme="dark"] .chip-conflict { background:rgba(139,92,246,.12); border-color:rgba(139,92,246,.25); }
+.chip-num { font-size:32px; font-weight:800; line-height:1; }
+.chip-pending  .chip-num { color:#d97706; }
+.chip-synced   .chip-num { color:#16a34a; }
+.chip-failed   .chip-num { color:#dc2626; }
+.chip-conflict .chip-num { color:#7c3aed; }
+.chip-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; margin-top:6px; color:var(--text-muted); }
+
+/* Section */
+.sec { background:var(--surface); color:var(--text); border-radius:14px; padding:22px 24px; box-shadow:var(--sh-sm); }
+.sec-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border); gap:12px; flex-wrap:wrap; }
+.sec-title { font-size:14px; font-weight:700; color:var(--c-primary); display:flex; align-items:center; gap:8px; }
+
+/* Filter bar */
+.filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px; }
+.filter-bar select {
+  padding:7px 12px; border:1px solid var(--border); border-radius:8px;
+  background:var(--bg); color:var(--text); font-size:13px; min-width:140px;
+}
+.filter-bar select:focus { outline:none; border-color:var(--c-primary); }
+.btn-apply { padding:7px 16px; background:var(--c-primary); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+.btn-clear { padding:7px 12px; background:var(--bg); color:var(--text-muted); border:1px solid var(--border); border-radius:8px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; }
+
+/* Data table — explicit color on every cell */
+.dt { width:100%; border-collapse:collapse; font-size:13px; }
+.dt thead { background:var(--bg); }
+.dt th { text-align:left; padding:9px 12px; background:var(--bg); color:var(--text-muted); font-weight:700; font-size:11px; text-transform:uppercase; border-bottom:2px solid var(--border); white-space:nowrap; }
+.dt td { padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--text); background:var(--surface); }
+.dt tr:last-child td { border-bottom:none; }
+.dt tbody tr:hover td { background:var(--surface-hover); }
+[data-theme="dark"] .dt th { background:var(--bg); color:var(--text-muted); border-bottom-color:var(--border); }
+[data-theme="dark"] .dt td { background:var(--surface); color:var(--text); border-bottom-color:var(--border); }
+[data-theme="dark"] .dt tbody tr:hover td { background:var(--surface-hover); }
+
+/* Inline badge */
+.ibadge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+.b-pending  { background:#fef3c7; color:#92400e; }
+.b-syncing  { background:#dbeafe; color:#1d4ed8; }
+.b-synced   { background:#dcfce7; color:#166534; }
+.b-failed   { background:#fee2e2; color:#991b1b; }
+.b-conflict { background:#ede9fe; color:#5b21b6; }
+.b-create   { background:#dcfce7; color:#166534; }
+.b-update   { background:#dbeafe; color:#1d4ed8; }
+.b-delete   { background:#fee2e2; color:#991b1b; }
+.b-ok       { background:#dcfce7; color:#166534; }
+.b-warn     { background:#fef3c7; color:#92400e; }
+.b-info     { background:#dbeafe; color:#1d4ed8; }
+[data-theme="dark"] .b-pending  { background:rgba(217,119,6,.2);  color:#fcd34d; }
+[data-theme="dark"] .b-syncing  { background:rgba(37,99,235,.2);  color:#93c5fd; }
+[data-theme="dark"] .b-synced   { background:rgba(22,163,74,.2);  color:#86efac; }
+[data-theme="dark"] .b-failed   { background:rgba(220,38,38,.2);  color:#fca5a5; }
+[data-theme="dark"] .b-conflict { background:rgba(139,92,246,.2); color:#c4b5fd; }
+[data-theme="dark"] .b-create   { background:rgba(22,163,74,.2);  color:#86efac; }
+[data-theme="dark"] .b-update   { background:rgba(37,99,235,.2);  color:#93c5fd; }
+[data-theme="dark"] .b-delete   { background:rgba(220,38,38,.2);  color:#fca5a5; }
+[data-theme="dark"] .b-ok       { background:rgba(22,163,74,.2);  color:#86efac; }
+[data-theme="dark"] .b-warn     { background:rgba(217,119,6,.2);  color:#fcd34d; }
+[data-theme="dark"] .b-info     { background:rgba(37,99,235,.2);  color:#93c5fd; }
+
+/* Payload toggle */
+.payload-toggle { background:none; border:none; cursor:pointer; color:var(--c-primary); font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px; }
+.payload-toggle:hover { background:var(--bg); }
+.payload-box { display:none; margin-top:6px; padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; font-family:monospace; font-size:11px; white-space:pre-wrap; word-break:break-all; max-height:150px; overflow-y:auto; color:var(--text); }
+
+/* Conflict card */
+.conflict-card { border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:14px; background:var(--surface); }
+.conflict-card:last-child { margin-bottom:0; }
+[data-theme="dark"] .conflict-card { border-color:rgba(139,92,246,.3); background:rgba(139,92,246,.06); }
+.conflict-hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:10px; }
+.conflict-id { font-size:11px; font-family:monospace; color:var(--text-muted); }
+.conflict-type-badge { font-size:12px; font-weight:700; color:#5b21b6; background:#ede9fe; padding:3px 10px; border-radius:6px; }
+[data-theme="dark"] .conflict-type-badge { background:rgba(139,92,246,.2); color:#c4b5fd; }
+.conflict-payloads { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0; }
+@media(max-width:700px){ .conflict-payloads { grid-template-columns:1fr; } }
+.payload-panel { border-radius:8px; padding:12px; }
+.payload-panel.local  { background:#fffbeb; border:1px solid #fde68a; }
+.payload-panel.server { background:#f0fdf4; border:1px solid #bbf7d0; }
+[data-theme="dark"] .payload-panel.local  { background:rgba(217,119,6,.1);  border-color:rgba(217,119,6,.3); }
+[data-theme="dark"] .payload-panel.server { background:rgba(22,163,74,.1);  border-color:rgba(22,163,74,.3); }
+.payload-lbl { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+.payload-panel.local  .payload-lbl { color:#92400e; }
+.payload-panel.server .payload-lbl { color:#166534; }
+[data-theme="dark"] .payload-panel.local  .payload-lbl { color:#fcd34d; }
+[data-theme="dark"] .payload-panel.server .payload-lbl { color:#86efac; }
+.payload-json { font-family:monospace; font-size:11px; white-space:pre-wrap; word-break:break-all; max-height:120px; overflow-y:auto; color:var(--text); }
+.conflict-actions { display:flex; gap:8px; justify-content:flex-end; }
+.btn-keep-server { padding:7px 16px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
+.btn-keep-local  { padding:7px 16px; background:#d97706; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
+.btn-keep-server:hover { background:#15803d; }
+.btn-keep-local:hover  { background:#b45309; }
+
+/* Device grid */
+.dev-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }
+.dev-card { border:1px solid var(--border); border-radius:12px; padding:16px; background:var(--bg); }
+.dev-card-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.dev-name { font-size:14px; font-weight:700; color:var(--text); }
+.dev-id { font-size:10px; font-family:monospace; color:var(--text-muted); margin-top:2px; }
+.dev-row { display:flex; justify-content:space-between; font-size:12px; padding:4px 0; color:var(--text-muted); border-bottom:1px solid var(--border); }
+.dev-row:last-child { border-bottom:none; }
+.dev-row strong { color:var(--text); }
+.dot-online  { width:8px; height:8px; border-radius:50%; background:#22c55e; display:inline-block; box-shadow:0 0 0 3px rgba(34,197,94,.2); margin-right:5px; }
+.dot-offline { width:8px; height:8px; border-radius:50%; background:#94a3b8; display:inline-block; margin-right:5px; }
+
+/* Empty state */
+.empty { text-align:center; padding:40px 20px; color:var(--text-muted); }
+.empty-icon { font-size:40px; margin-bottom:10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sync-page">
+
+  {# ─── STAT CHIPS ─── #}
+  <div class="stat-row">
+    <div class="stat-chip chip-pending">
+      <div class="chip-num">{{ sync_stats.pending }}</div>
+      <div class="chip-lbl">Pending</div>
+    </div>
+    <div class="stat-chip chip-synced">
+      <div class="chip-num">{{ sync_stats.synced }}</div>
+      <div class="chip-lbl">Synced</div>
+    </div>
+    <div class="stat-chip chip-failed">
+      <div class="chip-num">{{ sync_stats.failed }}</div>
+      <div class="chip-lbl">Failed</div>
+    </div>
+    <div class="stat-chip chip-conflict">
+      <div class="chip-num">{{ sync_stats.conflicts }}</div>
+      <div class="chip-lbl">Conflicts</div>
+    </div>
+  </div>
+
+  {# ─── CONFLICTS ─── #}
+  <div class="sec">
+    <div class="sec-hdr">
+      <div class="sec-title">
+        ⚠️ Unresolved Conflicts
+        {% if conflicts %}<span class="ibadge b-conflict">{{ conflicts|length }}</span>{% endif %}
+      </div>
+      <span style="font-size:12px;color:var(--text-muted);">Choose which version to keep — local (device) or server</span>
+    </div>
+
+    {% if conflicts %}
+      {% for c in conflicts %}
+      <div class="conflict-card">
+        <div class="conflict-hdr">
+          <div>
+            <div class="conflict-id">ID: {{ c.id }}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:3px;">
+              Queue: {{ c.sync_queue_id }} · {{ (c.created_at or '')[:16] }}
+            </div>
+          </div>
+          <span class="conflict-type-badge">{{ c.conflict_type or 'CONFLICT' }}</span>
+        </div>
+
+        <div class="conflict-payloads">
+          <div class="payload-panel local">
+            <div class="payload-lbl">Device version (local)</div>
+            <div class="payload-json">{{ c.local_payload or 'No data' }}</div>
+          </div>
+          <div class="payload-panel server">
+            <div class="payload-lbl">Server version (current)</div>
+            <div class="payload-json">{{ c.server_payload or 'No data' }}</div>
+          </div>
+        </div>
+
+        <div class="conflict-actions">
+          <form method="post" action="{{ url_for('system.sync_resolve_conflict', conflict_id=c.id) }}"
+                onsubmit="return confirm('Keep LOCAL version? This overwrites server data.')" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="keep" value="local">
+            <button class="btn-keep-local">Keep Local</button>
+          </form>
+          <form method="post" action="{{ url_for('system.sync_resolve_conflict', conflict_id=c.id) }}"
+                onsubmit="return confirm('Keep SERVER version? Device change will be discarded.')" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="keep" value="server">
+            <button class="btn-keep-server">Keep Server</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">
+        <div class="empty-icon">✅</div>
+        <div>No unresolved conflicts — everything is in sync.</div>
+      </div>
+    {% endif %}
+  </div>
+
+  {# ─── SYNC QUEUE ─── #}
+  <div class="sec">
+    <div class="sec-hdr">
+      <div class="sec-title">⚡ Sync Queue</div>
+      <span style="font-size:12px;color:var(--text-muted);">Last 100 items</span>
+    </div>
+
+    <form method="get" action="{{ url_for('system.sync_dashboard') }}" class="filter-bar">
+      <select name="status">
+        <option value="">All Statuses</option>
+        {% for s in ['PENDING','SYNCING','SYNCED','FAILED','CONFLICT'] %}
+        <option value="{{ s }}" {{ 'selected' if f_status == s }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <select name="device">
+        <option value="">All Devices</option>
+        {% for d in device_ids %}
+        <option value="{{ d }}" {{ 'selected' if f_device == d }}>{{ d[:28] }}</option>
+        {% endfor %}
+      </select>
+      <select name="entity">
+        <option value="">All Entities</option>
+        {% for e in entity_names %}
+        <option value="{{ e }}" {{ 'selected' if f_entity == e }}>{{ e }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-apply">Filter</button>
+      <a href="{{ url_for('system.sync_dashboard') }}" class="btn-clear">Clear</a>
+    </form>
+
+    {% if queue_items %}
+    <div style="overflow-x:auto;">
+      <table class="dt">
+        <thead>
+          <tr>
+            <th>Time</th><th>Status</th><th>Entity</th><th>Operation</th>
+            <th>Device</th><th>User</th><th>Retries</th><th>Payload</th><th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in queue_items %}
+          {% set s = item.status or 'PENDING' %}
+          {% set op = item.operation_type or '' %}
+          <tr>
+            <td style="white-space:nowrap;font-size:12px;">{{ (item.created_at or '')[:16] }}</td>
+            <td><span class="ibadge b-{{ s.lower() }}">{{ s }}</span></td>
+            <td style="font-weight:600;">{{ item.entity_name or '—' }}</td>
+            <td><span class="ibadge b-{{ op.lower() }}">{{ op or '—' }}</span></td>
+            <td style="font-family:monospace;font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ item.device_id or '' }}">
+              {{ (item.device_id or '—')[:22] }}
+            </td>
+            <td>{{ item.user_id or '—' }}</td>
+            <td style="text-align:center;">
+              {% if item.retry_count %}
+              <span class="ibadge {{ 'b-failed' if item.retry_count >= 4 else 'b-warn' if item.retry_count > 1 else 'b-info' }}">
+                {{ item.retry_count }}/5
+              </span>
+              {% else %}0{% endif %}
+            </td>
+            <td>
+              {% if item.payload %}
+              <button class="payload-toggle" onclick="togglePayload(this)">View</button>
+              <div class="payload-box">{{ item.payload }}</div>
+              {% else %}—{% endif %}
+            </td>
+            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#dc2626;font-size:11px;" title="{{ item.error_message or '' }}">
+              {{ item.error_message or '' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--text-muted);text-align:right;">
+      {{ queue_items|length }} item(s) shown
+    </div>
+    {% else %}
+    <div class="empty">
+      <div class="empty-icon">📭</div>
+      <div>{% if f_status or f_device or f_entity %}No items match the current filters.{% else %}No sync queue items yet.{% endif %}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ─── DEVICES ─── #}
+  <div class="sec" id="devices">
+    <div class="sec-hdr">
+      <div class="sec-title">📱 Registered Devices <span class="ibadge b-info">{{ devices|length }}</span></div>
+      <span style="font-size:12px;color:var(--text-muted);">Active = seen within 1 hour</span>
+    </div>
+
+    {% if devices %}
+    <div class="dev-grid">
+      {% for dev in devices %}
+      <div class="dev-card">
+        <div class="dev-card-hdr">
+          <div>
+            <div class="dev-name">
+              <span class="{{ 'dot-online' if dev.is_active else 'dot-offline' }}"></span>
+              {{ dev.device_name or 'Unnamed Device' }}
+            </div>
+            <div class="dev-id">{{ (dev.device_id or '—')[:32] }}</div>
+          </div>
+          <span class="ibadge {{ 'b-ok' if dev.is_active else 'b-warn' }}">
+            {{ 'Active' if dev.is_active else 'Inactive' }}
+          </span>
+        </div>
+        <div class="dev-row"><span>Platform</span><strong>{{ dev.platform or '—' }}</strong></div>
+        <div class="dev-row"><span>App Version</span><strong>{{ dev.app_version or '—' }}</strong></div>
+        <div class="dev-row"><span>User ID</span><strong>{{ dev.user_id or '—' }}</strong></div>
+        <div class="dev-row"><span>Last Online</span><strong>{{ (dev.last_online_at or '')[:16] or 'Never' }}</strong></div>
+        <div class="dev-row"><span>Last Sync</span><strong>{{ (dev.last_sync_at or '')[:16] or 'Never' }}</strong></div>
+        <div class="dev-row"><span>Registered</span><strong>{{ (dev.created_at or '')[:10] or '—' }}</strong></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+      <div class="empty-icon">📵</div>
+      <div>No devices registered yet — appear when offline sync first connects.</div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePayload(btn){
+  var box=btn.nextElementSibling;
+  var open=box.style.display==='block';
+  box.style.display=open?'none':'block';
+  btn.textContent=open?'View':'Hide';
+  if(!open){
+    try{ var d=JSON.parse(box.textContent.trim()); box.textContent=JSON.stringify(d,null,2); }catch(e){}
+  }
+}
+setTimeout(function(){ location.reload(); },30000);
+</script>
+{% endblock %}

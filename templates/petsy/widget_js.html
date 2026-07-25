@@ -1,4 +1,4 @@
-/* Petsy Chat Widget — embed on any website
+/* Petsy Chat Widget
    Usage: <script src="{{ base_url }}/petsy/widget.js"></script>
 */
 {% raw %}
@@ -10,83 +10,234 @@
   if (window.__petsy_loaded) return;
   window.__petsy_loaded = true;
 
-  var style = document.createElement('style');
-  style.textContent =
-    '#petsy-fab{position:fixed;bottom:24px;right:24px;z-index:99998;' +
-    'width:64px;height:64px;border-radius:50%;border:none;cursor:pointer;' +
-    'background:linear-gradient(135deg,#7c3aed,#4f46e5);' +
-    'box-shadow:0 4px 20px rgba(124,58,237,.5);' +
-    'display:flex;align-items:center;justify-content:center;' +
-    'padding:8px;transition:transform .2s,box-shadow .2s;}' +
+  /* ═══════════════════════════════════════════════
+     STYLES
+  ═══════════════════════════════════════════════ */
+  var css = `
+    #petsy-fab {
+      position: fixed;
+      bottom: 28px; right: 28px;
+      z-index: 99998;
+      width: 70px; height: 70px;
+      border-radius: 50%; border: none;
+      cursor: grab;
+      background: linear-gradient(135deg, #f43f5e 0%, #a855f7 55%, #6366f1 100%);
+      box-shadow: 0 6px 28px rgba(168,85,247,.6), 0 2px 10px rgba(0,0,0,.2);
+      display: flex; align-items: center; justify-content: center;
+      padding: 0; user-select: none;
+      animation: petsy-idle 3.6s ease-in-out infinite;
+      will-change: transform;
+    }
+    #petsy-fab.dragging {
+      cursor: grabbing;
+      animation: none !important;
+      transform: scale(1.15) !important;
+      box-shadow: 0 14px 40px rgba(168,85,247,.7);
+      transition: box-shadow .15s;
+    }
+    #petsy-fab.clicked {
+      animation: petsy-click-pop .35s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
 
-    '#petsy-fab:hover{transform:scale(1.12);box-shadow:0 6px 28px rgba(124,58,237,.65);}' +
+    /* ── Idle: big lively multi-step bounce+spin ── */
+    @keyframes petsy-idle {
+      0%   { transform: translateY(0)    rotate(0deg)   scale(1);    }
+      12%  { transform: translateY(-14px) rotate(12deg)  scale(1.08); }
+      25%  { transform: translateY(-6px)  rotate(-8deg)  scale(1.03); }
+      38%  { transform: translateY(-18px) rotate(5deg)   scale(1.10); }
+      50%  { transform: translateY(-4px)  rotate(-12deg) scale(1.02); }
+      62%  { transform: translateY(-12px) rotate(9deg)   scale(1.07); }
+      75%  { transform: translateY(-2px)  rotate(-6deg)  scale(1.01); }
+      88%  { transform: translateY(-9px)  rotate(4deg)   scale(1.05); }
+      100% { transform: translateY(0)    rotate(0deg)   scale(1);    }
+    }
 
-    '#petsy-hint-ext{position:fixed;bottom:100px;right:24px;z-index:99997;' +
-    'background:white;color:#1e1b4b;padding:10px 14px;border-radius:12px;' +
-    'font-size:13px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.15);' +
-    'white-space:nowrap;pointer-events:none;' +
-    'animation:petsy-pop-ext .4s ease;}' +
+    /* ── Click squish ── */
+    @keyframes petsy-click-pop {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(.75) rotate(-15deg); }
+      65%  { transform: scale(1.25) rotate(10deg); }
+      100% { transform: scale(1)  rotate(0deg); }
+    }
 
-    '#petsy-hint-ext::after{content:"";position:absolute;bottom:-7px;right:20px;' +
-    'border:7px solid transparent;border-top-color:white;border-bottom:none;}' +
+    /* ── Excited shake (triggered by JS class) ── */
+    @keyframes petsy-excited {
+      0%,100% { transform: rotate(0deg) scale(1); }
+      10%     { transform: rotate(-20deg) scale(1.15); }
+      25%     { transform: rotate(25deg) scale(1.2) translateY(-12px); }
+      40%     { transform: rotate(-18deg) scale(1.12); }
+      55%     { transform: rotate(22deg) scale(1.18) translateY(-8px); }
+      70%     { transform: rotate(-12deg) scale(1.1); }
+      85%     { transform: rotate(10deg) scale(1.05); }
+    }
+    #petsy-fab.excited {
+      animation: petsy-excited .9s cubic-bezier(.36,.07,.19,.97) forwards !important;
+    }
 
-    '#petsy-panel-ext{position:fixed;bottom:24px;right:24px;z-index:99999;' +
-    'width:370px;height:560px;border-radius:20px;overflow:hidden;' +
-    'box-shadow:0 12px 40px rgba(0,0,0,.2);' +
-    'display:none;flex-direction:column;' +
-    'transition:opacity .25s,transform .25s;opacity:0;' +
-    'transform:scale(.9) translateY(20px);}' +
+    /* ── Hover ── */
+    #petsy-fab:not(.dragging):hover {
+      animation-play-state: paused;
+      transform: scale(1.18) rotate(15deg) !important;
+      box-shadow: 0 12px 40px rgba(244,63,94,.65), 0 0 50px rgba(168,85,247,.4);
+      transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
+    }
 
-    '#petsy-panel-ext.open{display:flex;opacity:1;transform:scale(1) translateY(0);}' +
-    '#petsy-panel-ext iframe{width:100%;height:100%;border:none;}' +
+    /* ── Pulse ring ── */
+    #petsy-fab::before {
+      content: '';
+      position: absolute; inset: -8px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, #f43f5e, #a855f7, #6366f1, #f43f5e);
+      opacity: 0;
+      animation: petsy-ring 2.6s ease-out infinite;
+      z-index: -1;
+    }
+    @keyframes petsy-ring {
+      0%   { transform: scale(1);   opacity: .45; }
+      70%  { transform: scale(1.7); opacity: 0; }
+      100% { transform: scale(1.7); opacity: 0; }
+    }
 
-    '#petsy-close-ext{position:absolute;top:12px;right:12px;z-index:100000;' +
-    'width:28px;height:28px;border-radius:50%;border:none;' +
-    'background:rgba(255,255,255,.25);color:white;font-size:14px;' +
-    'cursor:pointer;display:flex;align-items:center;justify-content:center;}' +
+    /* ── Secondary glint ring ── */
+    #petsy-fab::after {
+      content: '';
+      position: absolute; inset: -3px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(255,255,255,.45);
+      animation: petsy-glint 3.2s linear infinite;
+    }
+    @keyframes petsy-glint {
+      0%   { transform: rotate(0deg) scale(1);    opacity: .6; }
+      50%  { transform: rotate(180deg) scale(1.1); opacity: .25; }
+      100% { transform: rotate(360deg) scale(1);   opacity: .6; }
+    }
 
-    '@keyframes petsy-pop-ext{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}' +
+    /* ── Notification badge ── */
+    #petsy-badge {
+      position: absolute; top: -3px; right: -3px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #f43f5e; color: white;
+      font-size: 10px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      border: 2.5px solid white;
+      box-shadow: 0 2px 8px rgba(244,63,94,.6);
+      animation: badge-pop .45s cubic-bezier(.34,1.56,.64,1);
+      pointer-events: none;
+    }
+    @keyframes badge-pop {
+      from { transform: scale(0) rotate(-45deg); }
+      to   { transform: scale(1) rotate(0deg);   }
+    }
 
-    '@media(max-width:420px){#petsy-panel-ext{width:calc(100vw - 16px);' +
-    'right:8px;height:80vh;bottom:90px;}}';
-  document.head.appendChild(style);
+    /* ── Particle ── */
+    .petsy-particle {
+      position: fixed;
+      pointer-events: none;
+      z-index: 999997;
+      font-size: 18px;
+      animation: particle-fly 1.1s ease-out forwards;
+      line-height: 1;
+    }
+    @keyframes particle-fly {
+      0%   { transform: translate(0,0) scale(1) rotate(0deg); opacity: 1; }
+      100% { opacity: 0; }
+    }
 
-  var fabSVG =
-    '<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">' +
-    '<ellipse cx="18" cy="14" rx="9" ry="12" transform="rotate(-20,18,14)" fill="white" opacity=".35"/>' +
-    '<ellipse cx="62" cy="14" rx="9" ry="12" transform="rotate(20,62,14)" fill="white" opacity=".35"/>' +
-    '<ellipse cx="18" cy="15" rx="5" ry="7" transform="rotate(-20,18,15)" fill="#f9a8d4" opacity=".8"/>' +
-    '<ellipse cx="62" cy="15" rx="5" ry="7" transform="rotate(20,62,15)" fill="#f9a8d4" opacity=".8"/>' +
-    '<circle cx="28" cy="32" r="7" fill="white"/>' +
-    '<circle cx="52" cy="32" r="7" fill="white"/>' +
-    '<circle cx="29" cy="33" r="4" fill="#1e0a3c"/>' +
-    '<circle cx="53" cy="33" r="4" fill="#1e0a3c"/>' +
-    '<circle cx="31" cy="31" r="1.5" fill="white"/>' +
-    '<circle cx="55" cy="31" r="1.5" fill="white"/>' +
-    '<ellipse cx="40" cy="43" rx="5" ry="3.5" fill="white" opacity=".5"/>' +
-    '<path d="M32 49 Q40 57 48 49" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>' +
-    '<ellipse cx="22" cy="44" rx="5" ry="3" fill="rgba(251,113,133,0.5)"/>' +
-    '<ellipse cx="58" cy="44" rx="5" ry="3" fill="rgba(251,113,133,0.5)"/>' +
+    /* ── Panel ── */
+    #petsy-panel-ext {
+      position: fixed;
+      z-index: 99999;
+      width: 380px; height: 590px;
+      border-radius: 22px; overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,.22), 0 4px 18px rgba(0,0,0,.12);
+      display: none; flex-direction: column;
+      opacity: 0; transform: scale(.85) translateY(24px);
+      transition: opacity .3s cubic-bezier(.34,1.56,.64,1),
+                  transform .3s cubic-bezier(.34,1.56,.64,1);
+      border: 1.5px solid rgba(168,85,247,.2);
+    }
+    #petsy-panel-ext.open {
+      display: flex; opacity: 1; transform: scale(1) translateY(0);
+    }
+    #petsy-panel-ext iframe {
+      width: 100%; height: 100%; border: none;
+    }
+
+    /* ── Close btn ── */
+    #petsy-close-ext {
+      position: absolute; top: 10px; right: 10px; z-index: 100000;
+      width: 26px; height: 26px; border-radius: 50%; border: none;
+      background: rgba(255,255,255,.25); color: white; font-size: 13px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(4px); transition: background .15s;
+    }
+    #petsy-close-ext:hover { background: rgba(255,255,255,.42); }
+
+    @media(max-width:440px) {
+      #petsy-panel-ext { width: calc(100vw - 18px); border-radius: 16px; }
+    }
+  `;
+  var styleEl = document.createElement('style');
+  styleEl.textContent = css;
+  document.head.appendChild(styleEl);
+
+
+  /* ═══════════════════════════════════════════════
+     PAW SVG
+  ═══════════════════════════════════════════════ */
+  var paw = '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="width:42px;height:42px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2))">' +
+    '<ellipse cx="32" cy="43" rx="14" ry="11" fill="white" opacity=".95"/>' +
+    '<ellipse cx="15" cy="29" rx="6.5" ry="8" transform="rotate(-15,15,29)" fill="white" opacity=".9"/>' +
+    '<ellipse cx="26" cy="21" rx="6" ry="7.5" fill="white" opacity=".9"/>' +
+    '<ellipse cx="38" cy="21" rx="6" ry="7.5" fill="white" opacity=".9"/>' +
+    '<ellipse cx="49" cy="29" rx="6.5" ry="8" transform="rotate(15,49,29)" fill="white" opacity=".9"/>' +
+    '<ellipse cx="32" cy="44" rx="7" ry="5.5" fill="#f9a8d4" opacity=".75"/>' +
+    '<ellipse cx="15.5" cy="30" rx="3" ry="3.5" fill="#f9a8d4" opacity=".65"/>' +
+    '<ellipse cx="26.5" cy="22" rx="3" ry="3.5" fill="#f9a8d4" opacity=".65"/>' +
+    '<ellipse cx="37.5" cy="22" rx="3" ry="3.5" fill="#f9a8d4" opacity=".65"/>' +
+    '<ellipse cx="48.5" cy="30" rx="3" ry="3.5" fill="#f9a8d4" opacity=".65"/>' +
     '</svg>';
 
+
+  /* ═══════════════════════════════════════════════
+     FAB
+  ═══════════════════════════════════════════════ */
   var fab = document.createElement('button');
   fab.id = 'petsy-fab';
-  fab.title = 'Chat with Petsy';
-  fab.innerHTML = fabSVG;
+  fab.title = 'Chat with Petsy 🐾';
+  fab.setAttribute('aria-label', 'Open Petsy chat');
+  fab.innerHTML = paw;
   document.body.appendChild(fab);
 
-  var hint = document.createElement('div');
-  hint.id = 'petsy-hint-ext';
-  hint.textContent = 'Hi! I\'m Petsy — ask me anything!';
-  document.body.appendChild(hint);
-  setTimeout(function() { hint.style.display = 'none'; }, 5000);
+  // Badge after 4 s
+  setTimeout(function() {
+    if (!_open) {
+      var b = document.createElement('div');
+      b.id = 'petsy-badge';
+      b.textContent = '1';
+      fab.appendChild(b);
+    }
+  }, 4000);
 
+  // Random "excited" anim every 10 s
+  setInterval(function() {
+    if (!_open && !_drag.active) {
+      fab.classList.remove('excited');
+      void fab.offsetWidth; // reflow to restart animation
+      fab.classList.add('excited');
+      setTimeout(function() { fab.classList.remove('excited'); }, 950);
+    }
+  }, 10000);
+
+
+  /* ═══════════════════════════════════════════════
+     PANEL
+  ═══════════════════════════════════════════════ */
   var panel = document.createElement('div');
   panel.id = 'petsy-panel-ext';
 
   var closeBtn = document.createElement('button');
   closeBtn.id = 'petsy-close-ext';
-  closeBtn.title = 'Close';
   closeBtn.innerHTML = '&#x2715;';
   closeBtn.onclick = function(e) { e.stopPropagation(); closePanel(); };
 
@@ -98,30 +249,244 @@
   panel.appendChild(iframe);
   document.body.appendChild(panel);
 
-  var open = false;
-  var loaded = false;
 
-  function openPanel() {
-    if (!loaded) {
-      iframe.src = BASE + '/petsy/embed';
-      loaded = true;
+  /* ═══════════════════════════════════════════════
+     STATE
+  ═══════════════════════════════════════════════ */
+  var _open   = false;
+  var _loaded = false;
+
+  /* drag state */
+  var _drag = {
+    active: false, moved: false,
+    startX: 0, startY: 0,
+    offX: 0,   offY: 0,
+    fabLeft: 0, fabTop: 0
+  };
+
+
+  /* ═══════════════════════════════════════════════
+     SOUND  (Web Audio — no file needed)
+  ═══════════════════════════════════════════════ */
+  function playSound(open) {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      var ctx = new Ctx();
+      function tone(f, t0, dur, vol) {
+        var o = ctx.createOscillator();
+        var g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        o.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(0.001, ctx.currentTime + t0);
+        g.gain.linearRampToValueAtTime(vol, ctx.currentTime + t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t0 + dur);
+        o.start(ctx.currentTime + t0);
+        o.stop(ctx.currentTime + t0 + dur + 0.06);
+      }
+      if (open) {
+        tone(440, 0.00, 0.18, 0.18);
+        tone(660, 0.12, 0.16, 0.16);
+        tone(880, 0.22, 0.22, 0.13);
+      } else {
+        tone(660, 0.00, 0.14, 0.14);
+        tone(440, 0.10, 0.18, 0.12);
+      }
+    } catch(_e) {}
+  }
+
+
+  /* ═══════════════════════════════════════════════
+     PARTICLES
+  ═══════════════════════════════════════════════ */
+  var _emojis = ['🐾','⭐','✨','💜','🐱','🌟','💫'];
+
+  function spawnParticles() {
+    var rect = fab.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2;
+    var cy = rect.top  + rect.height / 2;
+    for (var i = 0; i < 7; i++) {
+      (function(i) {
+        setTimeout(function() {
+          var p = document.createElement('div');
+          p.className = 'petsy-particle';
+          p.textContent = _emojis[Math.floor(Math.random() * _emojis.length)];
+          var angle = (Math.random() * 360) * Math.PI / 180;
+          var dist  = 55 + Math.random() * 50;
+          var dx = Math.cos(angle) * dist;
+          var dy = Math.sin(angle) * dist - 30;
+          var fs  = 13 + Math.random() * 12;
+          p.style.cssText =
+            'left:' + (cx - fs/2) + 'px;' +
+            'top:' + (cy - fs/2) + 'px;' +
+            'font-size:' + fs + 'px;';
+          p.style.setProperty('--dx', dx + 'px');
+          p.style.setProperty('--dy', dy + 'px');
+          // Inline the end transform since CSS var in keyframe may not work cross-browser
+          p.animate([
+            { transform: 'translate(0,0) scale(1) rotate(0deg)', opacity: 1 },
+            { transform: 'translate('+dx+'px,'+dy+'px) scale(0) rotate('+(Math.random()*360)+'deg)', opacity: 0 }
+          ], { duration: 900 + Math.random()*300, easing: 'ease-out', fill: 'forwards' });
+          document.body.appendChild(p);
+          setTimeout(function() { p.remove(); }, 1300);
+        }, i * 70);
+      })(i);
     }
-    open = true;
+  }
+
+
+  /* ═══════════════════════════════════════════════
+     PANEL POSITIONING  (follows FAB)
+  ═══════════════════════════════════════════════ */
+  function positionPanel() {
+    var rect = fab.getBoundingClientRect();
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var pW = Math.min(380, vw - 18);
+    var pH = 590;
+    var pad = 10;
+
+    // Prefer to open above the FAB
+    var top, left;
+
+    if (rect.top - pH - pad > 0) {
+      top = rect.top - pH - pad;    // above
+    } else {
+      top = rect.bottom + pad;      // below
+    }
+
+    // Align horizontally: try to centre on FAB, clamp to viewport
+    left = rect.left + rect.width / 2 - pW / 2;
+    left = Math.max(pad, Math.min(vw - pW - pad, left));
+    top  = Math.max(pad, Math.min(vh - pH - pad, top));
+
+    panel.style.left   = left + 'px';
+    panel.style.top    = top  + 'px';
+    panel.style.width  = pW   + 'px';
+    panel.style.right  = 'auto';
+    panel.style.bottom = 'auto';
+  }
+
+
+  /* ═══════════════════════════════════════════════
+     OPEN / CLOSE
+  ═══════════════════════════════════════════════ */
+  function openPanel() {
+    positionPanel();
+    if (!_loaded) { iframe.src = BASE + '/petsy/embed'; _loaded = true; }
+    _open = true;
     panel.classList.add('open');
-    fab.style.transform = 'scale(0)';
-    fab.style.opacity = '0';
-    hint.style.display = 'none';
+    document.getElementById('petsy-badge') && document.getElementById('petsy-badge').remove();
   }
 
   function closePanel() {
-    open = false;
+    _open = false;
     panel.classList.remove('open');
-    fab.style.transform = '';
-    fab.style.opacity = '';
   }
 
-  fab.addEventListener('click', function() {
-    if (open) closePanel(); else openPanel();
+
+  /* ═══════════════════════════════════════════════
+     DRAG  (pointer events — works for mouse + touch)
+  ═══════════════════════════════════════════════ */
+  function onPointerDown(e) {
+    // Use primary button only for mouse
+    if (e.type === 'mousedown' && e.button !== 0) return;
+
+    var pt = e.touches ? e.touches[0] : e;
+    var rect = fab.getBoundingClientRect();
+
+    _drag.active  = true;
+    _drag.moved   = false;
+    _drag.startX  = pt.clientX;
+    _drag.startY  = pt.clientY;
+    _drag.offX    = pt.clientX - rect.left;
+    _drag.offY    = pt.clientY - rect.top;
+
+    fab.classList.add('dragging');
+  }
+
+  function onPointerMove(e) {
+    if (!_drag.active) return;
+    var pt = e.touches ? e.touches[0] : e;
+    var dx = pt.clientX - _drag.startX;
+    var dy = pt.clientY - _drag.startY;
+
+    if (!_drag.moved && Math.hypot(dx, dy) > 7) {
+      _drag.moved = true;
+    }
+
+    if (_drag.moved) {
+      if (e.cancelable) e.preventDefault();
+      var W  = window.innerWidth;
+      var H  = window.innerHeight;
+      var fW = fab.offsetWidth;
+      var fH = fab.offsetHeight;
+      var x  = Math.max(0, Math.min(W - fW, pt.clientX - _drag.offX));
+      var y  = Math.max(0, Math.min(H - fH, pt.clientY - _drag.offY));
+
+      fab.style.left   = x + 'px';
+      fab.style.top    = y + 'px';
+      fab.style.right  = 'auto';
+      fab.style.bottom = 'auto';
+
+      if (_open) positionPanel();
+    }
+  }
+
+  function onPointerUp(e) {
+    if (!_drag.active) return;
+    _drag.active = false;
+    fab.classList.remove('dragging');
+
+    document.removeEventListener('mousemove',  onPointerMove);
+    document.removeEventListener('touchmove',  onPointerMove);
+    document.removeEventListener('mouseup',    onPointerUp);
+    document.removeEventListener('touchend',   onPointerUp);
+
+    if (!_drag.moved) {
+      // ── Pure click: toggle ──
+      fab.classList.remove('clicked');
+      void fab.offsetWidth;
+      fab.classList.add('clicked');
+      setTimeout(function() { fab.classList.remove('clicked'); }, 360);
+
+      playSound(!_open);
+      if (_open) {
+        closePanel();
+      } else {
+        spawnParticles();
+        openPanel();
+      }
+    } else {
+      // ── After drag: snap to nearest side ──
+      snapToEdge();
+    }
+  }
+
+  /* Snap FAB to nearest left/right edge after drag */
+  function snapToEdge() {
+    var rect = fab.getBoundingClientRect();
+    var cx   = rect.left + rect.width / 2;
+    var W    = window.innerWidth;
+    var targetX = cx < W / 2 ? 14 : W - fab.offsetWidth - 14;
+    fab.style.transition = 'left .3s cubic-bezier(.34,1.56,.64,1)';
+    fab.style.left = targetX + 'px';
+    setTimeout(function() { fab.style.transition = ''; }, 350);
+    if (_open) setTimeout(positionPanel, 310);
+  }
+
+  /* Attach events */
+  fab.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    onPointerDown(e);
+    document.addEventListener('mousemove', onPointerMove);
+    document.addEventListener('mouseup',   onPointerUp);
   });
+  fab.addEventListener('touchstart', function(e) {
+    onPointerDown(e);
+    document.addEventListener('touchmove', onPointerMove, { passive: false });
+    document.addEventListener('touchend',  onPointerUp);
+  }, { passive: true });
+
 })();
 {% endraw %}

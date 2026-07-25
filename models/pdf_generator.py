@@ -1,5 +1,5 @@
 """
-Invoice PDF Generator — uses fpdf2 (pure Python, no system dependencies).
+Invoice PDF Generator - uses fpdf2 (pure Python, no system dependencies).
 Install: pip install fpdf2
 """
 from __future__ import annotations
@@ -138,7 +138,7 @@ def generate_invoice_pdf(invoice: dict, clinic: Optional[dict] = None) -> bytes:
     pdf.set_x(pdf.l_margin + 3)
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_text_color(*_NAVY)
-    pdf.cell(half - 6, 5, invoice.get("owner_name") or "—",
+    pdf.cell(half - 6, 5, invoice.get("owner_name") or "-",
              new_x=XPos.LEFT, new_y=YPos.NEXT)
     pdf.set_x(pdf.l_margin + 3)
     pdf.set_font("Helvetica", "", 8)
@@ -155,7 +155,7 @@ def generate_invoice_pdf(invoice: dict, clinic: Optional[dict] = None) -> bytes:
     pdf.set_x(rx + 3)
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_text_color(*_NAVY)
-    pdf.cell(half - 6, 5, invoice.get("pet_name") or "—",
+    pdf.cell(half - 6, 5, invoice.get("pet_name") or "-",
              new_x=XPos.LEFT, new_y=YPos.NEXT)
     pdf.set_x(rx + 3)
     pdf.set_font("Helvetica", "", 8)
@@ -198,7 +198,7 @@ def generate_invoice_pdf(invoice: dict, clinic: Optional[dict] = None) -> bytes:
         pdf.cell(col_w[1], row_h, ltype[:10], align="C", fill=True)
         pdf.cell(col_w[2], row_h, f"{up:,.2f}", align="R", fill=True)
         pdf.cell(col_w[3], row_h, f"{tot:,.2f}", align="R", fill=True)
-        pdf.cell(col_w[4], row_h, f"{disc:.0f}%" if disc else "—", align="R", fill=True)
+        pdf.cell(col_w[4], row_h, f"{disc:.0f}%" if disc else "-", align="R", fill=True)
         pdf.set_font("Helvetica", "B", 8.5)
         pdf.cell(col_w[5], row_h, f"{tot:,.2f}", align="R", fill=True)
         pdf.set_font("Helvetica", "", 8.5)
@@ -290,5 +290,382 @@ def generate_invoice_pdf(invoice: dict, clinic: Optional[dict] = None) -> bytes:
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(*_BLACK)
         pdf.multi_cell(W, 5, notes, fill=True)
+
+    return bytes(pdf.output())
+
+
+# ── Vaccination Certificate ────────────────────────────────────────────────────
+
+_TEAL  = ( 13, 148, 136)   # #0d9488
+_TEAL_L = (204, 251, 241)   # #ccfbf1
+
+
+def generate_vaccination_certificate_pdf(vacc: dict, pet: dict, clinic: dict | None = None) -> bytes:
+    """
+    Generate a vaccination certificate PDF.
+    vacc  - row from vaccinations table (+ pet_name, owner_name via join)
+    pet   - row from get_pet() (includes owner_name, owner_phone)
+    clinic - row from get_clinic()
+    """
+    if not _FPDF_OK:
+        raise RuntimeError("fpdf2 is not installed. Run: pip install fpdf2")
+
+    clinic = clinic or {}
+    cname  = clinic.get("name") or "Aleefy Veterinary Clinic"
+    cphone = clinic.get("phone") or ""
+    caddr  = clinic.get("address") or ""
+
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.set_margins(20, 20, 20)
+    pdf.add_page()
+
+    W = pdf.w - pdf.l_margin - pdf.r_margin   # 170 mm
+
+    # ── Header band ──────────────────────────────────────────────────────────
+    pdf.set_fill_color(*_TEAL)
+    pdf.rect(0, 0, 210, 42, "F")
+
+    pdf.set_xy(20, 10)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_text_color(*_WHITE)
+    pdf.cell(W, 8, cname, new_x=XPos.LEFT, new_y=YPos.NEXT)
+
+    pdf.set_x(20)
+    pdf.set_font("Helvetica", "", 9)
+    sub = "Vaccination Certificate"
+    if cphone:
+        sub += f"    |    {cphone}"
+    if caddr:
+        sub += f"    |    {caddr}"
+    pdf.cell(W, 5, sub, new_x=XPos.LEFT, new_y=YPos.NEXT)
+
+    # Certificate number top-right
+    cert_no = f"CERT-{vacc.get('id', 0):05d}"
+    pdf.set_xy(130, 9)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(60, 7, cert_no, align="R", new_x=XPos.RIGHT, new_y=YPos.LAST)
+    pdf.set_xy(130, 17)
+    pdf.set_font("Helvetica", "", 8)
+    issued = str(vacc.get("administered_at") or date.today())[:10]
+    pdf.cell(60, 5, f"Issued: {issued}", align="R")
+
+    pdf.set_text_color(*_BLACK)
+    pdf.ln(28)
+
+    # ── Title ─────────────────────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(*_TEAL)
+    pdf.cell(W, 10, "VACCINATION CERTIFICATE", align="C", new_x=XPos.LEFT, new_y=YPos.NEXT)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(*_MUTED)
+    pdf.cell(W, 5, "Official record of vaccination administered by a licensed veterinarian",
+             align="C", new_x=XPos.LEFT, new_y=YPos.NEXT)
+    pdf.ln(6)
+
+    # ── Two-column info boxes ─────────────────────────────────────────────────
+    half = W / 2 - 4
+    y0 = pdf.get_y()
+
+    def _box(x, y, w, h, title, lines_kv):
+        pdf.set_fill_color(*_TEAL_L)
+        pdf.set_draw_color(*_TEAL)
+        pdf.rect(x, y, w, h, "FD")
+        pdf.set_xy(x + 4, y + 4)
+        pdf.set_font("Helvetica", "B", 7.5)
+        pdf.set_text_color(*_TEAL)
+        pdf.cell(w - 8, 5, title.upper(), new_x=XPos.LEFT, new_y=YPos.NEXT)
+        pdf.set_draw_color(*_TEAL)
+        pdf.line(x + 4, pdf.get_y(), x + w - 4, pdf.get_y())
+        pdf.ln(2)
+        for label, val in lines_kv:
+            pdf.set_x(x + 4)
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*_MUTED)
+            pdf.cell(w * 0.38, 5.5, label)
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(*_BLACK)
+            pdf.cell(w * 0.58, 5.5, str(val or "-"), new_x=XPos.LEFT, new_y=YPos.NEXT)
+
+    pet_name    = pet.get("pet_name") or vacc.get("pet_name") or "-"
+    species     = pet.get("species") or "-"
+    breed       = pet.get("breed") or "-"
+    sex         = pet.get("sex") or "-"
+    dob         = str(pet.get("dob") or "Unknown")[:10]
+    microchip   = pet.get("microchip_id") or "-"
+    owner_name  = pet.get("owner_name") or vacc.get("owner_name") or "-"
+    owner_phone = pet.get("owner_phone") or "-"
+
+    pet_info = [
+        ("Name",      pet_name),
+        ("Species",   species),
+        ("Breed",     breed),
+        ("Sex",       sex),
+        ("Date of Birth", dob),
+        ("Microchip", microchip),
+    ]
+    owner_info = [
+        ("Owner",    owner_name),
+        ("Phone",    owner_phone),
+        ("Address",  pet.get("owner_address") or "-"),
+    ]
+
+    box_h = 58
+    _box(pdf.l_margin, y0, half, box_h, "Patient Information", pet_info)
+    _box(pdf.l_margin + half + 8, y0, half, box_h, "Owner Information", owner_info)
+
+    pdf.set_y(y0 + box_h + 8)
+
+    # ── Vaccine details ───────────────────────────────────────────────────────
+    pdf.set_fill_color(*_NAVY)
+    pdf.set_text_color(*_WHITE)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(W, 7, "  VACCINE DETAILS", fill=True, new_x=XPos.LEFT, new_y=YPos.NEXT)
+
+    details = [
+        ("Vaccine Name",     vacc.get("vaccine_name") or "-"),
+        ("Brand / Product",  vacc.get("vaccine_brand") or "-"),
+        ("Batch / Lot No.",  vacc.get("batch_number") or "-"),
+        ("Dose Number",      str(vacc.get("dose_number") or "1")),
+        ("Site of Injection",vacc.get("site") or "Subcutaneous"),
+        ("Date Administered",str(vacc.get("administered_at") or "-")[:10]),
+        ("Next Due Date",    str(vacc.get("next_due_at") or "-")[:10]),
+        ("Administered By",  f"Dr. {vacc.get('administered_by')}" if vacc.get("administered_by") else "-"),
+    ]
+
+    fill = False
+    for label, val in details:
+        pdf.set_fill_color(*(_LIGHT if fill else _WHITE))
+        pdf.set_text_color(*_MUTED)
+        pdf.set_font("Helvetica", "B", 8.5)
+        pdf.cell(W * 0.38, 7, f"  {label}", fill=True)
+        pdf.set_text_color(*_BLACK)
+        pdf.set_font("Helvetica", "", 8.5)
+        pdf.cell(W * 0.62, 7, f"  {val}", fill=True, new_x=XPos.LEFT, new_y=YPos.NEXT)
+        fill = not fill
+
+    pdf.ln(4)
+
+    # ── Notes ─────────────────────────────────────────────────────────────────
+    if vacc.get("notes"):
+        pdf.set_fill_color(*_LIGHT)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*_MUTED)
+        pdf.cell(W, 5, "  Notes", fill=True, new_x=XPos.LEFT, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*_BLACK)
+        pdf.multi_cell(W, 5, f"  {vacc['notes']}", fill=True)
+        pdf.ln(4)
+
+    # ── Signature line ────────────────────────────────────────────────────────
+    pdf.ln(10)
+    sig_x = pdf.l_margin + W - 70
+    pdf.set_draw_color(*_NAVY)
+    pdf.line(sig_x, pdf.get_y(), sig_x + 70, pdf.get_y())
+    pdf.ln(2)
+    pdf.set_x(sig_x)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(*_MUTED)
+    dr = vacc.get("administered_by", "")
+    pdf.cell(70, 5, f"Dr. {dr}" if dr else "Veterinarian Signature", align="C")
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    pdf.set_y(-18)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(*_MUTED)
+    pdf.cell(0, 5,
+             f"This certificate was generated by {cname}  -  {cert_no}  -  Keep this document for your records.",
+             align="C")
+
+    return bytes(pdf.output())
+
+
+# ── Payslip PDF ────────────────────────────────────────────────────────────────
+
+_PURPLE   = ( 91,  33, 182)   # #5b21b6
+_PURPLE_L = (237, 233, 254)   # #ede9fe
+
+
+def generate_payslip_pdf(salary: dict, clinic: dict | None = None) -> bytes:
+    """Generate a professional payslip PDF for a salary record."""
+    if not _FPDF_OK:
+        raise RuntimeError("fpdf2 is not installed. Run: pip install fpdf2")
+
+    clinic = clinic or {}
+    cname  = clinic.get("name") or "Premium Animal Hospital"
+    cphone = clinic.get("phone") or ""
+    caddr  = clinic.get("address") or ""
+
+    MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
+              "Jul","Aug","Sep","Oct","Nov","Dec"]
+    yr  = int(salary.get("period_year")  or date.today().year)
+    mo  = int(salary.get("period_month") or date.today().month)
+    period_label = f"{MONTHS[mo-1]} {yr}"
+
+    def _f(key):
+        return float(salary.get(key) or 0)
+
+    basic  = _f("basic_salary")
+    allow  = _f("allowances")
+    ot_h   = _f("overtime_hours")
+    ot_r   = _f("overtime_rate")
+    ot_amt = round(ot_h * ot_r, 2)
+    gross  = _f("gross") or round(basic + allow + ot_amt, 2)
+    ded    = _f("deductions")
+    abs_d  = _f("absence_deduction")
+    tax_d  = _f("tax_deduction")
+    net    = _f("net") or round(gross - ded - abs_d - tax_d, 2)
+
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.set_margins(18, 18, 18)
+    pdf.add_page()
+    W = pdf.w - pdf.l_margin - pdf.r_margin   # ~174 mm
+
+    # ── Header band ──────────────────────────────────────────────────────────
+    pdf.set_fill_color(*_NAVY)
+    pdf.rect(0, 0, 210, 40, "F")
+
+    pdf.set_xy(18, 9)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_text_color(*_WHITE)
+    pdf.cell(W * 0.6, 9, cname[:50], ln=False)
+
+    pdf.set_xy(210 - 18 - 52, 9)
+    pdf.set_fill_color(*_PURPLE)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(52, 9, "  PAY SLIP  ", fill=True, align="C",
+             new_x=XPos.LEFT, new_y=YPos.NEXT)
+
+    pdf.set_xy(18, 20)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(200, 220, 255)
+    pdf.cell(W * 0.6, 5, f"Period: {period_label}", ln=False)
+    if cphone or caddr:
+        pdf.set_xy(18, 26)
+        pdf.cell(W, 5, f"{cphone}  {caddr}".strip())
+
+    # ── Employee info boxes ───────────────────────────────────────────────────
+    pdf.set_y(46)
+    box_w = W / 2 - 3
+
+    def _info_box(x, y, label, value):
+        pdf.set_xy(x, y)
+        pdf.set_fill_color(*_LIGHT)
+        pdf.set_draw_color(*_BORDER)
+        pdf.rect(x, y, box_w, 22, "FD")
+        pdf.set_xy(x + 3, y + 3)
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.set_text_color(*_MUTED)
+        pdf.cell(box_w - 6, 4, label.upper())
+        pdf.set_xy(x + 3, y + 8)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(*_BLACK)
+        pdf.cell(box_w - 6, 6, str(value)[:35])
+
+    lx = pdf.l_margin
+    rx = pdf.l_margin + box_w + 6
+    _info_box(lx, 46, "Employee Name", salary.get("full_name") or "-")
+    _info_box(rx, 46, "Period",        period_label)
+    _info_box(lx, 71, "Role",          (salary.get("role") or "").replace("_", " ").title())
+    _info_box(rx, 71, "Payment Status", salary.get("status") or "Draft")
+    hire_date     = str(salary.get("hire_date") or "")[:10]
+    contract_type = salary.get("contract_type") or "Full-time"
+    _info_box(lx, 96, "Hire Date",     hire_date or "-")
+    _info_box(rx, 96, "Contract Type", contract_type)
+
+    # ── Earnings table ────────────────────────────────────────────────────────
+    pdf.set_y(124)
+    col1 = W * 0.55
+    colR = W * 0.45
+
+    def _tbl_header(title):
+        pdf.set_fill_color(*_NAVY)
+        pdf.set_text_color(*_WHITE)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(W, 7, f"  {title}", fill=True, new_x=XPos.LEFT, new_y=YPos.NEXT)
+
+    def _tbl_row(label, amount, color=None, bold=False):
+        pdf.set_fill_color(*_WHITE)
+        pdf.set_text_color(*(color or _BLACK))
+        s = "B" if bold else ""
+        pdf.set_font("Helvetica", s, 8.5)
+        pdf.cell(col1, 6.5, f"  {label}", border="B")
+        pdf.cell(colR, 6.5, f"EGP {amount:,.2f}", border="B", align="R",
+                 new_x=XPos.LEFT, new_y=YPos.NEXT)
+
+    _tbl_header("EARNINGS")
+    _tbl_row("Basic Salary", basic)
+    if allow > 0:
+        _tbl_row("Allowances", allow)
+    if ot_amt > 0:
+        _tbl_row(f"Overtime ({ot_h:.1f} hrs x EGP {ot_r:.2f})", ot_amt)
+    pdf.set_fill_color(*_PURPLE_L)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_text_color(*_PURPLE)
+    pdf.cell(col1, 7, "  GROSS PAY", fill=True)
+    pdf.cell(colR, 7, f"EGP {gross:,.2f}", fill=True, align="R",
+             new_x=XPos.LEFT, new_y=YPos.NEXT)
+    pdf.ln(5)
+
+    _tbl_header("DEDUCTIONS")
+    if ded > 0:
+        _tbl_row("Other Deductions", ded)
+    if abs_d > 0:
+        _tbl_row("Absence Deduction", abs_d)
+    if tax_d > 0:
+        _tbl_row("Income Tax", tax_d)
+    total_ded = ded + abs_d + tax_d
+    pdf.set_fill_color(*_LIGHT)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_text_color(*_RED)
+    pdf.cell(col1, 7, "  TOTAL DEDUCTIONS", fill=True)
+    pdf.cell(colR, 7, f"EGP {total_ded:,.2f}", fill=True, align="R",
+             new_x=XPos.LEFT, new_y=YPos.NEXT)
+    pdf.ln(5)
+
+    pdf.set_fill_color(*_GREEN)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.set_text_color(*_WHITE)
+    pdf.cell(W, 12, f"  NET PAY: EGP {net:,.2f}", fill=True,
+             new_x=XPos.LEFT, new_y=YPos.NEXT)
+
+    if salary.get("payment_date"):
+        pdf.ln(4)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*_MUTED)
+        method = salary.get("payment_method") or "Cash"
+        pdf.cell(W, 5,
+                 f"Paid on {str(salary['payment_date'])[:10]} via {method}",
+                 align="C", new_x=XPos.LEFT, new_y=YPos.NEXT)
+
+    notes = salary.get("notes") or ""
+    if notes:
+        pdf.ln(3)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_text_color(*_MUTED)
+        pdf.multi_cell(W, 4.5, f"Notes: {notes}")
+
+    # ── Signature lines ────────────────────────────────────────────────────────
+    pdf.ln(10)
+    sig_y = pdf.get_y()
+    pdf.set_draw_color(*_NAVY)
+    pdf.line(pdf.l_margin, sig_y, pdf.l_margin + 70, sig_y)
+    pdf.line(pdf.l_margin + W - 70, sig_y, pdf.l_margin + W, sig_y)
+    pdf.ln(2)
+    pdf.set_font("Helvetica", "", 7.5)
+    pdf.set_text_color(*_MUTED)
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(70, 4, "Employee Signature", align="C")
+    pdf.set_x(pdf.l_margin + W - 70)
+    pdf.cell(70, 4, "Authorized Signatory", align="C")
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    pdf.set_y(-14)
+    pdf.set_font("Helvetica", "I", 7.5)
+    pdf.set_text_color(*_MUTED)
+    pdf.cell(0, 5,
+             f"Computer-generated payslip  -  {cname}  -  {date.today().isoformat()}",
+             align="C")
 
     return bytes(pdf.output())

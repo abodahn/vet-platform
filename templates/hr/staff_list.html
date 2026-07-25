@@ -6,34 +6,31 @@
 {% block page_sub %}Manage clinic staff, roles, and access{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('hr.staff_new') }}" class="pf-btn pf-btn-primary">
-  ➕ New Staff Member
-</a>
-<a href="{{ url_for('hr.roles_list') }}" class="pf-btn pf-btn-secondary">
-  🎭 View Roles
-</a>
+<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">HR Dashboard</a>
+<a href="{{ url_for('hr.staff_new') }}" class="pf-btn pf-btn-primary">+ New Staff</a>
+<a href="{{ url_for('hr.roles_list') }}" class="pf-btn pf-btn-secondary">View Roles</a>
 {% endblock %}
 
 {% block head_extra %}
 <style>
-.hr-filter-bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:20px; }
+.hr-filter-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:20px; }
 .hr-filter-bar select, .hr-filter-bar input { padding:8px 12px; border:1px solid var(--cl-border); border-radius:8px; background:var(--cl-surface); color:var(--cl-text); font-size:14px; }
 .hr-filter-bar button { padding:8px 18px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:14px; }
 .staff-table { width:100%; border-collapse:collapse; background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); }
-.staff-table th { background:var(--cl-primary); color:#fff; padding:12px 16px; text-align:left; font-size:13px; font-weight:600; }
-.staff-table td { padding:12px 16px; border-bottom:1px solid var(--cl-border); font-size:14px; }
+.staff-table th { background:var(--cl-primary); color:#fff; padding:11px 14px; text-align:left; font-size:12px; font-weight:600; text-transform:uppercase; }
+.staff-table td { padding:11px 14px; border-bottom:1px solid var(--cl-border); font-size:13.5px; }
 .staff-table tr:last-child td { border-bottom:none; }
 .staff-table tr:hover td { background:var(--cl-bg); }
-.avatar-circle { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#fff; flex-shrink:0; }
-.role-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; color:#fff; }
+.avatar-circle { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; color:#fff; flex-shrink:0; }
+.role-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; color:#fff; }
+.ct-badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
 .status-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
 .status-active   { background:#dcfce7; color:#166534; }
 .status-inactive { background:#fee2e2; color:#991b1b; }
-.action-btn { padding:5px 12px; border-radius:6px; font-size:12px; font-weight:500; text-decoration:none; display:inline-block; margin-right:4px; }
-.btn-view { background:var(--cl-info); color:#fff; }
-.btn-edit { background:var(--cl-warning); color:#fff; }
+.action-btn { padding:4px 11px; border-radius:6px; font-size:11px; font-weight:500; text-decoration:none; display:inline-block; margin-right:3px; }
+.btn-view { background:var(--cl-info,#0891b2); color:#fff; }
+.btn-edit { background:var(--cl-warning,#d97706); color:#fff; }
 .empty-state { text-align:center; padding:60px 20px; color:var(--cl-muted); }
-.empty-state .empty-icon { font-size:48px; margin-bottom:12px; }
 .result-count { color:var(--cl-muted); font-size:13px; margin-bottom:12px; }
 </style>
 {% endblock %}
@@ -50,13 +47,29 @@
       </option>
       {% endfor %}
     </select>
-    <input type="text" name="q" value="{{ search }}" placeholder="Search name, username, email…" style="min-width:220px;">
-    <button type="submit">🔍 Search</button>
-    {% if role_filter or search %}
-    <a href="{{ url_for('hr.staff_list') }}" style="color:var(--cl-muted);text-decoration:none;font-size:13px;">✕ Clear</a>
+
+    <select name="contract" onchange="this.form.submit()">
+      <option value="">All Contracts</option>
+      {% for ct in ['Full-time','Part-time','Contract','Probation','Intern'] %}
+      <option value="{{ ct }}" {% if contract_filter == ct %}selected{% endif %}>{{ ct }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="status" onchange="this.form.submit()">
+      <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+      <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+      <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+    </select>
+
+    <input type="text" name="q" value="{{ search }}" placeholder="Search name, title, email…" style="min-width:210px;">
+    <button type="submit">Search</button>
+    {% if role_filter or search or contract_filter or status_filter not in ('active', '') %}
+    <a href="{{ url_for('hr.staff_list') }}" style="color:var(--cl-muted);text-decoration:none;font-size:13px;">x Clear</a>
     {% endif %}
   </form>
 </div>
+
+{% set contract_colors = {'Full-time':'#16a34a','Part-time':'#0891b2','Contract':'#d97706','Probation':'#dc2626','Intern':'#7c3aed'} %}
 
 <div class="result-count">{{ users|length }} staff member{{ 's' if users|length != 1 else '' }} found</div>
 
@@ -66,12 +79,13 @@
     <thead>
       <tr>
         <th>Staff Member</th>
-        <th>Username</th>
+        <th>Job Title</th>
         <th>Role</th>
+        <th>Contract</th>
         <th>Branch</th>
         <th>Contact</th>
         <th>Status</th>
-        <th>Last Login</th>
+        <th>Hired</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -85,38 +99,42 @@
         'groomer':'#be185d','boarding_staff':'#6b7280','support_admin':'#374151','auditor':'#6b7280'
       } %}
       {% set role_color = color_map.get(u.role, '#6b7280') %}
+      {% set cc = contract_colors.get(u.contract_type or 'Full-time', '#6b7280') %}
       <tr>
         <td>
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="avatar-circle" style="background:{{ role_color }}">{{ initials }}</div>
             <div>
               <div style="font-weight:600;">{{ u.full_name or '—' }}</div>
-              {% if u.full_name_ar %}<div style="font-size:12px;color:var(--cl-muted);direction:rtl;">{{ u.full_name_ar }}</div>{% endif %}
+              <div style="font-size:11px;color:var(--cl-muted);">{{ u.username }}</div>
             </div>
           </div>
         </td>
-        <td><code style="background:var(--cl-bg);padding:2px 6px;border-radius:4px;font-size:13px;">{{ u.username }}</code></td>
+        <td style="color:var(--cl-muted)">{{ u.job_title or '—' }}</td>
         <td>
           <span class="role-badge" style="background:{{ role_color }};">
             {{ u.role.replace('_',' ').title() }}
           </span>
         </td>
+        <td>
+          <span class="ct-badge" style="background:{{ cc }}22;color:{{ cc }};border:1px solid {{ cc }}44">
+            {{ u.contract_type or 'Full-time' }}
+          </span>
+        </td>
         <td>{{ u.branch_name or '—' }}</td>
         <td>
-          {% if u.email %}<div style="font-size:13px;">📧 {{ u.email }}</div>{% endif %}
-          {% if u.phone %}<div style="font-size:13px;">📞 {{ u.phone }}</div>{% endif %}
+          {% if u.email %}<div style="font-size:12px;">{{ u.email }}</div>{% endif %}
+          {% if u.phone %}<div style="font-size:12px;">{{ u.phone }}</div>{% endif %}
           {% if not u.email and not u.phone %}—{% endif %}
         </td>
         <td>
           {% if u.is_active %}
-            <span class="status-badge status-active">● Active</span>
+            <span class="status-badge status-active">Active</span>
           {% else %}
-            <span class="status-badge status-inactive">● Inactive</span>
+            <span class="status-badge status-inactive">Inactive</span>
           {% endif %}
         </td>
-        <td style="font-size:13px;color:var(--cl-muted);">
-          {{ u.last_login_at[:16] if u.last_login_at else 'Never' }}
-        </td>
+        <td style="font-size:12px;color:var(--cl-muted);">{{ u.hire_date or '—' }}</td>
         <td>
           <a href="{{ url_for('hr.staff_detail', user_id=u.id) }}" class="action-btn btn-view">View</a>
           <a href="{{ url_for('hr.staff_edit', user_id=u.id) }}" class="action-btn btn-edit">Edit</a>
@@ -128,7 +146,7 @@
 </div>
 {% else %}
 <div class="empty-state">
-  <div class="empty-icon">👥</div>
+  <div style="font-size:48px;margin-bottom:12px;">👥</div>
   <div style="font-size:18px;font-weight:600;margin-bottom:8px;">No staff found</div>
   <div>Try adjusting your filters or <a href="{{ url_for('hr.staff_new') }}">add a new staff member</a>.</div>
 </div>

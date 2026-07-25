@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+{% block title %}Attendance Search — HR{% endblock %}
+{% block page_title %}Attendance Records{% endblock %}
+{% block page_sub %}Search, filter and manage staff sign-in history{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('hr.dashboard') }}" class="pf-btn pf-btn-secondary">HR Dashboard</a>
+<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">Staff List</a>
+<button onclick="document.getElementById('addModal').style.display='flex'" class="pf-btn pf-btn-primary">+ Log Attendance</button>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+/* ── layout ──────────────────────────────────────────────────────────────── */
+.att-wrap { display:flex; flex-direction:column; gap:20px; }
+
+/* ── today live board ────────────────────────────────────────────────────── */
+.live-board { background:var(--cl-surface); border-radius:14px; padding:18px 20px; box-shadow:0 2px 10px rgba(0,0,0,.07); }
+.live-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--cl-muted); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.live-dot   { width:8px; height:8px; background:#16a34a; border-radius:50%; animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+.live-grid  { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px; }
+.live-card  { background:var(--cl-bg); border-radius:10px; padding:11px 13px; border-left:3px solid #6b7280; cursor:default; }
+.live-card.present  { border-left-color:#16a34a; }
+.live-card.late     { border-left-color:#d97706; }
+.live-card.absent   { border-left-color:#dc2626; }
+.live-card.on-leave { border-left-color:#7c3aed; }
+.live-name   { font-size:13px; font-weight:600; line-height:1.2; }
+.live-role   { font-size:11px; color:var(--cl-muted); margin:2px 0 4px; }
+.live-time   { font-size:12px; font-weight:600; }
+.live-status { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; }
+.ls-present  { background:#dcfce7; color:#166534; }
+.ls-late     { background:#fef3c7; color:#92400e; }
+.ls-absent   { background:#fee2e2; color:#991b1b; }
+.ls-onleave  { background:#ede9fe; color:#5b21b6; }
+.ls-none     { background:#f3f4f6; color:#6b7280; }
+
+/* ── stats bar ───────────────────────────────────────────────────────────── */
+.stats-row   { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; }
+.stat-card   { background:var(--cl-surface); border-radius:10px; padding:14px 16px; box-shadow:0 2px 8px rgba(0,0,0,.06); text-align:center; }
+.stat-num    { font-size:1.8rem; font-weight:800; line-height:1; }
+.stat-lbl    { font-size:11px; color:var(--cl-muted); font-weight:600; text-transform:uppercase; margin-top:3px; }
+@media(max-width:768px){ .stats-row{grid-template-columns:repeat(3,1fr);} }
+
+/* ── search filters ──────────────────────────────────────────────────────── */
+.search-box  { background:var(--cl-surface); border-radius:12px; padding:16px 18px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.filt-row    { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+.filt-row input,
+.filt-row select { padding:9px 12px; border:1px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; }
+.filt-row input[type=text] { flex:1; min-width:160px; }
+.filt-row button { padding:9px 18px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; }
+.presets     { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.preset-btn  { padding:5px 12px; border:1px solid var(--cl-border); border-radius:20px; background:var(--cl-bg); color:var(--cl-text-muted,var(--cl-muted)); font-size:12px; cursor:pointer; transition:all .15s; }
+.preset-btn:hover,
+.preset-btn.active { background:var(--cl-primary); color:#fff; border-color:var(--cl-primary); }
+
+/* ── table ───────────────────────────────────────────────────────────────── */
+.att-table   { width:100%; border-collapse:collapse; background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.07); font-size:13px; }
+.att-table th { background:var(--cl-primary); color:#fff; padding:11px 13px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+.att-table td { padding:10px 13px; border-bottom:1px solid var(--cl-border); vertical-align:middle; }
+.att-table tr:last-child td { border-bottom:none; }
+.att-table tr:hover td { background:var(--cl-bg); }
+.status-pill { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+.sp-present  { background:#dcfce7; color:#166534; }
+.sp-late     { background:#fef3c7; color:#92400e; }
+.sp-absent   { background:#fee2e2; color:#991b1b; }
+.sp-onleave  { background:#ede9fe; color:#5b21b6; }
+.sp-other    { background:#f3f4f6; color:#6b7280; }
+.time-cell   { font-family:monospace; font-size:13px; font-weight:600; }
+.hours-badge { background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:8px; font-size:12px; font-weight:700; }
+.staff-link  { color:var(--cl-primary); font-weight:600; text-decoration:none; }
+.staff-link:hover { text-decoration:underline; }
+.role-chip   { font-size:11px; color:var(--cl-muted); }
+
+/* ── pagination ──────────────────────────────────────────────────────────── */
+.pager       { display:flex; gap:8px; align-items:center; justify-content:flex-end; padding-top:4px; }
+.pager a,
+.pager span  { padding:6px 13px; border-radius:8px; font-size:13px; border:1px solid var(--cl-border); background:var(--cl-surface); text-decoration:none; color:var(--cl-text); }
+.pager a:hover { background:var(--cl-primary); color:#fff; border-color:var(--cl-primary); }
+.pager .cur  { background:var(--cl-primary); color:#fff; border-color:var(--cl-primary); }
+
+/* ── add modal ───────────────────────────────────────────────────────────── */
+.modal-bg    { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; align-items:center; justify-content:center; }
+.modal-box   { background:var(--cl-surface); border-radius:14px; padding:28px 28px 22px; width:450px; max-width:95vw; box-shadow:0 8px 30px rgba(0,0,0,.18); }
+.modal-box h3 { font-size:16px; font-weight:700; margin-bottom:16px; }
+.form-grid   { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.form-grid .span2 { grid-column:1/-1; }
+.form-group label { display:block; font-size:12px; font-weight:600; color:var(--cl-muted); margin-bottom:4px; }
+.form-group select,
+.form-group input  { width:100%; padding:9px 10px; border:1px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; box-sizing:border-box; }
+.modal-btns  { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+.btn-cancel  { padding:8px 18px; background:var(--cl-bg); border:1px solid var(--cl-border); border-radius:8px; cursor:pointer; font-size:13px; }
+.btn-save    { padding:8px 18px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; }
+
+/* ── no-results ──────────────────────────────────────────────────────────── */
+.empty-state { text-align:center; padding:60px 20px; color:var(--cl-muted); }
+.empty-state .ei { font-size:48px; margin-bottom:10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set color_map = {
+  'super_admin':'#dc2626','clinic_owner':'#7c3aed','branch_manager':'#1d4ed8',
+  'doctor':'#0891b2','nurse':'#0d9488','reception':'#ca8a04',
+  'inventory_mgr':'#b45309','pharmacist':'#7c3aed','finance':'#166534',
+  'groomer':'#be185d','boarding_staff':'#6b7280','support_admin':'#374151','auditor':'#6b7280'
+} %}
+
+<div class="att-wrap">
+
+<!-- ═══════════════════════════════════════════════════════════ TODAY LIVE BOARD -->
+<div class="live-board">
+  <div class="live-title">
+    <span class="live-dot"></span>
+    Today — {{ today }} &nbsp;·&nbsp; {{ today_att|length }} records
+    {% if absent_today %} &nbsp;·&nbsp; <span style="color:#dc2626">{{ absent_today|length }} not recorded</span>{% endif %}
+  </div>
+  {% if today_att %}
+  <div class="live-grid">
+    {% for r in today_att %}
+    {% set sc = 'present' if r.status=='Present' else ('late' if r.status=='Late' else ('on-leave' if r.status=='On Leave' else 'absent')) %}
+    <div class="live-card {{ sc }}">
+      <a href="{{ url_for('hr.staff_detail', user_id=r.uid) }}" class="live-name" style="color:{{ color_map.get(r.role,'#374151') }};text-decoration:none">
+        {{ r.full_name }}
+      </a>
+      <div class="live-role">{{ r.role.replace('_',' ').title() }}</div>
+      {% if r.check_in %}
+      <div class="live-time">
+        In: <strong>{{ r.check_in }}</strong>
+        {% if r.check_out %} → Out: <strong>{{ r.check_out }}</strong>{% endif %}
+      </div>
+      {% endif %}
+      <div style="margin-top:4px">
+        {% if r.status=='Present' %}<span class="live-status ls-present">Present</span>
+        {% elif r.status=='Late' %}<span class="live-status ls-late">Late</span>
+        {% elif r.status=='On Leave' %}<span class="live-status ls-onleave">On Leave</span>
+        {% else %}<span class="live-status ls-absent">Absent</span>
+        {% endif %}
+        {% if r.hours_worked %}<span class="live-status ls-none" style="margin-left:4px">{{ "%.1f"|format(r.hours_worked|float) }}h</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% for r in absent_today %}
+    <div class="live-card absent" style="opacity:.65">
+      <a href="{{ url_for('hr.staff_detail', user_id=r.id) }}" class="live-name" style="color:#dc2626;text-decoration:none">
+        {{ r.full_name }}
+      </a>
+      <div class="live-role">{{ r.role.replace('_',' ').title() }}</div>
+      <div style="margin-top:6px"><span class="live-status ls-none">No record</span></div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="color:var(--cl-muted);font-size:13px">No attendance records yet for today.</div>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SUMMARY STATS -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-num" style="color:var(--cl-primary)">{{ stats.total_n or 0 }}</div>
+    <div class="stat-lbl">Total Records</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#16a34a">{{ stats.present_n or 0 }}</div>
+    <div class="stat-lbl">Present</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#d97706">{{ stats.late_n or 0 }}</div>
+    <div class="stat-lbl">Late</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#dc2626">{{ stats.absent_n or 0 }}</div>
+    <div class="stat-lbl">Absent</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#7c3aed">{{ stats.on_leave_n or 0 }}</div>
+    <div class="stat-lbl">On Leave</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#0891b2">{{ "%.1f"|format((stats.avg_hours or 0)|float) }}</div>
+    <div class="stat-lbl">Avg Hours</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ SEARCH FILTERS -->
+<div class="search-box">
+  <form method="get" action="{{ url_for('hr.hr_attendance') }}">
+    <div class="filt-row">
+      <input type="text" name="q" value="{{ q_name }}" placeholder="Search staff name or username…" id="q-input">
+      <select name="status">
+        <option value="">All Statuses</option>
+        {% for s in ['Present','Late','Absent','On Leave'] %}
+        <option value="{{ s }}" {% if f_status==s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <select name="branch_id">
+        <option value="">All Branches</option>
+        {% for br in branches %}
+        <option value="{{ br.id }}" {% if f_branch|string==br.id|string %}selected{% endif %}>{{ br.name }}</option>
+        {% endfor %}
+      </select>
+      <select name="user_id">
+        <option value="">All Staff</option>
+        {% for st in all_staff %}
+        <option value="{{ st.id }}" {% if f_user_id|string==st.id|string %}selected{% endif %}>{{ st.full_name }}</option>
+        {% endfor %}
+      </select>
+      <input type="date" name="date_from" value="{{ f_from }}" id="date-from">
+      <input type="date" name="date_to"   value="{{ f_to }}"   id="date-to">
+      <button type="submit">Search</button>
+      <a href="{{ url_for('hr.hr_attendance') }}" style="padding:9px 14px;border:1px solid var(--cl-border);border-radius:8px;font-size:13px;color:var(--cl-muted);text-decoration:none">Reset</a>
+    </div>
+    <div class="presets">
+      <span style="font-size:12px;color:var(--cl-muted);align-self:center">Quick:</span>
+      <button type="button" class="preset-btn" onclick="setRange(0,0)">Today</button>
+      <button type="button" class="preset-btn" onclick="setRange(-1,-1)">Yesterday</button>
+      <button type="button" class="preset-btn" onclick="setRange(-6,0)">Last 7 Days</button>
+      <button type="button" class="preset-btn" onclick="setRange(-13,0)">Last 2 Weeks</button>
+      <button type="button" class="preset-btn" onclick="thisMonth()">This Month</button>
+      <button type="button" class="preset-btn" onclick="lastMonth()">Last Month</button>
+    </div>
+  </form>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ RESULTS TABLE -->
+<div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div style="font-size:13px;color:var(--cl-muted)">
+      Showing {{ rows|length }} of <strong>{{ total }}</strong> records
+      &nbsp;({{ f_from }} → {{ f_to }})
+    </div>
+    {% if total > per_page %}
+    <div class="pager">
+      {% if page > 1 %}
+        <a href="{{ request.url | replace('page='~page, 'page='~(page-1)) if 'page=' in request.url else (request.url ~ '&page='~(page-1)) }}">← Prev</a>
+      {% endif %}
+      <span class="cur">{{ page }} / {{ total_pages }}</span>
+      {% if page < total_pages %}
+        <a href="{{ request.url | replace('page='~page, 'page='~(page+1)) if 'page=' in request.url else (request.url ~ '&page='~(page+1)) }}">Next →</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if rows %}
+  <div style="overflow-x:auto">
+    <table class="att-table">
+      <thead>
+        <tr>
+          <th>Staff Member</th>
+          <th>Date</th>
+          <th>Check In</th>
+          <th>Check Out</th>
+          <th>Hours</th>
+          <th>Break</th>
+          <th>Status</th>
+          <th>Branch</th>
+          <th>Notes</th>
+          <th>Recorded By</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>
+            <a href="{{ url_for('hr.staff_detail', user_id=r.uid) }}" class="staff-link">{{ r.full_name }}</a>
+            <div class="role-chip" style="color:{{ color_map.get(r.role,'#6b7280') }}">
+              {{ r.role.replace('_',' ').title() }}
+            </div>
+          </td>
+          <td style="font-weight:600;white-space:nowrap">{{ r.work_date }}</td>
+          <td class="time-cell">
+            {% if r.check_in %}
+              {% set h = r.check_in.split(':')[0]|int %}
+              <span style="color:{% if h >= 9 %}#d97706{% else %}#16a34a{% endif %}">
+                {{ r.check_in }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="time-cell">{{ r.check_out or '—' }}</td>
+          <td>
+            {% if r.hours_worked %}
+              <span class="hours-badge">{{ "%.1f"|format(r.hours_worked|float) }}h</span>
+            {% else %}—{% endif %}
+          </td>
+          <td style="color:var(--cl-muted);font-size:12px">
+            {{ r.break_minutes ~ ' min' if r.break_minutes else '—' }}
+          </td>
+          <td>
+            {% if r.status=='Present' %}<span class="status-pill sp-present">Present</span>
+            {% elif r.status=='Late' %}<span class="status-pill sp-late">Late</span>
+            {% elif r.status=='Absent' %}<span class="status-pill sp-absent">Absent</span>
+            {% elif r.status=='On Leave' %}<span class="status-pill sp-onleave">On Leave</span>
+            {% else %}<span class="status-pill sp-other">{{ r.status }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px;color:var(--cl-muted)">{{ r.branch_name or '—' }}</td>
+          <td style="font-size:12px;color:var(--cl-muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ r.notes or '' }}">
+            {{ r.notes or '—' }}
+          </td>
+          <td style="font-size:11px;color:var(--cl-muted)">{{ r.recorded_by or '—' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('hr.hr_attendance_delete', rec_id=r.id) }}"
+                  onsubmit="return confirm('Delete this attendance record?')">
+              <button type="submit" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px" title="Delete">✕</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="ei">🕐</div>
+    <div style="font-size:17px;font-weight:600;margin-bottom:6px">No records found</div>
+    <div>Try adjusting the date range or filters above.</div>
+  </div>
+  {% endif %}
+</div>
+
+</div><!-- .att-wrap -->
+
+<!-- ═══════════════════════════════════════════════════════════ ADD MODAL -->
+<div class="modal-bg" id="addModal" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal-box">
+    <h3>Log Attendance Record</h3>
+    <form method="post" action="{{ url_for('hr.hr_attendance_add') }}">
+      <div class="form-grid">
+        <div class="form-group span2">
+          <label>Staff Member *</label>
+          <select name="user_id" required>
+            <option value="">— select staff —</option>
+            {% for st in all_staff %}
+            <option value="{{ st.id }}">{{ st.full_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" name="work_date" value="{{ today }}" required>
+        </div>
+        <div class="form-group">
+          <label>Status *</label>
+          <select name="status" required>
+            <option value="Present">Present</option>
+            <option value="Late">Late</option>
+            <option value="Absent">Absent</option>
+            <option value="On Leave">On Leave</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Check In</label>
+          <input type="time" name="check_in">
+        </div>
+        <div class="form-group">
+          <label>Check Out</label>
+          <input type="time" name="check_out">
+        </div>
+        <div class="form-group span2">
+          <label>Notes</label>
+          <input type="text" name="notes" placeholder="Optional note…">
+        </div>
+      </div>
+      <div class="modal-btns">
+        <button type="button" class="btn-cancel" onclick="document.getElementById('addModal').style.display='none'">Cancel</button>
+        <button type="submit" class="btn-save">Save Record</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function setRange(fromOffset, toOffset) {
+  const today = new Date();
+  const fmt = d => d.toISOString().slice(0,10);
+  document.getElementById('date-from').value = fmt(new Date(today.getTime() + fromOffset*86400000));
+  document.getElementById('date-to').value   = fmt(new Date(today.getTime() + toOffset*86400000));
+  document.querySelector('.search-box form').submit();
+}
+
+function thisMonth() {
+  const today = new Date();
+  const fmt   = d => d.toISOString().slice(0,10);
+  document.getElementById('date-from').value = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
+  document.getElementById('date-to').value   = fmt(today);
+  document.querySelector('.search-box form').submit();
+}
+
+function lastMonth() {
+  const today = new Date();
+  const fmt   = d => d.toISOString().slice(0,10);
+  const first = new Date(today.getFullYear(), today.getMonth()-1, 1);
+  const last  = new Date(today.getFullYear(), today.getMonth(), 0);
+  document.getElementById('date-from').value = fmt(first);
+  document.getElementById('date-to').value   = fmt(last);
+  document.querySelector('.search-box form').submit();
+}
+</script>
+{% endblock %}

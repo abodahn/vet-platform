@@ -10,6 +10,15 @@
   <a href="{{ url_for('visits.visit_print', visit_id=visit.id) }}" target="_blank" class="pf-btn">
     🖨 Print
   </a>
+  <a href="{{ url_for('imaging.pet_studies', pet_id=visit.pet_id) }}" class="pf-btn"
+     title="View imaging studies for this patient">
+    🩻 Imaging
+  </a>
+  <a href="{{ url_for('imaging.upload', pet_id=visit.pet_id) }}" class="pf-btn"
+     style="background:color-mix(in srgb,var(--cl-primary) 10%,var(--cl-surface));"
+     title="Upload X-ray, ultrasound or photo for AI analysis">
+    📤 Upload Image
+  </a>
   {# ── Invoice link ──────────────────────────────────── #}
   {% if invoice %}
     <a href="{{ url_for('finance.invoice_detail', inv_id=invoice.id) }}"

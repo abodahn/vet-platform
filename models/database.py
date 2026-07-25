@@ -337,10 +337,16 @@ def get_db():
         return _PGConn(raw, pool=None)
 
     # Fallback: SQLite (dev / test mode)
-    conn = sqlite3.connect(_db_path)
+    conn = sqlite3.connect(_db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
+    # Performance PRAGMAs — applied once per connection
+    conn.execute("PRAGMA foreign_keys  = ON")
+    conn.execute("PRAGMA journal_mode  = WAL")       # concurrent reads during writes
+    conn.execute("PRAGMA synchronous   = NORMAL")    # safe with WAL, 3-5x faster than FULL
+    conn.execute("PRAGMA cache_size    = -20000")    # 20 MB page cache (was 2 MB)
+    conn.execute("PRAGMA temp_store    = MEMORY")    # temp tables in RAM, not disk
+    conn.execute("PRAGMA mmap_size     = 134217728") # 128 MB memory-mapped I/O
+    conn.execute("PRAGMA busy_timeout  = 5000")      # wait 5 s instead of failing instantly
     return conn
 
 
@@ -1359,6 +1365,138 @@ CREATE TABLE IF NOT EXISTS inpatient_meds (
     notes       TEXT,
     FOREIGN KEY (stay_id) REFERENCES inpatient_stays(id) ON DELETE CASCADE
 );
+
+-- ── PRODUCTION LOGGING TABLES ─────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS backend_logs (
+    id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+    correlation_id            TEXT,
+    request_id                TEXT,
+    user_id                   INTEGER,
+    username                  TEXT,
+    level                     TEXT DEFAULT 'INFO',
+    module_name               TEXT,
+    action_name               TEXT,
+    http_method               TEXT,
+    endpoint                  TEXT,
+    status_code               INTEGER,
+    duration_ms               INTEGER,
+    ip_address                TEXT,
+    user_agent                TEXT,
+    request_payload_summary   TEXT,
+    response_payload_summary  TEXT,
+    error_message             TEXT,
+    stack_trace               TEXT,
+    metadata                  TEXT DEFAULT '{}',
+    created_at                TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_blog_level    ON backend_logs(level);
+CREATE INDEX IF NOT EXISTS idx_blog_created  ON backend_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_blog_endpoint ON backend_logs(endpoint);
+CREATE INDEX IF NOT EXISTS idx_blog_user     ON backend_logs(user_id);
+
+CREATE TABLE IF NOT EXISTS frontend_logs (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    correlation_id    TEXT,
+    session_id        TEXT,
+    user_id           INTEGER,
+    username          TEXT,
+    level             TEXT DEFAULT 'INFO',
+    page_url          TEXT,
+    route_name        TEXT,
+    component_name    TEXT,
+    event_name        TEXT,
+    message           TEXT,
+    browser_name      TEXT,
+    browser_version   TEXT,
+    device_type       TEXT,
+    os_name           TEXT,
+    network_status    TEXT DEFAULT 'online',
+    api_endpoint      TEXT,
+    api_status_code   INTEGER,
+    error_stack       TEXT,
+    metadata          TEXT DEFAULT '{}',
+    created_at        TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_flog_level   ON frontend_logs(level);
+CREATE INDEX IF NOT EXISTS idx_flog_created ON frontend_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_flog_user    ON frontend_logs(user_id);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    correlation_id TEXT,
+    user_id        INTEGER,
+    username       TEXT,
+    action_type    TEXT NOT NULL,
+    entity_name    TEXT,
+    entity_id      TEXT,
+    old_value      TEXT,
+    new_value      TEXT,
+    ip_address     TEXT,
+    user_agent     TEXT,
+    created_at     TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_alog_action  ON audit_logs(action_type);
+CREATE INDEX IF NOT EXISTS idx_alog_entity  ON audit_logs(entity_name, entity_id);
+CREATE INDEX IF NOT EXISTS idx_alog_user    ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_alog_created ON audit_logs(created_at);
+
+-- ── OFFLINE SYNC TABLES ───────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS sync_queue (
+    id                 TEXT PRIMARY KEY,
+    local_uuid         TEXT NOT NULL,
+    server_uuid        TEXT,
+    device_id          TEXT NOT NULL,
+    user_id            INTEGER,
+    entity_name        TEXT NOT NULL,
+    operation_type     TEXT NOT NULL,
+    payload            TEXT NOT NULL,
+    status             TEXT DEFAULT 'PENDING',
+    retry_count        INTEGER DEFAULT 0,
+    last_error         TEXT,
+    priority           INTEGER DEFAULT 5,
+    created_offline_at TEXT,
+    last_attempt_at    TEXT,
+    synced_at          TEXT,
+    created_at         TEXT DEFAULT (datetime('now')),
+    updated_at         TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sq_status    ON sync_queue(status);
+CREATE INDEX IF NOT EXISTS idx_sq_device    ON sync_queue(device_id);
+CREATE INDEX IF NOT EXISTS idx_sq_entity    ON sync_queue(entity_name);
+CREATE INDEX IF NOT EXISTS idx_sq_priority  ON sync_queue(priority, created_offline_at);
+
+CREATE TABLE IF NOT EXISTS sync_conflicts (
+    id                TEXT PRIMARY KEY,
+    sync_queue_id     TEXT NOT NULL,
+    entity_name       TEXT,
+    local_payload     TEXT,
+    server_payload    TEXT,
+    conflict_type     TEXT,
+    resolution_status TEXT DEFAULT 'PENDING',
+    resolved_by       TEXT,
+    resolved_at       TEXT,
+    created_at        TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sc_status ON sync_conflicts(resolution_status);
+
+CREATE TABLE IF NOT EXISTS devices (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id     TEXT UNIQUE NOT NULL,
+    device_name   TEXT,
+    branch_id     INTEGER,
+    user_id       INTEGER,
+    platform      TEXT,
+    app_version   TEXT,
+    last_online_at TEXT,
+    last_sync_at  TEXT,
+    is_active     INTEGER DEFAULT 1,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_dev_device ON devices(device_id);
+CREATE INDEX IF NOT EXISTS idx_dev_user   ON devices(user_id);
 """
 
 # ── Seed data ──────────────────────────────────────────────────
@@ -1466,6 +1604,33 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
             conn.execute("ALTER TABLE owners ADD COLUMN loyalty_balance INTEGER DEFAULT 0")
         except Exception:
             pass  # column already exists
+        # Pet insurance columns
+        for _col, _type in [
+            ("insurance_provider", "TEXT"),
+            ("policy_number",      "TEXT"),
+            ("policy_expiry",      "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE pets ADD COLUMN {_col} {_type}")
+            except Exception:
+                pass  # column already exists
+        # Imaging studies table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS imaging_studies (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                pet_id      INTEGER NOT NULL,
+                owner_id    INTEGER,
+                visit_id    INTEGER,
+                study_type  TEXT NOT NULL,
+                body_region TEXT,
+                file_path   TEXT,
+                notes       TEXT,
+                ai_analysis TEXT,
+                created_by  TEXT,
+                created_at  TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (pet_id) REFERENCES pets(id) ON DELETE CASCADE
+            )
+        """)
         # Seed default budget targets (idempotent — only if table is empty)
         try:
             if conn.execute("SELECT COUNT(*) FROM budget_targets").fetchone()[0] == 0:
@@ -2293,8 +2458,7 @@ def get_invoice(inv_id: int) -> Optional[dict]:
     inv = dict(row)
     inv["lines"] = [dict(r) for r in conn.execute(
         "SELECT * FROM invoice_lines WHERE invoice_id=?", (inv_id,)).fetchall()]
-    inv["payments"] = [dict(r) for r in conn.execute(
-        "SELECT * FROM payments WHERE invoice_id=? ORDER BY received_at DESC", (inv_id,)).fetchall()]
+    inv["payments"] = []  # vet payments table not in shared DB; paid_amount tracked on invoice row
     conn.close()
     return inv
 
@@ -2314,19 +2478,24 @@ def list_invoices(owner_id: Optional[int] = None, status: str = "",
 
 def add_payment(invoice_id: int, owner_id: int, amount: float,
                 method: str = "Cash", reference: str = "", received_by: str = "") -> None:
+    """Record a payment by updating the invoice's paid_amount directly.
+    The shared DB's payments table belongs to Waslny (taxi) and cannot be used."""
     conn = get_db()
     with conn:
-        conn.execute(
-            "INSERT INTO payments(invoice_id,owner_id,amount,method,reference,received_by) VALUES(?,?,?,?,?,?)",
-            (invoice_id, owner_id, amount, method, reference, received_by))
-        # Update invoice paid/due
-        paid = conn.execute("SELECT COALESCE(SUM(amount),0) FROM payments WHERE invoice_id=?",
-                            (invoice_id,)).fetchone()[0]
-        total = conn.execute("SELECT total FROM invoices WHERE id=?", (invoice_id,)).fetchone()[0]
-        due = max(0.0, float(total) - float(paid))
+        row = conn.execute(
+            "SELECT total, paid_amount FROM invoices WHERE id=?", (invoice_id,)
+        ).fetchone()
+        if not row:
+            conn.close()
+            return
+        total = float(row["total"] or 0)
+        new_paid = min(float(row["paid_amount"] or 0) + float(amount), total)
+        due = max(0.0, total - new_paid)
         status = "Paid" if due == 0 else "Partial"
-        conn.execute("UPDATE invoices SET paid_amount=?,due_amount=?,status=?,updated_at=datetime('now') WHERE id=?",
-                     (float(paid), due, status, invoice_id))
+        conn.execute(
+            "UPDATE invoices SET paid_amount=?,due_amount=?,status=?,updated_at=datetime('now') WHERE id=?",
+            (new_paid, due, status, invoice_id)
+        )
     conn.close()
 
 def get_finance_summary(date_from: str = "", date_to: str = "") -> dict:
@@ -2335,8 +2504,8 @@ def get_finance_summary(date_from: str = "", date_to: str = "") -> dict:
     df = date_from or today
     dt = date_to   or today
     revenue = conn.execute(
-        "SELECT COALESCE(SUM(amount),0) FROM payments WHERE received_at BETWEEN ? AND ?",
-        (df+" 00:00:00", dt+" 23:59:59")).fetchone()[0]
+        "SELECT COALESCE(SUM(paid_amount),0) FROM invoices WHERE issue_date BETWEEN ? AND ? AND status IN ('Paid','Partial')",
+        (df, dt)).fetchone()[0]
     invoiced = conn.execute(
         "SELECT COALESCE(SUM(total),0) FROM invoices WHERE issue_date BETWEEN ? AND ? AND status!='Cancelled'",
         (df, dt)).fetchone()[0]
@@ -2369,8 +2538,8 @@ def get_dashboard_stats() -> dict:
         "pets_total":      conn.execute("SELECT COUNT(*) FROM pets").fetchone()[0],
         "visits_today":    conn.execute("SELECT COUNT(*) FROM visits WHERE visit_date=?", (today,)).fetchone()[0],
         "appts_today":     conn.execute("SELECT COUNT(*) FROM appointments WHERE appt_date=?", (today,)).fetchone()[0],
-        "revenue_today":   float(conn.execute("SELECT COALESCE(SUM(amount),0) FROM payments WHERE received_at LIKE ?", (f"{today}%",)).fetchone()[0] or 0),
-        "revenue_month":   float(conn.execute("SELECT COALESCE(SUM(amount),0) FROM payments WHERE received_at >= ?", (month_start,)).fetchone()[0] or 0),
+        "revenue_today":   float(conn.execute("SELECT COALESCE(SUM(paid_amount),0) FROM invoices WHERE issue_date=? AND status IN ('Paid','Partial')", (today,)).fetchone()[0] or 0),
+        "revenue_month":   float(conn.execute("SELECT COALESCE(SUM(paid_amount),0) FROM invoices WHERE issue_date >= ? AND status IN ('Paid','Partial')", (month_start,)).fetchone()[0] or 0),
         "invoices_unpaid": conn.execute("SELECT COUNT(*) FROM invoices WHERE status IN ('Unpaid','Partial')").fetchone()[0],
         "outstanding":     float(conn.execute("SELECT COALESCE(SUM(due_amount),0) FROM invoices WHERE status IN ('Unpaid','Partial')").fetchone()[0] or 0),
         "low_stock_count": conn.execute("SELECT COUNT(*) FROM items i WHERE (SELECT COALESCE(SUM(b.quantity),0) FROM batches b WHERE b.item_id=i.id) <= i.reorder_level AND i.is_active=1").fetchone()[0],
@@ -2385,8 +2554,8 @@ def get_revenue_by_day(days: int = 30) -> list:
     conn = get_db()
     since = (date.today() - timedelta(days=days)).isoformat()
     rows = conn.execute(
-        "SELECT DATE(received_at) d, COALESCE(SUM(amount),0) revenue FROM payments"
-        " WHERE received_at >= ? GROUP BY DATE(received_at) ORDER BY d", (since,)).fetchall()
+        "SELECT issue_date d, COALESCE(SUM(paid_amount),0) revenue FROM invoices"
+        " WHERE issue_date >= ? AND status IN ('Paid','Partial') GROUP BY issue_date ORDER BY d", (since,)).fetchall()
     conn.close()
     return [{"date": r["d"], "revenue": float(r["revenue"])} for r in rows]
 

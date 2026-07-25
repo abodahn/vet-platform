@@ -73,7 +73,7 @@ def dashboard():
     ).fetchone()[0] or 0)
 
     paid_count_today = conn.execute(
-        "SELECT COUNT(*) FROM payments WHERE received_at LIKE ?", (f"{today}%",)
+        "SELECT COUNT(*) FROM invoices WHERE issue_date=? AND status IN ('Paid','Partial')", (today,)
     ).fetchone()[0]
 
     conn.close()
@@ -716,31 +716,30 @@ def reports_export_xlsx():
     date_from   = request.args.get("date_from", month_start)
     date_to     = request.args.get("date_to", today)
 
-    conn = db.get_db()
-    # Invoices in range
-    inv_rows = conn.execute(
-        """SELECT i.invoice_number, i.issue_date, o.full_name AS owner,
-                  i.total_amount, i.discount_amount, i.tax_amount,
-                  i.net_amount, i.status
-           FROM invoices i
-           LEFT JOIN owners o ON o.id = i.owner_id
-           WHERE i.issue_date BETWEEN ? AND ?
-           ORDER BY i.issue_date""",
-        (date_from, date_to)
-    ).fetchall()
-    conn.close()
-
-    headers = ["Invoice #", "Date", "Owner", "Total", "Discount",
-               "Tax", "Net", "Status"]
-    rows = [
-        [r["invoice_number"], str(r["issue_date"])[:10], r["owner"],
-         float(r["total_amount"] or 0), float(r["discount_amount"] or 0),
-         float(r["tax_amount"] or 0), float(r["net_amount"] or 0),
-         r["status"]]
-        for r in inv_rows
-    ]
-
     try:
+        conn = db.get_db()
+        inv_rows = conn.execute(
+            """SELECT i.invoice_number, i.issue_date, o.full_name AS owner,
+                      i.total_amount, i.discount_amount, i.tax_amount,
+                      i.net_amount, i.status
+               FROM invoices i
+               LEFT JOIN owners o ON o.id = i.owner_id
+               WHERE i.issue_date BETWEEN ? AND ?
+               ORDER BY i.issue_date""",
+            (date_from, date_to)
+        ).fetchall()
+        conn.close()
+
+        headers = ["Invoice #", "Date", "Owner", "Total", "Discount",
+                   "Tax", "Net", "Status"]
+        rows = [
+            [r["invoice_number"], str(r["issue_date"])[:10], r["owner"],
+             float(r["total_amount"] or 0), float(r["discount_amount"] or 0),
+             float(r["tax_amount"] or 0), float(r["net_amount"] or 0),
+             r["status"]]
+            for r in inv_rows
+        ]
+
         buf = make_workbook(
             title=f"Financial Report — {date_from} to {date_to}",
             headers=headers,
@@ -754,6 +753,6 @@ def reports_export_xlsx():
             as_attachment=True,
             download_name=filename,
         )
-    except RuntimeError as e:
+    except Exception as e:
         flash(str(e), "danger")
         return redirect(url_for("finance.reports"))

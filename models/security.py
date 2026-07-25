@@ -1,7 +1,8 @@
 """
 Production Security Layer — Aleefy Platform
-Handles: rate limiting, CSRF tokens, session validation, bcrypt migration
+Handles: rate limiting, CSRF tokens, session validation, IP extraction, password strength
 """
+import re
 import secrets
 import threading
 import time
@@ -112,3 +113,50 @@ def check_session_timeout() -> bool:
 
 def touch_session() -> None:
     session[_SESSION_LAST_ACTIVE] = time.time()
+
+
+# ── Real IP Extraction ────────────────────────────────────────────────────────
+
+def get_real_ip(req=None) -> str:
+    """Extract the real client IP, trusting X-Forwarded-For from the first proxy.
+
+    Render, Koyeb, and Cloudflare all set X-Forwarded-For.
+    We take only the FIRST (leftmost) address — the client IP as seen by the
+    first proxy — which is the real client under standard proxy chaining.
+
+    Falls back to request.remote_addr if no forwarding header is present.
+    """
+    if req is None:
+        req = request
+    forwarded_for = req.headers.get("X-Forwarded-For", "")
+    if forwarded_for:
+        # "X-Forwarded-For: client, proxy1, proxy2" — take leftmost (client IP)
+        candidate = forwarded_for.split(",")[0].strip()
+        if candidate:
+            return candidate
+    return req.remote_addr or "unknown"
+
+
+# ── Password Strength Validation ─────────────────────────────────────────────
+
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """Validate password complexity. Returns (ok, error_message).
+
+    Rules:
+    - Minimum 12 characters
+    - At least 1 uppercase letter
+    - At least 1 lowercase letter
+    - At least 1 digit
+    - At least 1 special character (!@#$%^&*()_+-=[]{}|;':\",./<>?)
+    """
+    if len(password) < 12:
+        return False, "Password must be at least 12 characters."
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter."
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter."
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one digit."
+    if not re.search(r"[!@#$%^&*()\-_=+\[\]{}|;:'\",.<>?/\\`~]", password):
+        return False, "Password must contain at least one special character."
+    return True, ""

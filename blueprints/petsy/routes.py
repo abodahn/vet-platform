@@ -306,11 +306,11 @@ def _fetch_platform_data(message: str, user: dict) -> str:
 
         # ── REVENUE TODAY ─────────────────────────────────────────────────────
         if "revenue_today" in intents:
-            _df = _date_eq("received_at")
-            row = _q1(f"""
-                SELECT COALESCE(SUM(amount),0) AS collected,
+            row = _q1("""
+                SELECT COALESCE(SUM(paid_amount),0) AS collected,
                        COUNT(*) AS transactions
-                FROM payments WHERE {_df} = %s
+                FROM invoices WHERE SUBSTRING(issue_date::text,1,10) = %s
+                  AND status IN ('Paid','Partial')
             """, (today,))
             inv = _q1("""
                 SELECT COALESCE(SUM(total),0) AS invoiced,
@@ -321,18 +321,18 @@ def _fetch_platform_data(message: str, user: dict) -> str:
             if row is not None:
                 blocks.append(
                     f"💰 REVENUE TODAY ({today}):\n"
-                    f"  Collected (payments): {float(row['collected'] or 0):,.2f} EGP "
-                    f"({row['transactions']} transactions)\n"
+                    f"  Collected: {float(row['collected'] or 0):,.2f} EGP "
+                    f"({row['transactions']} invoices paid)\n"
                     f"  Invoiced today: {float((inv or {}).get('invoiced') or 0):,.2f} EGP "
                     f"({(inv or {}).get('count', 0)} invoices)"
                 )
 
         # ── REVENUE THIS MONTH ────────────────────────────────────────────────
         if "revenue_month" in intents:
-            _df = _date_eq("received_at")
-            row = _q1(f"""
-                SELECT COALESCE(SUM(amount),0) AS collected, COUNT(*) AS tx
-                FROM payments WHERE {_df} >= %s
+            row = _q1("""
+                SELECT COALESCE(SUM(paid_amount),0) AS collected, COUNT(*) AS tx
+                FROM invoices WHERE SUBSTRING(issue_date::text,1,10) >= %s
+                  AND status IN ('Paid','Partial')
             """, (month_s,))
             exp = _q1("""
                 SELECT COALESCE(SUM(amount),0) AS expenses
@@ -343,7 +343,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
                 expenses  = float((exp or {}).get("expenses") or 0)
                 blocks.append(
                     f"📊 REVENUE THIS MONTH (from {month_s}):\n"
-                    f"  Collected: {collected:,.2f} EGP ({row['tx']} payments)\n"
+                    f"  Collected: {collected:,.2f} EGP ({row['tx']} invoices paid)\n"
                     f"  Expenses:  {expenses:,.2f} EGP\n"
                     f"  Net profit: {collected - expenses:,.2f} EGP"
                 )
@@ -488,13 +488,12 @@ def _fetch_platform_data(message: str, user: dict) -> str:
         # ── DASHBOARD STATS ───────────────────────────────────────────────────
         if "dashboard_stats" in intents:
             _df_v  = _date_eq("visit_date")
-            _df_p  = _date_eq("received_at")
             c   = (_q1("SELECT COUNT(*) AS n FROM appointments WHERE appt_date = %s "
                        "AND status NOT IN ('Cancelled','NoShow')", (today,)) or {}).get("n", 0)
             v   = (_q1(f"SELECT COUNT(*) AS n FROM visits WHERE {_df_v} = %s", (today,)) or {}).get("n", 0)
             vo  = (_q1("SELECT COUNT(*) AS n FROM visits WHERE status = 'Open'") or {}).get("n", 0)
             pi  = (_q1("SELECT COUNT(*) AS n FROM invoices WHERE status IN ('Pending','Overdue')") or {}).get("n", 0)
-            rev = (_q1(f"SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE {_df_p} = %s", (today,)) or {}).get("s", 0)
+            rev = (_q1("SELECT COALESCE(SUM(paid_amount),0) AS s FROM invoices WHERE SUBSTRING(issue_date::text,1,10) = %s AND status IN ('Paid','Partial')", (today,)) or {}).get("s", 0)
             ls  = _q("SELECT i.id FROM items i LEFT JOIN batches b ON b.item_id=i.id "
                      "WHERE i.is_active=1 GROUP BY i.id, i.reorder_level "
                      "HAVING COALESCE(SUM(b.quantity),0) <= i.reorder_level")

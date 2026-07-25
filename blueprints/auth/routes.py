@@ -50,7 +50,7 @@ def login():
     username = ""
 
     if request.method == "POST":
-        ip = request.remote_addr or "unknown"
+        ip = sec.get_real_ip(request)
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         theme    = request.form.get("theme", "medical")
@@ -85,7 +85,7 @@ def login():
                 role=user.get("role", ""),
                 action="login",
                 module="auth",
-                ip=ip,
+                ip=ip,  # already uses get_real_ip above
                 user_agent=request.headers.get("User-Agent", ""),
             )
 
@@ -119,7 +119,7 @@ def logout():
         role=user.get("role", ""),
         action="logout",
         module="auth",
-        ip=request.remote_addr,
+        ip=sec.get_real_ip(request),
     )
     session.clear()
     flash("You have been logged out.", "info")
@@ -138,22 +138,24 @@ def profile():
             confirm  = request.form.get("confirm_password", "")
             if not db.verify_credentials(user["username"], old_pw):
                 flash("Current password is incorrect.", "error")
-            elif len(new_pw) < 12:
-                flash("New password must be at least 12 characters.", "error")
             elif new_pw != confirm:
                 flash("Passwords do not match.", "error")
             else:
-                import models.database as _db
-                conn = _db.get_db()
-                with conn:
-                    conn.execute(
-                        "UPDATE users SET password_hash=? WHERE id=?",
-                        (_db._hash(new_pw), user["id"]))
-                conn.close()
-                db.log_audit(username=user["username"], role=user.get("role",""),
-                             action="password_change", module="auth",
-                             ip=request.remote_addr)
-                flash("Password changed successfully.", "success")
+                pw_ok, pw_err = sec.validate_password_strength(new_pw)
+                if not pw_ok:
+                    flash(pw_err, "error")
+                else:
+                    import models.database as _db
+                    conn = _db.get_db()
+                    with conn:
+                        conn.execute(
+                            "UPDATE users SET password_hash=%s WHERE id=%s",
+                            (_db._hash(new_pw), user["id"]))
+                    conn.close()
+                    db.log_audit(username=user["username"], role=user.get("role",""),
+                                 action="password_change", module="auth",
+                                 ip=sec.get_real_ip(request))
+                    flash("Password changed successfully.", "success")
         else:
             theme = request.form.get("theme", user.get("theme_preference", "medical"))
             lang  = request.form.get("lang",  user.get("language", "en"))

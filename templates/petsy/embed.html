@@ -5,290 +5,496 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Petsy — {{ clinic_name }}</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --petsy-primary: #7c3aed;
-    --petsy-primary-dark: #4f46e5;
-    --petsy-light: #ede9fe;
-    --petsy-text: #1e1b4b;
-    --petsy-muted: #6b7280;
-    --petsy-bg: #f9fafb;
-    --petsy-surface: #ffffff;
-    --petsy-border: #e5e7eb;
-    --petsy-radius: 16px;
-    --petsy-user-bg: #7c3aed;
-    --petsy-bot-bg: #f3f4f6;
-  }
-  html, body { height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; }
-  body { display: flex; flex-direction: column; height: 100vh;
-         background: var(--petsy-bg); overflow: hidden; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ── Header ── */
-  .petsy-header {
-    background: linear-gradient(135deg, var(--petsy-primary), var(--petsy-primary-dark));
-    color: white; padding: 14px 16px;
-    display: flex; align-items: center; gap: 12px;
-    flex-shrink: 0;
-  }
-  .petsy-header-icon {
-    width: 44px; height: 44px; flex-shrink: 0;
-    filter: drop-shadow(0 2px 6px rgba(0,0,0,.25));
-  }
-  .petsy-header-info { flex: 1; }
-  .petsy-header-name { font-weight: 800; font-size: 1.05rem; }
-  .petsy-header-sub  { font-size: .75rem; opacity: .85; margin-top: 1px; }
-  .petsy-status {
-    width: 8px; height: 8px; background: #4ade80; border-radius: 50%;
-    box-shadow: 0 0 6px #4ade80; flex-shrink: 0;
-  }
+:root {
+  --p-pink:   #f43f5e;
+  --p-purple: #a855f7;
+  --p-indigo: #6366f1;
+  --p-grad:   linear-gradient(135deg, #f43f5e 0%, #a855f7 50%, #6366f1 100%);
+  --p-light:  #fdf4ff;
+  --p-text:   #1e1b4b;
+  --p-muted:  #6b7280;
+  --p-bg:     #f8fafc;
+  --p-surface:#ffffff;
+  --p-border: #ede9fe;
+  --p-user:   linear-gradient(135deg,#f43f5e,#a855f7);
+  --p-bot-bg: #f3f0fe;
+  --p-radius: 18px;
+}
 
-  /* ── Messages ── */
-  .petsy-messages {
-    flex: 1; overflow-y: auto; padding: 16px 14px;
-    display: flex; flex-direction: column; gap: 12px;
-    scroll-behavior: smooth;
-  }
-  .petsy-messages::-webkit-scrollbar { width: 4px; }
-  .petsy-messages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+html, body {
+  height: 100%; width: 100%;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--p-bg);
+  overflow: hidden;
+}
 
-  .msg-row { display: flex; gap: 8px; align-items: flex-end; }
-  .msg-row.user { flex-direction: row-reverse; }
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
 
-  .msg-avatar {
-    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: .85rem; overflow: hidden;
-  }
-  .msg-avatar.bot  { background: var(--petsy-primary); }
-  .msg-avatar.user { background: #d1d5db; font-size: 1rem; }
+/* ── Header ────────────────────────────────────────────────────────── */
+.petsy-header {
+  background: var(--p-grad);
+  color: white;
+  padding: 14px 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.petsy-header::after {
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 120px; height: 120px;
+  background: rgba(255,255,255,.08);
+  border-radius: 50%;
+}
 
-  .msg-bubble {
-    max-width: 78%; padding: 10px 14px; border-radius: 18px;
-    font-size: .875rem; line-height: 1.55; word-break: break-word;
-    white-space: pre-wrap;
-  }
-  .msg-row.bot  .msg-bubble {
-    background: var(--petsy-surface); color: var(--petsy-text);
-    border-bottom-left-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
-    border: 1px solid var(--petsy-border);
-  }
-  .msg-row.user .msg-bubble {
-    background: var(--petsy-primary); color: white;
-    border-bottom-right-radius: 4px;
-  }
-  .msg-time {
-    font-size: .68rem; color: var(--petsy-muted); margin-top: 3px;
-    text-align: right;
-  }
-  .msg-row.bot .msg-time { text-align: left; }
+.petsy-header-avatar {
+  width: 46px; height: 46px;
+  background: rgba(255,255,255,.2);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(4px);
+  border: 1.5px solid rgba(255,255,255,.35);
+}
+.petsy-header-avatar svg {
+  width: 30px; height: 30px;
+}
 
-  .msg-model {
-    font-size: .65rem; color: var(--petsy-muted); margin-top: 2px;
-    display: flex; align-items: center; gap: 3px;
-  }
+.petsy-header-info { flex: 1; min-width: 0; }
+.petsy-header-name {
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -.2px;
+}
+.petsy-header-sub {
+  font-size: .72rem;
+  opacity: .85;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-  /* ── Typing indicator ── */
-  .typing { display: flex; gap: 4px; padding: 12px 14px; }
-  .typing span {
-    width: 7px; height: 7px; background: var(--petsy-primary);
-    border-radius: 50%; animation: bounce .9s infinite;
-    opacity: .6;
-  }
-  .typing span:nth-child(2) { animation-delay: .15s; }
-  .typing span:nth-child(3) { animation-delay: .30s; }
-  @keyframes bounce {
-    0%,80%,100% { transform: translateY(0); }
-    40%         { transform: translateY(-6px); }
-  }
+.petsy-status-dot {
+  width: 10px; height: 10px;
+  background: #4ade80;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.6);
+  box-shadow: 0 0 8px #4ade80;
+  flex-shrink: 0;
+  animation: status-pulse 2.2s ease-in-out infinite;
+}
+@keyframes status-pulse {
+  0%,100%{ box-shadow: 0 0 8px #4ade80; }
+  50%    { box-shadow: 0 0 18px #4ade80; }
+}
 
-  /* ── Quick replies ── */
-  .quick-replies {
-    padding: 0 14px 8px; display: flex; gap: 6px; flex-wrap: wrap;
-    flex-shrink: 0;
-  }
-  .quick-btn {
-    border: 1.5px solid var(--petsy-primary); color: var(--petsy-primary);
-    background: white; border-radius: 20px; padding: 5px 12px;
-    font-size: .78rem; cursor: pointer; transition: .15s;
-    font-weight: 600; white-space: nowrap;
-  }
-  .quick-btn:hover { background: var(--petsy-primary); color: white; }
+/* ── Staff badge ────────────────────────────────────────────────────── */
+.petsy-staff-strip {
+  background: linear-gradient(90deg, rgba(251,191,36,.12), rgba(251,191,36,.06));
+  border-bottom: 1px solid rgba(251,191,36,.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 5px 14px;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .35px;
+  color: #92400e;
+  flex-shrink: 0;
+}
+.petsy-staff-strip .blink-dot {
+  width: 7px; height: 7px;
+  background: #f59e0b;
+  border-radius: 50%;
+  animation: blink-dot 1.8s ease-in-out infinite;
+  box-shadow: 0 0 5px #f59e0b;
+}
+@keyframes blink-dot { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-  /* ── Input bar ── */
-  .petsy-input-bar {
-    padding: 12px 14px; border-top: 1px solid var(--petsy-border);
-    display: flex; gap: 8px; align-items: center; flex-shrink: 0;
-    background: var(--petsy-surface);
-  }
-  .petsy-input {
-    flex: 1; padding: 10px 14px; border: 1.5px solid var(--petsy-border);
-    border-radius: 24px; font-size: .88rem; outline: none;
-    transition: border-color .2s; background: var(--petsy-bg);
-    color: var(--petsy-text); resize: none; max-height: 80px;
-    font-family: inherit;
-  }
-  .petsy-input:focus { border-color: var(--petsy-primary); }
-  .petsy-send {
-    width: 40px; height: 40px; border-radius: 50%; border: none;
-    background: linear-gradient(135deg, var(--petsy-primary), var(--petsy-primary-dark));
-    color: white; cursor: pointer; display: flex; align-items: center;
-    justify-content: center; flex-shrink: 0; font-size: 1rem;
-    transition: transform .15s, box-shadow .15s;
-    box-shadow: 0 2px 8px rgba(124,58,237,.4);
-  }
-  .petsy-send:hover { transform: scale(1.1); }
-  .petsy-send:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+/* ── Messages area ──────────────────────────────────────────────────── */
+.petsy-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scroll-behavior: smooth;
+}
+.petsy-messages::-webkit-scrollbar { width: 4px; }
+.petsy-messages::-webkit-scrollbar-thumb {
+  background: var(--p-border);
+  border-radius: 4px;
+}
 
-  /* ── Powered by ── */
-  .petsy-powered {
-    text-align: center; font-size: .65rem; color: var(--petsy-muted);
-    padding: 4px; flex-shrink: 0; background: var(--petsy-surface);
-  }
+/* ── Welcome card ───────────────────────────────────────────────────── */
+.petsy-welcome {
+  background: var(--p-surface);
+  border: 1px solid var(--p-border);
+  border-radius: 16px;
+  padding: 18px 16px 14px;
+  text-align: center;
+  margin-bottom: 4px;
+}
+.petsy-welcome-paw {
+  font-size: 2.4rem;
+  margin-bottom: 8px;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(168,85,247,.3));
+}
+.petsy-welcome-title {
+  font-weight: 800;
+  font-size: .9rem;
+  color: var(--p-text);
+  margin-bottom: 4px;
+}
+.petsy-welcome-sub {
+  font-size: .78rem;
+  color: var(--p-muted);
+  line-height: 1.5;
+}
 
-  /* ── Staff mode badge ── */
-  .petsy-staff-badge {
-    display: flex; align-items: center; gap: 6px; justify-content: center;
-    padding: 5px 14px; background: rgba(255,255,255,.15);
-    font-size: .72rem; font-weight: 700; letter-spacing: .4px;
-    color: white; flex-shrink: 0;
-  }
-  .petsy-staff-badge .dot {
-    width: 7px; height: 7px; background: #fbbf24; border-radius: 50%;
-    box-shadow: 0 0 6px #fbbf24; animation: blink 1.8s ease-in-out infinite;
-  }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+/* ── Quick replies ──────────────────────────────────────────────────── */
+.quick-replies {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0 14px 6px;
+  flex-shrink: 0;
+}
+.quick-btn {
+  border: 1.5px solid var(--p-purple);
+  color: var(--p-purple);
+  background: #fdf4ff;
+  border-radius: 20px;
+  padding: 5px 11px;
+  font-size: .76rem;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background .15s, color .15s, transform .1s;
+}
+.quick-btn:hover {
+  background: var(--p-purple);
+  color: white;
+  transform: translateY(-1px);
+}
+.quick-btn:active { transform: scale(.96); }
 
-  /* ── Live-data badge (per message) ── */
-  .msg-data-badge {
-    font-size: .64rem; color: #059669; margin-top: 2px;
-    display: flex; align-items: center; gap: 3px; font-weight: 600;
-  }
+/* ── Message rows ───────────────────────────────────────────────────── */
+.msg-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.msg-row.user { flex-direction: row-reverse; }
 
-  /* ── Welcome ── */
-  .petsy-welcome {
-    text-align: center; padding: 20px 16px 8px;
-    color: var(--petsy-muted); font-size: .82rem;
-  }
-  .petsy-welcome-icon { font-size: 2.8rem; margin-bottom: 6px; }
+.msg-avatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .85rem;
+  overflow: hidden;
+}
+.msg-avatar.bot  {
+  background: var(--p-grad);
+  padding: 4px;
+}
+.msg-avatar.user { background: #e5e7eb; }
+
+.msg-col {
+  display: flex;
+  flex-direction: column;
+  max-width: 80%;
+}
+.msg-row.user .msg-col { align-items: flex-end; }
+
+.msg-bubble {
+  padding: 9px 13px;
+  border-radius: 18px;
+  font-size: .855rem;
+  line-height: 1.55;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.msg-row.bot .msg-bubble {
+  background: var(--p-surface);
+  color: var(--p-text);
+  border-bottom-left-radius: 4px;
+  border: 1px solid var(--p-border);
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.msg-row.user .msg-bubble {
+  background: var(--p-user);
+  color: white;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 2px 8px rgba(168,85,247,.3);
+}
+
+.msg-time {
+  font-size: .65rem;
+  color: var(--p-muted);
+  margin-top: 3px;
+  padding: 0 4px;
+}
+.msg-meta {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  padding: 0 4px;
+}
+.msg-model {
+  font-size: .63rem;
+  color: var(--p-muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.msg-data-badge {
+  font-size: .63rem;
+  color: #059669;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #ecfdf5;
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+/* ── Typing indicator ───────────────────────────────────────────────── */
+.typing-bubble {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  padding: 10px 14px;
+}
+.typing-bubble span {
+  width: 7px; height: 7px;
+  background: var(--p-purple);
+  border-radius: 50%;
+  animation: bounce-dot .9s ease-in-out infinite;
+  opacity: .6;
+}
+.typing-bubble span:nth-child(2) { animation-delay: .15s; }
+.typing-bubble span:nth-child(3) { animation-delay: .30s; }
+@keyframes bounce-dot {
+  0%,80%,100% { transform: translateY(0); }
+  40%         { transform: translateY(-6px); }
+}
+
+/* ── Input bar ──────────────────────────────────────────────────────── */
+.petsy-input-bar {
+  padding: 10px 12px;
+  border-top: 1px solid var(--p-border);
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-shrink: 0;
+  background: var(--p-surface);
+}
+.petsy-input {
+  flex: 1;
+  padding: 9px 13px;
+  border: 1.5px solid var(--p-border);
+  border-radius: 22px;
+  font-size: .86rem;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  background: var(--p-bg);
+  color: var(--p-text);
+  resize: none;
+  max-height: 80px;
+  min-height: 38px;
+  font-family: inherit;
+  line-height: 1.45;
+  display: block;
+}
+.petsy-input:focus {
+  border-color: var(--p-purple);
+  box-shadow: 0 0 0 3px rgba(168,85,247,.12);
+}
+.petsy-input::placeholder { color: #9ca3af; }
+
+.petsy-send {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: var(--p-grad);
+  color: white;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: .95rem;
+  transition: transform .15s, box-shadow .15s, opacity .15s;
+  box-shadow: 0 3px 10px rgba(168,85,247,.45);
+  line-height: 1;
+}
+.petsy-send:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 5px 16px rgba(168,85,247,.55);
+}
+.petsy-send:active:not(:disabled) { transform: scale(.95); }
+.petsy-send:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── Footer ─────────────────────────────────────────────────────────── */
+.petsy-footer {
+  text-align: center;
+  font-size: .62rem;
+  color: #c4b5fd;
+  padding: 5px 14px 6px;
+  background: var(--p-grad);
+  flex-shrink: 0;
+  letter-spacing: .2px;
+}
 </style>
 </head>
 <body>
 
 <!-- Header -->
 <div class="petsy-header">
-  <svg class="petsy-header-icon" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#a78bfa"/>
-        <stop offset="100%" style="stop-color:#818cf8"/>
-      </linearGradient>
-    </defs>
-    <ellipse cx="18" cy="14" rx="9" ry="12" transform="rotate(-20,18,14)" fill="white" opacity=".3"/>
-    <ellipse cx="62" cy="14" rx="9" ry="12" transform="rotate(20,62,14)" fill="white" opacity=".3"/>
-    <rect x="6" y="14" width="68" height="50" rx="18" fill="white" opacity=".2"/>
-    <circle cx="28" cy="32" r="7" fill="white"/>
-    <circle cx="52" cy="32" r="7" fill="white"/>
-    <circle cx="29" cy="33" r="4" fill="#4c1d95"/>
-    <circle cx="53" cy="33" r="4" fill="#4c1d95"/>
-    <circle cx="31" cy="31" r="1.5" fill="white"/>
-    <circle cx="55" cy="31" r="1.5" fill="white"/>
-    <ellipse cx="40" cy="43" rx="5" ry="3.5" fill="white" opacity=".5"/>
-    <path d="M32 49 Q40 57 48 49" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-    <ellipse cx="22" cy="44" rx="5" ry="3" fill="rgba(251,113,133,0.5)"/>
-    <ellipse cx="58" cy="44" rx="5" ry="3" fill="rgba(251,113,133,0.5)"/>
-  </svg>
+  <div class="petsy-header-avatar">
+    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+      <!-- Paw print icon in header -->
+      <ellipse cx="32" cy="42" rx="13" ry="10" fill="white" opacity=".9"/>
+      <ellipse cx="15" cy="30" rx="6" ry="7.5" transform="rotate(-15,15,30)" fill="white" opacity=".85"/>
+      <ellipse cx="25.5" cy="22.5" rx="5.5" ry="7" fill="white" opacity=".85"/>
+      <ellipse cx="38.5" cy="22.5" rx="5.5" ry="7" fill="white" opacity=".85"/>
+      <ellipse cx="49" cy="30" rx="6" ry="7.5" transform="rotate(15,49,30)" fill="white" opacity=".85"/>
+      <ellipse cx="32" cy="43" rx="6.5" ry="5" fill="#f9a8d4" opacity=".7"/>
+      <ellipse cx="15.5" cy="31" rx="2.8" ry="3.2" fill="#f9a8d4" opacity=".6"/>
+      <ellipse cx="26" cy="23" rx="2.6" ry="3.2" fill="#f9a8d4" opacity=".6"/>
+      <ellipse cx="38" cy="23" rx="2.6" ry="3.2" fill="#f9a8d4" opacity=".6"/>
+      <ellipse cx="48.5" cy="31" rx="2.8" ry="3.2" fill="#f9a8d4" opacity=".6"/>
+    </svg>
+  </div>
   <div class="petsy-header-info">
     <div class="petsy-header-name">🐾 Petsy</div>
-    <div class="petsy-header-sub">{{ clinic_name }} AI Assistant</div>
+    <div class="petsy-header-sub">{{ clinic_name }} · Your AI Assistant</div>
   </div>
-  <div class="petsy-status" title="Online"></div>
+  <div class="petsy-status-dot" title="Online"></div>
 </div>
 
 {% if is_staff %}
-<div class="petsy-staff-badge">
-  <span class="dot"></span>
+<div class="petsy-staff-strip">
+  <span class="blink-dot"></span>
   🔒 Staff Mode — Live clinic data enabled
 </div>
 {% endif %}
 
 <!-- Messages -->
 <div class="petsy-messages" id="msgs">
-  <div class="petsy-welcome">
-    <div class="petsy-welcome-icon">🐾</div>
+
+  <!-- Welcome card -->
+  <div class="petsy-welcome" id="welcomeCard">
+    <span class="petsy-welcome-paw">🐾</span>
     {% if is_staff %}
-    <div>Hi! I'm <strong>Petsy</strong>, your internal AI assistant.<br>
-    Ask me about today's schedule, patients, revenue, stock, and more.</div>
+    <div class="petsy-welcome-title">Hi, I'm Petsy!</div>
+    <div class="petsy-welcome-sub">Your internal AI assistant — ask me about today's<br>schedule, patients, revenue, stock, and more.</div>
     {% else %}
-    <div>Hi! I'm <strong>Petsy</strong>, your veterinary assistant.<br>
-    Ask me anything about your pet or our services!</div>
+    <div class="petsy-welcome-title">Hi there! I'm Petsy 🐱</div>
+    <div class="petsy-welcome-sub">Your friendly vet assistant. Ask me anything about<br>your pet, our services, or general pet health!</div>
     {% endif %}
   </div>
-  <!-- Quick replies shown initially -->
-  <div class="quick-replies" id="quickReplies">
-    {% if is_staff %}
-    <button class="quick-btn" onclick="quickSend(this)">📅 Today's appointments</button>
-    <button class="quick-btn" onclick="quickSend(this)">🏥 Open visits now</button>
-    <button class="quick-btn" onclick="quickSend(this)">💰 Revenue today</button>
-    <button class="quick-btn" onclick="quickSend(this)">📦 Low stock alerts</button>
-    <button class="quick-btn" onclick="quickSend(this)">📊 Dashboard summary</button>
-    <button class="quick-btn" onclick="quickSend(this)">💊 Pending prescriptions</button>
-    {% else %}
-    <button class="quick-btn" onclick="quickSend(this)">📅 Book appointment</button>
-    <button class="quick-btn" onclick="quickSend(this)">💉 Vaccination info</button>
-    <button class="quick-btn" onclick="quickSend(this)">🐶 Dog health tips</button>
-    <button class="quick-btn" onclick="quickSend(this)">🐱 Cat health tips</button>
-    <button class="quick-btn" onclick="quickSend(this)">⏰ Working hours</button>
-    <button class="quick-btn" onclick="quickSend(this)">💊 Medication advice</button>
-    {% endif %}
-  </div>
+
 </div>
 
-<!-- Input -->
+<!-- Quick replies -->
+<div class="quick-replies" id="quickReplies">
+  {% if is_staff %}
+  <button class="quick-btn" onclick="quickSend(this)">📅 Today's appointments</button>
+  <button class="quick-btn" onclick="quickSend(this)">🏥 Open visits now</button>
+  <button class="quick-btn" onclick="quickSend(this)">💰 Revenue today</button>
+  <button class="quick-btn" onclick="quickSend(this)">📦 Low stock alerts</button>
+  <button class="quick-btn" onclick="quickSend(this)">📊 Dashboard summary</button>
+  <button class="quick-btn" onclick="quickSend(this)">💊 Pending prescriptions</button>
+  {% else %}
+  <button class="quick-btn" onclick="quickSend(this)">📅 Book appointment</button>
+  <button class="quick-btn" onclick="quickSend(this)">💉 Vaccination info</button>
+  <button class="quick-btn" onclick="quickSend(this)">🐶 Dog health tips</button>
+  <button class="quick-btn" onclick="quickSend(this)">🐱 Cat care tips</button>
+  <button class="quick-btn" onclick="quickSend(this)">⏰ Working hours</button>
+  <button class="quick-btn" onclick="quickSend(this)">💊 Medication advice</button>
+  {% endif %}
+</div>
+
+<!-- Input bar -->
 <div class="petsy-input-bar">
-  <textarea class="petsy-input" id="inp" rows="1" placeholder="Ask Petsy anything…"
-            onkeydown="handleKey(event)"></textarea>
+  <textarea
+    class="petsy-input"
+    id="inp"
+    rows="1"
+    placeholder="Ask Petsy anything…"
+    onkeydown="handleKey(event)"
+    oninput="autoGrow(this)"
+  ></textarea>
   <button class="petsy-send" id="sendBtn" onclick="sendMsg()" title="Send">
-    ➤
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="22" y1="2" x2="11" y2="13"/>
+      <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+    </svg>
   </button>
 </div>
 
-<div class="petsy-powered">Powered by Petsy AI · {{ clinic_name }}</div>
+<div class="petsy-footer">Powered by Petsy AI · {{ clinic_name }}</div>
 
 <script>
-const msgs      = document.getElementById('msgs');
-const inp       = document.getElementById('inp');
-const sendBtn   = document.getElementById('sendBtn');
-let   history_  = [];
-let   sending   = false;
+const msgs    = document.getElementById('msgs');
+const inp     = document.getElementById('inp');
+const sendBtn = document.getElementById('sendBtn');
+let history_  = [];
+let sending   = false;
 
+/* ── Helpers ── */
 function ts() {
-  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 80) + 'px';
+}
+
+/* ── Render a message ── */
 function addMsg(role, text, model, dataFound) {
   const isUser = role === 'user';
+
   const row = document.createElement('div');
   row.className = 'msg-row ' + (isUser ? 'user' : 'bot');
 
+  /* Avatar */
   const avatar = document.createElement('div');
   avatar.className = 'msg-avatar ' + (isUser ? 'user' : 'bot');
-  if (isUser) { avatar.textContent = '👤'; }
-  else {
-    avatar.innerHTML = `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
-      <ellipse cx="18" cy="14" rx="9" ry="12" transform="rotate(-20,18,14)" fill="white" opacity=".4"/>
-      <ellipse cx="62" cy="14" rx="9" ry="12" transform="rotate(20,62,14)" fill="white" opacity=".4"/>
-      <circle cx="28" cy="32" r="7" fill="white"/>
-      <circle cx="52" cy="32" r="7" fill="white"/>
-      <circle cx="29" cy="33" r="4" fill="#4c1d95"/>
-      <circle cx="53" cy="33" r="4" fill="#4c1d95"/>
-      <circle cx="31" cy="31" r="1.5" fill="white"/>
-      <circle cx="55" cy="31" r="1.5" fill="white"/>
-      <path d="M32 49 Q40 57 48 49" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  if (isUser) {
+    avatar.textContent = '👤';
+  } else {
+    avatar.innerHTML = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+      <ellipse cx="32" cy="42" rx="13" ry="10" fill="white" opacity=".9"/>
+      <ellipse cx="15" cy="30" rx="6" ry="7.5" transform="rotate(-15,15,30)" fill="white" opacity=".85"/>
+      <ellipse cx="25.5" cy="22.5" rx="5.5" ry="7" fill="white" opacity=".85"/>
+      <ellipse cx="38.5" cy="22.5" rx="5.5" ry="7" fill="white" opacity=".85"/>
+      <ellipse cx="49" cy="30" rx="6" ry="7.5" transform="rotate(15,49,30)" fill="white" opacity=".85"/>
     </svg>`;
   }
 
-  const wrap  = document.createElement('div');
-  wrap.style.cssText = 'display:flex;flex-direction:column;max-width:78%';
+  /* Column */
+  const col = document.createElement('div');
+  col.className = 'msg-col';
 
   const bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
@@ -298,12 +504,13 @@ function addMsg(role, text, model, dataFound) {
   time.className = 'msg-time';
   time.textContent = ts();
 
-  wrap.appendChild(bubble);
-  wrap.appendChild(time);
+  col.appendChild(bubble);
+  col.appendChild(time);
+
   if (!isUser) {
     const meta = document.createElement('div');
-    meta.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:2px;flex-wrap:wrap';
-    if (model) {
+    meta.className = 'msg-meta';
+    if (model && model !== 'none') {
       const ml = document.createElement('span');
       ml.className = 'msg-model';
       ml.textContent = '⚡ ' + model;
@@ -312,35 +519,41 @@ function addMsg(role, text, model, dataFound) {
     if (dataFound) {
       const db = document.createElement('span');
       db.className = 'msg-data-badge';
-      db.textContent = '📊 Live clinic data';
+      db.textContent = '📊 Live data';
       meta.appendChild(db);
     }
-    if (meta.children.length) wrap.appendChild(meta);
+    if (meta.children.length) col.appendChild(meta);
   }
 
-  if (isUser) { row.appendChild(wrap); row.appendChild(avatar); }
-  else        { row.appendChild(avatar); row.appendChild(wrap); }
+  if (isUser) { row.appendChild(col); row.appendChild(avatar); }
+  else        { row.appendChild(avatar); row.appendChild(col); }
 
   msgs.appendChild(row);
   msgs.scrollTop = msgs.scrollHeight;
 }
 
+/* ── Typing indicator ── */
 function addTyping() {
   const row = document.createElement('div');
-  row.className = 'msg-row bot'; row.id = 'typing-row';
+  row.className = 'msg-row bot';
+  row.id = 'typing-row';
+
   const avatar = document.createElement('div');
   avatar.className = 'msg-avatar bot';
-  avatar.innerHTML = `<svg viewBox="0 0 80 80" style="width:100%;height:100%">
-    <circle cx="28" cy="32" r="7" fill="white"/>
-    <circle cx="52" cy="32" r="7" fill="white"/>
-    <circle cx="29" cy="33" r="4" fill="#4c1d95"/>
-    <circle cx="53" cy="33" r="4" fill="#4c1d95"/>
-    <path d="M32 49 Q40 57 48 49" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  avatar.innerHTML = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+    <ellipse cx="32" cy="42" rx="13" ry="10" fill="white" opacity=".9"/>
+    <ellipse cx="15" cy="30" rx="6" ry="7.5" transform="rotate(-15,15,30)" fill="white" opacity=".85"/>
+    <ellipse cx="25.5" cy="22.5" rx="5.5" ry="7" fill="white" opacity=".85"/>
+    <ellipse cx="38.5" cy="22.5" rx="5.5" ry="7" fill="white" opacity=".85"/>
+    <ellipse cx="49" cy="30" rx="6" ry="7.5" transform="rotate(15,49,30)" fill="white" opacity=".85"/>
   </svg>`;
+
   const bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
-  bubble.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
-  row.appendChild(avatar); row.appendChild(bubble);
+  bubble.innerHTML = '<div class="typing-bubble"><span></span><span></span><span></span></div>';
+
+  row.appendChild(avatar);
+  row.appendChild(bubble);
   msgs.appendChild(row);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -349,28 +562,32 @@ function removeTyping() {
   document.getElementById('typing-row')?.remove();
 }
 
+/* ── Quick reply ── */
 function quickSend(btn) {
-  const text = btn.textContent.replace(/^[^\s]+\s/, '').trim();
+  const raw  = btn.textContent.trim();
+  /* Strip leading emoji+space if present */
+  const text = raw.replace(/^[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}✂💵📅🏥💰📦📊💊💉🐶🐱⏰]\s*/u, '').trim();
   document.getElementById('quickReplies')?.remove();
   inp.value = text;
   sendMsg();
 }
 
+/* ── Key handler ── */
 function handleKey(e) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
-  // Auto-grow textarea
-  inp.style.height = 'auto';
-  inp.style.height = Math.min(inp.scrollHeight, 80) + 'px';
 }
 
+/* ── Send message ── */
 async function sendMsg() {
   const text = inp.value.trim();
   if (!text || sending) return;
-  sending = true; sendBtn.disabled = true;
-  inp.value = ''; inp.style.height = 'auto';
+  sending = true;
+  sendBtn.disabled = true;
+  inp.value = '';
+  inp.style.height = 'auto';
 
-  // Remove quick replies on first message
   document.getElementById('quickReplies')?.remove();
+  document.getElementById('welcomeCard')?.remove();
 
   addMsg('user', text);
   history_.push({ role: 'user', content: text });
@@ -380,20 +597,24 @@ async function sendMsg() {
     const r = await fetch('/petsy/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history: history_.slice(-6) }),
+      body: JSON.stringify({ message: text, history: history_.slice(-8) }),
     });
     const data = await r.json();
     removeTyping();
-    if (data.error) { addMsg('bot', '⚠️ ' + data.error); }
-    else {
+    if (data.error) {
+      addMsg('bot', '⚠️ ' + data.error);
+    } else {
       addMsg('bot', data.reply, data.model, data.data_found);
       history_.push({ role: 'assistant', content: data.reply });
     }
-  } catch (e) {
+  } catch (_e) {
     removeTyping();
-    addMsg('bot', '⚠️ Connection error. Please check your internet connection.');
+    addMsg('bot', '⚠️ Connection error — please try again.');
   }
-  sending = false; sendBtn.disabled = false; inp.focus();
+
+  sending = false;
+  sendBtn.disabled = false;
+  inp.focus();
 }
 </script>
 </body>

@@ -544,6 +544,35 @@ def salary_grades():
     )
 
 
+# ── PAYSLIP PDF ──────────────────────────────────────────────────────────────
+
+@payroll_bp.route("/salaries/<int:sid>/payslip")
+@login_required
+def salary_payslip(sid):
+    from flask import Response, abort
+    from models.pdf_generator import generate_payslip_pdf
+    conn = db.get_db()
+    row  = conn.execute("""
+        SELECT s.*, u.full_name, u.role, u.email, u.phone,
+               u.hire_date, u.contract_type, u.job_title, u.national_id
+        FROM salaries s JOIN users u ON u.id=s.user_id
+        WHERE s.id=%s
+    """, (sid,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    salary = dict(row)
+    clinic = db.get_clinic()
+    try:
+        pdf_bytes = generate_payslip_pdf(salary=salary, clinic=clinic)
+        fname = f"payslip_{salary['full_name'].replace(' ','_')}_{salary['period_year']}-{salary['period_month']:02d}.pdf"
+        return Response(pdf_bytes, mimetype="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+    except Exception as e:
+        flash(f"Payslip generation failed: {e}", "danger")
+        return redirect(url_for("payroll.salary_detail", sid=sid))
+
+
 # ── API — attendance summary for a user/period (used by salary form JS) ───────
 
 @payroll_bp.route("/api/attendance/<int:uid>/<int:year>/<int:month>")

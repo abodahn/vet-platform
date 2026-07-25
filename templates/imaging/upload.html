@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Upload Imaging Study{% endblock %}
+{% block page_title %}📤 Upload Imaging Study{% endblock %}
+{% block page_sub %}X-Ray, Ultrasound, MRI, Endoscopy or any clinical image{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;">
+<div class="v3-card" style="padding:0;overflow:hidden;">
+  <div style="padding:18px 24px;background:linear-gradient(135deg,var(--cl-primary),color-mix(in srgb,var(--cl-primary) 75%,var(--cl-accent)));color:#fff;font-weight:700;font-size:1rem;">
+    🩻 New Imaging Study
+  </div>
+  <form method="post" enctype="multipart/form-data" style="padding:24px;">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+      <div>
+        <label style="font-size:.83rem;font-weight:600;color:var(--cl-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;">
+          Pet <span style="color:var(--cl-danger)">*</span>
+        </label>
+        <select name="pet_id" required class="form-control"
+                style="padding:10px 12px;border:1.5px solid var(--cl-border);border-radius:8px;background:var(--cl-bg);color:var(--cl-text);width:100%;">
+          <option value="">— select pet —</option>
+          {% for p in pets %}
+          <option value="{{ p.id }}" {% if p.id|string == pet_id_pre %}selected{% endif %}>
+            {{ p.pet_name }} ({{ p.species }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.83rem;font-weight:600;color:var(--cl-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;">Study Type</label>
+        <select name="study_type" style="padding:10px 12px;border:1.5px solid var(--cl-border);border-radius:8px;background:var(--cl-bg);color:var(--cl-text);width:100%;">
+          {% for t in ['X-Ray','Ultrasound','MRI','CT Scan','Endoscopy','Dermatoscopy','Fundoscopy','Other'] %}
+          <option>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.83rem;font-weight:600;color:var(--cl-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;">Body Region</label>
+        <input type="text" name="body_region" placeholder="e.g. Chest, Abdomen, Left Leg"
+               style="padding:10px 12px;border:1.5px solid var(--cl-border);border-radius:8px;background:var(--cl-bg);color:var(--cl-text);width:100%;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:.83rem;font-weight:600;color:var(--cl-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;">Image File <span style="color:var(--cl-danger)">*</span></label>
+        <input type="file" name="image_file" accept="image/*" required
+               style="padding:8px;border:1.5px solid var(--cl-border);border-radius:8px;background:var(--cl-bg);color:var(--cl-text);width:100%;box-sizing:border-box;">
+      </div>
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:.83rem;font-weight:600;color:var(--cl-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;">Notes</label>
+      <textarea name="notes" rows="3"
+                style="padding:10px 12px;border:1.5px solid var(--cl-border);border-radius:8px;background:var(--cl-bg);color:var(--cl-text);width:100%;box-sizing:border-box;resize:vertical;"
+                placeholder="Clinical context, reason for imaging…"></textarea>
+    </div>
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px;border:1.5px solid var(--cl-border);border-radius:8px;background:var(--cl-bg);margin-bottom:20px;">
+      <input type="checkbox" name="run_ai" value="1" style="width:18px;height:18px;accent-color:var(--cl-primary);">
+      <span style="font-size:.95rem;font-weight:600;">🔬 Run AI analysis on this image (Gemini Vision)</span>
+    </label>
+    <div style="display:flex;gap:12px;">
+      <button type="submit" style="padding:11px 28px;background:linear-gradient(135deg,var(--cl-primary),color-mix(in srgb,var(--cl-primary) 75%,var(--cl-accent)));color:#fff;border:none;border-radius:9px;font-size:.97rem;font-weight:700;cursor:pointer;">
+        📤 Upload Study
+      </button>
+      <a href="{{ url_for('imaging.index') }}" style="padding:11px 22px;background:var(--cl-surface);color:var(--cl-text);border:1.5px solid var(--cl-border);border-radius:9px;font-size:.97rem;font-weight:600;text-decoration:none;">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
+</div>
+{% endblock %}

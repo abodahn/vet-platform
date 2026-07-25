@@ -6,6 +6,7 @@
 {% block topbar_actions %}
 <a href="{{ url_for('inventory.item_new') }}" class="pf-btn pf-btn-primary">{{ t('+ New Item', '+ صنف جديد') }}</a>
 <a href="{{ url_for('inventory.batch_new') }}" class="pf-btn pf-btn-secondary">{{ t('Receive Stock', 'استلام مخزون') }}</a>
+<a href="{{ url_for('inventory.transfer') }}" class="pf-btn pf-btn-secondary">{{ t('Transfer Stock', 'نقل مخزون') }}</a>
 {% endblock %}
 
 {% block head_extra %}

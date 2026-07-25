@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}HR Dashboard{% endblock %}
+{% block page_title %}HR Dashboard{% endblock %}
+{% block page_sub %}People, attendance, payroll & performance overview{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('hr.staff_new') }}" class="pf-btn pf-btn-primary">+ New Staff</a>
+<a href="{{ url_for('hr.hr_attendance') }}" class="pf-btn pf-btn-secondary">Attendance</a>
+<a href="{{ url_for('hr.roster') }}" class="pf-btn pf-btn-secondary">Weekly Roster</a>
+<a href="{{ url_for('hr.overtime_list') }}" class="pf-btn pf-btn-secondary">Overtime</a>
+<a href="{{ url_for('hr.certifications_list') }}" class="pf-btn pf-btn-secondary">Certifications</a>
+<a href="{{ url_for('hr.staff_list') }}" class="pf-btn pf-btn-secondary">Staff List</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+.hr-kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:16px; margin-bottom:24px; }
+.kpi-card    { background:var(--cl-surface); border-radius:12px; padding:18px 20px;
+               box-shadow:0 2px 8px rgba(0,0,0,.06); border-top:4px solid var(--cl-primary); }
+.kpi-card.green  { border-color:#16a34a; }
+.kpi-card.red    { border-color:#dc2626; }
+.kpi-card.amber  { border-color:#d97706; }
+.kpi-card.purple { border-color:#7c3aed; }
+.kpi-card.teal   { border-color:#0d9488; }
+.kpi-card.blue   { border-color:#1d4ed8; }
+.kpi-num  { font-size:2rem; font-weight:800; line-height:1; margin:4px 0 2px; }
+.kpi-lbl  { font-size:0.78rem; color:var(--cl-muted); font-weight:600; text-transform:uppercase; }
+.kpi-sub  { font-size:0.75rem; color:var(--cl-muted); margin-top:2px; }
+.hr-2col  { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+.hr-3col  { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-bottom:20px; }
+.hr-card  { background:var(--cl-surface); border-radius:12px; padding:20px;
+            box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.hr-card-title { font-size:0.95rem; font-weight:700; color:var(--cl-primary);
+                 margin-bottom:14px; padding-bottom:10px; border-bottom:1.5px solid var(--cl-border); }
+.role-bar-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.role-bar-label { font-size:0.82rem; font-weight:600; min-width:120px; }
+.role-bar-track { flex:1; background:var(--cl-bg); border-radius:99px; height:8px; }
+.role-bar-fill  { height:8px; border-radius:99px; }
+.role-bar-count { font-size:0.82rem; color:var(--cl-muted); min-width:24px; text-align:right; }
+.hire-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--cl-border); }
+.hire-row:last-child { border-bottom:none; }
+.hire-avatar { width:34px; height:34px; border-radius:50%; display:flex; align-items:center;
+               justify-content:center; font-weight:700; font-size:13px; color:#fff; flex-shrink:0; }
+.hire-name   { font-weight:600; font-size:0.88rem; }
+.hire-meta   { font-size:0.76rem; color:var(--cl-muted); }
+.alert-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 14px;
+               border-radius:8px; font-size:0.84rem; font-weight:600; margin-bottom:10px; }
+.alert-warn  { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+.alert-ok    { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+.alert-info  { background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
+@media(max-width:768px){ .hr-2col,.hr-3col{ grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set color_map = {
+  'super_admin':'#dc2626','clinic_owner':'#7c3aed','branch_manager':'#1d4ed8',
+  'doctor':'#0891b2','nurse':'#0d9488','reception':'#ca8a04',
+  'inventory_mgr':'#b45309','pharmacist':'#7c3aed','finance':'#166534',
+  'groomer':'#be185d','boarding_staff':'#6b7280','support_admin':'#374151','auditor':'#6b7280'
+} %}
+
+{# ── KPI cards ──────────────────────────────────────────────────────────── #}
+<div class="hr-kpi-grid">
+  <div class="kpi-card green">
+    <div class="kpi-lbl">Active Staff</div>
+    <div class="kpi-num" style="color:#16a34a">{{ total_staff }}</div>
+    <div class="kpi-sub">{{ total_inactive }} inactive</div>
+  </div>
+  <div class="kpi-card green">
+    <div class="kpi-lbl">Present Today</div>
+    <div class="kpi-num" style="color:#16a34a">{{ present_today }}</div>
+    <div class="kpi-sub">{{ late_today }} late</div>
+  </div>
+  <div class="kpi-card amber">
+    <div class="kpi-lbl">On Leave</div>
+    <div class="kpi-num" style="color:#d97706">{{ on_leave_today }}</div>
+    <div class="kpi-sub">today</div>
+  </div>
+  <div class="kpi-card red">
+    <div class="kpi-lbl">Leave Requests</div>
+    <div class="kpi-num" style="color:#dc2626">{{ pending_leaves }}</div>
+    <div class="kpi-sub">pending approval</div>
+  </div>
+  <div class="kpi-card purple">
+    <div class="kpi-lbl">Reviews Pending</div>
+    <div class="kpi-num" style="color:#7c3aed">{{ pending_reviews }}</div>
+    <div class="kpi-sub">draft reviews</div>
+  </div>
+  <div class="kpi-card blue">
+    <div class="kpi-lbl">No Shift Assigned</div>
+    <div class="kpi-num" style="color:#1d4ed8">{{ unassigned_shifts }}</div>
+    <div class="kpi-sub">staff members</div>
+  </div>
+  {% if payroll_stats %}
+  <div class="kpi-card teal">
+    <div class="kpi-lbl">Payroll This Month</div>
+    <div class="kpi-num" style="color:#0d9488;font-size:1.4rem">{{ "EGP {:,.0f}".format(payroll_stats.total_net or 0) }}</div>
+    <div class="kpi-sub">{{ payroll_stats.paid_cnt or 0 }}/{{ payroll_stats.tot or 0 }} paid</div>
+  </div>
+  {% endif %}
+  {% if pending_overtime is defined and pending_overtime > 0 %}
+  <div class="kpi-card amber">
+    <div class="kpi-lbl">Overtime Pending</div>
+    <div class="kpi-num" style="color:#d97706">{{ pending_overtime }}</div>
+    <div class="kpi-sub">awaiting approval</div>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Alerts ─────────────────────────────────────────────────────────────── #}
+{% if pending_leaves > 0 %}
+<a href="{{ url_for('attendance.leaves_list', status='Pending') }}" style="text-decoration:none">
+  <div class="alert-badge alert-warn">
+    ⚠ {{ pending_leaves }} leave request{{ 's' if pending_leaves != 1 }} awaiting approval — click to review
+  </div>
+</a>
+{% endif %}
+{% if unassigned_shifts > 0 %}
+<a href="{{ url_for('hr.staff_list') }}" style="text-decoration:none">
+  <div class="alert-badge alert-info">
+    📅 {{ unassigned_shifts }} staff member{{ 's' if unassigned_shifts != 1 }} have no shift assigned
+  </div>
+</a>
+{% endif %}
+{% if pending_overtime is defined and pending_overtime > 0 %}
+<a href="{{ url_for('hr.overtime_list', status='Pending') }}" style="text-decoration:none">
+  <div class="alert-badge alert-warn">
+    ⏱ {{ pending_overtime }} overtime entr{{ 'ies' if pending_overtime != 1 else 'y' }} awaiting approval — click to review
+  </div>
+</a>
+{% endif %}
+
+<div class="hr-2col">
+
+  {# ── Headcount by Role ───────────────────────────────────────────────── #}
+  <div class="hr-card">
+    <div class="hr-card-title">Headcount by Role</div>
+    {% if by_role %}
+      {% set max_cnt = by_role[0].cnt %}
+      {% set color_map = {
+        'super_admin':'#dc2626','clinic_owner':'#7c3aed','branch_manager':'#1d4ed8',
+        'doctor':'#0891b2','nurse':'#0d9488','reception':'#ca8a04',
+        'inventory_mgr':'#b45309','pharmacist':'#7c3aed','finance':'#166534',
+        'groomer':'#be185d','boarding_staff':'#6b7280','support_admin':'#374151','auditor':'#6b7280'
+      } %}
+      {% for r in by_role %}
+      {% set pct = (r.cnt / max_cnt * 100)|int if max_cnt > 0 else 0 %}
+      {% set rc = color_map.get(r.role, '#6b7280') %}
+      <div class="role-bar-row">
+        <div class="role-bar-label" style="color:{{ rc }}">{{ r.role.replace('_',' ').title() }}</div>
+        <div class="role-bar-track">
+          <div class="role-bar-fill" style="width:{{ pct }}%;background:{{ rc }}"></div>
+        </div>
+        <div class="role-bar-count">{{ r.cnt }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color:var(--cl-muted);text-align:center;padding:20px 0">No staff yet.</p>
+    {% endif %}
+  </div>
+
+  {# ── Contract Type Split ──────────────────────────────────────────────── #}
+  <div class="hr-card">
+    <div class="hr-card-title">Contract Types</div>
+    {% set contract_colors = {'Full-time':'#16a34a','Part-time':'#0891b2','Contract':'#d97706','Probation':'#dc2626','Intern':'#7c3aed'} %}
+    {% if by_contract %}
+      {% set max_ct = by_contract[0].cnt %}
+      {% for c in by_contract %}
+      {% set pct = (c.cnt / max_ct * 100)|int if max_ct > 0 else 0 %}
+      {% set cc = contract_colors.get(c.ctype, '#6b7280') %}
+      <div class="role-bar-row">
+        <div class="role-bar-label" style="color:{{ cc }}">{{ c.ctype }}</div>
+        <div class="role-bar-track">
+          <div class="role-bar-fill" style="width:{{ pct }}%;background:{{ cc }}"></div>
+        </div>
+        <div class="role-bar-count">{{ c.cnt }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color:var(--cl-muted);text-align:center;padding:20px 0">No data yet.</p>
+    {% endif %}
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--cl-border)">
+      <div class="hr-card-title" style="margin-bottom:10px">Quick Links</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <a href="{{ url_for('attendance.dashboard') }}" class="pf-btn pf-btn-secondary" style="text-align:center">Attendance Dashboard</a>
+        <a href="{{ url_for('payroll.dashboard') }}" class="pf-btn pf-btn-secondary" style="text-align:center">Payroll Dashboard</a>
+        <a href="{{ url_for('attendance.shifts_list') }}" class="pf-btn pf-btn-secondary" style="text-align:center">Manage Shifts</a>
+        <a href="{{ url_for('hr.performance_list') }}" class="pf-btn pf-btn-secondary" style="text-align:center">Performance Reviews</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ── Recent Hires ────────────────────────────────────────────────────────── #}
+{% if recent_hires %}
+<div class="hr-card" style="margin-bottom:20px">
+  <div class="hr-card-title">Recent Hires (Last 90 Days)</div>
+  {% for h in recent_hires %}
+  {% set rc = color_map.get(h.role, '#6b7280') %}
+  <div class="hire-row">
+    <div class="hire-avatar" style="background:{{ rc }}">{{ (h.full_name or 'U')[:2]|upper }}</div>
+    <div style="flex:1">
+      <div class="hire-name">
+        <a href="{{ url_for('hr.staff_detail', user_id=h.id) }}" style="color:var(--cl-primary);text-decoration:none">{{ h.full_name or '—' }}</a>
+      </div>
+      <div class="hire-meta">{{ h.role.replace('_',' ').title() }}{% if h.job_title %} · {{ h.job_title }}{% endif %}</div>
+    </div>
+    <div style="text-align:right">
+      <span style="font-size:0.8rem;background:#dcfce7;color:#166534;padding:2px 9px;border-radius:20px;font-weight:600">
+        Joined {{ h.hire_date or 'recently' }}
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Bottom 3-col: Birthdays · Anniversaries · Expiring Certs ────────────── #}
+<div class="hr-3col">
+
+  {# Birthdays this month #}
+  <div class="hr-card">
+    <div class="hr-card-title">🎂 Birthdays This Month</div>
+    {% if birthdays_this_month %}
+      {% for b in birthdays_this_month %}
+      {% set rc = color_map.get(b.role, '#6b7280') %}
+      <div class="hire-row">
+        <div class="hire-avatar" style="background:{{ rc }}">{{ (b.full_name or 'U')[:2]|upper }}</div>
+        <div style="flex:1">
+          <div class="hire-name">
+            <a href="{{ url_for('hr.staff_detail', user_id=b.id) }}" style="color:var(--cl-primary);text-decoration:none">{{ b.full_name }}</a>
+          </div>
+          <div class="hire-meta">{{ b.role.replace('_',' ').title() }}</div>
+        </div>
+        <span style="font-size:0.8rem;background:#fce7f3;color:#9d174d;padding:2px 9px;border-radius:20px;font-weight:600">
+          Day {{ b.bday|int }}
+        </span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color:var(--cl-muted);text-align:center;padding:18px 0;font-size:13px">No birthdays this month.</p>
+    {% endif %}
+  </div>
+
+  {# Work Anniversaries this month #}
+  <div class="hr-card">
+    <div class="hr-card-title">🎉 Anniversaries This Month</div>
+    {% if anniversaries_this_month %}
+      {% for a in anniversaries_this_month %}
+      {% set rc = color_map.get(a.role, '#6b7280') %}
+      <div class="hire-row">
+        <div class="hire-avatar" style="background:{{ rc }}">{{ (a.full_name or 'U')[:2]|upper }}</div>
+        <div style="flex:1">
+          <div class="hire-name">
+            <a href="{{ url_for('hr.staff_detail', user_id=a.id) }}" style="color:var(--cl-primary);text-decoration:none">{{ a.full_name }}</a>
+          </div>
+          <div class="hire-meta">{{ a.hire_date }}</div>
+        </div>
+        <span style="font-size:0.8rem;background:#ede9fe;color:#5b21b6;padding:2px 9px;border-radius:20px;font-weight:600">
+          {{ a.years }}yr
+        </span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color:var(--cl-muted);text-align:center;padding:18px 0;font-size:13px">No anniversaries this month.</p>
+    {% endif %}
+  </div>
+
+  {# Expiring Certifications #}
+  <div class="hr-card">
+    <div class="hr-card-title">
+      ⚠ Expiring Certifications
+      <a href="{{ url_for('hr.certifications_list') }}" style="float:right;font-size:12px;color:var(--cl-primary);font-weight:500">All →</a>
+    </div>
+    {% if expiring_certs %}
+      {% for c in expiring_certs %}
+      <div class="hire-row">
+        <div style="flex:1">
+          <div class="hire-name">
+            <a href="{{ url_for('hr.staff_detail', user_id=c.user_id) }}" style="color:var(--cl-primary);text-decoration:none">{{ c.full_name }}</a>
+          </div>
+          <div class="hire-meta">{{ c.cert_name }}</div>
+        </div>
+        <span style="font-size:0.8rem;background:{% if c.days_left <= 7 %}#fee2e2;color:#991b1b{% else %}#fef3c7;color:#92400e{% endif %};padding:2px 9px;border-radius:20px;font-weight:600">
+          {{ c.days_left }}d left
+        </span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color:var(--cl-muted);text-align:center;padding:18px 0;font-size:13px">No certs expiring soon.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+{# ── Recent Warnings ─────────────────────────────────────────────────────── #}
+{% if recent_warnings %}
+<div class="hr-card" style="margin-bottom:20px">
+  <div class="hr-card-title">Recent Disciplinary Actions</div>
+  {% set wt_colors = {'Verbal':'#92400e','Written':'#9a3412','Final Warning':'#991b1b','Suspension':'#7f1d1d'} %}
+  {% set wt_bg     = {'Verbal':'#fef3c7','Written':'#fed7aa','Final Warning':'#fee2e2','Suspension':'#fca5a5'} %}
+  {% for w in recent_warnings %}
+  <div class="hire-row">
+    <div>
+      <span style="display:inline-block;padding:2px 9px;border-radius:4px;font-size:11px;font-weight:700;background:{{ wt_bg.get(w.warning_type,'#fef3c7') }};color:{{ wt_colors.get(w.warning_type,'#92400e') }}">
+        {{ w.warning_type }}
+      </span>
+    </div>
+    <div style="flex:1">
+      <div class="hire-name">
+        <a href="{{ url_for('hr.staff_detail', user_id=w.user_id) }}" style="color:var(--cl-primary);text-decoration:none">{{ w.full_name }}</a>
+      </div>
+      <div class="hire-meta">{{ w.reason or '—' }}</div>
+    </div>
+    <span style="font-size:12px;color:var(--cl-muted)">{{ w.issued_date }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

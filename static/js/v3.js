@@ -716,9 +716,97 @@
         closeSidebar();
       }
     });
+
+    // Expose global so onclick="v3ToggleSidebar()" in base.html works
+    window.v3ToggleSidebar = function () {
+      if (document.body.classList.contains('v3-sidebar-open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    };
+  }
+
+  /* ─── Desktop sidebar collapse (mini-mode) ─────────────────────
+   * Clicking the hamburger on ≥769px toggles a narrow icon-only sidebar.
+   * State is saved in localStorage so it persists across pages.
+   * ─────────────────────────────────────────────────────────────── */
+  function _initDesktopCollapse() {
+    var STORAGE_KEY = 'al-sidebar-collapsed';
+    var sidebar     = qs('.v3-sidebar') || qs('[data-v3-sidebar]');
+    var main        = qs('.v3-main');
+    var hb          = qs('#v3-hamburger');
+    if (!sidebar || !main) return;
+
+    function setCollapsed(collapsed) {
+      if (collapsed) {
+        document.body.classList.add('v3-sidebar-collapsed');
+        sidebar.setAttribute('aria-label', 'Navigation (collapsed)');
+      } else {
+        document.body.classList.remove('v3-sidebar-collapsed');
+        sidebar.setAttribute('aria-label', 'Navigation');
+      }
+      safeLocalSet(STORAGE_KEY, collapsed ? '1' : '0');
+    }
+
+    // Restore saved state on page load (desktop only)
+    function restoreState() {
+      if (window.innerWidth > 768 && safeLocalGet(STORAGE_KEY, '0') === '1') {
+        setCollapsed(true);
+      }
+    }
+
+    // Wire up hamburger for desktop toggle
+    if (hb) {
+      hb.addEventListener('click', function () {
+        if (window.innerWidth <= 768) return; // mobile handled by _initMobileSidebar
+        setCollapsed(!document.body.classList.contains('v3-sidebar-collapsed'));
+      });
+    }
+
+    // Auto-tag nav items with data-nav-label for CSS tooltips
+    sidebar.querySelectorAll('.v3-nav-item, .v3-nav-toggle').forEach(function (el) {
+      if (el.getAttribute('data-nav-label')) return; // already set
+      // Find text node: prefer a span without v3-nav-icon class
+      var spans = el.querySelectorAll('span');
+      var label = '';
+      spans.forEach(function (sp) {
+        if (!sp.classList.contains('v3-nav-icon') &&
+            !sp.classList.contains('v3-nav-group-icon') &&
+            sp.textContent.trim()) {
+          label = sp.textContent.trim();
+        }
+      });
+      if (!label) {
+        // Fall back to aria-label or title
+        label = el.getAttribute('aria-label') || el.getAttribute('title') || '';
+      }
+      if (label) el.setAttribute('data-nav-label', label);
+    });
+
+    // Also allow clicking the sidebar brand/logo area to expand when collapsed
+    var brand = sidebar.querySelector('.v3-brand, .v3-sidebar-brand');
+    if (brand) {
+      brand.style.cursor = 'pointer';
+      brand.addEventListener('click', function () {
+        if (document.body.classList.contains('v3-sidebar-collapsed')) {
+          setCollapsed(false);
+        }
+      });
+    }
+
+    // Clear collapsed state when resizing to mobile
+    window.addEventListener('resize', function () {
+      if (window.innerWidth <= 768) {
+        document.body.classList.remove('v3-sidebar-collapsed');
+      }
+    });
+
+    restoreState();
   }
 
   document.addEventListener('DOMContentLoaded', _initMobileSidebar);
+  document.addEventListener('DOMContentLoaded', _initDesktopCollapse);
 
   /* =========================================================
    * 6. ACTIVE NAV ITEM
