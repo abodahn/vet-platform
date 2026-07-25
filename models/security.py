@@ -7,6 +7,7 @@ import base64
 import hashlib
 import io
 import logging
+import os
 import re
 import secrets
 import threading
@@ -446,20 +447,43 @@ def totp_available() -> bool:
     return pyotp is not None
 
 
+class TOTPUnavailable(RuntimeError):
+    """Raised when an account requires TOTP but the library is missing.
+
+    Deliberately fatal to the login attempt: silently downgrading a
+    two-factor account to password-only would remove a security control
+    without anyone noticing. See TOTP_FAIL_OPEN for the recovery path.
+    """
+
+
 def totp_required(user_id) -> bool:
     """True when `user_id` must pass a TOTP challenge to finish logging in."""
     row = _user_totp_row(user_id)
     enabled = bool(row and row["totp_enabled"] and row["totp_secret"])
     if enabled and pyotp is None:
-        # ponytail: fail OPEN when the library is missing, so a bad deploy
-        # cannot lock a clinic out of its own patient records on a Monday
-        # morning. Ceiling: anyone who can uninstall a package can bypass 2FA
-        # — but they already own the host. Flip to fail-closed the day this
-        # runs somewhere the operator cannot reach the server.
+        # A missing library must not silently remove a security control.
+        # Default is fail CLOSED: the user cannot complete login, and the
+        # error names the fix. The escape hatch mirrors CORS_ALLOW_WILDCARD
+        # in config.py — a clinic locked out by a bad deploy sets
+        # TOTP_FAIL_OPEN=1, restarts, and gets password-only login back
+        # while someone installs pyotp. Secure by default, recoverable in
+        # one step, and the bypass is always a deliberate act.
+        if os.environ.get("TOTP_FAIL_OPEN", "") == "1":
+            logger.error(
+                "User id=%s has 2FA enabled but pyotp is not installed. "
+                "TOTP_FAIL_OPEN=1 is set, so password-only login is being "
+                "ALLOWED. This disables two-factor authentication — install "
+                "pyotp, restart, and unset TOTP_FAIL_OPEN.", user_id)
+            return False
         logger.error(
-            "User id=%s has 2FA enabled but pyotp is not installed — allowing "
-            "password-only login. Install pyotp and restart.", user_id)
-        return False
+            "User id=%s has 2FA enabled but pyotp is not installed — refusing "
+            "login. Run 'pip install -r requirements.txt' and restart. To "
+            "restore password-only access in the meantime, set TOTP_FAIL_OPEN=1.",
+            user_id)
+        raise TOTPUnavailable(
+            "Two-factor authentication is required for this account but is "
+            "not available on this server. Contact your administrator."
+        )
     return enabled
 
 

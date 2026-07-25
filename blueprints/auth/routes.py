@@ -291,7 +291,22 @@ def login():
             # Password was right, but that is only the FIRST factor. Do not
             # populate session["user"] yet — park the half-login in a
             # short-lived pending slot that only /auth/2fa can promote.
-            if sec.totp_required(user["id"]):
+            try:
+                needs_2fa = sec.totp_required(user["id"])
+            except sec.TOTPUnavailable as exc:
+                # 2FA is enrolled but unavailable on this server. Refuse the
+                # login rather than silently downgrading to password-only.
+                # The operator's recovery path (TOTP_FAIL_OPEN=1) is named in
+                # the server log, not shown to the user.
+                db.log_audit(
+                    username=username, role=user.get("role", ""),
+                    action="login_blocked_2fa_unavailable", module="auth",
+                    ip=ip, user_agent=request.headers.get("User-Agent", ""),
+                )
+                return render_template("login.html", error=str(exc),
+                                       username=username)
+
+            if needs_2fa:
                 session[_PENDING_2FA] = {
                     "user_id":    user["id"],
                     "username":   user["username"],

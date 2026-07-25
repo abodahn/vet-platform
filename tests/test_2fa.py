@@ -354,3 +354,32 @@ def test_seeded_admin_still_logs_in_with_password_only(client):
     assert resp.status_code == 302
     with client.session_transaction() as s:
         assert s.get("user", {}).get("username") == "admin"
+
+
+# ─── Missing-library behaviour ────────────────────────────────────────────────
+
+def test_missing_pyotp_fails_closed(app, user_id, monkeypatch):
+    """A missing library must not silently remove a security control.
+
+    If pyotp disappears from a deploy, an account with 2FA enrolled must be
+    refused, not quietly downgraded to password-only.
+    """
+    _enrol(app, user_id)
+    with app.app_context():
+        monkeypatch.setattr(sec, "pyotp", None)
+        monkeypatch.delenv("TOTP_FAIL_OPEN", raising=False)
+        with pytest.raises(sec.TOTPUnavailable):
+            sec.totp_required(user_id)
+
+
+def test_missing_pyotp_escape_hatch(app, user_id, monkeypatch):
+    """TOTP_FAIL_OPEN=1 restores password-only login for a locked-out clinic.
+
+    Mirrors CORS_ALLOW_WILDCARD: secure by default, recoverable in one
+    deliberate step, never inherited by accident.
+    """
+    _enrol(app, user_id)
+    with app.app_context():
+        monkeypatch.setattr(sec, "pyotp", None)
+        monkeypatch.setenv("TOTP_FAIL_OPEN", "1")
+        assert sec.totp_required(user_id) is False
