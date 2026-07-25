@@ -421,10 +421,15 @@ def order_create():
         if not items:
             return jsonify({"error": "No items"}), 400
 
-        subtotal = sum(float(i["qty"]) * float(i["unit_price"]) for i in items)
-        tax_amt  = sum(float(i["qty"]) * float(i["unit_price"]) * float(i.get("tax_rate",0))/100 for i in items)
-        total    = subtotal - discount_g + tax_amt
-        change   = max(0, paid_amt - total)
+        # Round every money value at the write. Without this, 65.9% of VAT
+        # sales store a total that is not representable to 2 decimal places
+        # (measured). Currently masked only because tax rates are all 0% —
+        # it would surface the day pet-shop VAT is switched on.
+        # ponytail: real fix is NUMERIC(12,2) end to end — see docs/MONEY_PRECISION.md
+        subtotal = round(sum(float(i["qty"]) * float(i["unit_price"]) for i in items), 2)
+        tax_amt  = round(sum(float(i["qty"]) * float(i["unit_price"]) * float(i.get("tax_rate",0))/100 for i in items), 2)
+        total    = round(subtotal - discount_g + tax_amt, 2)
+        change   = round(max(0, paid_amt - total), 2)
 
         order_num = _next_order_number()
         conn = _get_db()

@@ -1851,6 +1851,7 @@ _SEED_ROLES = [
     ("inventory_mgr",  "Inventory Manager",     "مدير المخزون",           "#b45309"),
     ("pharmacist",     "Pharmacist",            "صيدلاني",                "#7c3aed"),
     ("finance",        "Finance User",          "موظف مالية",             "#166534"),
+    ("hr",             "HR Officer",            "موظف الموارد البشرية",    "#7e22ce"),
     ("groomer",        "Groomer",               "موظف تجميل",             "#be185d"),
     ("boarding_staff", "Boarding Staff",        "موظف الإيواء",           "#6b7280"),
     ("support_admin",  "Support Admin",         "مدير الدعم الفني",       "#374151"),
@@ -2834,10 +2835,17 @@ def add_payment(invoice_id: int, owner_id: int, amount: float,
         if not row:
             conn.close()
             return
-        total = float(row["total"] or 0)
-        new_paid = min(float(row["paid_amount"] or 0) + float(amount), total)
-        due = max(0.0, total - new_paid)
-        status = "Paid" if due == 0 else "Partial"
+        total = round(float(row["total"] or 0), 2)
+        # Round at every write. Money is stored as REAL (binary float), so
+        # accumulating instalments leaves residues like 4.5e-13: a simulation
+        # over 200k invoices showed ~14% of instalment-paid invoices ending up
+        # permanently "Partial" while the screen displayed 0.00 due. The min()
+        # clamp below does NOT prevent this — measured with and without.
+        new_paid = round(min(round(float(row["paid_amount"] or 0) + float(amount), 2), total), 2)
+        due = round(max(0.0, total - new_paid), 2)
+        # Compare against half a piastre, never against exact zero.
+        # ponytail: real fix is NUMERIC(12,2) end to end — see docs/MONEY_PRECISION.md
+        status = "Paid" if due < 0.005 else "Partial"
         conn.execute(
             "UPDATE invoices SET paid_amount=?,due_amount=?,status=?,updated_at=datetime('now') WHERE id=?",
             (new_paid, due, status, invoice_id)

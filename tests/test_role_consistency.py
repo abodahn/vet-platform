@@ -28,14 +28,13 @@ OWNED = (
 )
 
 # Known-bad role names awaiting a product decision (see the audit report).
-# `hr` and `staff` have no seeded equivalent, so renaming them would either
-# remove access somebody relies on or grant access somebody should not have.
+# `hr` was resolved on 2026-07-25 by seeding a real "hr" role, so the
+# attendance / launcher / uploads checks that referenced it now work.
+# `staff` remains parked: it is dead text with no seeded equivalent, and
+# deleting it is a product call, not a correctness one.
 # Each entry is (relative_path, role). Fix one -> delete its line here.
 PENDING_PRODUCT_DECISION = frozenset({
-    ("attendance/routes.py", "hr"),
-    ("launcher/routes.py", "hr"),
     ("launcher/routes.py", "staff"),
-    ("uploads/routes.py", "hr"),
 })
 
 
