@@ -1,60 +1,60 @@
 {% extends "base.html" %}
 
-{% block title %}Visit #{{ visit.id }} — {{ visit.pet_name }}{% endblock %}
+{% block title %}{{ t('Visit','زيارة') }} #{{ visit.id }} — {{ visit.pet_name }}{% endblock %}
 
-{% block page_title %}Visit #{{ visit.id }} — {{ visit.pet_name }}{% endblock %}
-{% block page_sub %}{{ visit.visit_date[:16] if visit.visit_date else '' }} · {{ visit.visit_type }} · Dr. {{ visit.doctor_name }}</{% endblock %}
+{% block page_title %}{{ t('Visit','زيارة') }} #{{ visit.id }} — {{ visit.pet_name }}{% endblock %}
+{% block page_sub %}{{ visit.visit_date[:16] if visit.visit_date else '' }} · {{ visit.visit_type }} · {{ t('Dr.','د.') }} {{ visit.doctor_name }}</{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('visits.visits_list') }}" class="pf-btn">← Visits</a>
+  <a href="{{ url_for('visits.visits_list') }}" class="pf-btn">{{ t('← Visits','← الزيارات') }}</a>
   <a href="{{ url_for('visits.visit_print', visit_id=visit.id) }}" target="_blank" class="pf-btn">
-    🖨 Print
+    🖨 {{ t('Print','طباعة') }}
   </a>
   <a href="{{ url_for('imaging.pet_studies', pet_id=visit.pet_id) }}" class="pf-btn"
-     title="View imaging studies for this patient">
-    🩻 Imaging
+     title="{{ t('View imaging studies for this patient','عرض دراسات التصوير لهذا المريض') }}">
+    🩻 {{ t('Imaging','التصوير الطبي') }}
   </a>
   <a href="{{ url_for('imaging.upload', pet_id=visit.pet_id) }}" class="pf-btn"
      style="background:color-mix(in srgb,var(--cl-primary) 10%,var(--cl-surface));"
-     title="Upload X-ray, ultrasound or photo for AI analysis">
-    📤 Upload Image
+     title="{{ t('Upload X-ray, ultrasound or photo for AI analysis','رفع صورة أشعة أو موجات فوق صوتية للتحليل بالذكاء الاصطناعي') }}">
+    📤 {{ t('Upload Image','رفع صورة') }}
   </a>
   {# ── Invoice link ──────────────────────────────────── #}
   {% if invoice %}
     <a href="{{ url_for('finance.invoice_detail', inv_id=invoice.id) }}"
        class="pf-btn" style="background:var(--cl-accent);color:#fff">
-      🧾 Invoice {{ invoice.invoice_number }}
+      🧾 {{ t('Invoice','فاتورة') }} {{ invoice.invoice_number }}
     </a>
   {% elif visit.status == 'Completed' %}
     <a href="{{ url_for('visits.visit_invoice', visit_id=visit.id) }}"
-       class="pf-btn pf-btn-secondary">🧾 Create Invoice</a>
+       class="pf-btn pf-btn-secondary">🧾 {{ t('Create Invoice','إنشاء فاتورة') }}</a>
   {% endif %}
   {# ── Pharmacy dispense link ───────────────────────── #}
   {% if prescriptions %}
     <a href="{{ url_for('pharmacy.index') }}" class="pf-btn"
-       style="background:#7c3aed;color:#fff">💊 Pharmacy</a>
+       style="background:#7c3aed;color:#fff">💊 {{ t('Pharmacy','الصيدلية') }}</a>
   {% endif %}
   {% if visit.status == 'Open' %}
     {% if diagnoses %}
     <button onclick="loadDischargeInstructions({{ visit.id }})"
             style="background:linear-gradient(135deg,#16a34a,#10b981);color:#fff;border:none;
                    border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:600;font-size:.85rem">
-      📋 Discharge Instructions
+      📋 {{ t('Discharge Instructions','تعليمات الخروج') }}
     </button>
     <form method="post" action="{{ url_for('visits.complete_visit', visit_id=visit.id) }}" style="display:inline">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <button type="submit" class="pf-btn pf-btn-primary"
-              onclick="return confirm('Mark this visit as Completed? An invoice will be auto-generated.')">
-        ✔ Complete Visit
+              onclick="return confirm('{{ t('Mark this visit as Completed? An invoice will be auto-generated.','إنهاء هذه الزيارة؟ سيتم إنشاء فاتورة تلقائياً.') }}')">
+        ✔ {{ t('Complete Visit','إنهاء الزيارة') }}
       </button>
     </form>
     {% else %}
-    <button class="pf-btn" disabled title="Add a diagnosis first"
-            style="opacity:.5;cursor:not-allowed">✔ Complete Visit</button>
+    <button class="pf-btn" disabled title="{{ t('Add a diagnosis first','أضف تشخيصاً أولاً') }}"
+            style="opacity:.5;cursor:not-allowed">✔ {{ t('Complete Visit','إنهاء الزيارة') }}</button>
     {% endif %}
   {% else %}
     <span class="pf-badge" style="background:var(--cl-success);color:#fff;padding:.4rem .8rem;border-radius:8px">
-      ✔ Completed
+      ✔ {{ t('Completed','مكتملة') }}
     </span>
   {% endif %}
 {% endblock %}
@@ -64,7 +64,7 @@
 {% if visit.status == 'Open' and not diagnoses %}
 <div style="background:var(--cl-warning);color:#7a5200;border-radius:10px;padding:.8rem 1.2rem;
             margin-bottom:1rem;display:flex;align-items:center;gap:.6rem;font-weight:500">
-  ⚠️ Add at least one diagnosis before completing this visit.
+  ⚠️ {{ t('Add at least one diagnosis before completing this visit.','أضف تشخيصاً واحداً على الأقل قبل إنهاء هذه الزيارة.') }}
 </div>
 {% endif %}
 
@@ -90,16 +90,16 @@
       </div>
       <div style="border-top:1px solid var(--cl-border);padding-top:.8rem;display:grid;gap:.5rem">
         <div style="display:flex;justify-content:space-between;font-size:.88rem">
-          <span style="color:var(--cl-muted)">Sex</span>
+          <span style="color:var(--cl-muted)">{{ t('Sex','الجنس') }}</span>
           <span style="font-weight:500">{{ visit.sex or '—' }}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:.88rem">
-          <span style="color:var(--cl-muted)">Record Weight</span>
+          <span style="color:var(--cl-muted)">{{ t('Record Weight','الوزن المسجل') }}</span>
           <span style="font-weight:500">{{ visit.pet_weight or '—' }} kg</span>
         </div>
         {% if visit.pet_dob %}
         <div style="display:flex;justify-content:space-between;font-size:.88rem">
-          <span style="color:var(--cl-muted)">DOB</span>
+          <span style="color:var(--cl-muted)">{{ t('DOB','تاريخ الميلاد') }}</span>
           <span style="font-weight:500">{{ visit.pet_dob }}</span>
         </div>
         {% endif %}
@@ -110,7 +110,7 @@
     {% if visit.allergies %}
     <div style="background:#fff0f0;border:1.5px solid var(--cl-danger);border-radius:10px;
                 padding:.8rem 1rem">
-      <div style="font-weight:700;color:var(--cl-danger);margin-bottom:.3rem">⚠️ Allergies</div>
+      <div style="font-weight:700;color:var(--cl-danger);margin-bottom:.3rem">⚠️ {{ t('Allergies','الحساسية') }}</div>
       <div style="font-size:.9rem;color:var(--cl-danger)">{{ visit.allergies }}</div>
     </div>
     {% endif %}
@@ -118,7 +118,7 @@
     <!-- Owner Card -->
     <div class="pf-card">
       <div style="font-weight:700;margin-bottom:.7rem;color:var(--cl-muted);font-size:.8rem;
-                  text-transform:uppercase;letter-spacing:.06em">Owner</div>
+                  text-transform:uppercase;letter-spacing:.06em">{{ t('Owner','المالك') }}</div>
       <div style="font-weight:600;font-size:1rem;margin-bottom:.3rem">{{ visit.owner_name }}</div>
       <div style="font-size:.88rem;color:var(--cl-muted);margin-bottom:.5rem">{{ visit.owner_phone }}</div>
       {% if visit.owner_phone %}
@@ -126,7 +126,7 @@
          target="_blank"
          style="display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;
                 color:#25d366;text-decoration:none;font-weight:600">
-        💬 WhatsApp
+        💬 {{ t('WhatsApp','واتساب') }}
       </a>
       {% endif %}
     </div>
@@ -134,18 +134,18 @@
     <!-- Vitals Card -->
     <div class="pf-card">
       <div style="font-weight:700;margin-bottom:.7rem;color:var(--cl-muted);font-size:.8rem;
-                  text-transform:uppercase;letter-spacing:.06em">Visit Vitals</div>
+                  text-transform:uppercase;letter-spacing:.06em">{{ t('Visit Vitals','العلامات الحيوية') }}</div>
       <div style="display:grid;gap:.5rem">
         <div style="display:flex;justify-content:space-between;font-size:.88rem">
-          <span style="color:var(--cl-muted)">Weight</span>
+          <span style="color:var(--cl-muted)">{{ t('Weight','الوزن') }}</span>
           <span style="font-weight:600">{{ visit.weight_kg or '—' }} {% if visit.weight_kg %}kg{% endif %}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:.88rem">
-          <span style="color:var(--cl-muted)">Temperature</span>
+          <span style="color:var(--cl-muted)">{{ t('Temperature','درجة الحرارة') }}</span>
           <span style="font-weight:600">{{ visit.temp_c or '—' }} {% if visit.temp_c %}°C{% endif %}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:.88rem">
-          <span style="color:var(--cl-muted)">Heart Rate</span>
+          <span style="color:var(--cl-muted)">{{ t('Heart Rate','معدل النبض') }}</span>
           <span style="font-weight:600">{{ visit.heart_rate or '—' }} {% if visit.heart_rate %}bpm{% endif %}</span>
         </div>
       </div>
@@ -154,27 +154,27 @@
     <!-- Visit Meta -->
     <div class="pf-card">
       <div style="font-weight:700;margin-bottom:.7rem;color:var(--cl-muted);font-size:.8rem;
-                  text-transform:uppercase;letter-spacing:.06em">Visit Info</div>
+                  text-transform:uppercase;letter-spacing:.06em">{{ t('Visit Info','بيانات الزيارة') }}</div>
       <div style="display:grid;gap:.5rem">
         <div style="display:flex;justify-content:space-between;font-size:.88rem">
-          <span style="color:var(--cl-muted)">Date</span>
+          <span style="color:var(--cl-muted)">{{ t('Date','التاريخ') }}</span>
           <span style="font-weight:500">{{ visit.visit_date[:10] if visit.visit_date else '—' }}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:.88rem">
-          <span style="color:var(--cl-muted)">Type</span>
+          <span style="color:var(--cl-muted)">{{ t('Type','النوع') }}</span>
           <span style="font-weight:500">{{ visit.visit_type or '—' }}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:.88rem">
-          <span style="color:var(--cl-muted)">Doctor</span>
+          <span style="color:var(--cl-muted)">{{ t('Doctor','الطبيب') }}</span>
           <span style="font-weight:500">{{ visit.doctor_name or '—' }}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:.88rem">
-          <span style="color:var(--cl-muted)">Status</span>
+          <span style="color:var(--cl-muted)">{{ t('Status','الحالة') }}</span>
           <span>
             {% if visit.status == 'Open' %}
-              <span class="pf-badge" style="background:var(--cl-info);color:#fff">Open</span>
+              <span class="pf-badge" style="background:var(--cl-info);color:#fff">{{ t('Open','مفتوحة') }}</span>
             {% elif visit.status == 'Completed' %}
-              <span class="pf-badge" style="background:var(--cl-success);color:#fff">Completed</span>
+              <span class="pf-badge" style="background:var(--cl-success);color:#fff">{{ t('Completed','مكتملة') }}</span>
             {% else %}
               <span class="pf-badge" style="background:var(--cl-muted);color:#fff">{{ visit.status }}</span>
             {% endif %}
@@ -194,11 +194,11 @@
     <!-- Chief Complaint -->
     {% if visit.chief_complaint %}
     <div class="pf-card" style="border-left:4px solid var(--cl-primary)">
-      <div style="font-weight:700;margin-bottom:.5rem">Chief Complaint</div>
+      <div style="font-weight:700;margin-bottom:.5rem">{{ t('Chief Complaint','الشكوى الرئيسية') }}</div>
       <div style="font-size:.95rem">{{ visit.chief_complaint }}</div>
       {% if visit.symptoms %}
       <div style="margin-top:.7rem;font-size:.88rem;color:var(--cl-muted)">
-        <strong>Symptoms:</strong> {{ visit.symptoms }}
+        <strong>{{ t('Symptoms:','الأعراض:') }}</strong> {{ visit.symptoms }}
       </div>
       {% endif %}
     </div>
@@ -207,19 +207,19 @@
     <!-- ─── SOAP NOTES ─── -->
     <div class="pf-card" id="soap">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <div class="pf-card-title">📝 SOAP Clinical Notes</div>
+        <div class="pf-card-title">📝 {{ t('SOAP Clinical Notes','ملاحظات SOAP السريرية') }}</div>
         {% if visit.soap_subjective or visit.soap_objective or visit.soap_assessment or visit.soap_plan %}
-        <span class="pf-badge success" style="font-size:11px">Recorded</span>
+        <span class="pf-badge success" style="font-size:11px">{{ t('Recorded','مسجلة') }}</span>
         {% endif %}
       </div>
 
       {% if visit.soap_subjective or visit.soap_objective or visit.soap_assessment or visit.soap_plan %}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
         {% for label, icon, field in [
-          ('Subjective','👤','soap_subjective'),
-          ('Objective','🔍','soap_objective'),
-          ('Assessment','🧠','soap_assessment'),
-          ('Plan','💊','soap_plan')
+          (t('Subjective','البيانات الذاتية'),'👤','soap_subjective'),
+          (t('Objective','البيانات الموضوعية'),'🔍','soap_objective'),
+          (t('Assessment','التقييم'),'🧠','soap_assessment'),
+          (t('Plan','الخطة'),'💊','soap_plan')
         ] %}
         <div style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;padding:12px">
           <div style="font-size:11px;font-weight:700;color:var(--cl-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
@@ -235,34 +235,34 @@
       <details {% if not (visit.soap_subjective or visit.soap_objective) %}open{% endif %}>
         <summary style="cursor:pointer;font-weight:600;font-size:.9rem;color:var(--cl-primary);
                          margin-bottom:.8rem;list-style:none">
-          {% if visit.soap_subjective or visit.soap_objective %}✏️ Update SOAP Notes{% else %}＋ Record SOAP Notes{% endif %}
+          {% if visit.soap_subjective or visit.soap_objective %}✏️ {{ t('Update SOAP Notes','تحديث ملاحظات SOAP') }}{% else %}＋ {{ t('Record SOAP Notes','تسجيل ملاحظات SOAP') }}{% endif %}
         </summary>
         <form method="post" action="{{ url_for('visits.save_soap', visit_id=visit.id) }}"
               style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
                      padding:1rem;display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
           <div>
-            <label class="pf-label">👤 Subjective <span style="font-weight:400;color:var(--cl-muted)">(owner reports)</span></label>
+            <label class="pf-label">👤 {{ t('Subjective','البيانات الذاتية') }} <span style="font-weight:400;color:var(--cl-muted)">{{ t('(owner reports)','(ما يذكره المالك)') }}</span></label>
             <textarea name="soap_subjective" class="pf-input" rows="3"
-                      placeholder="What the owner reports: symptoms, history, concerns…">{{ visit.soap_subjective or '' }}</textarea>
+                      placeholder="{{ t('What the owner reports: symptoms, history, concerns…','ما يذكره المالك: الأعراض، التاريخ المرضي، المخاوف…') }}">{{ visit.soap_subjective or '' }}</textarea>
           </div>
           <div>
-            <label class="pf-label">🔍 Objective <span style="font-weight:400;color:var(--cl-muted)">(doctor observes)</span></label>
+            <label class="pf-label">🔍 {{ t('Objective','البيانات الموضوعية') }} <span style="font-weight:400;color:var(--cl-muted)">{{ t('(doctor observes)','(ما يلاحظه الطبيب)') }}</span></label>
             <textarea name="soap_objective" class="pf-input" rows="3"
-                      placeholder="Physical exam findings, vitals, lab results…">{{ visit.soap_objective or '' }}</textarea>
+                      placeholder="{{ t('Physical exam findings, vitals, lab results…','نتائج الفحص السريري، العلامات الحيوية، نتائج المختبر…') }}">{{ visit.soap_objective or '' }}</textarea>
           </div>
           <div>
-            <label class="pf-label">🧠 Assessment <span style="font-weight:400;color:var(--cl-muted)">(diagnosis / evaluation)</span></label>
+            <label class="pf-label">🧠 {{ t('Assessment','التقييم') }} <span style="font-weight:400;color:var(--cl-muted)">{{ t('(diagnosis / evaluation)','(التشخيص / التقييم)') }}</span></label>
             <textarea name="soap_assessment" class="pf-input" rows="3"
-                      placeholder="Clinical interpretation, differential diagnosis…">{{ visit.soap_assessment or '' }}</textarea>
+                      placeholder="{{ t('Clinical interpretation, differential diagnosis…','التفسير السريري، التشخيص التفريقي…') }}">{{ visit.soap_assessment or '' }}</textarea>
           </div>
           <div>
-            <label class="pf-label">💊 Plan <span style="font-weight:400;color:var(--cl-muted)">(treatment plan)</span></label>
+            <label class="pf-label">💊 {{ t('Plan','الخطة') }} <span style="font-weight:400;color:var(--cl-muted)">{{ t('(treatment plan)','(خطة العلاج)') }}</span></label>
             <textarea name="soap_plan" class="pf-input" rows="3"
-                      placeholder="Medications, follow-up, client education…">{{ visit.soap_plan or '' }}</textarea>
+                      placeholder="{{ t('Medications, follow-up, client education…','الأدوية، المتابعة، توعية المالك…') }}">{{ visit.soap_plan or '' }}</textarea>
           </div>
           <div style="grid-column:span 2;text-align:right">
-            <button type="submit" class="pf-btn pf-btn-primary">Save SOAP Notes</button>
+            <button type="submit" class="pf-btn pf-btn-primary">{{ t('Save SOAP Notes','حفظ ملاحظات SOAP') }}</button>
           </div>
         </form>
       </details>
@@ -272,8 +272,8 @@
     <!-- ─── DIAGNOSIS SECTION ─── -->
     <div class="pf-card" id="diagnosis">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <div class="pf-card-title">🔍 Diagnosis</div>
-        <span style="font-size:.82rem;color:var(--cl-muted)">{{ diagnoses|length }} record(s)</span>
+        <div class="pf-card-title">🔍 {{ t('Diagnosis','التشخيص') }}</div>
+        <span style="font-size:.82rem;color:var(--cl-muted)">{{ diagnoses|length }} {{ t('record(s)','سجل') }}</span>
       </div>
 
       {% if diagnoses %}
@@ -290,55 +290,55 @@
           </div>
           <span style="white-space:nowrap;margin-left:.8rem">
             {% if d.severity == 'Mild' %}
-              <span class="pf-badge" style="background:var(--cl-success);color:#fff">Mild</span>
+              <span class="pf-badge" style="background:var(--cl-success);color:#fff">{{ t('Mild','بسيط') }}</span>
             {% elif d.severity == 'Moderate' %}
-              <span class="pf-badge" style="background:var(--cl-warning);color:#7a5200">Moderate</span>
+              <span class="pf-badge" style="background:var(--cl-warning);color:#7a5200">{{ t('Moderate','متوسط') }}</span>
             {% elif d.severity == 'Severe' %}
-              <span class="pf-badge" style="background:var(--cl-danger);color:#fff">Severe</span>
+              <span class="pf-badge" style="background:var(--cl-danger);color:#fff">{{ t('Severe','شديد') }}</span>
             {% elif d.severity == 'Critical' %}
-              <span class="pf-badge" style="background:#7b0000;color:#fff">Critical</span>
+              <span class="pf-badge" style="background:#7b0000;color:#fff">{{ t('Critical','حرج') }}</span>
             {% endif %}
           </span>
         </div>
         {% endfor %}
       </div>
       {% else %}
-      <div style="color:var(--cl-muted);font-size:.9rem;margin-bottom:1rem">No diagnoses recorded yet.</div>
+      <div style="color:var(--cl-muted);font-size:.9rem;margin-bottom:1rem">{{ t('No diagnoses recorded yet.','لا توجد تشخيصات مسجلة بعد.') }}</div>
       {% endif %}
 
       {% if visit.status == 'Open' %}
       <details {% if not diagnoses %}open{% endif %}>
         <summary style="cursor:pointer;font-weight:600;font-size:.9rem;color:var(--cl-primary);
                          margin-bottom:.8rem;list-style:none">
-          ＋ Add Diagnosis
+          ＋ {{ t('Add Diagnosis','إضافة تشخيص') }}
         </summary>
         <form method="post" action="{{ url_for('visits.add_diagnosis', visit_id=visit.id) }}"
               style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
                      padding:1rem;display:grid;gap:.8rem">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
           <div>
-            <label class="pf-label">Diagnosis <span style="color:var(--cl-danger)">*</span></label>
+            <label class="pf-label">{{ t('Diagnosis','التشخيص') }} <span style="color:var(--cl-danger)">*</span></label>
             <input type="text" name="diagnosis_text" class="pf-input" required
-                   placeholder="e.g. Acute gastroenteritis">
+                   placeholder="{{ t('e.g. Acute gastroenteritis','مثال: التهاب معدي معوي حاد') }}">
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
             <div>
-              <label class="pf-label">Severity</label>
+              <label class="pf-label">{{ t('Severity','الشدة') }}</label>
               <select name="severity" class="pf-input">
-                <option value="Mild">Mild</option>
-                <option value="Moderate">Moderate</option>
-                <option value="Severe">Severe</option>
-                <option value="Critical">Critical</option>
+                <option value="Mild">{{ t('Mild','بسيط') }}</option>
+                <option value="Moderate">{{ t('Moderate','متوسط') }}</option>
+                <option value="Severe">{{ t('Severe','شديد') }}</option>
+                <option value="Critical">{{ t('Critical','حرج') }}</option>
               </select>
             </div>
             <div>
-              <label class="pf-label">Notes</label>
+              <label class="pf-label">{{ t('Notes','ملاحظات') }}</label>
               <input type="text" name="diagnosis_notes" class="pf-input"
-                     placeholder="Additional notes…">
+                     placeholder="{{ t('Additional notes…','ملاحظات إضافية…') }}">
             </div>
           </div>
           <div style="text-align:right">
-            <button type="submit" class="pf-btn pf-btn-primary">Add Diagnosis</button>
+            <button type="submit" class="pf-btn pf-btn-primary">{{ t('Add Diagnosis','إضافة تشخيص') }}</button>
           </div>
         </form>
       </details>
@@ -347,20 +347,20 @@
 
     <!-- ─── TREATMENT PLAN ─── -->
     <div class="pf-card" id="treatment">
-      <div class="pf-card-title" style="margin-bottom:1rem">💊 Treatment Plan</div>
+      <div class="pf-card-title" style="margin-bottom:1rem">💊 {{ t('Treatment Plan','خطة العلاج') }}</div>
 
       {% if treatment %}
       <div style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
                   padding:1rem;margin-bottom:1rem">
-        <div style="margin-bottom:.5rem"><strong>Plan:</strong> {{ treatment.plan_text or '—' }}</div>
+        <div style="margin-bottom:.5rem"><strong>{{ t('Plan:','الخطة:') }}</strong> {{ treatment.plan_text or '—' }}</div>
         {% if treatment.goals %}
-        <div style="margin-bottom:.5rem"><strong>Goals:</strong> {{ treatment.goals }}</div>
+        <div style="margin-bottom:.5rem"><strong>{{ t('Goals:','الأهداف:') }}</strong> {{ treatment.goals }}</div>
         {% endif %}
         {% if treatment.duration %}
-        <div style="margin-bottom:.5rem"><strong>Duration:</strong> {{ treatment.duration }}</div>
+        <div style="margin-bottom:.5rem"><strong>{{ t('Duration:','المدة:') }}</strong> {{ treatment.duration }}</div>
         {% endif %}
         {% if treatment.followup_in %}
-        <div><strong>Follow-up:</strong> in {{ treatment.followup_in }} {{ treatment.followup_unit or 'days' }}</div>
+        <div><strong>{{ t('Follow-up:','المتابعة:') }}</strong> {{ t('in','خلال') }} {{ treatment.followup_in }} {{ treatment.followup_unit or 'days' }}</div>
         {% endif %}
       </div>
       {% endif %}
@@ -369,46 +369,46 @@
       <details {% if not treatment %}open{% endif %}>
         <summary style="cursor:pointer;font-weight:600;font-size:.9rem;color:var(--cl-primary);
                          margin-bottom:.8rem;list-style:none">
-          {% if treatment %}✏️ Update Plan{% else %}＋ Add Treatment Plan{% endif %}
+          {% if treatment %}✏️ {{ t('Update Plan','تحديث الخطة') }}{% else %}＋ {{ t('Add Treatment Plan','إضافة خطة علاج') }}{% endif %}
         </summary>
         <form method="post" action="{{ url_for('visits.save_treatment', visit_id=visit.id) }}"
               style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
                      padding:1rem;display:grid;gap:.8rem">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
           <div>
-            <label class="pf-label">Treatment Plan</label>
+            <label class="pf-label">{{ t('Treatment Plan','خطة العلاج') }}</label>
             <textarea name="plan_text" class="pf-input" rows="3"
-                      placeholder="Describe the treatment approach…">{{ treatment.plan_text if treatment else '' }}</textarea>
+                      placeholder="{{ t('Describe the treatment approach…','اشرح أسلوب العلاج…') }}">{{ treatment.plan_text if treatment else '' }}</textarea>
           </div>
           <div>
-            <label class="pf-label">Goals</label>
+            <label class="pf-label">{{ t('Goals','الأهداف') }}</label>
             <textarea name="goals" class="pf-input" rows="2"
-                      placeholder="Expected outcomes…">{{ treatment.goals if treatment else '' }}</textarea>
+                      placeholder="{{ t('Expected outcomes…','النتائج المتوقعة…') }}">{{ treatment.goals if treatment else '' }}</textarea>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem">
             <div>
-              <label class="pf-label">Duration</label>
+              <label class="pf-label">{{ t('Duration','المدة') }}</label>
               <input type="text" name="duration" class="pf-input"
                      value="{{ treatment.duration if treatment else '' }}"
-                     placeholder="e.g. 7 days">
+                     placeholder="{{ t('e.g. 7 days','مثال: 7 أيام') }}">
             </div>
             <div>
-              <label class="pf-label">Follow-up in</label>
+              <label class="pf-label">{{ t('Follow-up in','المتابعة خلال') }}</label>
               <input type="number" name="followup_in" class="pf-input" min="1"
                      value="{{ treatment.followup_in if treatment else '' }}"
-                     placeholder="e.g. 2">
+                     placeholder="{{ t('e.g. 2','مثال: 2') }}">
             </div>
             <div>
-              <label class="pf-label">Unit</label>
+              <label class="pf-label">{{ t('Unit','الوحدة') }}</label>
               <select name="followup_unit" class="pf-input">
-                <option value="days" {% if treatment and treatment.followup_unit=='days' %}selected{% endif %}>Days</option>
-                <option value="weeks" {% if treatment and treatment.followup_unit=='weeks' %}selected{% endif %}>Weeks</option>
-                <option value="months" {% if treatment and treatment.followup_unit=='months' %}selected{% endif %}>Months</option>
+                <option value="days" {% if treatment and treatment.followup_unit=='days' %}selected{% endif %}>{{ t('Days','أيام') }}</option>
+                <option value="weeks" {% if treatment and treatment.followup_unit=='weeks' %}selected{% endif %}>{{ t('Weeks','أسابيع') }}</option>
+                <option value="months" {% if treatment and treatment.followup_unit=='months' %}selected{% endif %}>{{ t('Months','شهور') }}</option>
               </select>
             </div>
           </div>
           <div style="text-align:right">
-            <button type="submit" class="pf-btn pf-btn-primary">Save Treatment Plan</button>
+            <button type="submit" class="pf-btn pf-btn-primary">{{ t('Save Treatment Plan','حفظ خطة العلاج') }}</button>
           </div>
         </form>
       </details>
@@ -418,7 +418,7 @@
     <!-- ─── PRESCRIPTIONS ─── -->
     <div class="pf-card" id="prescriptions">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <div class="pf-card-title">💉 Prescriptions</div>
+        <div class="pf-card-title">💉 {{ t('Prescriptions','الوصفات الطبية') }}</div>
         <span style="font-size:.82rem;color:var(--cl-muted)">{{ prescriptions|length }} Rx</span>
       </div>
 
@@ -432,12 +432,12 @@
         <table style="width:100%;font-size:.85rem;border-collapse:collapse">
           <thead>
             <tr style="border-bottom:1px solid var(--cl-border)">
-              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Medication</th>
-              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Dosage</th>
-              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Frequency</th>
-              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Duration</th>
-              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Route</th>
-              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">Qty</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">{{ t('Medication','دواء') }}</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">{{ t('Dosage','الجرعة') }}</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">{{ t('Frequency','التكرار') }}</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">{{ t('Duration','المدة') }}</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">{{ t('Route','طريقة الإعطاء') }}</th>
+              <th style="text-align:left;padding:.3rem .5rem;color:var(--cl-muted);font-weight:500">{{ t('Qty','الكمية') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -461,23 +461,23 @@
           </tbody>
         </table>
         {% else %}
-        <div style="font-size:.88rem;color:var(--cl-muted)">No items in this prescription.</div>
+        <div style="font-size:.88rem;color:var(--cl-muted)">{{ t('No items in this prescription.','لا توجد أصناف في هذه الوصفة.') }}</div>
         {% endif %}
         {% if rx.notes %}
-        <div style="margin-top:.5rem;font-size:.85rem;color:var(--cl-muted)">Notes: {{ rx.notes }}</div>
+        <div style="margin-top:.5rem;font-size:.85rem;color:var(--cl-muted)">{{ t('Notes:','ملاحظات:') }} {{ rx.notes }}</div>
         {% endif %}
       </div>
       {% endfor %}
 
       {% if not prescriptions %}
-      <div style="color:var(--cl-muted);font-size:.9rem;margin-bottom:1rem">No prescriptions yet.</div>
+      <div style="color:var(--cl-muted);font-size:.9rem;margin-bottom:1rem">{{ t('No prescriptions yet.','لا توجد وصفات بعد.') }}</div>
       {% endif %}
 
       {% if visit.status == 'Open' %}
       <details>
         <summary style="cursor:pointer;font-weight:600;font-size:.9rem;color:var(--cl-primary);
                          margin-bottom:.8rem;list-style:none">
-          ＋ Add Prescription
+          ＋ {{ t('Add Prescription','إضافة وصفة') }}
         </summary>
         <form method="post" action="{{ url_for('visits.add_prescription', visit_id=visit.id) }}"
               id="rxForm"
@@ -489,37 +489,37 @@
                                         border-radius:6px;padding:.8rem;display:grid;
                                         grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;gap:.5rem">
               <div>
-                <label class="pf-label" style="font-size:.78rem">Medication *</label>
+                <label class="pf-label" style="font-size:.78rem">{{ t('Medication','دواء') }} *</label>
                 <input type="text" name="medication_name_1" class="pf-input" style="font-size:.85rem" required
-                       placeholder="Drug name">
+                       placeholder="{{ t('Drug name','اسم الدواء') }}">
               </div>
               <div>
-                <label class="pf-label" style="font-size:.78rem">Dosage</label>
-                <input type="text" name="dosage_1" class="pf-input" style="font-size:.85rem" placeholder="e.g. 5mg">
+                <label class="pf-label" style="font-size:.78rem">{{ t('Dosage','الجرعة') }}</label>
+                <input type="text" name="dosage_1" class="pf-input" style="font-size:.85rem" placeholder="{{ t('e.g. 5mg','مثال: 5 مجم') }}">
               </div>
               <div>
-                <label class="pf-label" style="font-size:.78rem">Frequency</label>
-                <input type="text" name="frequency_1" class="pf-input" style="font-size:.85rem" placeholder="e.g. BID">
+                <label class="pf-label" style="font-size:.78rem">{{ t('Frequency','التكرار') }}</label>
+                <input type="text" name="frequency_1" class="pf-input" style="font-size:.85rem" placeholder="{{ t('e.g. BID','مثال: BID') }}">
               </div>
               <div>
-                <label class="pf-label" style="font-size:.78rem">Duration</label>
-                <input type="text" name="duration_1" class="pf-input" style="font-size:.85rem" placeholder="e.g. 7d">
+                <label class="pf-label" style="font-size:.78rem">{{ t('Duration','المدة') }}</label>
+                <input type="text" name="duration_1" class="pf-input" style="font-size:.85rem" placeholder="{{ t('e.g. 7d','مثال: 7 أيام') }}">
               </div>
               <div>
-                <label class="pf-label" style="font-size:.78rem">Route</label>
+                <label class="pf-label" style="font-size:.78rem">{{ t('Route','طريقة الإعطاء') }}</label>
                 <select name="route_1" class="pf-input" style="font-size:.85rem">
                   <option value="">—</option>
-                  <option value="Oral">Oral</option>
+                  <option value="Oral">{{ t('Oral','فموي') }}</option>
                   <option value="IV">IV</option>
                   <option value="IM">IM</option>
                   <option value="SC">SC</option>
-                  <option value="Topical">Topical</option>
-                  <option value="Ophthalmic">Ophthalmic</option>
-                  <option value="Otic">Otic</option>
+                  <option value="Topical">{{ t('Topical','موضعي') }}</option>
+                  <option value="Ophthalmic">{{ t('Ophthalmic','عيني') }}</option>
+                  <option value="Otic">{{ t('Otic','أذني') }}</option>
                 </select>
               </div>
               <div>
-                <label class="pf-label" style="font-size:.78rem">Qty</label>
+                <label class="pf-label" style="font-size:.78rem">{{ t('Qty','الكمية') }}</label>
                 <input type="number" name="quantity_1" class="pf-input" style="font-size:.85rem" placeholder="—">
               </div>
             </div>
@@ -528,13 +528,13 @@
           <div style="margin-bottom:.8rem">
             <button type="button" onclick="addRxLine()" class="pf-btn"
                     style="font-size:.85rem;padding:.3rem .8rem">
-              ＋ Add Line
+              ＋ {{ t('Add Line','إضافة سطر') }}
             </button>
           </div>
 
           <div>
-            <label class="pf-label">Prescription Notes</label>
-            <input type="text" name="rx_notes" class="pf-input" placeholder="General notes…">
+            <label class="pf-label">{{ t('Prescription Notes','ملاحظات الوصفة') }}</label>
+            <input type="text" name="rx_notes" class="pf-input" placeholder="{{ t('General notes…','ملاحظات عامة…') }}">
           </div>
 
           <!-- Drug Interaction Checker -->
@@ -545,10 +545,10 @@
             <button type="button" onclick="checkDrugInteractions()"
                     style="background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;border:none;
                            border-radius:6px;padding:5px 12px;cursor:pointer;font-size:.78rem;font-weight:600">
-              💊 Check Interactions
+              💊 {{ t('Check Interactions','فحص التداخلات الدوائية') }}
             </button>
-            <span style="font-size:.72rem;color:var(--cl-muted)">AI checks against current medications</span>
-            <button type="submit" class="pf-btn pf-btn-primary" style="margin-left:auto">Save Prescription</button>
+            <span style="font-size:.72rem;color:var(--cl-muted)">{{ t('AI checks against current medications','يفحص الذكاء الاصطناعي التداخل مع الأدوية الحالية') }}</span>
+            <button type="submit" class="pf-btn pf-btn-primary" style="margin-left:auto">{{ t('Save Prescription','حفظ الوصفة') }}</button>
           </div>
         </form>
       </details>
@@ -558,9 +558,9 @@
     <!-- ─── LAB REQUESTS ─── -->
     <div class="pf-card" id="lab">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <div class="pf-card-title">🔬 Lab Requests</div>
+        <div class="pf-card-title">🔬 {{ t('Lab Requests','طلبات المختبر') }}</div>
         <a href="{{ url_for('clinical.lab_list') }}" style="font-size:.82rem;color:var(--cl-primary)">
-          View Lab Module →
+          {{ t('View Lab Module →','عرض وحدة المختبر ←') }}
         </a>
       </div>
 
@@ -572,7 +572,7 @@
           <div>
             <div style="font-weight:600">{{ lr.test_name }}</div>
             {% if lr.sample_type %}
-            <div style="font-size:.82rem;color:var(--cl-muted)">Sample: {{ lr.sample_type }}</div>
+            <div style="font-size:.82rem;color:var(--cl-muted)">{{ t('Sample:','العينة:') }} {{ lr.sample_type }}</div>
             {% endif %}
             {% if lr.notes %}
             <div style="font-size:.82rem;color:var(--cl-muted)">{{ lr.notes }}</div>
@@ -590,14 +590,14 @@
         {% endfor %}
       </div>
       {% else %}
-      <div style="color:var(--cl-muted);font-size:.9rem;margin-bottom:1rem">No lab requests for this visit.</div>
+      <div style="color:var(--cl-muted);font-size:.9rem;margin-bottom:1rem">{{ t('No lab requests for this visit.','لا توجد طلبات مختبر لهذه الزيارة.') }}</div>
       {% endif %}
 
       {% if visit.status == 'Open' %}
       <details>
         <summary style="cursor:pointer;font-weight:600;font-size:.9rem;color:var(--cl-primary);
                          margin-bottom:.8rem;list-style:none">
-          ＋ Request Lab Test
+          ＋ {{ t('Request Lab Test','طلب فحص مخبري') }}
         </summary>
         <form method="post" action="{{ url_for('clinical.lab_request_from_visit') if false else '#' }}"
               style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
@@ -605,9 +605,9 @@
               onsubmit="submitLabRequest(event, {{ visit.id }})">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
             <div>
-              <label class="pf-label">Test Name <span style="color:var(--cl-danger)">*</span></label>
+              <label class="pf-label">{{ t('Test Name','اسم الفحص') }} <span style="color:var(--cl-danger)">*</span></label>
               <input type="text" name="test_name" id="labTestName" class="pf-input"
-                     list="commonTests" required placeholder="e.g. CBC, Biochemistry">
+                     list="commonTests" required placeholder="{{ t('e.g. CBC, Biochemistry','مثال: CBC، كيمياء الدم') }}">
               <datalist id="commonTests">
                 <option value="Complete Blood Count (CBC)">
                 <option value="Biochemistry Panel">
@@ -623,28 +623,28 @@
               </datalist>
             </div>
             <div>
-              <label class="pf-label">Priority</label>
+              <label class="pf-label">{{ t('Priority','الأولوية') }}</label>
               <select name="priority" id="labPriority" class="pf-input">
-                <option value="Routine">Routine</option>
-                <option value="Urgent">Urgent</option>
+                <option value="Routine">{{ t('Routine','روتيني') }}</option>
+                <option value="Urgent">{{ t('Urgent','عاجل') }}</option>
                 <option value="STAT">STAT</option>
               </select>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
             <div>
-              <label class="pf-label">Sample Type</label>
+              <label class="pf-label">{{ t('Sample Type','نوع العينة') }}</label>
               <input type="text" name="sample_type" id="labSampleType" class="pf-input"
-                     placeholder="e.g. Blood, Urine">
+                     placeholder="{{ t('e.g. Blood, Urine','مثال: دم، بول') }}">
             </div>
             <div>
-              <label class="pf-label">Notes</label>
+              <label class="pf-label">{{ t('Notes','ملاحظات') }}</label>
               <input type="text" name="lab_notes" id="labNotes" class="pf-input"
-                     placeholder="Special instructions…">
+                     placeholder="{{ t('Special instructions…','تعليمات خاصة…') }}">
             </div>
           </div>
           <div style="text-align:right">
-            <button type="submit" class="pf-btn pf-btn-primary">Request Test</button>
+            <button type="submit" class="pf-btn pf-btn-primary">{{ t('Request Test','طلب الفحص') }}</button>
           </div>
         </form>
       </details>
@@ -654,7 +654,7 @@
     <!-- Visit Notes (if any) -->
     {% if visit.notes %}
     <div class="pf-card">
-      <div class="pf-card-title" style="margin-bottom:.7rem">📝 Notes</div>
+      <div class="pf-card-title" style="margin-bottom:.7rem">📝 {{ t('Notes','ملاحظات') }}</div>
       <div style="font-size:.92rem;white-space:pre-wrap">{{ visit.notes }}</div>
     </div>
     {% endif %}
@@ -671,7 +671,7 @@
 
 <!-- Floating trigger button -->
 <button id="aiFloatBtn" onclick="toggleAiPanel()"
-  title="Ask AI about this patient"
+  title="{{ t('Ask AI about this patient','اسأل الذكاء الاصطناعي عن هذا المريض') }}"
   style="position:fixed;bottom:28px;right:28px;z-index:1100;
          width:56px;height:56px;border-radius:50%;border:none;
          background:var(--cl-primary);color:#fff;font-size:1.5rem;
@@ -693,7 +693,7 @@
               display:flex;align-items:center;gap:10px;background:var(--cl-primary);color:#fff">
     <span style="font-size:1.2rem">🤖</span>
     <div style="flex:1">
-      <div style="font-weight:700;font-size:.95rem">AI Clinical Assistant</div>
+      <div style="font-weight:700;font-size:.95rem">{{ t('AI Clinical Assistant','المساعد السريري الذكي') }}</div>
       <div style="font-size:.75rem;opacity:.85" id="aiPatientLabel">
         {{ visit.pet_name }} — {{ visit.species }}
       </div>
@@ -713,8 +713,8 @@
   <div id="aiMsgs"
     style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px">
     <div style="text-align:center;color:var(--cl-muted);font-size:.82rem;margin-top:20px">
-      Ask me anything about <strong>{{ visit.pet_name }}</strong>.<br>
-      I already know the patient's history, medications, and allergies.
+      {{ t('Ask me anything about','اسألني أي شيء عن') }} <strong>{{ visit.pet_name }}</strong>.<br>
+      {{ t("I already know the patient's history, medications, and allergies.", 'أعرف بالفعل التاريخ المرضي والأدوية والحساسية لهذا المريض.') }}
     </div>
   </div>
 
@@ -727,21 +727,21 @@
             style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;
                    border-radius:6px;padding:5px 10px;cursor:pointer;font-size:.75rem;font-weight:600;
                    white-space:nowrap">
-      📸 Analyze Photo
+      📸 {{ t('Analyze Photo','تحليل الصورة') }}
     </button>
-    <span style="font-size:.72rem;color:var(--cl-muted)">Upload wound/eye/skin photo for AI diagnosis</span>
+    <span style="font-size:.72rem;color:var(--cl-muted)">{{ t('Upload wound/eye/skin photo for AI diagnosis','ارفع صورة جرح أو عين أو جلد للتشخيص بالذكاء الاصطناعي') }}</span>
   </div>
 
   <!-- Input row -->
   <div style="padding:12px;border-top:1px solid var(--cl-border);display:flex;gap:8px">
-    <input id="aiInput" type="text" placeholder="Ask about this patient…"
+    <input id="aiInput" type="text" placeholder="{{ t('Ask about this patient…','اسأل عن هذا المريض…') }}"
       style="flex:1;padding:8px 12px;border:1px solid var(--cl-border);
              border-radius:8px;font-size:.88rem;outline:none"
       onkeydown="if(event.key==='Enter')sendAiMsg()">
     <button onclick="sendAiMsg()"
       style="padding:8px 14px;background:var(--cl-primary);color:#fff;border:none;
              border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600">
-      Send
+      {{ t('Send','إرسال') }}
     </button>
   </div>
 </div>
@@ -760,8 +760,8 @@
       <span style="background:linear-gradient(135deg,#16a34a,#10b981);border-radius:10px;
                    padding:7px 11px;font-size:1.1rem">📋</span>
       <div>
-        <div style="font-weight:700;font-size:1.05rem">AI Discharge Instructions</div>
-        <div style="font-size:.78rem;color:var(--cl-muted)">Bilingual — English & Arabic</div>
+        <div style="font-weight:700;font-size:1.05rem">{{ t('AI Discharge Instructions','تعليمات الخروج بالذكاء الاصطناعي') }}</div>
+        <div style="font-size:.78rem;color:var(--cl-muted)">{{ t('Bilingual — English & Arabic','ثنائي اللغة — إنجليزي وعربي') }}</div>
       </div>
       <button onclick="document.getElementById('dischargeModal').style.display='none'"
               style="margin-left:auto;background:none;border:none;font-size:1.3rem;
@@ -771,19 +771,19 @@
          color:var(--cl-text);min-height:80px">
       <div style="color:var(--cl-muted);display:flex;align-items:center;gap:8px">
         <span style="animation:spin 1s linear infinite;display:inline-block">⏳</span>
-        Generating bilingual discharge instructions...
+        {{ t('Generating bilingual discharge instructions...','جارٍ إنشاء تعليمات الخروج ثنائية اللغة...') }}
       </div>
     </div>
     <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
       <button onclick="printDischarge()"
               style="background:#16a34a;color:#fff;border:none;border-radius:8px;
-                     padding:8px 18px;cursor:pointer;font-weight:600">🖨 Print</button>
+                     padding:8px 18px;cursor:pointer;font-weight:600">🖨 {{ t('Print','طباعة') }}</button>
       <button onclick="whatsappDischarge()"
               style="background:#25d366;color:#fff;border:none;border-radius:8px;
-                     padding:8px 18px;cursor:pointer;font-weight:600">📱 WhatsApp</button>
+                     padding:8px 18px;cursor:pointer;font-weight:600">📱 {{ t('WhatsApp','واتساب') }}</button>
       <button onclick="document.getElementById('dischargeModal').style.display='none'"
               style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
-                     padding:8px 18px;cursor:pointer">Close</button>
+                     padding:8px 18px;cursor:pointer">{{ t('Close','إغلاق') }}</button>
     </div>
   </div>
 </div>
@@ -1092,9 +1092,17 @@ function checkDrugInteractions() {
     } else if (sev === 'mild') {
       banner.style.background = '#fef9c3'; banner.style.border = '1px solid #fde68a'; banner.style.color = '#713f12';
       banner.innerHTML = '💛 <strong>Mild interaction noted</strong>: ' + (d.recommendation || '');
+    } else if (sev === 'unchecked' || sev === 'unknown' || d.safe !== true) {
+      // Not verified is NOT the same as safe. This branch used to fall through
+      // to the green banner below, so a down AI service told the vet
+      // "Safe to prescribe". Never imply clearance from a check that did not run.
+      banner.style.background = '#f1f5f9'; banner.style.border = '1.5px solid #94a3b8'; banner.style.color = '#334155';
+      banner.innerHTML = '❔ <strong>Not checked</strong>. ' +
+        (d.recommendation || 'This is not a statement that the combination is safe — verify manually.');
     } else {
       banner.style.background = '#dcfce7'; banner.style.border = '1px solid #86efac'; banner.style.color = '#14532d';
-      banner.innerHTML = '✅ <strong>No significant interactions found</strong>. ' + (d.recommendation || 'Safe to prescribe.');
+      banner.innerHTML = '✅ <strong>No interaction found in this check</strong>. ' +
+        (d.recommendation || 'Screened against known interactions only — species contraindications and dosing are not covered.');
     }
   })
   .catch(function() {

@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Clinical Decision Support','دعم القرار السريري') }}{% endblock %}
+{% block page_title %}{{ t('Clinical Decision Support','دعم القرار السريري') }}{% endblock %}
+{% block page_sub %}{{ t('Species contraindications · Drug interactions · Weight-based dosing',
+                          'موانع الاستعمال حسب النوع · التداخلات الدوائية · الجرعة حسب الوزن') }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Severity is never signalled by colour alone: every level also carries a
+     distinct glyph, an explicit text label, and a distinct border weight/style,
+     so it survives colour-blindness, dark mode and greyscale printing. */
+  .cds-alert{
+    display:flex; gap:.85rem; align-items:flex-start;
+    background:var(--surface, var(--cl-surface)); color:var(--text, var(--cl-text));
+    border:1px solid var(--border, var(--cl-border));
+    border-radius:8px; padding:.9rem 1rem; margin-bottom:.75rem;
+  }
+  html[dir="rtl"] .cds-alert{ direction:rtl; }
+  .cds-alert-icon{ font-size:1.5rem; line-height:1.2; flex-shrink:0; }
+  .cds-alert-body{ flex:1; min-width:0; }
+  .cds-label{
+    display:inline-block; font-weight:800; font-size:.7rem; letter-spacing:.08em;
+    text-transform:uppercase; padding:.15rem .5rem; border-radius:4px;
+    margin-bottom:.35rem; border:1px solid currentColor;
+  }
+  .cds-msg{ font-size:.9rem; line-height:1.6; }
+  .cds-alt{ font-size:.85rem; margin-top:.5rem; padding:.45rem .6rem;
+            border-inline-start:3px solid var(--c-success, #16a34a);
+            background:var(--c-success-bg, #f0fdf4); border-radius:0 4px 4px 0; }
+  .cds-src{ font-size:.72rem; color:var(--text-muted, var(--cl-muted));
+            margin-top:.5rem; word-break:break-word; }
+  .cds-drugs{ font-size:.78rem; font-weight:700; color:var(--text-muted, var(--cl-muted));
+              margin-bottom:.25rem; }
+
+  /* contraindicated — thick solid bar, inverted label */
+  .cds-contraindicated{ border-inline-start:8px solid var(--c-danger, #dc2626);
+                        background:var(--c-danger-bg, #fef2f2); }
+  .cds-contraindicated .cds-label{ background:var(--c-danger, #dc2626); color:#fff;
+                                   border-color:var(--c-danger, #dc2626); }
+  .cds-contraindicated .cds-msg{ font-weight:600; }
+  /* major — thick solid bar */
+  .cds-major{ border-inline-start:6px solid var(--c-danger, #dc2626); }
+  .cds-major .cds-label{ color:var(--c-danger, #dc2626); }
+  /* unverified — dashed bar, deliberately loud: absence of data is not safety */
+  .cds-unverified{ border-inline-start:6px dashed var(--c-warning, #d97706); }
+  .cds-unverified .cds-label{ color:var(--c-warning, #d97706); }
+  /* moderate — medium solid bar */
+  .cds-moderate{ border-inline-start:4px solid var(--c-warning, #d97706); }
+  .cds-moderate .cds-label{ color:var(--c-warning, #d97706); }
+  /* caution — dotted bar */
+  .cds-caution{ border-inline-start:4px dotted var(--c-info, #0284c7); }
+  .cds-caution .cds-label{ color:var(--c-info, #0284c7); }
+  /* info */
+  .cds-info{ border-inline-start:4px solid var(--border, #cbd5e1); }
+  .cds-info .cds-label{ color:var(--text-muted, #64748b); }
+
+  .cds-advisory{ margin-top:1.25rem; padding:.8rem 1rem; border-radius:8px;
+                 border:1px dashed var(--border, var(--cl-border));
+                 background:var(--surface-raised, transparent);
+                 color:var(--text-muted, var(--cl-muted));
+                 font-size:.82rem; line-height:1.6; }
+  .cds-draft{ font-size:.75rem; font-weight:700; color:var(--c-warning, #d97706); }
+  .cds-dose{ border:1px solid var(--border, var(--cl-border)); border-radius:8px;
+             padding:.9rem 1rem; margin-bottom:.7rem; font-size:.88rem; }
+  .cds-dose-big{ font-size:1.25rem; font-weight:800; }
+  .cds-dose-refused{ border-inline-start:6px dashed var(--c-warning, #d97706); }
+  .cds-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.9rem; }
+  @media print { .cds-alert{ break-inside:avoid; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set ICONS = {'contraindicated':'⛔','major':'⚠️','unverified':'❓','moderate':'⚡','caution':'🔎','info':'ℹ️'} %}
+{% set L = 'ar' if current_lang == 'ar' else 'en' %}
+
+<div class="pf-card" style="margin-bottom:1.2rem">
+  <form method="post" action="{{ url_for('cds.index') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <div class="cds-grid" style="margin-bottom:.9rem">
+      <div style="grid-column:1/-1">
+        <label class="pf-label">{{ t('Medications','الأدوية') }} *</label>
+        <textarea name="drugs" class="pf-input" rows="4" required
+                  placeholder="{{ t('One drug per line, e.g.
+Metacam 1.5mg/ml
+Prednisolone 5mg','دواء واحد في كل سطر، مثال:
+ميلوكسيكام
+بريدنيزولون') }}">{{ form.drugs }}</textarea>
+        <div style="font-size:.75rem;color:var(--text-muted,var(--cl-muted));margin-top:.3rem">
+          {{ t('Trade names and Arabic names are matched exactly, not guessed. Anything unrecognised is reported as unverified.',
+                'يتم مطابقة الأسماء التجارية والعربية مطابقةً تامة دون تخمين. وأي اسم غير معروف يُبلَّغ عنه كغير مُتحقَّق منه.') }}
+        </div>
+      </div>
+      <div>
+        <label class="pf-label">{{ t('Species','النوع') }} *</label>
+        <select name="species" class="pf-input" required>
+          <option value="">—</option>
+          {% for sp_val, sp_en, sp_ar in [
+              ('Dog','Dog','كلب'), ('Cat','Cat','قطة'), ('Rabbit','Rabbit','أرنب'),
+              ('Guinea pig','Guinea pig','خنزير غينيا'), ('Hamster','Hamster','هامستر'),
+              ('Bird','Bird','طائر'), ('Turtle','Turtle','سلحفاة'), ('Fish','Fish','سمك') ] %}
+          <option value="{{ sp_val }}" {% if form.species == sp_val %}selected{% endif %}>{{ t(sp_en, sp_ar) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="pf-label">{{ t('Breed','السلالة') }}</label>
+        <input type="text" name="breed" class="pf-input" value="{{ form.breed }}"
+               placeholder="{{ t('e.g. Border Collie','مثال: بوردر كولي') }}">
+      </div>
+      <div>
+        <label class="pf-label">{{ t('Weight (kg)','الوزن (كجم)') }}</label>
+        <input type="text" inputmode="decimal" name="weight_kg" class="pf-input"
+               value="{{ form.weight_kg }}" placeholder="{{ t('e.g. 4.2','مثال: 4.2') }}">
+      </div>
+    </div>
+    <button type="submit" class="pf-btn pf-btn-primary">
+      🩺 {{ t('Run Safety Check','إجراء فحص السلامة') }}
+    </button>
+  </form>
+</div>
+
+{% if result %}
+
+  {# ── Headline ────────────────────────────────────────────────────────── #}
+  {% set worst = result.worst_severity %}
+  <div class="cds-alert cds-{{ worst or 'info' }}" style="margin-bottom:1.2rem">
+    <div class="cds-alert-icon">{{ ICONS.get(worst, '✅') }}</div>
+    <div class="cds-alert-body">
+      <div class="cds-label">
+        {% if worst %}{{ severity_label[worst][L] }}
+        {% else %}{{ t('No rule triggered','لم تُفعَّل أي قاعدة') }}{% endif %}
+      </div>
+      <div class="cds-msg">
+        {% if worst %}
+          {{ t('%d finding(s) for %d medication(s).'|format(result.alerts|length, result.checked_count),
+                '%d نتيجة لعدد %d من الأدوية.'|format(result.alerts|length, result.checked_count)) }}
+        {% else %}
+          <strong>{{ t('No rule in this database matched.','لم تتطابق أي قاعدة في قاعدة البيانات هذه.') }}</strong>
+          {{ t('This is NOT a statement that the combination is safe — it only means nothing in the curated dataset applies. The dataset is a shortlist, not a complete formulary.',
+                'هذا لا يعني أن التركيبة آمنة — بل يعني فقط أنه لا توجد قاعدة منطبقة ضمن البيانات المُنسَّقة، وهي قائمة مختصرة وليست مرجعًا دوائيًا شاملًا.') }}
+        {% endif %}
+      </div>
+      {% if result.unrecognised %}
+      <div class="cds-msg" style="margin-top:.5rem">
+        <strong>{{ t('Not checked at all:','لم يُفحص إطلاقًا:') }}</strong>
+        {{ result.unrecognised|join(' · ') }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Findings ────────────────────────────────────────────────────────── #}
+  {% if result.alerts %}
+  <div class="pf-card" style="margin-bottom:1.2rem">
+    <h3 style="margin:0 0 .9rem;font-size:1rem">{{ t('Findings','النتائج') }}</h3>
+    {% for a in result.alerts %}
+    <div class="cds-alert cds-{{ a.severity }}">
+      <div class="cds-alert-icon" aria-hidden="true">{{ ICONS.get(a.severity,'ℹ️') }}</div>
+      <div class="cds-alert-body">
+        <span class="cds-label">{{ a.severity_label[L] }}</span>
+        <div class="cds-drugs">{{ a.drugs|join(' + ') }}{% if a.species %} · {{ a.species }}{% endif %}</div>
+        <div class="cds-msg">{{ t(a.message_en, a.message_ar) }}</div>
+        {% if a.alternative_en %}
+        <div class="cds-alt"><strong>{{ t('Instead:','البديل:') }}</strong> {{ t(a.alternative_en, a.alternative_ar) }}</div>
+        {% endif %}
+        {% if a.source %}<div class="cds-src">{{ t('Source','المرجع') }}: {{ a.source }}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# ── Doses ───────────────────────────────────────────────────────────── #}
+  {% if result.doses %}
+  <div class="pf-card" style="margin-bottom:1.2rem">
+    <h3 style="margin:0 0 .9rem;font-size:1rem">{{ t('Dose for this patient','الجرعة لهذا المريض') }}</h3>
+    {% for d in result.doses %}
+      {% if d.ok %}
+      <div class="cds-dose">
+        <div style="font-weight:700;margin-bottom:.35rem">{{ d.drug }}
+          <span style="font-weight:400;color:var(--text-muted,var(--cl-muted))">
+            · {{ d.species }} · {{ d.weight_kg }} kg{% if d.route %} · {{ d.route }}{% endif %}</span>
+        </div>
+        <div class="cds-dose-big">{{ d.min_total }} – {{ d.max_total }} {{ d.unit }}
+          <span style="font-size:.85rem;font-weight:500">{{ d.frequency }}</span></div>
+        <div style="font-size:.82rem;color:var(--text-muted,var(--cl-muted))">
+          {{ d.per_kg_range }}
+          {% if d.max_daily_total %} · <strong>{{ t('Do not exceed','لا تتجاوز') }}
+            {{ d.max_daily_total }} {{ d.unit }}/{{ t('day','يوم') }}</strong>{% endif %}
+        </div>
+        {% if t(d.note_en, d.note_ar) %}
+        <div class="cds-msg" style="margin-top:.5rem">{{ t(d.note_en, d.note_ar) }}</div>{% endif %}
+        <div class="cds-src">{{ t('Source','المرجع') }}: {{ d.source }}</div>
+        {% for a in d.alerts %}
+        <div class="cds-alert cds-{{ a.severity }}" style="margin-top:.7rem;margin-bottom:0">
+          <div class="cds-alert-icon" aria-hidden="true">{{ ICONS.get(a.severity,'ℹ️') }}</div>
+          <div class="cds-alert-body">
+            <span class="cds-label">{{ a.severity_label[L] }}</span>
+            <div class="cds-msg">{{ t(a.message_en, a.message_ar) }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="cds-dose cds-dose-refused">
+        <div style="font-weight:700;margin-bottom:.35rem">{{ d.drug }}</div>
+        <div class="cds-msg"><strong>{{ t('No dose calculated.','لم تُحسب الجرعة.') }}</strong>
+          {{ t(d.refusal_en, d.refusal_ar) }}</div>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="cds-advisory">
+    <div>{{ t(result.advisory.en, result.advisory.ar) }}</div>
+    <div style="margin-top:.4rem">
+      {{ t('Rule engine only — no AI generated any statement on this page.',
+            'محرك قواعد فقط — لم يُولِّد الذكاء الاصطناعي أي عبارة في هذه الصفحة.') }}
+      {{ t('Dataset','مجموعة البيانات') }} {{ result.data_version }}
+      · <span class="cds-draft">{{ result.review_status }}</span>
+    </div>
+  </div>
+
+{% else %}
+
+  <div class="cds-advisory">
+    <div>{{ t(advisory.en, advisory.ar) }}</div>
+    <div style="margin-top:.4rem">
+      {{ t('Dataset','مجموعة البيانات') }} {{ data_version }}
+      · <span class="cds-draft">{{ review_status }}</span>
+    </div>
+  </div>
+
+{% endif %}
+
+{% endblock %}

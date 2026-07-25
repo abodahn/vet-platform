@@ -137,6 +137,15 @@ def create_app(cfg=None) -> Flask:
     from blueprints.imaging import imaging_bp
     app.register_blueprint(imaging_bp)
 
+    # Clinical decision support — standalone reference page only. Deliberately
+    # NOT wired into add_prescription or dispense as a blocking gate: its drug
+    # data is marked DRAFT and unreviewed, and at the expected inventory
+    # name-match rate an always-on checker would generate enough "unverified"
+    # alerts to train staff past the ones that matter. Gate on the data file's
+    # review_status before making it blocking.
+    from blueprints.cds import cds_bp
+    app.register_blueprint(cds_bp)
+
     # ── Upload directory ─────────────────────────────────────────────────────
     uploads_path = os.path.join(os.path.dirname(app.config["DATABASE_PATH"]), "uploads")
     os.makedirs(uploads_path, exist_ok=True)

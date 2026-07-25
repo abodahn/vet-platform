@@ -880,14 +880,29 @@ def drug_interactions():
     current_rx = data.get("current_medications", [])   # list of strings
     species    = data.get("species", "")
 
+    # NEVER report "safe" for a check that did not actually run. The visit
+    # template paints any severity outside severe/moderate/mild as a green
+    # "Safe to prescribe" banner, so an unverified result reads to a busy vet
+    # as clearance. Absence of a finding is not a finding.
     if not new_drug:
-        return jsonify({"safe": True, "message": "No drug specified"})
+        return jsonify({
+            "safe": None, "severity": "unchecked", "interactions": [],
+            "recommendation": "No drug specified — no interaction check was performed.",
+        })
 
     if not current_rx:
+        # No co-medication means no *interaction* to find. It says nothing
+        # about species contraindications or dosing — paracetamol in a cat is
+        # lethal with an empty medication list.
         return jsonify({
-            "safe": True,
-            "message": f"No current medications on file — {new_drug} can be prescribed.",
-            "severity": "none",
+            "safe": None,
+            "severity": "unchecked",
+            "interactions": [],
+            "recommendation": (
+                f"No other medications on file, so no interaction check applies to "
+                f"{new_drug}. This does NOT check species contraindications, breed "
+                f"sensitivity, or dosing — verify those yourself."
+            ),
         })
 
     prompt = (
@@ -909,11 +924,25 @@ def drug_interactions():
         if not result:
             raise ValueError
     except Exception:
+        # The model was unreachable or returned something unparseable. That is
+        # the one case where the old code claimed safe=True — a down AI service
+        # rendered as "Safe to prescribe". Fail closed instead.
+        _logger.warning("drug_interactions: unparseable AI reply for %r", new_drug)
         result = {
-            "safe": True,
-            "severity": "unknown",
+            "safe": False,
+            "severity": "unchecked",
             "interactions": [],
-            "recommendation": reply[:300],
+            "recommendation": (
+                "The interaction check could not be completed — verify manually "
+                "before prescribing. This is NOT a statement that the combination "
+                "is safe."
+            ),
         }
+
+    # A reply that parsed but omitted a severity must not fall through to the
+    # template's green branch either.
+    if not result.get("severity"):
+        result["severity"] = "unchecked"
+        result["safe"] = False
 
     return jsonify(result)
