@@ -98,9 +98,12 @@ def configure_postgres(host="localhost", port=5432, dbname="vetclinic",
         if os.environ.get("FLASK_ENV", "development").lower() == "production":
             logger.error("Could not create PG pool (%s) — will retry per request", exc)
         else:
+            # Note: set_path() has not run yet at this point, so _db_path is
+            # still empty — don't claim a path we don't know.
             logger.warning(
-                "PostgreSQL unavailable (%s) — falling back to SQLite at %s. "
-                "This is a DEV-ONLY fallback.", exc, _db_path or "<unset>",
+                "PostgreSQL unavailable (%s) — falling back to SQLite. "
+                "This is a DEV-ONLY fallback; production fails hard instead.",
+                exc,
             )
             _PG_CONFIG = {}
 
