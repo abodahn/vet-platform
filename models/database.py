@@ -160,6 +160,252 @@ def _fix_sql(sql: str) -> str:
     return s
 
 
+# ─────────────────────────────────────────────────────────────────
+# SQLite compatibility — the mirror of _fix_sql().
+#
+# The house convention is "write SQLite-flavoured SQL, _fix_sql() adapts it to
+# PostgreSQL".  Review alone never enforced that: 158 raw %s placeholders plus a
+# long tail of ::casts / EXTRACT / INTERVAL / ILIKE / NOW() shipped anyway, most
+# of them hidden inside try/except blocks that blank a dashboard statistic
+# instead of raising.  _fix_sql_sqlite() translates the other direction so the
+# SQLite path (tests, CI, the degraded-mode fallback) survives PG-flavoured SQL.
+#
+# Correctness rule: anything that cannot be translated *faithfully* is left
+# alone so SQLite raises, rather than silently returning a wrong number in a
+# financial or clinical report.
+# ─────────────────────────────────────────────────────────────────
+
+_SQLITE_FIX_CACHE: dict = {}
+# ponytail: flat cap + clear, not an LRU. _FIX_CACHE next door is unbounded;
+# both are keyed by SQL text from a fixed set of call sites, so the working set
+# is a few hundred entries. Swap for functools.lru_cache if SQL ever gets
+# generated from unbounded user input.
+_SQLITE_FIX_CACHE_MAX = 5000
+
+# expr::type — type names we can translate exactly. Anything else is left in
+# place so SQLite raises "unrecognized token: :" loudly.
+_CAST_MAP = {
+    "text": "TEXT", "varchar": "TEXT", "char": "TEXT",
+    "int": "INTEGER", "int4": "INTEGER", "int8": "INTEGER",
+    "integer": "INTEGER", "bigint": "INTEGER", "smallint": "INTEGER",
+    "numeric": "REAL", "decimal": "REAL", "real": "REAL",
+    "float": "REAL", "float8": "REAL", "double": "REAL",
+    "date": "date()", "timestamp": "datetime()",
+}
+_CAST_RE = re.compile(r"::\s*(\w+)")
+_EXTRACT_RE = re.compile(r"\bEXTRACT\s*\(\s*(\w+)\s+FROM\s+", re.IGNORECASE)
+_EXTRACT_FMT = {"year": "%Y", "month": "%m", "day": "%d",
+                "hour": "%H", "minute": "%M", "dow": "%w"}
+_AGE_RE = re.compile(r"^\s*AGE\s*\((.+)\)\s*$", re.IGNORECASE | re.DOTALL)
+# '<n> <unit>' interval literals whose SQLite date-modifier spelling is identical.
+_INTERVAL_LIT_RE = re.compile(
+    r"^'(\d+)\s+(day|days|month|months|year|years|hour|hours"
+    r"|minute|minutes|second|seconds)'$", re.IGNORECASE)
+_INTERVAL_RE = re.compile(r"([+-])\s*INTERVAL\s+\x00(\d+)\x00", re.IGNORECASE)
+
+
+def _sqlite_mask(sql: str):
+    """Replace every single-quoted literal with a \\x00N\\x00 token.
+
+    Every rule below then operates on text that provably contains no string
+    literal, which is what keeps LIKE '%foo%', 'a::b' and strftime('%Y', ...)
+    out of harm's way.
+    """
+    lits: list = []
+
+    def grab(m):
+        lits.append(m.group(0))
+        return f"\x00{len(lits) - 1}\x00"
+
+    return _SQ_STRING_RE.sub(grab, sql), lits
+
+
+def _tok(lits: list, literal: str) -> str:
+    """Register a literal we are emitting, return its mask token."""
+    lits.append(literal)
+    return f"\x00{len(lits) - 1}\x00"
+
+
+def _operand_start(s: str, end: int) -> int:
+    """Index at which the expression ending at s[end-1] begins, or -1.
+
+    Handles `col`, `t.col`, `123`, a masked literal, `fn(...)` and a bare
+    parenthesised group — i.e. everything a PG cast or interval operator binds
+    to in this codebase.
+    """
+    i = end - 1
+    while i >= 0 and s[i].isspace():
+        i -= 1
+    if i < 0:
+        return -1
+    if s[i] == ")":
+        depth = 0
+        while i >= 0:
+            if s[i] == ")":
+                depth += 1
+            elif s[i] == "(":
+                depth -= 1
+                if depth == 0:
+                    break
+            i -= 1
+        if i < 0:
+            return -1
+        j = i - 1                      # pull in the function name, if any
+        while j >= 0 and (s[j].isalnum() or s[j] == "_"):
+            j -= 1
+        return j + 1
+    j = i
+    while j >= 0 and (s[j].isalnum() or s[j] in '_."\x00'):
+        j -= 1
+    return j + 1 if j < i else -1
+
+
+def _close_paren(s: str, open_idx: int) -> int:
+    """Index of the ')' matching the '(' at open_idx, or -1."""
+    depth = 0
+    for i in range(open_idx, len(s)):
+        if s[i] == "(":
+            depth += 1
+        elif s[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+    return -1
+
+
+def _sqlite_extract(s: str, lits: list) -> str:
+    """EXTRACT(field FROM expr) -> CAST(strftime(...) AS INTEGER)."""
+    pos = 0
+    while True:
+        m = _EXTRACT_RE.search(s, pos)
+        if not m:
+            return s
+        open_idx = s.index("(", m.start())
+        close = _close_paren(s, open_idx)
+        fmt = _EXTRACT_FMT.get(m.group(1).lower())
+        if close < 0 or fmt is None:
+            pos = m.end()              # untranslatable -> leave it, SQLite raises
+            continue
+        inner = s[m.end():close].strip()
+        age = _AGE_RE.match(inner)
+        if age and fmt == "%Y":
+            # PG age(x) == age(current_date, x); EXTRACT(YEAR FROM ...) is the
+            # whole-years component. Reproduced exactly: year difference minus
+            # 1 when this year's anniversary has not happened yet.
+            x = age.group(1)
+            y, md = _tok(lits, "'%Y'"), _tok(lits, "'%m%d'")
+            now = _tok(lits, "'now'")
+            rep = (f"(strftime({y},{now}) - strftime({y},{x})"
+                   f" - (strftime({md},{now}) < strftime({md},{x})))")
+        elif age:
+            pos = m.end()              # AGE() outside the YEAR form: not translatable
+            continue
+        else:
+            rep = f"CAST(strftime({_tok(lits, chr(39) + fmt + chr(39))}, {inner}) AS INTEGER)"
+        s = s[:m.start()] + rep + s[close + 1:]
+        pos = m.start() + len(rep)
+
+
+def _sqlite_interval(s: str, lits: list) -> str:
+    """expr ± INTERVAL '<n> <unit>' -> date/datetime(expr, '<±n> <unit>')."""
+    pos = 0
+    while True:
+        m = _INTERVAL_RE.search(s, pos)
+        if not m:
+            return s
+        lit = _INTERVAL_LIT_RE.match(lits[int(m.group(2))])
+        start = _operand_start(s, m.start())
+        if not lit or start < 0:
+            pos = m.end()              # compound/odd interval -> leave it, SQLite raises
+            continue
+        operand = s[start:m.start()].rstrip()
+        sign = m.group(1)
+        mod = _tok(lits, f"'{sign}{lit.group(1)} {lit.group(2)}'")
+        # A date operand must stay a date: datetime() would append " 00:00:00"
+        # and break text comparison against 'YYYY-MM-DD' columns.
+        bare = operand.strip().upper()
+        fn = "date" if bare == "CURRENT_DATE" or bare.startswith("DATE(") else "datetime"
+        rep = f"{fn}({operand}, {mod})"
+        s = s[:start] + rep + s[m.end():]
+        pos = start + len(rep)
+
+
+def _sqlite_casts(s: str) -> str:
+    """expr::type -> CAST(expr AS ...) / date(expr) / datetime(expr)."""
+    pos = 0
+    while True:
+        m = _CAST_RE.search(s, pos)
+        if not m:
+            return s
+        target = _CAST_MAP.get(m.group(1).lower())
+        start = _operand_start(s, m.start())
+        if target is None or start < 0:
+            pos = m.end()              # unknown type -> leave it, SQLite raises
+            continue
+        expr = s[start:m.start()].rstrip()
+        rep = (f"{target[:-2]}({expr})" if target.endswith("()")
+               else f"CAST({expr} AS {target})")
+        s = s[:start] + rep + s[m.end():]
+        pos = start + len(rep)
+
+
+def _fix_sql_sqlite(sql: str) -> str:
+    """Translate PostgreSQL SQL quirks to SQLite. Mirror of _fix_sql()."""
+    cached = _SQLITE_FIX_CACHE.get(sql)
+    if cached is not None:
+        return cached
+    s, lits = _sqlite_mask(sql)
+    # %s -> ? placeholders. Literals are masked, so LIKE '%foo%' and
+    # strftime('%Y', ...) are untouched by construction.
+    s = s.replace("%s", "?")
+    # ILIKE -> LIKE. SQLite's LIKE is case-insensitive for ASCII only; Arabic
+    # is caseless so this is lossless here, but it is NOT a general equivalence.
+    s = re.sub(r"\bILIKE\b", "LIKE", s, flags=re.IGNORECASE)
+    s = _sqlite_extract(s, lits)
+    s = _sqlite_interval(s, lits)
+    s = _sqlite_casts(s)
+    s = s.replace("NOW()", f"datetime({_tok(lits, chr(39) + 'now' + chr(39))})")
+    out = re.sub(r"\x00(\d+)\x00", lambda m: lits[int(m.group(1))], s)
+    if len(_SQLITE_FIX_CACHE) >= _SQLITE_FIX_CACHE_MAX:
+        _SQLITE_FIX_CACHE.clear()
+    _SQLITE_FIX_CACHE[sql] = out
+    return out
+
+
+class _SQLiteCursor(sqlite3.Cursor):
+    """sqlite3.Cursor that runs every statement through _fix_sql_sqlite().
+
+    Subclassing rather than wrapping keeps lastrowid, rowcount, description,
+    row_factory, fetch*/iteration and close() as the genuine sqlite3 article.
+    """
+
+    def execute(self, sql, params=()):
+        return super().execute(_fix_sql_sqlite(sql), params)
+
+    def executemany(self, sql, seq_of_params):
+        return super().executemany(_fix_sql_sqlite(sql), seq_of_params)
+
+
+class _SQLiteConn(sqlite3.Connection):
+    """sqlite3.Connection whose cursors translate PG-flavoured SQL.
+
+    `with conn:`, executescript(), commit/rollback/close and the interpreter's
+    own reference handling are all inherited unchanged.
+    """
+
+    def cursor(self, factory=_SQLiteCursor):
+        return super().cursor(factory)
+
+    def execute(self, sql, params=(), _protect=False):
+        # _protect is a PostgreSQL savepoint concern (_PGCursor.execute); a
+        # failed statement never poisons a SQLite transaction, so it is a no-op
+        # here — accepted so shared call sites like hr/routes.py:63 work on both.
+        return self.cursor().execute(sql, params)
+
+    def executemany(self, sql, seq_of_params):
+        return self.cursor().executemany(sql, seq_of_params)
+
+
 class _PGCursor:
     """Wraps psycopg2 DictCursor to behave like sqlite3.Cursor.
 
@@ -413,7 +659,7 @@ def _connect():
         return _PGConn(raw, pool=None)
 
     # Fallback: SQLite (dev / test mode)
-    conn = sqlite3.connect(_db_path, check_same_thread=False)
+    conn = sqlite3.connect(_db_path, check_same_thread=False, factory=_SQLiteConn)
     conn.row_factory = sqlite3.Row
     # Performance PRAGMAs — applied once per connection
     conn.execute("PRAGMA foreign_keys  = ON")
