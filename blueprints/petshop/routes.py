@@ -197,7 +197,7 @@ def products():
 
 
 @petshop_bp.route("/products/new", methods=["GET", "POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "receptionist", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "reception", "support_admin")
 def product_new():
     ensure_petshop_tables()
     if request.method == "POST":
@@ -241,7 +241,7 @@ def product_new():
 
 
 @petshop_bp.route("/products/<int:pid>/edit", methods=["GET", "POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "receptionist", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "reception", "support_admin")
 def product_edit(pid):
     ensure_petshop_tables()
     conn = _get_db()

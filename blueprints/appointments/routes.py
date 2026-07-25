@@ -5,13 +5,18 @@ Aleefy Platform
 
 from flask import (
     render_template, request, redirect, url_for,
-    flash, session, jsonify
+    flash, session, jsonify, current_app, abort, make_response
 )
 from . import appointments_bp
 from blueprints.auth.routes import login_required
 import models.database as db
 from models.database import get_db
 from datetime import date, datetime, timedelta
+import hmac
+import logging
+import os
+
+logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -354,7 +359,7 @@ def appt_detail(appt_id):
 
     conn = get_db()
     pet_row = conn.execute(
-        "SELECT p.*, o.full_name owner_name FROM pets p JOIN owners o ON o.id=p.owner_id WHERE p.id=%s",
+        "SELECT p.*, o.full_name owner_name FROM pets p JOIN owners o ON o.id=p.owner_id WHERE p.id=?",
         (appt["pet_id"],)
     ).fetchone()
     conn.close()
@@ -437,10 +442,10 @@ def appt_edit(appt_id):
         conn = get_db()
         conn.execute("""
             UPDATE appointments
-               SET appt_date=%s, appt_start=%s, appt_end=%s, duration_min=%s,
-                   doctor_name=%s, appointment_type=%s, priority=%s,
-                   reason=%s, notes=%s, channel=%s, updated_at=NOW()
-             WHERE id=%s
+               SET appt_date=?, appt_start=?, appt_end=?, duration_min=?,
+                   doctor_name=?, appointment_type=?, priority=?,
+                   reason=?, notes=?, channel=?, updated_at=datetime('now')
+             WHERE id=?
         """, (
             appt_date, appt_start, appt_end, duration_min, doctor_name,
             request.form.get("appointment_type", appt.get("appointment_type", "Consultation")),
@@ -608,7 +613,9 @@ def _noshowscore(owner_id: int, appt_time: str = "") -> dict:
             reasons.append(f"{unpaid} unpaid invoice(s)")
 
         last_done = conn.execute(
-            "SELECT MAX(SUBSTRING(appt_date::text,1,10)) FROM appointments WHERE owner_id=? AND status='Completed'",
+            # appt_date is TEXT 'YYYY-MM-DD'; the PG-only `::text` cast broke
+            # this on SQLite and the bare except below hid it. MAX() is enough.
+            "SELECT MAX(appt_date) FROM appointments WHERE owner_id=? AND status='Completed'",
             (owner_id,)).fetchone()[0]
         if last_done:
             days_since = (date.today() - date.fromisoformat(str(last_done)[:10])).days
@@ -625,9 +632,9 @@ def _noshowscore(owner_id: int, appt_time: str = "") -> dict:
                     score += 8
                     reasons.append("Early morning slot")
             except Exception:
-                pass
+                logger.warning("no-show score: unparsable appt_time %r", appt_time)
     except Exception:
-        pass
+        logger.exception("no-show score computation failed for owner %s", owner_id)
     finally:
         conn.close()
 
@@ -645,35 +652,111 @@ def api_risk_score(owner_id):
 
 # ── Waiting Room TV Display ───────────────────────────────────────────────────
 
-@appointments_bp.route("/waiting-room")
-def waiting_room():
-    """Public TV display — no login required."""
+WAITING_ROOM_COOKIE = "wr_token"
+_TOKEN_WARNED = False
+
+
+def mask_owner_name(full_name) -> str:
+    """'Ahmed El Gohary' -> 'Ahmed E.'  Safe for Arabic and single-word names.
+
+    Never index into the raw string — str.split() guarantees non-empty parts,
+    so parts[-1][0] cannot IndexError, and it works on any script.
+    """
+    parts = str(full_name or "").split()
+    if not parts:
+        return ""
+    if len(parts) == 1:
+        return parts[0]
+    return f"{parts[0]} {parts[-1][0]}."
+
+
+def _waiting_room_token() -> str:
+    return (current_app.config.get("WAITING_ROOM_TOKEN")
+            or os.environ.get("WAITING_ROOM_TOKEN", "")).strip()
+
+
+def _waiting_room_authorized() -> bool:
+    """True if the display token matches — or if no token is configured.
+
+    Fail-OPEN when unconfigured is deliberate: an existing clinic whose TV is
+    already running must not go blank on deploy. It is logged loudly once.
+    # ponytail: fail-open until WAITING_ROOM_TOKEN is set everywhere; flip the
+    # `return True` below to `return False` once ops confirms it is deployed.
+    """
+    global _TOKEN_WARNED
+    if session.get("user"):
+        return True                      # logged-in staff always allowed
+    expected = _waiting_room_token()
+    if not expected:
+        if not _TOKEN_WARNED:
+            _TOKEN_WARNED = True
+            logger.warning(
+                "WAITING_ROOM_TOKEN is not configured — /appointments/waiting-room "
+                "and /appointments/api/queue are serving unauthenticated. Set "
+                "WAITING_ROOM_TOKEN to lock the TV display down."
+            )
+        return True
+    supplied = request.args.get("t") or request.cookies.get(WAITING_ROOM_COOKIE) or ""
+    return hmac.compare_digest(supplied, expected)
+
+
+def _queue_rows(mask: bool = True):
+    """Today's active queue. Never raises.
+
+    Always emits `owner_display` (masked). `owner_name` (full PII) is emitted
+    only when mask=False, i.e. for an authenticated staff session.
+    """
     conn = get_db()
     try:
-        queue = conn.execute("""
-            SELECT a.id, a.appt_time, a.appointment_type, a.priority,
-                   o.full_name owner_name, p.pet_name, p.species,
+        # `appt_time` does not exist on this table — the column is `appt_start`.
+        # The old query raised on every call and the bare except swallowed it,
+        # so this display has been permanently empty (and never leaked anything).
+        rows = conn.execute("""
+            SELECT a.id, a.appt_start AS appt_time, a.appointment_type, a.priority,
+                   o.full_name AS owner_name, p.pet_name, p.species,
                    a.doctor_name, a.status
             FROM appointments a
             JOIN owners o ON o.id = a.owner_id
             LEFT JOIN pets p ON p.id = a.pet_id
-            WHERE SUBSTRING(a.appt_date::text,1,10) = ?
+            WHERE a.appt_date = ?
               AND a.status IN ('Scheduled','Confirmed','Checked-in')
-            ORDER BY a.appt_time
+            ORDER BY a.appt_start
         """, (date.today().isoformat(),)).fetchall()
-
-        clinic = conn.execute("SELECT * FROM clinic LIMIT 1").fetchone()
-        tips = conn.execute(
-            "SELECT content FROM notifications WHERE module='system' ORDER BY created_at DESC LIMIT 10"
-        ).fetchall()
     except Exception:
-        queue  = []
-        clinic = None
-        tips   = []
+        logger.exception("waiting-room queue query failed")
+        rows = []
     finally:
         conn.close()
 
-    queue_list = [dict(r) for r in queue]
+    out = []
+    for r in rows:
+        d = dict(r)
+        full = d.get("owner_name", "")
+        d["owner_display"] = mask_owner_name(full)
+        if mask:
+            # PII: never ship the owner's full name to a public display.
+            d.pop("owner_name", None)
+        out.append(d)
+    return out
+
+
+@appointments_bp.route("/waiting-room")
+def waiting_room():
+    """Public TV display — gated by WAITING_ROOM_TOKEN when one is configured."""
+    if not _waiting_room_authorized():
+        abort(404)
+
+    queue_list = _queue_rows()
+
+    conn = get_db()
+    try:
+        clinic = conn.execute("SELECT * FROM clinic LIMIT 1").fetchone()
+    except Exception:
+        logger.exception("waiting-room clinic lookup failed")
+        clinic = None
+    finally:
+        conn.close()
+
     # Estimate wait: each checked-in = 20 min used; estimate per position
     checked_in = sum(1 for q in queue_list if q["status"] == "Checked-in")
     for i, q in enumerate(queue_list):
@@ -684,31 +767,27 @@ def waiting_room():
                       "🐰" if q.get("species") == "Rabbit" else
                       "🦜" if q.get("species") == "Bird" else "🐾")
 
-    return render_template(
+    resp = make_response(render_template(
         "appointments/waiting_room.html",
         queue=queue_list,
         clinic=clinic,
         today=date.today().strftime("%A, %d %B %Y"),
-    )
+    ))
+    # Persist the token so the page's own /api/queue polling stays authorized.
+    token = _waiting_room_token()
+    if token and request.args.get("t") == token:
+        resp.set_cookie(WAITING_ROOM_COOKIE, token, max_age=60 * 60 * 24 * 365,
+                        httponly=True, samesite="Lax")
+    return resp
 
 
 @appointments_bp.route("/api/queue")
 def api_queue():
-    """JSON queue for auto-refresh."""
-    conn = get_db()
-    try:
-        rows = conn.execute("""
-            SELECT a.id, a.appt_time, a.appointment_type, a.status,
-                   o.full_name owner_name, p.pet_name, p.species, a.doctor_name
-            FROM appointments a
-            JOIN owners o ON o.id = a.owner_id
-            LEFT JOIN pets p ON p.id = a.pet_id
-            WHERE SUBSTRING(a.appt_date::text,1,10) = ?
-              AND a.status IN ('Scheduled','Confirmed','Checked-in')
-            ORDER BY a.appt_time
-        """, (date.today().isoformat(),)).fetchall()
-    except Exception:
-        rows = []
-    finally:
-        conn.close()
-    return jsonify([dict(r) for r in rows])
+    """JSON queue for auto-refresh. Same gate as the TV page.
+
+    Anonymous (TV) callers get masked owner names; logged-in staff — e.g. the
+    launcher dashboard widget — keep the full name they already had.
+    """
+    if not _waiting_room_authorized():
+        abort(404)
+    return jsonify(_queue_rows(mask=not session.get("user")))

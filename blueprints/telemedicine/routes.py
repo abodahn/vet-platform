@@ -2,6 +2,7 @@
 Telemedicine — Video Consultations via Jitsi Meet (no API key required).
 Each session gets a unique Jitsi room: meet.jit.si/PAH-<clinic_slug>-<token>
 """
+import logging
 import secrets
 import string
 from datetime import date, datetime
@@ -11,6 +12,10 @@ from . import telemedicine_bp
 from blueprints.auth.routes import login_required
 from models.database import get_db
 import models.database as db
+
+logger = logging.getLogger(__name__)
+
+TELEMEDICINE_FALLBACK_PRICE = 0.0
 
 
 # ── Table init ────────────────────────────────────────────────────────────────
@@ -222,6 +227,33 @@ def start_session(sid):
     return redirect(url_for("telemedicine.session_detail", sid=sid))
 
 
+# ── Pricing ───────────────────────────────────────────────────────────────────
+
+def _telemedicine_price(conn) -> float:
+    """Configured telemedicine price from service_catalog, else the fallback.
+
+    The LIKE pattern MUST be a bound parameter. Inlining '%tele%' makes
+    psycopg2 read '%t' as a format placeholder and raise — which is exactly
+    how this lookup silently returned the fallback price since day one.
+    The column is `standard_price`; `price` does not exist on this table.
+    """
+    try:
+        row = conn.execute(
+            "SELECT standard_price FROM service_catalog "
+            "WHERE LOWER(name) LIKE ? AND is_active=1 "
+            "ORDER BY sort_order, id LIMIT 1",
+            ("%tele%",),
+        ).fetchone()
+    except Exception:
+        logger.exception("service_catalog telemedicine price lookup failed")
+        return TELEMEDICINE_FALLBACK_PRICE
+    if not row or row["standard_price"] is None:
+        logger.warning("No active service_catalog entry matching '%%tele%%'; "
+                       "using fallback price %s", TELEMEDICINE_FALLBACK_PRICE)
+        return TELEMEDICINE_FALLBACK_PRICE
+    return float(row["standard_price"])
+
+
 # ── Complete Session ──────────────────────────────────────────────────────────
 
 @telemedicine_bp.route("/<int:sid>/complete", methods=["POST"])
@@ -249,11 +281,7 @@ def complete_session(sid):
     inv_id = None
     try:
         duration = int(ts["duration_min"] or 30)
-        # Look up telemedicine price from catalog
-        price_row = conn.execute(
-            "SELECT price FROM service_catalog WHERE LOWER(name) LIKE '%tele%' AND is_active=1 LIMIT 1"
-        ).fetchone()
-        price = float(price_row["price"]) if price_row else 0.0
+        price = _telemedicine_price(conn)
 
         if ts["owner_id"] and price > 0:
             inv_data = {
@@ -275,7 +303,11 @@ def complete_session(sid):
             conn.execute("UPDATE telemedicine_sessions SET invoice_id=? WHERE id=?", (inv_id, sid))
             conn.commit()
     except Exception:
-        pass
+        # Session IS completed at this point; only the invoice failed.
+        # Log it loudly instead of swallowing — this hid a broken query for months.
+        logger.exception("Telemedicine auto-invoice failed for session %s", sid)
+        flash("Session completed, but the invoice could not be generated. "
+              "Please create it manually.", "warning")
 
     conn.close()
 

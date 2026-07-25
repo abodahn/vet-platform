@@ -14,39 +14,51 @@ Versioned REST layer with standardized response envelope:
     }
   }
 
-Endpoints:
-  GET  /api/v1/health                  — public health check
-  GET  /api/v1/system/diagnostics      — admin only system diagnostics
-  POST /api/v1/logs/frontend           — browser sends frontend error logs
-  POST /api/v1/sync/push               — device pushes offline queue
-  GET  /api/v1/sync/status             — sync queue summary
-  GET  /api/v1/sync/conflicts          — list unresolved conflicts
-  POST /api/v1/sync/conflicts/:id/resolve — resolve a conflict
-  GET  /api/v1/sync/devices            — registered devices
+Endpoints  (auth: public | user = session or Bearer API_V1_KEY | admin):
+  GET  /api/v1/health                     public   health check
+  GET  /api/v1/version                    public   version info
+  GET  /api/v1/system/diagnostics         admin    system diagnostics
+  POST /api/v1/logs/frontend              user     browser error telemetry
+  GET  /api/v1/logs/backend               admin    backend log query
+  POST /api/v1/logs/cleanup               admin    log retention sweep
+  POST /api/v1/sync/push                  user     device pushes offline queue
+  GET  /api/v1/sync/status                user     sync queue summary
+  GET  /api/v1/sync/pending               admin    full pending list
+  GET  /api/v1/sync/conflicts             admin    unresolved conflicts
+  POST /api/v1/sync/conflicts/:id/resolve admin    resolve a conflict
+  GET  /api/v1/sync/devices               admin    registered devices
+
+NOT REGISTERED in app.py — dormant by design. See report / register_notes below.
 """
 
 import uuid
 import time
-import json
+import hmac
+import logging
 import platform
 import traceback
 import os
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Blueprint, request, jsonify, session, g
+from flask import Blueprint, request, jsonify, session, g, current_app
 
 import models.database as db
 from models.logging_db import log_backend, log_frontend, log_audit, cleanup_old_logs
 from models.sync import (
-    enqueue, get_pending, mark_synced, mark_failed, mark_conflict,
-    resolve_conflict, get_sync_status_summary, register_device, touch_device_online
+    enqueue, get_pending, resolve_conflict, get_sync_status_summary,
+    register_device, touch_device_online,
 )
 
 api_v1_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
+logger = logging.getLogger(__name__)
+
 APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
 BUILD_NUMBER = os.environ.get("BUILD_NUMBER", "production_final_v1")
+
+# Roles allowed through @require_admin. Names must match models.database._SEED_ROLES.
+ADMIN_ROLES = ("super_admin", "clinic_owner", "support_admin")
 
 
 # ── Response helpers ──────────────────────────────────────────
@@ -83,12 +95,54 @@ def err(message, status=400, code=None):
     return jsonify(body), status
 
 
+# ── Identity ──────────────────────────────────────────────────
+#
+# Two accepted credentials:
+#   1. A normal browser session — session["user"] = {id, username, role, ...},
+#      the shape blueprints/auth/routes.py actually writes. The old code read
+#      session["user_id"] / session["role"], which this app never sets, so every
+#      protected endpoint 401'd. Fail-closed, but broken.
+#   2. `Authorization: Bearer <API_V1_KEY>` for headless/mobile clients, which
+#      have no cookie jar. Absent config = no key auth, never a blanket allow.
+
+
+def _api_key() -> str:
+    return (current_app.config.get("API_V1_KEY")
+            or os.environ.get("API_V1_KEY", "")).strip()
+
+
+def _bearer_token() -> str:
+    auth = request.headers.get("Authorization", "")
+    scheme, _, token = auth.partition(" ")
+    return token.strip() if scheme.lower() == "bearer" else ""
+
+
+def _key_authenticated() -> bool:
+    expected, supplied = _api_key(), _bearer_token()
+    return bool(expected) and bool(supplied) and hmac.compare_digest(supplied, expected)
+
+
+def current_identity() -> dict:
+    """{'id','username','role'} for the caller, or {} when unauthenticated."""
+    user = session.get("user") or {}
+    if user:
+        return {"id": user.get("id"), "username": user.get("username", ""),
+                "role": user.get("role", "")}
+    if _key_authenticated():
+        # The API key is an operator credential — it carries admin rights.
+        # ponytail: single shared key, no per-device rotation or scopes.
+        # Move to per-device keys in the `devices` table if >1 integration.
+        return {"id": None, "username": "api_key", "role": "super_admin"}
+    return {}
+
+
 # ── Decorators ────────────────────────────────────────────────
 
 def require_auth(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if not session.get("user_id"):
+        g.identity = current_identity()
+        if not g.identity:
             return err("Authentication required", 401, "UNAUTHENTICATED")
         return f(*args, **kwargs)
     return wrapper
@@ -97,13 +151,17 @@ def require_auth(f):
 def require_admin(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        role = session.get("role", "")
-        if role not in ("super_admin", "clinic_owner", "support_admin"):
+        # Stands alone: never assume require_auth ran first.
+        ident = getattr(g, "identity", None) or current_identity()
+        g.identity = ident
+        if not ident:
+            return err("Authentication required", 401, "UNAUTHENTICATED")
+        if ident.get("role") not in ADMIN_ROLES:
             log_backend(
                 level="WARNING", module_name="api_v1", action_name="admin_blocked",
                 http_method=request.method, endpoint=request.path, status_code=403,
-                ip_address=request.remote_addr, user_id=session.get("user_id"),
-                username=session.get("username", ""), error_message="Insufficient role"
+                ip_address=request.remote_addr, user_id=ident.get("id"),
+                username=ident.get("username", ""), error_message="Insufficient role"
             )
             return err("Admin access required", 403, "FORBIDDEN")
         return f(*args, **kwargs)
@@ -153,7 +211,8 @@ def health():
         conn.close()
         db_latency_ms = int((time.monotonic() - t0) * 1000)
         db_ok = True
-    except Exception as e:
+    except Exception:
+        logger.exception("api_v1 health check: database probe failed")
         db_ok = False
 
     status_code = 200 if db_ok else 503
@@ -214,7 +273,7 @@ def diagnostics():
     from pathlib import Path
     log_dir = Path(__file__).parent.parent.parent / "logs"
     log_files = []
-    for f in sorted(log_dir.rglob("*.log")):
+    for f in sorted(log_dir.rglob("*.log")) if log_dir.is_dir() else []:
         log_files.append({
             "file":     f.name,
             "channel":  f.parent.name,
@@ -244,7 +303,9 @@ def diagnostics():
         report["errors_last_24h"] = err_count
         report["active_devices_24h"] = active_devices
     except Exception:
+        logger.exception("api_v1 diagnostics: 24h error/device counts failed")
         report["errors_last_24h"] = -1
+        report["active_devices_24h"] = -1
 
     # System info
     report["system"] = {
@@ -258,7 +319,7 @@ def diagnostics():
     }
 
     log_audit(
-        user_id=session.get("user_id"), username=session.get("username", ""),
+        user_id=g.identity.get("id"), username=g.identity.get("username", ""),
         action_type="VIEW", entity_name="system_diagnostics", entity_id="",
         ip_address=request.remote_addr, user_agent=request.user_agent.string[:200],
     )
@@ -271,27 +332,33 @@ def diagnostics():
 # ════════════════════════════════════════════════════════════════
 
 @api_v1_bp.route("/logs/frontend", methods=["POST"])
+@require_auth
 def receive_frontend_log():
     """
     POST /api/v1/logs/frontend
     Browser sends batched frontend logs when online.
     Body: { logs: [{...}, ...] }  OR a single log object.
-    No auth required — session info embedded in payload.
-    Rate limited implicitly by Flask-Limiter on the app level.
+
+    Auth IS required. This writes attacker-controlled text to disk and to
+    frontend_logs; leaving it anonymous is an unauthenticated log-poisoning and
+    disk-fill vector. Only logged-in staff pages ship telemetry in this app.
+    # ponytail: per-request batch cap only, no rate limit. Add Flask-Limiter
+    # here if a device ever loops on a failing request.
     """
     try:
         data = request.get_json(silent=True) or {}
         logs = data.get("logs", [data] if data else [])
         # Enrich with server-side user if session exists
-        uid = session.get("user_id")
-        uname = session.get("username", "")
+        uid = g.identity.get("id")
+        uname = g.identity.get("username", "")
         for entry in logs[:50]:  # cap at 50 per batch
             if uid and not entry.get("user_id"):
                 entry["user_id"] = uid
                 entry["username"] = uname
             log_frontend(entry)
         return ok({"accepted": len(logs[:50])})
-    except Exception as e:
+    except Exception:
+        logger.exception("api_v1 frontend log ingestion failed")
         return err("Log ingestion failed", 500)
 
 
@@ -321,7 +388,7 @@ def sync_push():
     if not items:
         return ok({"queued": 0})
 
-    user_id = session.get("user_id")
+    user_id = g.identity.get("id")
     register_device(device_id, user_id=user_id)
     touch_device_online(device_id)
 
@@ -345,7 +412,7 @@ def sync_push():
             results.append({"local_uuid": item.get("local_uuid"), "status": "error", "error": str(e)})
 
     log_audit(
-        user_id=user_id, username=session.get("username", ""),
+        user_id=user_id, username=g.identity.get("username", ""),
         action_type="SYNC", entity_name="sync_queue", entity_id=device_id,
         new_value={"queued": queued, "device": device_id},
         ip_address=request.remote_addr,
@@ -392,10 +459,10 @@ def sync_resolve_conflict(conflict_id):
     """POST /api/v1/sync/conflicts/:id/resolve  Body: { keep: 'server'|'local' }"""
     data = request.get_json(silent=True) or {}
     keep = data.get("keep", "server")
-    username = session.get("username", "system")
+    username = g.identity.get("username") or "system"
     resolve_conflict(conflict_id, resolved_by=username, keep=keep)
     log_audit(
-        user_id=session.get("user_id"), username=username,
+        user_id=g.identity.get("id"), username=username,
         action_type="APPROVE", entity_name="sync_conflict", entity_id=conflict_id,
         new_value={"keep": keep}, ip_address=request.remote_addr,
     )
@@ -426,7 +493,7 @@ def logs_cleanup():
     """POST /api/v1/logs/cleanup — manually trigger log file retention cleanup."""
     deleted = cleanup_old_logs()
     log_audit(
-        user_id=session.get("user_id"), username=session.get("username", ""),
+        user_id=g.identity.get("id"), username=g.identity.get("username", ""),
         action_type="DELETE", entity_name="log_files", entity_id="",
         new_value={"deleted_files": deleted}, ip_address=request.remote_addr,
     )
