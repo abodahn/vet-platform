@@ -1,142 +1,217 @@
 {% extends "base.html" %}
 
-{% block title %}Audit Log{% endblock %}
-{% block page_title %}Audit Log{% endblock %}
-{% block page_sub %}Complete platform activity trail with filters{% endblock %}
+{% block title %}{{ t("Audit Log", "سجل التدقيق") }}{% endblock %}
+{% block page_title %}{{ t("Audit Log", "سجل التدقيق") }}{% endblock %}
+{% block page_sub %}{{ t("Who changed what, and when", "من غيّر ماذا، ومتى") }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">🖥️ Monitor</a>
-<a href="{{ url_for('system.settings') }}" class="pf-btn pf-btn-secondary">⚙️ Settings</a>
+<a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">🖥️ {{ t("Monitor", "المراقبة") }}</a>
+<a href="{{ url_for('system.settings') }}" class="pf-btn pf-btn-secondary">⚙️ {{ t("Settings", "الإعدادات") }}</a>
 {% endblock %}
 
 {% block head_extra %}
 <style>
-.filter-bar { background:var(--cl-surface); border-radius:12px; padding:18px 22px; margin-bottom:22px; box-shadow:0 2px 8px rgba(0,0,0,.07); }
-.filter-bar form { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
-.filter-group { display:flex; flex-direction:column; gap:5px; }
-.filter-group label { font-size:11px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.4px; }
-.filter-group select, .filter-group input {
-  padding:8px 12px; border:1.5px solid var(--cl-border); border-radius:8px;
-  background:var(--cl-bg); color:var(--cl-text); font-size:13px; min-width:140px;
-}
-.filter-group select:focus, .filter-group input:focus { outline:none; border-color:var(--cl-primary); }
-.filter-btn { padding:9px 20px; background:var(--cl-primary); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; align-self:flex-end; }
-.clear-link { font-size:12px; color:var(--cl-muted); text-decoration:none; align-self:flex-end; padding-bottom:8px; }
-.audit-table { width:100%; border-collapse:collapse; background:var(--cl-surface); border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); font-size:13px; }
-.audit-table th { background:var(--cl-primary); color:#fff; padding:11px 14px; text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
-.audit-table td { padding:10px 14px; border-bottom:1px solid var(--cl-border); vertical-align:middle; }
-.audit-table tr:last-child td { border-bottom:none; }
-.audit-table tr:hover td { background:var(--cl-bg); }
-.action-chip { display:inline-block; padding:2px 9px; border-radius:4px; font-size:11px; font-weight:700; }
-.ac-login        { background:#dbeafe; color:#1d4ed8; }
-.ac-login_failed { background:#fee2e2; color:#991b1b; }
-.ac-logout       { background:#f3f4f6; color:#374151; }
-.ac-create       { background:#dcfce7; color:#166534; }
-.ac-update       { background:#fef3c7; color:#92400e; }
-.ac-delete       { background:#fee2e2; color:#991b1b; }
-.ac-reset_password { background:#ede9fe; color:#5b21b6; }
-.ac-default      { background:#e0e7ff; color:#3730a3; }
-.module-tag { display:inline-block; background:var(--cl-bg); border:1px solid var(--cl-border); padding:2px 7px; border-radius:4px; font-size:11px; color:var(--cl-muted); font-family:monospace; }
-.result-info { color:var(--cl-muted); font-size:13px; margin-bottom:12px; }
-.empty-state { text-align:center; padding:60px; color:var(--cl-muted); }
+/* Only what the pf-* system has no component for: the field-level diff cell
+   and the pager. Everything else reuses pf-card / pf-table / pf-badge / pf-btn
+   and the --al-* custom properties. */
+.audit-filters      { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:var(--al-space-sm); align-items:end; }
+.audit-filters .pf-field { margin-bottom:0; }
+.audit-diff         { display:grid; grid-template-columns:auto auto 1fr; gap:2px 8px; align-items:baseline; font-size:0.78rem; }
+.audit-diff dt      { font-weight:600; color:var(--al-text); white-space:nowrap; }
+.audit-diff .arrow  { color:var(--al-text-muted); }
+.audit-val-old      { color:var(--al-danger); text-decoration:line-through; word-break:break-word; }
+.audit-val-new      { color:var(--al-success); font-weight:600; word-break:break-word; }
+.audit-val-empty    { color:var(--al-text-muted); font-style:italic; text-decoration:none; }
+.audit-note         { font-size:0.78rem; color:var(--al-text-muted); word-break:break-word; }
+.audit-entity-link  { font-size:0.75rem; font-family:var(--al-font-mono, monospace); color:var(--al-primary); text-decoration:none; }
+.audit-entity-link:hover { text-decoration:underline; }
+.audit-pager        { display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap; margin-top:var(--al-space-lg); }
+.audit-pager .current { font-size:0.82rem; color:var(--al-text-muted); }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- Filter Bar -->
-<div class="filter-bar">
-  <form method="get">
-    <div class="filter-group">
-      <label>User</label>
-      <select name="user">
-        <option value="">All Users</option>
+<!-- ── Filters ──────────────────────────────────────────────────────────── -->
+<div class="pf-card" style="margin-bottom:var(--al-space-lg);">
+  <form method="get" class="audit-filters">
+    <div class="pf-field">
+      <label class="pf-form-label" for="af-user">{{ t("User", "المستخدم") }}</label>
+      <select class="pf-select" id="af-user" name="user">
+        <option value="">{{ t("All users", "كل المستخدمين") }}</option>
         {% for u in users %}
         <option value="{{ u }}" {% if f_user == u %}selected{% endif %}>{{ u }}</option>
         {% endfor %}
       </select>
     </div>
-    <div class="filter-group">
-      <label>Action</label>
-      <input type="text" name="action" value="{{ f_action }}" placeholder="e.g. login, create…">
-    </div>
-    <div class="filter-group">
-      <label>Module</label>
-      <select name="module">
-        <option value="">All Modules</option>
+
+    <div class="pf-field">
+      <label class="pf-form-label" for="af-module">{{ t("Module", "الوحدة") }}</label>
+      <select class="pf-select" id="af-module" name="module">
+        <option value="">{{ t("All modules", "كل الوحدات") }}</option>
         {% for m in modules %}
         <option value="{{ m }}" {% if f_module == m %}selected{% endif %}>{{ m }}</option>
         {% endfor %}
       </select>
     </div>
-    <div class="filter-group">
-      <label>From Date</label>
-      <input type="date" name="date_from" value="{{ f_from }}">
+
+    <div class="pf-field">
+      <label class="pf-form-label" for="af-action">{{ t("Action", "الإجراء") }}</label>
+      <input class="pf-form-control" id="af-action" type="text" name="action"
+             value="{{ f_action }}" placeholder="{{ t('e.g. update, delete', 'مثال: تعديل، حذف') }}">
     </div>
-    <div class="filter-group">
-      <label>To Date</label>
-      <input type="date" name="date_to" value="{{ f_to }}">
+
+    <div class="pf-field">
+      <label class="pf-form-label" for="af-entity">{{ t("Record type", "نوع السجل") }}</label>
+      <select class="pf-select" id="af-entity" name="entity_type">
+        <option value="">{{ t("All records", "كل السجلات") }}</option>
+        {% for e in entities %}
+        <option value="{{ e }}" {% if f_entity == e %}selected{% endif %}>{{ e }}</option>
+        {% endfor %}
+      </select>
     </div>
-    <button type="submit" class="filter-btn">🔍 Filter</button>
-    {% if f_user or f_action or f_module or f_from or f_to %}
-    <a href="{{ url_for('system.audit_log') }}" class="clear-link">✕ Clear</a>
-    {% endif %}
+
+    <div class="pf-field">
+      <label class="pf-form-label" for="af-eid">{{ t("Record ID", "رقم السجل") }}</label>
+      <input class="pf-form-control" id="af-eid" type="text" name="entity_id"
+             value="{{ f_eid }}" placeholder="{{ t('e.g. 1042', 'مثال: ١٠٤٢') }}">
+    </div>
+
+    <div class="pf-field">
+      <label class="pf-form-label" for="af-from">{{ t("From date", "من تاريخ") }}</label>
+      <input class="pf-form-control" id="af-from" type="date" name="date_from" value="{{ f_from }}">
+    </div>
+
+    <div class="pf-field">
+      <label class="pf-form-label" for="af-to">{{ t("To date", "إلى تاريخ") }}</label>
+      <input class="pf-form-control" id="af-to" type="date" name="date_to" value="{{ f_to }}">
+    </div>
+
+    <div class="pf-field" style="display:flex;gap:8px;">
+      <button type="submit" class="pf-btn pf-btn-primary">🔍 {{ t("Filter", "تصفية") }}</button>
+      {% if has_filters %}
+      <a href="{{ url_for('system.audit_log') }}" class="pf-btn pf-btn-outline">✕ {{ t("Clear", "مسح") }}</a>
+      {% endif %}
+    </div>
   </form>
 </div>
 
-<div class="result-info">Showing {{ logs|length }} log entries (max 200)</div>
+<div class="pf-text-sm pf-text-muted" style="margin-bottom:var(--al-space-sm);">
+  {% if total %}
+    {{ t("Showing", "عرض") }}
+    {{ (page - 1) * page_size + 1 }}–{{ [page * page_size, total]|min }}
+    {{ t("of", "من") }} {{ total }}
+    {{ t("entries", "إدخالاً") }}
+  {% else %}
+    {{ t("No entries", "لا توجد إدخالات") }}
+  {% endif %}
+</div>
 
 {% if logs %}
-<div style="overflow-x:auto;">
-  <table class="audit-table">
+<div class="pf-table-wrap">
+  <table class="pf-table">
     <thead>
       <tr>
-        <th>Timestamp</th>
-        <th>User</th>
-        <th>Role</th>
-        <th>Action</th>
-        <th>Module</th>
-        <th>Entity</th>
-        <th>Details</th>
-        <th>IP</th>
+        <th>{{ t("Time", "الوقت") }}</th>
+        <th>{{ t("User", "المستخدم") }}</th>
+        <th>{{ t("Action", "الإجراء") }}</th>
+        <th>{{ t("Module", "الوحدة") }}</th>
+        <th>{{ t("Record", "السجل") }}</th>
+        <th>{{ t("What changed", "ما الذي تغيّر") }}</th>
+        <th>{{ t("IP", "عنوان الشبكة") }}</th>
       </tr>
     </thead>
     <tbody>
       {% for log in logs %}
-      {% set ac = log.action or 'default' %}
-      {% set chip_class = 'ac-' ~ ac if 'ac-' ~ ac in ['ac-login','ac-login_failed','ac-logout','ac-create','ac-update','ac-delete','ac-reset_password'] else 'ac-default' %}
+      {% set act = (log.action or '')|lower %}
+      {% if 'delete' in act or 'fail' in act %}{% set badge = 'danger' %}
+      {% elif 'create' in act or 'login' in act %}{% set badge = 'success' %}
+      {% elif 'edit' in act or 'update' in act %}{% set badge = 'warning' %}
+      {% else %}{% set badge = '' %}{% endif %}
       <tr>
-        <td style="white-space:nowrap;color:var(--cl-muted);font-size:12px;">
-          {{ log.timestamp[:16] if log.timestamp else '—' }}
-        </td>
-        <td style="font-weight:600;">{{ log.username or '—' }}</td>
-        <td style="color:var(--cl-muted);font-size:12px;">{{ (log.role or '—').replace('_',' ') }}</td>
-        <td>
-          <span class="action-chip {{ chip_class }}">{{ log.action or '—' }}</span>
+        <td class="pf-text-xs pf-text-muted" style="white-space:nowrap;">
+          {{ (log.timestamp or '')[:16] or '—' }}
         </td>
         <td>
-          {% if log.module %}
-          <span class="module-tag">{{ log.module }}</span>
+          <div style="font-weight:600;">{{ log.username or '—' }}</div>
+          <div class="pf-text-xs pf-text-muted">{{ (log.role or '')|replace('_',' ') }}</div>
+        </td>
+        <td><span class="pf-badge {{ badge }}">{{ log.action or '—' }}</span></td>
+        <td class="pf-text-xs pf-text-muted">{{ log.module or '—' }}</td>
+        <td>
+          {% if log.entity_type %}
+            {# Click a record to see its whole history — the "who changed this
+               invoice?" question, answered in one click. #}
+            <a class="audit-entity-link"
+               href="{{ url_for('system.audit_log', entity_type=log.entity_type, entity_id=log.entity_id or '') }}"
+               title="{{ t('Show all changes to this record', 'عرض كل التغييرات على هذا السجل') }}">
+              {{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}
+            </a>
           {% else %}—{% endif %}
         </td>
-        <td style="font-size:12px;color:var(--cl-muted);">
-          {% if log.entity_type %}{{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}{% else %}—{% endif %}
+        <td style="max-width:420px;">
+          {% if log.changes %}
+            <dl class="audit-diff">
+              {% for field, ch in log.changes.items() %}
+                <dt>{{ field|replace('_',' ') }}</dt>
+                <dd class="audit-val-old {% if ch['from'] in (None, '') %}audit-val-empty{% endif %}">
+                  {%- if ch['from'] in (None, '') -%}
+                    {{ t("empty", "فارغ") }}
+                  {%- else -%}{{ ch['from'] }}{%- endif -%}
+                </dd>
+                <dd>
+                  <span class="arrow">{{ '←' if current_lang == 'ar' else '→' }}</span>
+                  <span class="audit-val-new {% if ch['to'] in (None, '') %}audit-val-empty{% endif %}">
+                    {%- if ch['to'] in (None, '') -%}
+                      {{ t("empty", "فارغ") }}
+                    {%- else -%}{{ ch['to'] }}{%- endif -%}
+                  </span>
+                </dd>
+              {% endfor %}
+            </dl>
+          {% elif log.details %}
+            <div class="audit-note" title="{{ log.details }}">{{ log.details }}</div>
+          {% else %}
+            <span class="pf-text-muted">—</span>
+          {% endif %}
         </td>
-        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;"
-            title="{{ log.details or '' }}">
-          {{ log.details or '—' }}
+        <td class="pf-text-xs pf-text-muted" style="font-family:var(--al-font-mono, monospace);">
+          {{ log.ip or '—' }}
         </td>
-        <td style="font-size:12px;color:var(--cl-muted);font-family:monospace;">{{ log.ip or '—' }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
+{% if pages > 1 %}
+<nav class="audit-pager" aria-label="{{ t('Audit log pages', 'صفحات سجل التدقيق') }}">
+  {% if page > 1 %}
+    <a class="pf-btn pf-btn-outline pf-btn-sm"
+       href="{{ url_for('system.audit_log', **dict(request.args, page=1)) }}">« {{ t("First", "الأولى") }}</a>
+    <a class="pf-btn pf-btn-outline pf-btn-sm"
+       href="{{ url_for('system.audit_log', **dict(request.args, page=page-1)) }}">{{ t("Previous", "السابقة") }}</a>
+  {% endif %}
+  <span class="current">{{ t("Page", "صفحة") }} {{ page }} / {{ pages }}</span>
+  {% if page < pages %}
+    <a class="pf-btn pf-btn-outline pf-btn-sm"
+       href="{{ url_for('system.audit_log', **dict(request.args, page=page+1)) }}">{{ t("Next", "التالية") }}</a>
+    <a class="pf-btn pf-btn-outline pf-btn-sm"
+       href="{{ url_for('system.audit_log', **dict(request.args, page=pages)) }}">{{ t("Last", "الأخيرة") }} »</a>
+  {% endif %}
+</nav>
+{% endif %}
+
 {% else %}
-<div class="empty-state">
+<div class="pf-empty">
   <div style="font-size:40px;margin-bottom:12px;">📭</div>
-  <div style="font-size:18px;font-weight:600;margin-bottom:6px;">No audit logs found</div>
-  <div>Try adjusting your filter criteria.</div>
+  <div style="font-size:1.1rem;font-weight:600;margin-bottom:6px;">
+    {{ t("No audit entries found", "لا توجد إدخالات في سجل التدقيق") }}
+  </div>
+  <div class="pf-text-sm">
+    {{ t("Try widening the filters or the date range.",
+         "جرّب توسيع عوامل التصفية أو النطاق الزمني.") }}
+  </div>
 </div>
 {% endif %}
 {% endblock %}

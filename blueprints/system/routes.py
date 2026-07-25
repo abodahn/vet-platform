@@ -10,6 +10,7 @@ from flask import render_template, request, redirect, url_for, session, flash, c
 from . import system_bp
 from blueprints.auth.routes import login_required, role_required
 import models.database as db
+import models.audit as audit
 import models.backup as bk
 from models.sync import get_sync_status_summary, resolve_conflict
 
@@ -171,39 +172,96 @@ def _get_flask_version():
         return "unknown"
 
 
+AUDIT_PAGE_SIZE = 50
+
+
 @system_bp.route("/audit")
 @role_required("super_admin", "clinic_owner", "support_admin", "auditor")
 def audit_log():
+    """Filtered, paginated view of the live `audit_log` table.
+
+    Never SELECTs the whole table: it grows without bound and a clinic that has
+    been running for a year has hundreds of thousands of rows. One page of
+    AUDIT_PAGE_SIZE plus a COUNT for the pager, nothing more.
+    """
+    f_user   = request.args.get("user", "").strip()
+    f_action = request.args.get("action", "").strip()
+    f_module = request.args.get("module", "").strip()
+    f_entity = request.args.get("entity_type", "").strip()
+    f_eid    = request.args.get("entity_id", "").strip()
+    f_from   = request.args.get("date_from", "").strip()
+    f_to     = request.args.get("date_to", "").strip()
+
+    where, params = ["1=1"], []
+    if f_user:   where.append("username=?");     params.append(f_user)
+    if f_action: where.append("action LIKE ?");  params.append(f"%{f_action}%")
+    if f_module: where.append("module=?");       params.append(f_module)
+    if f_entity: where.append("entity_type=?");  params.append(f_entity)
+    if f_eid:    where.append("entity_id=?");    params.append(f_eid)
+    if f_from:   where.append("timestamp >= ?"); params.append(f_from + " 00:00:00")
+    if f_to:     where.append("timestamp <= ?"); params.append(f_to + " 23:59:59")
+    clause = " AND ".join(where)
+
+    page = request.args.get("page", type=int) or 1
+    if page < 1:
+        page = 1
+    offset = (page - 1) * AUDIT_PAGE_SIZE
+
     conn = db.get_db()
-    # Filters
-    f_user   = request.args.get("user", "")
-    f_action = request.args.get("action", "")
-    f_module = request.args.get("module", "")
-    f_from   = request.args.get("date_from", "")
-    f_to     = request.args.get("date_to", "")
-    q = "SELECT * FROM audit_log WHERE 1=1"
-    params = []
-    if f_user:   q += " AND username=?";          params.append(f_user)
-    if f_action: q += " AND action LIKE ?";       params.append(f"%{f_action}%")
-    if f_module: q += " AND module=?";            params.append(f_module)
-    if f_from:   q += " AND timestamp >= ?";      params.append(f_from + " 00:00:00")
-    if f_to:     q += " AND timestamp <= ?";      params.append(f_to + " 23:59:59")
-    q += " ORDER BY timestamp DESC LIMIT 200"
-    logs = [dict(r) for r in conn.execute(q, params).fetchall()]
-    # For filter dropdowns
-    users   = [dict(r)["username"] for r in conn.execute("SELECT DISTINCT username FROM audit_log ORDER BY username").fetchall()]
-    modules = [dict(r)["module"] for r in conn.execute("SELECT DISTINCT module FROM audit_log ORDER BY module").fetchall()]
-    conn.close()
+    try:
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM audit_log WHERE {clause}", params
+        ).fetchone()[0]
+
+        rows = conn.execute(
+            f"SELECT * FROM audit_log WHERE {clause} "
+            f"ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?",
+            params + [AUDIT_PAGE_SIZE, offset],
+        ).fetchall()
+
+        # Filter dropdowns. DISTINCT over the whole table is the one unbounded
+        # scan left here; it is cheap next to the row fetch it replaces and the
+        # cardinality is tiny (staff count, module count).
+        users = [r[0] for r in conn.execute(
+            "SELECT DISTINCT username FROM audit_log WHERE username <> '' ORDER BY username"
+        ).fetchall()]
+        modules = [r[0] for r in conn.execute(
+            "SELECT DISTINCT module FROM audit_log WHERE module <> '' ORDER BY module"
+        ).fetchall()]
+        entities = [r[0] for r in conn.execute(
+            "SELECT DISTINCT entity_type FROM audit_log WHERE entity_type <> '' ORDER BY entity_type"
+        ).fetchall()]
+    finally:
+        conn.close()
+
+    # Decode the field-level diff where there is one. Legacy rows carry a plain
+    # English sentence in `details`; parse_details() returns None for those and
+    # the template falls back to rendering the text.
+    logs = []
+    for r in rows:
+        d = dict(r)
+        d["changes"] = audit.parse_details(d.get("details"))
+        logs.append(d)
+
+    pages = max(1, (total + AUDIT_PAGE_SIZE - 1) // AUDIT_PAGE_SIZE)
     return render_template(
         "system/audit_log.html",
         logs=logs,
         users=users,
         modules=modules,
+        entities=entities,
         f_user=f_user,
         f_action=f_action,
         f_module=f_module,
+        f_entity=f_entity,
+        f_eid=f_eid,
         f_from=f_from,
         f_to=f_to,
+        page=page,
+        pages=pages,
+        total=total,
+        page_size=AUDIT_PAGE_SIZE,
+        has_filters=any([f_user, f_action, f_module, f_entity, f_eid, f_from, f_to]),
         active="audit",
     )
 
@@ -568,10 +626,17 @@ def role_edit(role_id):
         flash("Display name is required.", "danger")
         return redirect(url_for("system.roles_list"))
     try:
-        db.update_role(role_id, display_name, display_ar, permissions, color)
-        db.log_audit(username=session["user"]["username"], role=session["user"]["role"],
-                     action="edit_role", module="system", entity_type="role", entity_id=str(role_id),
-                     details=f"Updated role id={role_id}")
+        # WORKED EXAMPLE of field-level auditing (models/audit.py).
+        #
+        # Editing a role silently rewrites who can see medical records and who
+        # can touch money, and until now it recorded only "Updated role id=7".
+        # This records the actual permission list before and after.
+        #
+        # The old db.log_audit() call is gone rather than kept alongside: two
+        # rows per edit would double the table and give an auditor two entries
+        # to reconcile for one action. This one is strictly more informative.
+        with audit.audit_row("roles", role_id, module="system", action="edit_role"):
+            db.update_role(role_id, display_name, display_ar, permissions, color)
         flash("Role updated successfully.", "success")
     except Exception as e:
         flash(f"Error updating role: {e}", "danger")
