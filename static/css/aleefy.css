@@ -14,159 +14,28 @@
  *   Coral     : #E8716A  (care / alert highlight)
  */
 
-/* ── Google Fonts: Plus Jakarta Sans + Cairo (Arabic) ─────── */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap');
+/* ── Fonts: self-hosted DM Sans + Cairo. @font-face lives in tokens.css.
+      A Google Fonts @import for 'Plus Jakarta Sans' used to sit here — a
+      hidden 4th CDN dependency and a 2nd latin family. Both removed. ── */
 
 /* ═══════════════════════════════════════════════════════════
    1. DESIGN TOKENS
 ═══════════════════════════════════════════════════════════ */
-:root {
-  /* Brand Colors */
-  --al-primary:        #1B6B5C;
-  --al-primary-mid:    #2A9D8F;
-  --al-primary-light:  #E6F4F1;
-  --al-primary-dark:   #124840;
-  --al-gold:           #C9A84C;
-  --al-gold-light:     #F5EDD3;
-  --al-gold-dark:      #A07C2E;
-  --al-cream:          #F7F3EC;
-  --al-cream-dark:     #EDE8DF;
-  --al-coral:          #E8716A;
-  --al-coral-light:    #FDECEA;
+/* Design tokens moved to tokens.css (single token layer).
+   was: --al-* palette + surface tokens */
 
-  /* Text */
-  --al-navy:           #0D1B2A;
-  --al-text:           #1A2E3B;
-  --al-text-mid:       #4A6274;
-  --al-text-light:     #7A9BAD;
-
-  /* Backgrounds */
-  --al-bg:             #F7F3EC;
-  --al-bg-white:       #FFFFFF;
-  --al-bg-card:        #FFFFFF;
-  --al-bg-hover:       #F0F7F5;
-
-  /* Borders */
-  --al-border:         #DDE8E5;
-  --al-border-mid:     #C5D8D4;
-
-  /* Status */
-  --al-success:        #1E8C5A;
-  --al-success-bg:     #E8F5EE;
-  --al-warning:        #C9850A;
-  --al-warning-bg:     #FEF3DC;
-  --al-danger:         #C0392B;
-  --al-danger-bg:      #FDECEA;
-  --al-info:           #1A6FA8;
-  --al-info-bg:        #E8F2FB;
-
-  /* Sidebar */
-  --al-sidebar-bg:        #0D2B24;
-  --al-sidebar-bg-mid:    #102F28;
-  --al-sidebar-text:      #A8C5C0;
-  --al-sidebar-text-dim:  #5A8A82;
-  --al-sidebar-active-bg: rgba(201,168,76,0.12);
-  --al-sidebar-active:    #C9A84C;
-  --al-sidebar-hover-bg:  rgba(255,255,255,0.05);
-  --al-sidebar-width:     256px;
-
-  /* Topbar */
-  --al-topbar-bg:      #FFFFFF;
-  --al-topbar-border:  #EAE6DF;
-  --al-topbar-h:       60px;
-
-  /* Spacing */
-  --al-space-xs:  4px;
-  --al-space-sm:  8px;
-  --al-space-md:  16px;
-  --al-space-lg:  24px;
-  --al-space-xl:  32px;
-
-  /* Radius */
-  --al-r-sm:   6px;
-  --al-r-md:   10px;
-  --al-r-lg:   16px;
-  --al-r-xl:   24px;
-  --al-r-full: 999px;
-
-  /* Shadows */
-  --al-shadow-sm:  0 1px 3px rgba(13,27,42,0.06), 0 1px 2px rgba(13,27,42,0.04);
-  --al-shadow-md:  0 4px 12px rgba(13,27,42,0.08), 0 2px 4px rgba(13,27,42,0.04);
-  --al-shadow-lg:  0 8px 24px rgba(13,27,42,0.10), 0 4px 8px rgba(13,27,42,0.06);
-  --al-shadow-xl:  0 20px 50px rgba(13,27,42,0.14);
-
-  /* Transitions */
-  --al-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
 
 /* ═══════════════════════════════════════════════════════════
    1b. SURFACE TOKENS (used by cards, panels etc.)
 ═══════════════════════════════════════════════════════════ */
-:root {
-  --al-surface:   #FFFFFF;
-  --al-surface-2: #F4F7F6;
-  --al-surface-3: #EAF0EE;
-  --al-text-muted: #7A9BAD;
-  --al-glass-bg:  rgba(255,255,255,0.72);
-  --al-glass-border: rgba(255,255,255,0.55);
-}
+
 
 /* ═══════════════════════════════════════════════════════════
    1c. DARK MODE — [data-theme="dark"]
 ═══════════════════════════════════════════════════════════ */
-[data-theme="dark"] {
-  /* Backgrounds */
-  --al-bg:             #080F1A;
-  --al-bg-white:       #0D1828;
-  --al-bg-card:        #0D1828;
-  --al-bg-hover:       #162238;
-  --al-surface:        #0D1828;
-  --al-surface-2:      #111E30;
-  --al-surface-3:      #162238;
-  --al-cream:          #080F1A;
-  --al-cream-dark:     #0D1828;
+/* Design tokens moved to tokens.css (single token layer).
+   was: --al-* dark palette (blue-tinted; now green, matching v3) */
 
-  /* Text */
-  --al-text:           #DDE6EE;
-  --al-text-mid:       #8BA5BC;
-  --al-text-light:     #5A7A94;
-  --al-text-muted:     #5A7A94;
-  --al-navy:           #DDE6EE;
-
-  /* Borders */
-  --al-border:         rgba(42,157,143,0.18);
-  --al-border-mid:     rgba(42,157,143,0.28);
-
-  /* Status colors — slightly brightened for dark bg */
-  --al-success-bg:     rgba(30,140,90,0.14);
-  --al-warning-bg:     rgba(201,133,10,0.14);
-  --al-danger-bg:      rgba(192,57,43,0.14);
-  --al-info-bg:        rgba(26,111,168,0.14);
-  --al-primary-light:  rgba(27,107,92,0.18);
-  --al-gold-light:     rgba(201,168,76,0.14);
-
-  /* Sidebar */
-  --al-sidebar-bg:        #060E18;
-  --al-sidebar-bg-mid:    #080F1A;
-  --al-sidebar-text:      #7AACB8;
-  --al-sidebar-text-dim:  #3A6878;
-  --al-sidebar-active-bg: rgba(201,168,76,0.15);
-  --al-sidebar-hover-bg:  rgba(255,255,255,0.04);
-
-  /* Topbar */
-  --al-topbar-bg:      #0D1828;
-  --al-topbar-border:  rgba(42,157,143,0.15);
-
-  /* Shadows */
-  --al-shadow-sm:  0 1px 3px rgba(0,0,0,0.35);
-  --al-shadow-md:  0 4px 12px rgba(0,0,0,0.45);
-  --al-shadow-lg:  0 8px 28px rgba(0,0,0,0.55);
-  --al-shadow-xl:  0 20px 60px rgba(0,0,0,0.65);
-
-  /* Glass */
-  --al-glass-bg:  rgba(13,24,40,0.72);
-  --al-glass-border: rgba(42,157,143,0.22);
-}
 
 /* Dark mode — inverted form controls */
 [data-theme="dark"] input,
@@ -200,7 +69,11 @@ html {
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', 'Cairo', system-ui, sans-serif;
+  /* was 'Plus Jakarta Sans' — a THIRD latin family, loaded by the hidden
+     @import at the top of this file. base.html has always loaded DM Sans and
+     v3.css declares it as --font, so the app was shipping two similar
+     geometric sans-serifs at once. Unified on the token. */
+  font-family: var(--font);
   background: var(--al-bg);
   color: var(--al-text);
   line-height: 1.6;
@@ -209,7 +82,7 @@ body {
 
 [lang="ar"] body,
 [dir="rtl"] body {
-  font-family: 'Cairo', 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-family: var(--font-ar);
 }
 
 a { color: var(--al-primary); text-decoration: none; }
@@ -1400,10 +1273,13 @@ a:hover { color: var(--al-primary-mid); }
   border-radius: 3px 0 0 3px;
 }
 
-[dir="rtl"] @media (max-width: 900px) {
-  .al-sidebar { transform: translateX(100%); }
-  .al-sidebar.open { transform: translateX(0); }
-  .al-main { margin-right: 0; }
+/* BUG: this was `[dir="rtl"] @media (...)` — a selector cannot precede an
+   at-rule, so every browser dropped the whole construct and the RTL mobile
+   sidebar never slid in from the right. Nested correctly below. */
+@media (max-width: 900px) {
+  [dir="rtl"] .al-sidebar { transform: translateX(100%); }
+  [dir="rtl"] .al-sidebar.open { transform: translateX(0); }
+  [dir="rtl"] .al-main { margin-right: 0; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1411,28 +1287,7 @@ a:hover { color: var(--al-primary-mid); }
 ═══════════════════════════════════════════════════════════ */
 
 /* Map old platform variables to new Aleefy tokens */
-:root {
-  --cl-primary:    var(--al-primary);
-  --cl-accent:     var(--al-gold);
-  --cl-bg:         var(--al-bg);
-  --cl-card:       var(--al-bg-card);
-  --cl-border:     var(--al-border);
-  --cl-text:       var(--al-text);
-  --cl-text-light: var(--al-text-light);
-  --cl-muted:      var(--al-text-mid);
-  --cl-success:    var(--al-success);
-  --cl-warning:    var(--al-warning);
-  --cl-danger:     var(--al-danger);
-  --cl-sidebar-bg: var(--al-sidebar-bg);
-  --cl-sidebar-text: var(--al-sidebar-text);
-  --cl-sidebar-active: var(--al-gold);
-  --cl-sidebar-hover: var(--al-sidebar-hover-bg);
-  --cl-topbar-bg:  var(--al-topbar-bg);
-  --cl-radius:     var(--al-r-md);
-  --cl-radius-md:  var(--al-r-md);
-  --cl-radius-lg:  var(--al-r-lg);
-  --cl-shadow:     var(--al-shadow-md);
-}
+
 
 /* Redirect old platform classes to Aleefy */
 .pf-card        { background: var(--al-bg-card); border-radius: var(--al-r-lg); padding: var(--al-space-lg); box-shadow: var(--al-shadow-sm); border: 1px solid var(--al-border); }

@@ -8,141 +8,17 @@
    Animal palette: forest green sidebar, warm ivory content,
    amber/coral accents, earthy tones
 ────────────────────────────────────────────────────────────── */
-:root {
-  /* ── Primary — Forest Teal (calm medical + nature) ── */
-  --c-primary:      #0B7A6B;
-  --c-primary-d:    #08604F;
-  --c-primary-l:    #0D9488;
-  --c-primary-50:   #F0FBF8;
-  --c-primary-100:  #D0F0EB;
-  --c-primary-200:  #A1E1D7;
+/* Design tokens moved to tokens.css (single token layer).
+   was: the canonical light palette (--c-... and bare --bg/--text/--surface). */
 
-  /* ── Coral / Amber — warm animal tones ── */
-  --c-coral:        #E87428;
-  --c-coral-d:      #C95F18;
-  --c-coral-100:    #FEF3EA;
-
-  /* ── Gold — sun-warmed fur ── */
-  --c-gold:         #D4A017;
-  --c-gold-100:     #FEF8E6;
-
-  /* ── Semantic ── */
-  --c-success:      #16A34A;
-  --c-success-bg:   #F0FDF4;
-  --c-warning:      #D97706;
-  --c-warning-bg:   #FFFBEB;
-  --c-danger:       #DC2626;
-  --c-danger-bg:    #FEF2F2;
-  --c-info:         #0284C7;
-  --c-info-bg:      #F0F9FF;
-
-  /* ── LIGHT MODE SURFACES (warm ivory — NOT teal-tinted) ── */
-  --bg:             #F7F5F1;   /* warm ivory — parchment */
-  --bg-soft:        #EDE9E3;   /* soft sand */
-  --surface:        #FFFFFF;
-  --surface-raised: #FAFAF8;
-  --surface-hover:  #F5F3EF;
-  --border:         #E5E0D8;
-  --border-md:      #CCC7BE;
-
-  /* ── Light text (warm dark) ── */
-  --text:           #1C1A17;
-  --text-2:         #2F2B24;
-  --text-3:         #5A5246;
-  --text-muted:     #8C7F72;
-  --text-disabled:  #BCB3A8;
-
-  /* ── Sidebar colors ── */
-  --sidebar-bg:       #0A1F17;   /* deep forest green */
-  --sidebar-bg-2:     #0D2B1E;
-  --sidebar-text:     #B8D4C8;
-  --sidebar-muted:    rgba(184,212,200,.4);
-  --sidebar-active:   #0B7A6B;
-
-  /* ── Override V2 aleefy.css tokens ── */
-  --al-primary:        #0B7A6B;
-  --al-primary-dark:   #08604F;
-  --al-accent:         #D4A017;
-  --al-bg:             #F7F5F1;
-  --al-surface:        #FFFFFF;
-  --al-border:         #E5E0D8;
-  --al-text:           #1C1A17;
-  --al-text-muted:     #8C7F72;
-  --al-sidebar-bg:     #0A1F17;
-  --al-sidebar-text:   #B8D4C8;
-
-  /* ── Layout ── */
-  --sidebar-w:   260px;
-  --topbar-h:    60px;
-
-  /* ── Radius ── */
-  --r-xs:   4px;
-  --r-sm:   6px;
-  --r-md:   10px;
-  --r-lg:   16px;
-  --r-xl:   22px;
-  --r-2xl:  32px;
-  --r-full: 9999px;
-
-  /* ── Spacing ── */
-  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
-  --sp-5:20px; --sp-6:24px; --sp-7:28px; --sp-8:32px;
-  --sp-10:40px; --sp-12:48px;
-
-  /* ── Shadows (warm earth tones) ── */
-  --sh-xs: 0 1px 2px rgba(28,26,23,.05);
-  --sh-sm: 0 1px 4px rgba(28,26,23,.07), 0 2px 8px rgba(28,26,23,.04);
-  --sh-md: 0 4px 16px rgba(28,26,23,.09), 0 2px 6px rgba(28,26,23,.05);
-  --sh-lg: 0 8px 28px rgba(28,26,23,.12), 0 4px 12px rgba(28,26,23,.06);
-  --sh-xl: 0 20px 50px rgba(28,26,23,.16);
-
-  /* ── Transitions ── */
-  --tx:      0.18s ease;
-  --tx-fast: 0.12s ease;
-  --tx-slow: 0.3s ease;
-
-  /* ── Font ── */
-  --font:    'DM Sans', 'Cairo', system-ui, sans-serif;
-  --font-ar: 'Cairo', 'DM Sans', sans-serif;
-}
 
 /* ──────────────────────────────────────────────────────────────
    SECTION 2 — DARK MODE TOKENS
    Deep forest night — green-tinted dark, not blue
 ────────────────────────────────────────────────────────────── */
-[data-theme="dark"] {
-  --bg:             #101810;   /* deep forest black */
-  --bg-soft:        #162116;
-  --surface:        #1A2B1A;
-  --surface-raised: #1E3120;
-  --surface-hover:  #223625;
-  --border:         #2A3E2A;
-  --border-md:      #375237;
+/* Design tokens moved to tokens.css (single token layer).
+   was: canonical tokens (dark) */
 
-  --text:           #E8EDE6;
-  --text-2:         #C8D4C4;
-  --text-3:         #8FA48A;
-  --text-muted:     #6B8066;
-  --text-disabled:  #3A4E38;
-
-  --c-primary:      #0D9488;
-  --c-primary-d:    #0B7A6B;
-  --c-primary-50:   #1A2B1A;
-  --c-primary-100:  #1E3120;
-
-  --sh-xs: 0 1px 2px rgba(0,0,0,.25);
-  --sh-sm: 0 1px 4px rgba(0,0,0,.3),  0 2px 8px rgba(0,0,0,.2);
-  --sh-md: 0 4px 16px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.25);
-  --sh-lg: 0 8px 28px rgba(0,0,0,.4),  0 4px 12px rgba(0,0,0,.3);
-  --sh-xl: 0 20px 50px rgba(0,0,0,.5);
-
-  /* Override V2 dark */
-  --al-bg:      #101810;
-  --al-surface: #1A2B1A;
-  --al-border:  #2A3E2A;
-  --al-text:    #E8EDE6;
-  --al-text-muted: #6B8066;
-}
 
 /* ──────────────────────────────────────────────────────────────
    SECTION 3 — CRITICAL OVERRIDES (must beat aleefy.css + platform.css)

@@ -11,16 +11,42 @@
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}{{ app_title or page_title or 'Dashboard' }}{% endblock %} — Aleefy</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/aleefy-logo.png') }}">
-  <!-- Fonts: DM Sans + Cairo -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <!-- Bootstrap Icons -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <!-- CSS: platform.css → aleefy.css → v3.css (order matters) -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/platform.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/aleefy.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/v3.css') }}">
+
+  {#-
+    ASSET_V — cache-busting content hash, STAMPED AUTOMATICALLY by
+    `python static/css/build.py`. Do not edit the value by hand; edit the CSS
+    or JS sources and re-run the build.
+
+    ponytail: a literal stamped into the template beats a Flask context
+    processor, because it needs no app.py change and it is a *content* hash
+    (mtime changes on every `git checkout`, content doesn't). Upgrade path if
+    you'd rather compute it at runtime — add to app.py:
+
+        import hashlib
+        from pathlib import Path
+
+        @app.context_processor
+        def _asset_version():
+            files = [Path(app.static_folder) / 'css/app.min.css',
+                     Path(app.static_folder) / 'js/app.min.js']
+            h = hashlib.sha256()
+            for f in files:
+                h.update(f.read_bytes())
+            return {'ASSET_V': h.hexdigest()[:10]}
+
+    ...then delete the `{% set %}` below. Jinja's `set` would shadow the
+    context processor, so it has to go.
+  -#}
+  {% set ASSET_V = "32f0ebfc5c" %}
+
+  {#- Fonts + icons are SELF-HOSTED (static/fonts/) — no CDN, no third-party
+      request, works on a blocked or slow connection. See tokens.css. -#}
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+        href="{{ url_for('static', filename='fonts/' + ('cairo-arabic.woff2' if (current_lang or 'en') == 'ar' else 'dmsans-latin.woff2')) }}">
+
+  {#- ONE stylesheet: tokens.css + icons.css + platform.css + aleefy.css + v3.css,
+      minified by static/css/build.py. Sources stay readable in git. -#}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.min.css') }}?v={{ ASSET_V }}">
   {% block extra_css %}{% endblock %}
   {% block head_extra %}{% endblock %}
 </head>
@@ -153,7 +179,9 @@
             <span>{{ t('Pet Shop', 'متجر الحيوانات') }}</span>
           </a>
           <a href="{{ url_for('petshop.pos') }}" class="v3-nav-item">
-            <span class="v3-nav-icon"><i class="bi bi-cash-register"></i></span>
+            {# bi-cash-register does not exist in bootstrap-icons 1.11.3 — this
+               rendered a blank box even on the CDN. bi-upc-scan is the POS icon. #}
+            <span class="v3-nav-icon"><i class="bi bi-upc-scan"></i></span>
             <span>{{ t('Point of Sale', 'نقطة البيع') }}</span>
           </a>
           <a href="{{ url_for('procurement.dashboard') }}" class="v3-nav-item">
@@ -786,8 +814,8 @@
 <!-- ═══════════════════════════════════════════════════
      SCRIPTS
 ═══════════════════════════════════════════════════ -->
-<script src="{{ url_for('static', filename='js/platform.js') }}"></script>
-<script src="{{ url_for('static', filename='js/v3.js') }}"></script>
+<!-- ONE bundle: platform.js + v3.js, minified by static/css/build.py -->
+<script src="{{ url_for('static', filename='js/app.min.js') }}?v={{ ASSET_V }}"></script>
 
 <script>
 /* ── V3 Core Shell JS ───────────────────────────────────── */

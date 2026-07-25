@@ -1,0 +1,507 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   ALEEFY — TOKEN LAYER (single source of truth)
+   ═══════════════════════════════════════════════════════════════════════
+
+   This file replaces THREE competing token systems that used to live in
+   platform.css (`--cl-*`), aleefy.css (`--al-*`) and v3.css (`--c-*`/bare).
+
+   Structure:
+     1. @font-face — self-hosted DM Sans + Cairo (was Google Fonts CDN)
+     2. CANONICAL tokens, light      :root
+     3. CANONICAL tokens, dark       [data-theme="dark"]
+     4. ALIAS SHIM — every legacy name points at a canonical token
+
+   Why the alias shim exists
+   -------------------------
+   166 templates reference `--cl-*` / `--al-*` / `--pf-*` directly
+   (`--cl-primary` alone appears 403 times). Renaming them by hand is a
+   huge, untestable diff. Instead every legacy name is a `var()` pointer at
+   a canonical token, so it inherits the [data-theme="dark"] override for
+   free. That permanently kills the "dark mode only works with v3 token
+   names" class of bug — there is now exactly ONE place a theme value is
+   defined.
+
+   ponytail: alias shim over a 166-template rename. The shim costs ~90 var
+   indirections (free at runtime — resolved once per element, not per use).
+   Cleanup path when someone has an afternoon: run a codemod over
+   templates/ replacing `var(--cl-X)` -> `var(--canonical-X)` per the map in
+   section 4, then delete section 4. Do it one legacy prefix at a time
+   (--pf-* is smallest, --cl-* is largest) and re-run
+   `python static/css/build.py` after each.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+
+/* ──────────────────────────────────────────────────────────────
+   1 — SELF-HOSTED FONTS
+   Was: 3 CDN <link>s in base.html + 1 hidden @import in aleefy.css.
+   `unicode-range` means the browser downloads only the subsets a page
+   actually needs: a latin page never fetches the Arabic file, and an
+   Arabic page never fetches latin-ext.
+   Cairo carries the FULL Arabic range — this app is bilingual RTL.
+────────────────────────────────────────────────────────────── */
+
+/* DM Sans — variable weight 100..1000, roman */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url('../fonts/dmsans-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url('../fonts/dmsans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* DM Sans — variable weight 100..1000, italic */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: italic;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url('../fonts/dmsans-latin-ext-italic.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: italic;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url('../fonts/dmsans-latin-italic.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Cairo — variable weight 200..1000. ARABIC SUBSET IS LOAD-BEARING. */
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url('../fonts/cairo-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url('../fonts/cairo-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url('../fonts/cairo-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   2 — CANONICAL TOKENS · LIGHT
+   Names are the v3 scheme. These are the only values you edit.
+────────────────────────────────────────────────────────────── */
+:root {
+  /* ── Primary — Forest Teal (calm medical + nature) ── */
+  --c-primary:      #0B7A6B;
+  --c-primary-d:    #08604F;
+  --c-primary-l:    #0D9488;
+  --c-primary-50:   #F0FBF8;
+  --c-primary-100:  #D0F0EB;
+  --c-primary-200:  #A1E1D7;
+  --c-primary-rgb:  11,122,107;
+  --c-primary-subtle: rgba(11,122,107,.09);
+
+  /* ── Coral / Amber — warm animal tones ── */
+  --c-coral:        #E87428;
+  --c-coral-d:      #C95F18;
+  --c-coral-100:    #FEF3EA;
+
+  /* ── Gold — sun-warmed fur ── */
+  --c-gold:         #D4A017;
+  --c-gold-d:       #A07C2E;
+  --c-gold-100:     #FEF8E6;
+  --c-gold-rgb:     212,160,23;
+  --c-gold-subtle:  rgba(212,160,23,.13);
+
+  /* ── Semantic ── */
+  --c-success:      #16A34A;
+  --c-success-bg:   #F0FDF4;
+  --c-success-bd:   rgba(22,163,74,.20);
+  --c-warning:      #D97706;
+  --c-warning-bg:   #FFFBEB;
+  --c-warning-bd:   rgba(217,119,6,.20);
+  --c-danger:       #DC2626;
+  --c-danger-bg:    #FEF2F2;
+  --c-danger-bd:    rgba(220,38,38,.20);
+  --c-info:         #0284C7;
+  --c-info-bg:      #F0F9FF;
+  --c-info-bd:      rgba(2,132,199,.20);
+
+  /* ── Surfaces (warm ivory — NOT teal-tinted) ── */
+  --bg:             #F7F5F1;   /* warm ivory — parchment */
+  --bg-soft:        #EDE9E3;   /* soft sand */
+  --surface:        #FFFFFF;
+  --surface-raised: #FAFAF8;
+  --surface-hover:  #F5F3EF;
+  --surface-sunk:   #F2EFE9;
+  --border:         #E5E0D8;
+  --border-md:      #CCC7BE;
+  --glass-bg:       rgba(255,255,255,.72);
+  --glass-border:   rgba(255,255,255,.55);
+
+  /* ── Text (warm dark) ── */
+  --text:           #1C1A17;
+  --text-2:         #2F2B24;
+  --text-3:         #5A5246;
+  /* --text-muted was #8C7F72 = 3.58:1 on --bg. Darkened to clear WCAG AA
+     (4.5:1) on both --bg and --surface. See DARK-MODE/CONTRAST FIXES below. */
+  --text-muted:     #796D60;
+  --text-disabled:  #BCB3A8;
+  --text-inverse:   #FFFFFF;
+
+  /* ── Sidebar (dark in BOTH themes — no dark override needed) ── */
+  --sidebar-bg:       #0A1F17;   /* deep forest green */
+  --sidebar-bg-2:     #0D2B1E;
+  --sidebar-text:     #B8D4C8;
+  --sidebar-muted:    rgba(184,212,200,.55);
+  --sidebar-active:   #0B7A6B;
+  --sidebar-active-bg:  rgba(212,160,23,.16);
+  --sidebar-active-bd:  rgba(212,160,23,.55);
+  --sidebar-active-txt: #F5C84A;
+  --sidebar-hover-bg:   rgba(255,255,255,.07);
+  --sidebar-border:     rgba(255,255,255,.09);
+  --sidebar-icon-bg:    rgba(255,255,255,.10);
+
+  /* ── Topbar ── */
+  --topbar-bg:      #FFFFFF;
+  --topbar-border:  #E5E0D8;
+
+  /* ── Layout ── */
+  --sidebar-w:   260px;
+  --topbar-h:    60px;
+
+  /* ── Radius ── */
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   16px;
+  --r-xl:   22px;
+  --r-2xl:  32px;
+  --r-full: 9999px;
+
+  /* ── Spacing ── */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
+  --sp-5:20px; --sp-6:24px; --sp-7:28px; --sp-8:32px;
+  --sp-10:40px; --sp-12:48px;
+
+  /* ── Shadows (warm earth tones) ── */
+  --sh-xs: 0 1px 2px rgba(28,26,23,.05);
+  --sh-sm: 0 1px 4px rgba(28,26,23,.07), 0 2px 8px rgba(28,26,23,.04);
+  --sh-md: 0 4px 16px rgba(28,26,23,.09), 0 2px 6px rgba(28,26,23,.05);
+  --sh-lg: 0 8px 28px rgba(28,26,23,.12), 0 4px 12px rgba(28,26,23,.06);
+  --sh-xl: 0 20px 50px rgba(28,26,23,.16);
+
+  /* ── Transitions ── */
+  --tx:      0.18s ease;
+  --tx-fast: 0.12s ease;
+  --tx-slow: 0.3s ease;
+
+  /* ── Font ── */
+  --font:    'DM Sans', 'Cairo', system-ui, sans-serif;
+  --font-ar: 'Cairo', 'DM Sans', sans-serif;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   3 — CANONICAL TOKENS · DARK
+   Deep forest night — green-tinted dark, not blue.
+   Everything in section 4 inherits these automatically because the
+   aliases are var() pointers, not copies.
+────────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg:             #101810;   /* deep forest black */
+  --bg-soft:        #162116;
+  --surface:        #1A2B1A;
+  --surface-raised: #1E3120;
+  --surface-hover:  #223625;
+  --surface-sunk:   #162116;
+  --border:         #2A3E2A;
+  --border-md:      #375237;
+  --glass-bg:       rgba(26,43,26,.72);
+  --glass-border:   rgba(42,62,42,.55);
+
+  --text:           #E8EDE6;
+  --text-2:         #C8D4C4;
+  --text-3:         #8FA48A;
+  /* --text-muted was #6B8066 = 3.49:1 on --surface. Brightened to clear AA. */
+  --text-muted:     #88A083;
+  --text-disabled:  #3A4E38;
+  --text-inverse:   #101810;
+
+  /* Lifted from #0D9488 -> #12AC9C: the darker teal measured 3.99:1 against
+     --surface, failing AA for the 400+ places --cl-primary is used as a text
+     colour. #12AC9C is the smallest step that clears 4.5:1 on --bg (6.38),
+     --surface (5.27) and --surface-raised (4.89). Same hue, lifted for dark —
+     standard practice, brand identity unchanged. */
+  --c-primary:      #12AC9C;
+  --c-primary-d:    #0D9488;
+  --c-primary-l:    #2DD4BF;
+  --c-primary-50:   #1A2B1A;
+  --c-primary-100:  #1E3120;
+  --c-primary-rgb:  18,172,156;
+  --c-primary-subtle: rgba(18,172,156,.16);
+
+  --c-gold-100:     rgba(212,160,23,.14);
+  --c-gold-subtle:  rgba(212,160,23,.18);
+  --c-coral-100:    rgba(232,116,40,.14);
+
+  --c-success-bg:   rgba(22,163,74,.14);
+  --c-success-bd:   rgba(22,163,74,.32);
+  --c-warning-bg:   rgba(217,119,6,.14);
+  --c-warning-bd:   rgba(217,119,6,.32);
+  --c-danger-bg:    rgba(220,38,38,.14);
+  --c-danger-bd:    rgba(220,38,38,.32);
+  --c-info-bg:      rgba(2,132,199,.14);
+  --c-info-bd:      rgba(2,132,199,.32);
+
+  --topbar-bg:      #1A2B1A;
+  --topbar-border:  #2A3E2A;
+
+  --sh-xs: 0 1px 2px rgba(0,0,0,.25);
+  --sh-sm: 0 1px 4px rgba(0,0,0,.3),  0 2px 8px rgba(0,0,0,.2);
+  --sh-md: 0 4px 16px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.25);
+  --sh-lg: 0 8px 28px rgba(0,0,0,.4),  0 4px 12px rgba(0,0,0,.3);
+  --sh-xl: 0 20px 50px rgba(0,0,0,.5);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   4 — ALIAS SHIM
+   Legacy names -> canonical tokens. NO dark block needed here:
+   a var() pointer re-resolves under [data-theme="dark"] on its own.
+   Add nothing here. Add to sections 2+3 and point an alias at it.
+══════════════════════════════════════════════════════════════ */
+:root {
+
+  /* ── --al-* (aleefy.css V2 scheme) ────────────────────────── */
+  --al-primary:        var(--c-primary);
+  --al-primary-mid:    var(--c-primary-l);
+  --al-primary-light:  var(--c-primary-50);
+  --al-primary-dark:   var(--c-primary-d);
+  --al-accent:         var(--c-gold);
+  --al-gold:           var(--c-gold);
+  --al-gold-light:     var(--c-gold-100);
+  --al-gold-dark:      var(--c-gold-d);
+  --al-cream:          var(--bg);
+  --al-cream-dark:     var(--bg-soft);
+  --al-coral:          var(--c-coral);
+  --al-coral-light:    var(--c-coral-100);
+
+  --al-navy:           var(--text);
+  --al-text:           var(--text);
+  --al-text-mid:       var(--text-3);
+  --al-text-light:     var(--text-muted);
+  --al-text-muted:     var(--text-muted);
+
+  --al-bg:             var(--bg);
+  --al-bg-white:       var(--surface);
+  --al-bg-card:        var(--surface);
+  --al-bg-hover:       var(--surface-hover);
+  --al-surface:        var(--surface);
+  --al-surface-2:      var(--surface-sunk);
+  --al-surface-3:      var(--bg-soft);
+  --al-glass-bg:       var(--glass-bg);
+  --al-glass-border:   var(--glass-border);
+
+  --al-border:         var(--border);
+  --al-border-mid:     var(--border-md);
+
+  --al-success:        var(--c-success);
+  --al-success-bg:     var(--c-success-bg);
+  --al-warning:        var(--c-warning);
+  --al-warning-bg:     var(--c-warning-bg);
+  --al-danger:         var(--c-danger);
+  --al-danger-bg:      var(--c-danger-bg);
+  --al-info:           var(--c-info);
+  --al-info-bg:        var(--c-info-bg);
+
+  --al-sidebar-bg:        var(--sidebar-bg);
+  --al-sidebar-bg-mid:    var(--sidebar-bg-2);
+  --al-sidebar-text:      var(--sidebar-text);
+  --al-sidebar-text-dim:  var(--sidebar-muted);
+  --al-sidebar-active-bg: var(--sidebar-active-bg);
+  --al-sidebar-active:    var(--c-gold);
+  --al-sidebar-hover-bg:  var(--sidebar-hover-bg);
+  --al-sidebar-width:     var(--sidebar-w);
+
+  --al-topbar-bg:      var(--topbar-bg);
+  --al-topbar-border:  var(--topbar-border);
+  --al-topbar-h:       var(--topbar-h);
+
+  --al-space-xs: var(--sp-1);
+  --al-space-sm: var(--sp-2);
+  --al-space-md: var(--sp-4);
+  --al-space-lg: var(--sp-6);
+  --al-space-xl: var(--sp-8);
+
+  --al-r-sm:   var(--r-sm);
+  --al-r-md:   var(--r-md);
+  --al-r-lg:   var(--r-lg);
+  --al-r-xl:   var(--r-xl);
+  --al-r-full: var(--r-full);
+
+  --al-shadow-sm: var(--sh-sm);
+  --al-shadow-md: var(--sh-md);
+  --al-shadow-lg: var(--sh-lg);
+  --al-shadow-xl: var(--sh-xl);
+
+  --al-transition: var(--tx);
+
+
+  /* ── --cl-* (platform.css V1 scheme — 1,900+ template references) ──
+     These previously had NO dark values at all: --cl-surface stayed
+     #ffffff under [data-theme="dark"], giving 1.19:1 text contrast on
+     197 usages. Pointing them at canonical tokens fixes that class of
+     bug once, for all of them. */
+  --cl-primary:         var(--c-primary);
+  --cl-primary-dark:    var(--c-primary-d);
+  --cl-primary-light:   var(--c-primary-l);
+  --cl-primary-subtle:  var(--c-primary-subtle);
+  --cl-primary-subtle2: var(--c-primary-50);
+  --cl-primary-rgb:     var(--c-primary-rgb);
+
+  --cl-accent:         var(--c-gold);
+  --cl-accent-dark:    var(--c-gold-d);
+  --cl-accent-light:   #F5B03A;
+  --cl-accent-subtle:  var(--c-gold-subtle);
+
+  --cl-teal:           var(--c-info);
+  --cl-teal-subtle:    var(--c-info-bg);
+
+  --cl-bg:             var(--bg);
+  --cl-card:           var(--surface);
+  --cl-surface:        var(--surface);
+  --cl-surface-2:      var(--surface-sunk);
+  --cl-surface-3:      var(--bg-soft);
+  --cl-surface-hover:  var(--surface-hover);
+
+  --cl-text:           var(--text);
+  --cl-muted:          var(--text-3);
+  --cl-text-muted:     var(--text-3);
+  --cl-text-light:     var(--text-muted);
+  --cl-text-inverse:   var(--text-inverse);
+
+  --cl-border:         var(--border);
+  --cl-border-strong:  var(--border-md);
+
+  --cl-success:        var(--c-success);
+  --cl-success-bg:     var(--c-success-bg);
+  --cl-success-border: var(--c-success-bd);
+  --cl-warning:        var(--c-warning);
+  --cl-warning-bg:     var(--c-warning-bg);
+  --cl-warning-border: var(--c-warning-bd);
+  --cl-danger:         var(--c-danger);
+  --cl-danger-bg:      var(--c-danger-bg);
+  --cl-danger-border:  var(--c-danger-bd);
+  --cl-info:           var(--c-info);
+  --cl-info-bg:        var(--c-info-bg);
+  --cl-info-border:    var(--c-info-bd);
+
+  --cl-sidebar-bg:         var(--sidebar-bg);
+  --cl-sidebar-text:       var(--sidebar-text);
+  --cl-sidebar-muted:      var(--sidebar-muted);
+  --cl-sidebar-active:     var(--c-gold);
+  --cl-sidebar-active-bg:  var(--sidebar-active-bg);
+  --cl-sidebar-active-bdr: var(--sidebar-active-bd);
+  --cl-sidebar-active-txt: var(--sidebar-active-txt);
+  --cl-sidebar-hover:      var(--sidebar-hover-bg);
+  --cl-sidebar-hover-bg:   var(--sidebar-hover-bg);
+  --cl-sidebar-border:     var(--sidebar-border);
+  --cl-sidebar-icon-bg:    var(--sidebar-icon-bg);
+  --cl-sidebar-section-dot:#4ADE80;
+  --cl-sidebar-width:      var(--sidebar-w);
+
+  --cl-topbar-bg:      var(--topbar-bg);
+  --cl-topbar-border:  var(--topbar-border);
+  --cl-topbar-text:    var(--text);
+  --cl-topbar-muted:   var(--text-3);
+
+  --cl-shadow:            var(--sh-md);
+  --cl-shadow-xs:         var(--sh-xs);
+  --cl-shadow-sm:         var(--sh-sm);
+  --cl-shadow-md:         var(--sh-md);
+  --cl-shadow-lg:         var(--sh-lg);
+  --cl-shadow-card:       var(--sh-sm);
+  --cl-shadow-card-hover: var(--sh-md);
+
+  --cl-radius:      var(--r-md);
+  --cl-radius-xs:   var(--r-xs);
+  --cl-radius-sm:   var(--r-sm);
+  --cl-radius-md:   var(--r-md);
+  --cl-radius-lg:   var(--r-lg);
+  --cl-radius-xl:   var(--r-xl);
+  --cl-radius-pill: var(--r-full);
+
+  --cl-transition:      var(--tx);
+  --cl-transition-slow: var(--tx-slow);
+
+  --cl-font:    var(--font);
+  --cl-font-ar: var(--font-ar);
+
+
+  /* ── --pf-* and bare names ─────────────────────────────────────
+     BUG: these were referenced 147 times across templates/ but were
+     never defined in ANY stylesheet. `color: var(--pf-muted)` with no
+     definition is an invalid value -> the declaration is dropped and the
+     element falls back to inherited colour. Defining them here is the
+     fix; values chosen to match what the surrounding design expects. */
+  --pf-primary:     var(--c-primary);
+  --pf-accent:      var(--c-gold);
+  --pf-muted:       var(--text-3);
+  --pf-text:        var(--text);
+  --pf-text-muted:  var(--text-3);
+  --pf-border:      var(--border);
+  --pf-bg-alt:      var(--bg-soft);
+  --pf-bg-card:     var(--surface);
+  --pf-bg-subtle:   var(--surface-hover);
+  --pf-surface-2:   var(--surface-sunk);
+  --pf-success:     var(--c-success);
+  --pf-error:       var(--c-danger);
+
+  --muted:          var(--text-3);
+  --muted-bg:       var(--surface-hover);
+  --card-bg:        var(--surface);
+  --radius:         var(--r-lg);
+  --primary-dark:   var(--c-primary-d);
+  --primary-light:  var(--c-primary-l);
+  --primary-soft:   var(--c-primary-50);
+  --warning-soft:   var(--c-warning-bg);
+  --warning-text:   var(--c-warning);
+  --accent-rgb:     var(--c-gold-rgb);
+
+  /* Module/status badge tokens (platform.css originals, unchanged) */
+  --badge-active-bg:   #D1FAE5; --badge-active-txt:  #065F46;
+  --badge-beta-bg:     #DBEAFE; --badge-beta-txt:    #1E40AF;
+  --badge-soon-bg:     #FEF9C3; --badge-soon-txt:    #78350F;
+  --badge-planned-bg:  #F1F5F9; --badge-planned-txt: #475569;
+  --module-card-header-opacity: .07;
+}
+
+[data-theme="dark"] {
+  /* Only the badge literals need a dark pass — everything else above is
+     a var() pointer and re-resolves on its own. */
+  --badge-active-bg:  rgba(22,163,74,.18);  --badge-active-txt:  #86EFAC;
+  --badge-beta-bg:    rgba(59,130,246,.18); --badge-beta-txt:    #93C5FD;
+  --badge-soon-bg:    rgba(217,119,6,.18);  --badge-soon-txt:    #FCD34D;
+  --badge-planned-bg: rgba(148,163,184,.16);--badge-planned-txt: #CBD5E1;
+  --module-card-header-opacity: .14;
+  --cl-accent-light:  #F5C84A;
+  --cl-sidebar-section-dot: #4ADE80;
+}
