@@ -54,6 +54,12 @@ def create_app(cfg=None) -> Flask:
         admin_pass=app.config.get("SEED_ADMIN_PASS", "1234"),
     )
 
+    # Return every checked-out DB connection at the end of each request.
+    # 247 route functions call get_db() with no try/finally; without this a
+    # single unhandled exception leaked a pooled connection permanently and
+    # ~20 of them exhausted the pool until restart.
+    app.teardown_appcontext(db.close_context_connections)
+
     # Configure backup system
     backup_dir = os.path.join(os.path.dirname(app.config["DATABASE_PATH"]), "backups")
     bk.configure(db_path=app.config["DATABASE_PATH"], backup_dir=backup_dir)

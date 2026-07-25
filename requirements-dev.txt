@@ -1,0 +1,8 @@
+# Test tooling. Install alongside requirements.txt:
+#   pip install -r requirements.txt -r requirements-dev.txt
+#
+# Everything else tests/ imports (psycopg2, requests) is already a runtime
+# dependency, and the rest is stdlib. Playwright is deliberately absent — the
+# browser suite lives in ../tests and is not part of CI.
+
+pytest>=8.0.0

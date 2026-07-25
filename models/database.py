@@ -24,6 +24,19 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Optional Flask integration — get_db() registers connections on the app context
+# so they can be released automatically. Absent flask (plain scripts / seeders)
+# get_db() behaves exactly as before.
+try:
+    from flask import g as _flask_g, has_app_context as _has_app_ctx
+except ImportError:  # pragma: no cover - flask is a hard dep of the app itself
+    _flask_g = None
+
+    def _has_app_ctx():
+        return False
+
+_G_CONNS = "_db_conns"
+
 _db_path: str = ""
 
 # ── PostgreSQL connection pool ─────────────────────────────────
@@ -77,8 +90,19 @@ def configure_postgres(host="localhost", port=5432, dbname="vetclinic",
             min_conn, max_conn, user, host, dbname,
         )
     except Exception as exc:
-        logger.warning("Could not create PG pool (%s) — falling back to per-request connect", exc)
         _POOL = None
+        # In production a missing PostgreSQL must be loud and fatal — silently
+        # writing to an empty SQLite file would look like "working" while losing
+        # every record. Outside production, clear _PG_CONFIG so get_db() can
+        # actually reach its SQLite branch (it cannot while _PG_CONFIG is set).
+        if os.environ.get("FLASK_ENV", "development").lower() == "production":
+            logger.error("Could not create PG pool (%s) — will retry per request", exc)
+        else:
+            logger.warning(
+                "PostgreSQL unavailable (%s) — falling back to SQLite at %s. "
+                "This is a DEV-ONLY fallback.", exc, _db_path or "<unset>",
+            )
+            _PG_CONFIG = {}
 
 
 def set_path(path: str) -> None:
@@ -93,14 +117,28 @@ def set_path(path: str) -> None:
 
 _FIX_CACHE: dict = {}
 
+# Single-quoted SQL string literal, '' being the embedded-quote escape.
+_SQ_STRING_RE = re.compile(r"('(?:[^']|'')*')")
+
+# INSERT target table, used to decide whether "RETURNING id" can be appended.
+_INSERT_TABLE_RE = re.compile(r'\s*INSERT\s+INTO\s+"?(\w+)"?', re.IGNORECASE)
+
+# Tables in _SCHEMA that have no `id` column, so INSERT ... RETURNING id would
+# raise UndefinedColumn. Verified by scanning _SCHEMA; tests/test_db_layer.py
+# re-scans and fails if a new id-less table appears.
+_TABLES_WITHOUT_ID = frozenset({"settings"})
+
 
 def _fix_sql(sql: str) -> str:
     """Translate SQLite SQL quirks to PostgreSQL."""
     if sql in _FIX_CACHE:
         return _FIX_CACHE[sql]
     s = sql
-    # ? -> %s placeholders
-    s = s.replace("?", "%s")
+    # ? -> %s placeholders, but never inside a single-quoted string literal
+    # (e.g. "SET message = 'Confirm? reply YES'" must keep its literal ?).
+    parts = _SQ_STRING_RE.split(s)
+    # split() keeps the captured literals at odd indices; only touch the rest.
+    s = "".join(p if i % 2 else p.replace("?", "%s") for i, p in enumerate(parts))
     # SQLite datetime function -> PostgreSQL NOW()
     s = s.replace("datetime('now')", "NOW()")
     # SQLite AUTOINCREMENT primary key -> PostgreSQL SERIAL
@@ -154,69 +192,65 @@ class _PGCursor:
             cleaned.append(p.replace('\x00', '') if isinstance(p, str) else p)
         return type(params)(cleaned) if isinstance(params, tuple) else cleaned
 
-    def execute(self, sql, params=()):
+    @staticmethod
+    def _returning_id_target(fixed: str):
+        """Return the INSERT target table if 'RETURNING id' should be appended."""
+        m = _INSERT_TABLE_RE.match(fixed)
+        if not m or 'RETURNING' in fixed.upper():
+            return None
+        table = m.group(1).lower()
+        return None if table in _TABLES_WITHOUT_ID else table
+
+    def _run(self, fixed, params):
+        """Bare execute — no savepoint, one round-trip. Errors propagate."""
+        if self._returning_id_target(fixed):
+            # params must be None (not ()) when there are none, otherwise
+            # psycopg2 interpolates and chokes on any literal % in the SQL.
+            self._cur.execute(
+                fixed.rstrip().rstrip(';') + ' RETURNING id', params or None
+            )
+            row = self._cur.fetchone()
+            # ON CONFLICT DO NOTHING that hit a conflict returns no row.
+            self.lastrowid = row[0] if row else None
+        else:
+            self._cur.execute(fixed, params or None)
+            self.lastrowid = None
+        self.rowcount = self._cur.rowcount
+
+    def execute(self, sql, params=(), _protect=False):
+        """Run one statement.
+
+        _protect=True wraps the statement in a SAVEPOINT so a failure does not
+        poison the surrounding transaction. Only executescript() needs that (it
+        runs idempotent DDL that is expected to fail on re-runs); every ordinary
+        query runs bare, which is 1 round-trip instead of 3-5.
+        """
         fixed = _fix_sql(sql)
         params = self._clean_params(params)
-        is_insert = fixed.strip().upper().startswith('INSERT')
+        if not _protect:
+            self._run(fixed, params)
+            return self
 
         adm = self._admin()
         sp = self._new_sp()
         adm.execute(f'SAVEPOINT {sp}')
-
         try:
-            # For INSERT, try appending RETURNING id to capture lastrowid
-            if is_insert and 'RETURNING' not in fixed.upper():
-                sp2 = self._new_sp()
-                adm.execute(f'SAVEPOINT {sp2}')
-                try:
-                    self._cur.execute(
-                        fixed.rstrip().rstrip(';') + ' RETURNING id',
-                        params or ()
-                    )
-                    row = self._cur.fetchone()
-                    self.lastrowid = row[0] if row else None
-                    self.rowcount = self._cur.rowcount
-                    adm.execute(f'RELEASE SAVEPOINT {sp2}')
-                    adm.execute(f'RELEASE SAVEPOINT {sp}')
-                    adm.close()
-                    return self
-                except Exception:
-                    adm.execute(f'ROLLBACK TO SAVEPOINT {sp2}')
-                    # fall through to plain execute below
-
-            # Plain execute
-            self._cur.execute(fixed, params or ())
-            self.rowcount = self._cur.rowcount
+            self._run(fixed, params)
             adm.execute(f'RELEASE SAVEPOINT {sp}')
-
-        except Exception as exc:
+        except Exception:
             try:
                 adm.execute(f'ROLLBACK TO SAVEPOINT {sp}')
             except Exception:
-                pass
+                logger.warning("ROLLBACK TO SAVEPOINT %s failed", sp, exc_info=True)
             adm.close()
-            raise exc
-
+            raise
         adm.close()
         return self
 
     def executemany(self, sql, params_list):
         fixed = _fix_sql(sql)
-        adm = self._admin()
-        sp = self._new_sp()
-        adm.execute(f'SAVEPOINT {sp}')
-        try:
-            self._cur.executemany(fixed, params_list)
-            self.rowcount = self._cur.rowcount
-            adm.execute(f'RELEASE SAVEPOINT {sp}')
-        except Exception as exc:
-            try:
-                adm.execute(f'ROLLBACK TO SAVEPOINT {sp}')
-            except Exception:
-                pass
-            adm.close()
-            raise exc
-        adm.close()
+        self._cur.executemany(fixed, params_list)
+        self.rowcount = self._cur.rowcount
         return self
 
     def fetchone(self):
@@ -249,6 +283,7 @@ class _PGConn:
         self._pool = pool
         self._conn.autocommit = False
         self._dict_factory = psycopg2.extras.DictCursor
+        self._closed = False
 
     def cursor(self):
         return _PGCursor(
@@ -256,9 +291,9 @@ class _PGConn:
             self._conn
         )
 
-    def execute(self, sql, params=()):
+    def execute(self, sql, params=(), _protect=False):
         cur = self.cursor()
-        cur.execute(sql, params)
+        cur.execute(sql, params, _protect=_protect)
         return cur
 
     def executemany(self, sql, params_list):
@@ -282,7 +317,7 @@ class _PGConn:
             if not stmt:
                 continue
             try:
-                self.execute(stmt)
+                self.execute(stmt, _protect=True)
             except Exception:
                 pass  # IF NOT EXISTS handles duplicates; savepoints keep tx alive
 
@@ -293,7 +328,14 @@ class _PGConn:
         self._conn.rollback()
 
     def close(self):
-        """Return connection to the pool (if pooled) or close it."""
+        """Return connection to the pool (if pooled) or close it.
+
+        Idempotent: many call sites do `with conn:` (which closes) *and* then
+        conn.close(). A second putconn() would corrupt the pool.
+        """
+        if self._closed:
+            return
+        self._closed = True
         try:
             if self._pool is not None:
                 # Must be in a clean state before returning to pool.
@@ -301,12 +343,12 @@ class _PGConn:
                 try:
                     self._conn.rollback()
                 except Exception:
-                    pass
+                    logger.warning("rollback before putconn failed", exc_info=True)
                 self._pool.putconn(self._conn)
             else:
                 self._conn.close()
         except Exception:
-            pass
+            logger.warning("closing DB connection failed", exc_info=True)
 
     def __enter__(self):
         return self
@@ -324,7 +366,41 @@ def get_db():
     is unavailable) and return it wrapped as a sqlite3-compatible object.
 
     Always pair with conn.close() or use as a context manager (with conn:).
+    When a Flask app context is active the connection is also registered for
+    automatic release by close_context_connections() — see that function for the
+    teardown hook app.py must install. Outside an app context (scripts, seeders)
+    this is a no-op and the caller stays responsible for close().
     """
+    return _track_conn(_connect())
+
+
+def _track_conn(conn):
+    if _flask_g is not None and _has_app_ctx():
+        conns = _flask_g.get(_G_CONNS)
+        if conns is None:
+            conns = []
+            setattr(_flask_g, _G_CONNS, conns)
+        conns.append(conn)
+    return conn
+
+
+def close_context_connections(exc=None):
+    """Release every connection get_db() handed out during this app context.
+
+    Register once in app.py:  app.teardown_appcontext(database.close_context_connections)
+    Safe to call twice — _PGConn.close()/sqlite3.close() are both idempotent, and
+    the list is popped off `g` here.
+    """
+    if _flask_g is None or not _has_app_ctx():
+        return
+    for conn in _flask_g.pop(_G_CONNS, None) or ():
+        try:
+            conn.close()
+        except Exception:
+            logger.warning("teardown: failed to release DB connection", exc_info=True)
+
+
+def _connect():
     if _POOL is not None:
         # Fast path: get from pool (no TCP handshake)
         raw = _POOL.getconn()
@@ -1220,6 +1296,25 @@ CREATE INDEX IF NOT EXISTS idx_reminders_date     ON reminders(scheduled_for);
 CREATE INDEX IF NOT EXISTS idx_batches_expiry     ON batches(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_owners_phone       ON owners(phone);
 CREATE INDEX IF NOT EXISTS idx_owners_name        ON owners(full_name);
+-- hot FK joins (detail rows fetched per parent record)
+CREATE INDEX IF NOT EXISTS idx_appts_owner        ON appointments(owner_id);
+CREATE INDEX IF NOT EXISTS idx_visits_owner       ON visits(owner_id);
+CREATE INDEX IF NOT EXISTS idx_treatment_visit    ON treatment_plans(visit_id);
+CREATE INDEX IF NOT EXISTS idx_rx_items_rx        ON prescription_items(prescription_id);
+CREATE INDEX IF NOT EXISTS idx_labreq_visit       ON lab_requests(visit_id);
+CREATE INDEX IF NOT EXISTS idx_labres_request     ON lab_results(lab_request_id);
+CREATE INDEX IF NOT EXISTS idx_vaccinations_pet   ON vaccinations(pet_id);
+CREATE INDEX IF NOT EXISTS idx_surgeries_pet      ON surgeries(pet_id);
+CREATE INDEX IF NOT EXISTS idx_followups_pet      ON followups(pet_id);
+CREATE INDEX IF NOT EXISTS idx_invlines_invoice   ON invoice_lines(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_payments_owner     ON payments(owner_id);
+CREATE INDEX IF NOT EXISTS idx_po_lines_po        ON po_lines(po_id);
+-- date-range report / due-list filters
+CREATE INDEX IF NOT EXISTS idx_visits_date        ON visits(visit_date);
+CREATE INDEX IF NOT EXISTS idx_payments_date      ON payments(received_at);
+CREATE INDEX IF NOT EXISTS idx_expenses_date      ON expenses(expense_date);
+CREATE INDEX IF NOT EXISTS idx_followups_due      ON followups(due_date);
+CREATE INDEX IF NOT EXISTS idx_vaccinations_due   ON vaccinations(next_due_at);
 
 -- ── NOTIFICATIONS ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS notifications (
@@ -1540,6 +1635,23 @@ _SEED_WA_TEMPLATES = [
 ]
 
 
+def _try_stmt(conn, sql, params=()):
+    """Run a statement that is *expected* to fail once already applied (idempotent
+    migrations / probes for tables that may not exist yet).
+
+    On PostgreSQL this uses the SAVEPOINT path so a failure does not abort the
+    surrounding transaction — ordinary execute() no longer takes savepoints.
+    Returns the cursor, or None if the statement failed.
+    """
+    try:
+        if isinstance(conn, _PGConn):
+            return conn.execute(sql, params, _protect=True)
+        return conn.execute(sql, params)
+    except Exception as exc:
+        logger.debug("idempotent statement skipped: %s (%s)", sql.strip()[:120], exc)
+        return None
+
+
 def _run_pg_migrations(conn) -> None:
     """Create any tables/columns that were added after initial PostgreSQL setup.
     Safe to run on every startup — all statements use IF NOT EXISTS / try-except.
@@ -1572,10 +1684,7 @@ def _run_pg_migrations(conn) -> None:
         "CREATE INDEX IF NOT EXISTS idx_loyalty_owner ON loyalty_points(owner_id)"
     )
     # loyalty_balance column on owners
-    try:
-        conn.execute("ALTER TABLE owners ADD COLUMN loyalty_balance INTEGER DEFAULT 0")
-    except Exception:
-        pass
+    _try_stmt(conn, "ALTER TABLE owners ADD COLUMN loyalty_balance INTEGER DEFAULT 0")
 
 
 def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
@@ -1595,25 +1704,16 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
             ("soap_assessment", "TEXT"),
             ("soap_plan",       "TEXT"),
         ]:
-            try:
-                conn.execute(f"ALTER TABLE visits ADD COLUMN {_col} {_type}")
-            except Exception:
-                pass  # column already exists
+            _try_stmt(conn, f"ALTER TABLE visits ADD COLUMN {_col} {_type}")
         # Loyalty balance column on owners
-        try:
-            conn.execute("ALTER TABLE owners ADD COLUMN loyalty_balance INTEGER DEFAULT 0")
-        except Exception:
-            pass  # column already exists
+        _try_stmt(conn, "ALTER TABLE owners ADD COLUMN loyalty_balance INTEGER DEFAULT 0")
         # Pet insurance columns
         for _col, _type in [
             ("insurance_provider", "TEXT"),
             ("policy_number",      "TEXT"),
             ("policy_expiry",      "TEXT"),
         ]:
-            try:
-                conn.execute(f"ALTER TABLE pets ADD COLUMN {_col} {_type}")
-            except Exception:
-                pass  # column already exists
+            _try_stmt(conn, f"ALTER TABLE pets ADD COLUMN {_col} {_type}")
         # Imaging studies table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS imaging_studies (
@@ -1631,23 +1731,23 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
                 FOREIGN KEY (pet_id) REFERENCES pets(id) ON DELETE CASCADE
             )
         """)
-        # Seed default budget targets (idempotent — only if table is empty)
-        try:
-            if conn.execute("SELECT COUNT(*) FROM budget_targets").fetchone()[0] == 0:
-                for _cat, _amt in [
-                    ("Medicines/Supplies", 50000),
-                    ("Staff Salaries",     120000),
-                    ("Utilities",          15000),
-                    ("Equipment",          25000),
-                    ("Marketing",          10000),
-                    ("Miscellaneous",      8000),
-                ]:
-                    conn.execute(
-                        "INSERT INTO budget_targets (category, monthly_egp) VALUES (?,?)",
-                        (_cat, _amt)
-                    )
-        except Exception:
-            pass  # Table may not exist yet in this transaction; migrations run next
+        # Seed default budget targets (idempotent — only if table is empty).
+        # Table may not exist yet in this transaction; _try_stmt keeps the probe
+        # from aborting the surrounding transaction on PostgreSQL.
+        _bt = _try_stmt(conn, "SELECT COUNT(*) FROM budget_targets")
+        if _bt is not None and _bt.fetchone()[0] == 0:
+            for _cat, _amt in [
+                ("Medicines/Supplies", 50000),
+                ("Staff Salaries",     120000),
+                ("Utilities",          15000),
+                ("Equipment",          25000),
+                ("Marketing",          10000),
+                ("Miscellaneous",      8000),
+            ]:
+                conn.execute(
+                    "INSERT INTO budget_targets (category, monthly_egp) VALUES (?,?)",
+                    (_cat, _amt)
+                )
         # clinic
         if conn.execute("SELECT COUNT(*) FROM clinic").fetchone()[0] == 0:
             conn.execute(
