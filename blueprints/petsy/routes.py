@@ -169,8 +169,11 @@ def _fetch_platform_data(message: str, user: dict) -> str:
             return []
 
     def _q1(sql, params=()):
+        # dict(), not the raw row: callers below use .get(), which sqlite3.Row
+        # does not have. Returning a dict keeps both DB backends interchangeable.
         try:
-            return conn.execute(sql, params).fetchone()
+            row = conn.execute(sql, params).fetchone()
+            return dict(row) if row is not None else None
         except Exception as _e:
             _logger.error("Petsy query error: %s | SQL: %s", _e, sql[:120])
             return None
@@ -185,7 +188,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
         doc_filter = ""
         doc_params_appt: list = []
         if role == "doctor":
-            doc_filter = "AND doctor_name = %s"
+            doc_filter = "AND doctor_name = ?"
             doc_params_appt = [uname]
 
         # ── APPOINTMENTS TODAY ────────────────────────────────────────────────
@@ -195,7 +198,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
                        appointment_type, status, doctor_name
                 FROM appointments a
                 LEFT JOIN owners o ON o.id = a.owner_id
-                WHERE appt_date = %s AND status NOT IN ('Cancelled','NoShow')
+                WHERE appt_date = ? AND status NOT IN ('Cancelled','NoShow')
                 {doc_filter}
                 ORDER BY appt_start
                 LIMIT 30
@@ -217,7 +220,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
                        appointment_type, status, doctor_name
                 FROM appointments a
                 LEFT JOIN owners o ON o.id = a.owner_id
-                WHERE appt_date > %s AND appt_date <= %s
+                WHERE appt_date > ? AND appt_date <= ?
                   AND status NOT IN ('Cancelled','NoShow')
                 {doc_filter}
                 ORDER BY appt_date, appt_start
@@ -242,7 +245,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
                 JOIN pets  p ON p.id = v.pet_id
                 JOIN owners o ON o.id = v.owner_id
                 WHERE v.status = 'Open'
-                {('AND v.doctor_name = %s' if role=='doctor' else '')}
+                {('AND v.doctor_name = ?' if role=='doctor' else '')}
                 ORDER BY v.visit_date DESC
                 LIMIT 20
             """, ([uname] if role == "doctor" else []))
@@ -265,8 +268,8 @@ def _fetch_platform_data(message: str, user: dict) -> str:
                 FROM visits v
                 JOIN pets  p ON p.id = v.pet_id
                 JOIN owners o ON o.id = v.owner_id
-                WHERE {_df} = %s
-                {('AND v.doctor_name = %s' if role=='doctor' else '')}
+                WHERE {_df} = ?
+                {('AND v.doctor_name = ?' if role=='doctor' else '')}
                 ORDER BY v.visit_date
                 LIMIT 30
             """, ([today, uname] if role == "doctor" else [today]))
@@ -309,13 +312,13 @@ def _fetch_platform_data(message: str, user: dict) -> str:
             row = _q1("""
                 SELECT COALESCE(SUM(paid_amount),0) AS collected,
                        COUNT(*) AS transactions
-                FROM invoices WHERE SUBSTRING(issue_date::text,1,10) = %s
+                FROM invoices WHERE SUBSTRING(issue_date::text,1,10) = ?
                   AND status IN ('Paid','Partial')
             """, (today,))
             inv = _q1("""
                 SELECT COALESCE(SUM(total),0) AS invoiced,
                        COUNT(*) AS count
-                FROM invoices WHERE SUBSTRING(issue_date::text,1,10) = %s
+                FROM invoices WHERE SUBSTRING(issue_date::text,1,10) = ?
                   AND status != 'Cancelled'
             """, (today,))
             if row is not None:
@@ -331,12 +334,12 @@ def _fetch_platform_data(message: str, user: dict) -> str:
         if "revenue_month" in intents:
             row = _q1("""
                 SELECT COALESCE(SUM(paid_amount),0) AS collected, COUNT(*) AS tx
-                FROM invoices WHERE SUBSTRING(issue_date::text,1,10) >= %s
+                FROM invoices WHERE SUBSTRING(issue_date::text,1,10) >= ?
                   AND status IN ('Paid','Partial')
             """, (month_s,))
             exp = _q1("""
                 SELECT COALESCE(SUM(amount),0) AS expenses
-                FROM expenses WHERE SUBSTRING(expense_date::text,1,10) >= %s
+                FROM expenses WHERE SUBSTRING(expense_date::text,1,10) >= ?
             """, (month_s,))
             if row is not None:
                 collected = float(row["collected"] or 0)
@@ -380,7 +383,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
             rows = _q("""
                 SELECT b.batch_number, i.name AS item_name, b.quantity, i.unit, b.expiry_date
                 FROM batches b JOIN items i ON i.id = b.item_id
-                WHERE SUBSTRING(b.expiry_date::text,1,10) <= %s AND b.quantity > 0
+                WHERE SUBSTRING(b.expiry_date::text,1,10) <= ? AND b.quantity > 0
                 ORDER BY b.expiry_date LIMIT 25
             """, (exp90,))
             if rows:
@@ -428,7 +431,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
                 FROM vaccinations v
                 JOIN pets   p ON p.id = v.pet_id
                 JOIN owners o ON o.id = p.owner_id
-                WHERE SUBSTRING(v.next_due_at::text,1,10) BETWEEN %s AND %s
+                WHERE SUBSTRING(v.next_due_at::text,1,10) BETWEEN ? AND ?
                 ORDER BY v.next_due_at
                 LIMIT 25
             """, (today, due30))
@@ -453,7 +456,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
                 SELECT u.full_name, u.role, ar.check_in, ar.check_out, ar.status
                 FROM attendance_records ar
                 JOIN users u ON u.id = ar.user_id
-                WHERE SUBSTRING(ar.work_date::text,1,10) = %s
+                WHERE SUBSTRING(ar.work_date::text,1,10) = ?
                 ORDER BY ar.check_in
                 LIMIT 30
             """, (today,))
@@ -488,12 +491,12 @@ def _fetch_platform_data(message: str, user: dict) -> str:
         # ── DASHBOARD STATS ───────────────────────────────────────────────────
         if "dashboard_stats" in intents:
             _df_v  = _date_eq("visit_date")
-            c   = (_q1("SELECT COUNT(*) AS n FROM appointments WHERE appt_date = %s "
+            c   = (_q1("SELECT COUNT(*) AS n FROM appointments WHERE appt_date = ? "
                        "AND status NOT IN ('Cancelled','NoShow')", (today,)) or {}).get("n", 0)
-            v   = (_q1(f"SELECT COUNT(*) AS n FROM visits WHERE {_df_v} = %s", (today,)) or {}).get("n", 0)
+            v   = (_q1(f"SELECT COUNT(*) AS n FROM visits WHERE {_df_v} = ?", (today,)) or {}).get("n", 0)
             vo  = (_q1("SELECT COUNT(*) AS n FROM visits WHERE status = 'Open'") or {}).get("n", 0)
             pi  = (_q1("SELECT COUNT(*) AS n FROM invoices WHERE status IN ('Pending','Overdue')") or {}).get("n", 0)
-            rev = (_q1("SELECT COALESCE(SUM(paid_amount),0) AS s FROM invoices WHERE SUBSTRING(issue_date::text,1,10) = %s AND status IN ('Paid','Partial')", (today,)) or {}).get("s", 0)
+            rev = (_q1("SELECT COALESCE(SUM(paid_amount),0) AS s FROM invoices WHERE SUBSTRING(issue_date::text,1,10) = ? AND status IN ('Paid','Partial')", (today,)) or {}).get("s", 0)
             ls  = _q("SELECT i.id FROM items i LEFT JOIN batches b ON b.item_id=i.id "
                      "WHERE i.is_active=1 GROUP BY i.id, i.reorder_level "
                      "HAVING COALESCE(SUM(b.quantity),0) <= i.reorder_level")
@@ -516,7 +519,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
                 JOIN pets  p ON p.id = gb.pet_id
                 JOIN owners o ON o.id = gb.owner_id
                 JOIN grooming_services gs ON gs.id = gb.service_id
-                WHERE gb.booking_date = %s
+                WHERE gb.booking_date = ?
                 ORDER BY gb.start_time
                 LIMIT 20
             """, (today,))
@@ -584,7 +587,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
                     SELECT o.full_name, o.phone, p.pet_name, p.species
                     FROM owners o
                     LEFT JOIN pets p ON p.owner_id = o.id
-                    WHERE o.full_name ILIKE %s OR p.pet_name ILIKE %s
+                    WHERE o.full_name ILIKE ? OR p.pet_name ILIKE ?
                     LIMIT 10
                 """, (f"%{clean}%", f"%{clean}%"))
                 if rows:

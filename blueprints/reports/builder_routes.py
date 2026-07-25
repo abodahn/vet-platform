@@ -128,7 +128,14 @@ SOURCES = {
 }
 
 
+_saved_reports_ready = False
+
+
 def _ensure_saved_reports():
+    """Create the saved_reports table once per process, not once per request."""
+    global _saved_reports_ready
+    if _saved_reports_ready:
+        return
     conn = db.get_db()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS saved_reports (
@@ -142,6 +149,7 @@ def _ensure_saved_reports():
     """)
     conn.commit()
     conn.close()
+    _saved_reports_ready = True
 
 
 # ── Builder landing ───────────────────────────────────────────────────────────

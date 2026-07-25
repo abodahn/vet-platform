@@ -156,7 +156,7 @@ def upload():
             cur = conn.execute(
                 """INSERT INTO attachments(entity_type,entity_id,filename,original_name,
                    mime_type,size_bytes,category,caption,uploaded_by)
-                   VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                   VALUES(?,?,?,?,?,?,?,?,?)""",
                 (entity_type, entity_id, stored_name,
                  secure_filename(f.filename),
                  final_mime,
@@ -194,7 +194,7 @@ def _safe_attachment_path(att) -> str | None:
 @login_required
 def serve(att_id):
     conn = get_db()
-    att = conn.execute("SELECT * FROM attachments WHERE id=%s", (att_id,)).fetchone()
+    att = conn.execute("SELECT * FROM attachments WHERE id=?", (att_id,)).fetchone()
     conn.close()
     if not att:
         abort(404)
@@ -215,13 +215,13 @@ def serve(att_id):
 @login_required
 def delete(att_id):
     conn = get_db()
-    att = conn.execute("SELECT * FROM attachments WHERE id=%s", (att_id,)).fetchone()
+    att = conn.execute("SELECT * FROM attachments WHERE id=?", (att_id,)).fetchone()
     if att and _can_access(att["entity_type"]):
         filepath = _safe_attachment_path(att)
         if filepath and os.path.exists(filepath):
             os.remove(filepath)
         with conn:
-            conn.execute("DELETE FROM attachments WHERE id=%s", (att_id,))
+            conn.execute("DELETE FROM attachments WHERE id=?", (att_id,))
         log_audit(username=session["user"]["username"], role=session["user"]["role"],
                   action="file_delete", module="uploads", entity_id=str(att_id))
         flash("File deleted.", "success")
@@ -236,7 +236,7 @@ def list_attachments(entity_type, entity_id):
         return jsonify([])
     conn = get_db()
     rows = conn.execute(
-        "SELECT * FROM attachments WHERE entity_type=%s AND entity_id=%s ORDER BY uploaded_at DESC",
+        "SELECT * FROM attachments WHERE entity_type=? AND entity_id=? ORDER BY uploaded_at DESC",
         (entity_type, str(entity_id))).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])

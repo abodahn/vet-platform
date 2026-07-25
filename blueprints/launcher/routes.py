@@ -396,7 +396,7 @@ MODULES = [
         "url_key":     "petshop.index",
         "url":         "/petshop/",
         "legacy":      False,
-        "roles":       ["super_admin","clinic_owner","branch_manager","receptionist","reception","finance","support_admin","staff"],
+        "roles":       ["super_admin","clinic_owner","branch_manager","reception","finance","support_admin","staff"],
         "status":      "active",
         "category":    "commercial",
         "color":       "#e8920a",
@@ -467,10 +467,11 @@ _CATEGORY_ORDER = ["clinical","operations","inventory","commercial","finance","c
 
 
 def _visible_modules(role: str) -> list:
-    """Return modules visible to `role`, grouped by category."""
-    user_role = role or "staff"
-    visible = [m for m in MODULES if user_role in m["roles"] or user_role == "super_admin"]
-    return visible
+    """Return modules visible to `role`. Fails closed: an empty or unrecognised
+    role sees nothing, matching the check in open_module() below."""
+    if not role:
+        return []
+    return [m for m in MODULES if role == "super_admin" or role in m["roles"]]
 
 
 def _grouped(modules: list) -> list:
@@ -498,6 +499,10 @@ def index():
     user    = session["user"]
     role    = user.get("role", "")
     modules = _visible_modules(role)
+    if not modules:
+        from flask import flash
+        flash("Your account has no role assigned, or its role is not recognised. "
+              "Ask an administrator to set your role.", "warning")
     grouped = _grouped(modules)
     legacy_url = current_app.config.get("LEGACY_APP_URL", "http://localhost:5000")
 

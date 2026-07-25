@@ -428,6 +428,25 @@ def add_expense():
 # DAILY CLOSING
 # ─────────────────────────────────────────────
 
+_closing_notes_ready = False
+
+
+def _ensure_closing_notes(conn):
+    """Create closing_notes once per process, not once per request."""
+    global _closing_notes_ready
+    if _closing_notes_ready:
+        return
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS closing_notes
+           (id INTEGER PRIMARY KEY AUTOINCREMENT,
+            closing_date TEXT NOT NULL,
+            note TEXT,
+            created_by TEXT,
+            created_at TEXT DEFAULT (datetime('now')))"""
+    )
+    _closing_notes_ready = True
+
+
 @accounting_bp.route("/closing", methods=["GET", "POST"])
 @login_required
 def daily_closing():
@@ -439,14 +458,7 @@ def daily_closing():
         if note:
             try:
                 with conn:
-                    conn.execute(
-                        """CREATE TABLE IF NOT EXISTS closing_notes
-                           (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            closing_date TEXT NOT NULL,
-                            note TEXT,
-                            created_by TEXT,
-                            created_at TEXT DEFAULT (datetime('now')))"""
-                    )
+                    _ensure_closing_notes(conn)
                     conn.execute(
                         "INSERT INTO closing_notes (closing_date, note, created_by) VALUES (?, ?, ?)",
                         (today, note, session["user"].get("full_name", ""))
@@ -491,14 +503,7 @@ def daily_closing():
 
     # Previous 7 days' closings
     try:
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS closing_notes
-               (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                closing_date TEXT NOT NULL,
-                note TEXT,
-                created_by TEXT,
-                created_at TEXT DEFAULT (datetime('now')))"""
-        )
+        _ensure_closing_notes(conn)
         previous_closings = [dict(r) for r in conn.execute(
             """SELECT closing_date, note, created_by, created_at
                FROM closing_notes
