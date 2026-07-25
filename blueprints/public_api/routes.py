@@ -127,7 +127,7 @@ def book():
     try:
         # 1. Find or create owner
         cur = conn.execute(
-            "SELECT id FROM owners WHERE phone=%s OR whatsapp_phone=%s LIMIT 1",
+            "SELECT id FROM owners WHERE phone=? OR whatsapp_phone=? LIMIT 1",
             (mobile, whatsapp)
         )
         row = cur.fetchone()
@@ -136,14 +136,14 @@ def book():
         else:
             cur = conn.execute(
                 "INSERT INTO owners (full_name, phone, whatsapp_phone, email, source) "
-                "VALUES (%s, %s, %s, %s, %s)",
+                "VALUES (?, ?, ?, ?, ?)",
                 (owner_name, mobile, whatsapp, email, "website")
             )
             owner_id = cur.lastrowid
 
         # 2. Find or create pet
         cur = conn.execute(
-            "SELECT id FROM pets WHERE owner_id=%s AND pet_name=%s LIMIT 1",
+            "SELECT id FROM pets WHERE owner_id=? AND pet_name=? LIMIT 1",
             (owner_id, pet_name)
         )
         row = cur.fetchone()
@@ -152,7 +152,7 @@ def book():
         else:
             cur = conn.execute(
                 "INSERT INTO pets (owner_id, pet_name, species, breed, source) "
-                "VALUES (%s, %s, %s, %s, %s)",
+                "VALUES (?, ?, ?, ?, ?)",
                 (owner_id, pet_name, species, breed, "website")
             )
             pet_id = cur.lastrowid
@@ -162,7 +162,7 @@ def book():
             "INSERT INTO appointments "
             "(owner_id, pet_id, appt_date, appt_start, doctor_name, service_name, "
             " branch, notes, status, source) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (owner_id, pet_id, appt_date, appt_time, doctor, service,
              branch, notes, "Pending", "website")
         )
@@ -178,7 +178,7 @@ def book():
             conn.execute(
                 "INSERT INTO reminders "
                 "(owner_id, pet_id, appointment_id, reminder_type, scheduled_for, message, status) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (owner_id, pet_id, appointment_id, "appointment",
                  scheduled_for, message, "Pending")
             )
@@ -228,7 +228,7 @@ def contact():
         # Ensure table exists
         conn.execute("""
             CREATE TABLE IF NOT EXISTS contact_messages (
-                id              SERIAL PRIMARY KEY,
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 name            TEXT,
                 mobile          TEXT,
                 email           TEXT,
@@ -236,7 +236,7 @@ def contact():
                 branch          TEXT,
                 contact_method  TEXT,
                 message         TEXT,
-                created_at      TIMESTAMP DEFAULT NOW(),
+                created_at      TEXT DEFAULT (datetime('now')),
                 handled         BOOLEAN DEFAULT FALSE
             )
         """)
@@ -244,7 +244,7 @@ def contact():
         conn.execute(
             "INSERT INTO contact_messages "
             "(name, mobile, email, pet_name, branch, contact_method, message) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (name, mobile, email, pet_name, branch, method, message)
         )
         conn.commit()
@@ -287,7 +287,7 @@ def emergency():
     try:
         # Find or create owner
         cur = conn.execute(
-            "SELECT id FROM owners WHERE phone=%s LIMIT 1",
+            "SELECT id FROM owners WHERE phone=? LIMIT 1",
             (mobile,)
         )
         row = cur.fetchone()
@@ -296,7 +296,7 @@ def emergency():
         else:
             cur = conn.execute(
                 "INSERT INTO owners (full_name, phone, whatsapp_phone, source) "
-                "VALUES (%s, %s, %s, %s)",
+                "VALUES (?, ?, ?, ?)",
                 (owner_name, mobile, mobile, "website")
             )
             owner_id = cur.lastrowid
@@ -305,7 +305,7 @@ def emergency():
         pet_id = None
         if pet_name and owner_id:
             cur = conn.execute(
-                "SELECT id FROM pets WHERE owner_id=%s AND pet_name=%s LIMIT 1",
+                "SELECT id FROM pets WHERE owner_id=? AND pet_name=? LIMIT 1",
                 (owner_id, pet_name)
             )
             row = cur.fetchone()
@@ -313,7 +313,7 @@ def emergency():
                 pet_id = row["id"]
             else:
                 cur = conn.execute(
-                    "INSERT INTO pets (owner_id, pet_name, source) VALUES (%s, %s, %s)",
+                    "INSERT INTO pets (owner_id, pet_name, source) VALUES (?, ?, ?)",
                     (owner_id, pet_name, "website")
                 )
                 pet_id = cur.lastrowid
@@ -322,7 +322,7 @@ def emergency():
         cur = conn.execute(
             "INSERT INTO appointments "
             "(owner_id, pet_id, appt_date, branch, notes, status, source) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (owner_id, pet_id, today, branch, description, "Emergency", "website")
         )
         appointment_id = cur.lastrowid

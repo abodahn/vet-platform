@@ -27,6 +27,11 @@ STATUS_COLORS = {
 }
 
 
+# Set only after the DDL has actually succeeded, so a failed run retries.
+# Per-process (each gunicorn worker ensures once) — harmless, DDL is IF NOT EXISTS.
+_inpatient_ready = False
+
+
 def _ensure_tables(conn):
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS inpatient_stays (
@@ -82,9 +87,13 @@ def _ensure_tables(conn):
 
 @inpatient_bp.before_request
 def _init():
+    global _inpatient_ready
+    if _inpatient_ready:
+        return
     conn = db.get_db()
     _ensure_tables(conn)
     conn.close()
+    _inpatient_ready = True
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -101,7 +110,7 @@ def _get_stay(stay_id: int):
         JOIN pets   p ON p.id = s.pet_id
         JOIN owners o ON o.id = s.owner_id
         JOIN users  u ON u.id = s.admitted_by
-        WHERE s.id = %s
+        WHERE s.id = ?
     """, (stay_id,)).fetchone()
     conn.close()
     return dict(row) if row else None
@@ -126,7 +135,7 @@ def dashboard():
     conn = db.get_db()
     status_f = request.args.get("status", "")
 
-    where  = ["s.status != 'Discharged'"] if not status_f else ["s.status = %s"]
+    where  = ["s.status != 'Discharged'"] if not status_f else ["s.status = ?"]
     params = [status_f] if status_f else []
 
     stays = conn.execute(f"""
@@ -182,7 +191,7 @@ def admit():
                   (pet_id, owner_id, visit_id, ward, cage_number, admitted_by,
                    reason, diagnosis, treatment_plan, status,
                    expected_discharge, daily_rate)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'Admitted',%s,%s)
+                VALUES (?,?,?,?,?,?,?,?,?,'Admitted',?,?)
             """, (
                 pet_id, owner_id,
                 f.get("visit_id") or None,
@@ -231,7 +240,7 @@ def stay_detail(stay_id: int):
         SELECT r.*, u.full_name AS recorded_by_name
         FROM inpatient_rounds r
         JOIN users u ON u.id = r.recorded_by
-        WHERE r.stay_id = %s
+        WHERE r.stay_id = ?
         ORDER BY r.round_time DESC
     """, (stay_id,)).fetchall()
 
@@ -239,7 +248,7 @@ def stay_detail(stay_id: int):
         SELECT m.*, u.full_name AS given_by_name
         FROM inpatient_meds m
         LEFT JOIN users u ON u.id = m.given_by
-        WHERE m.stay_id = %s
+        WHERE m.stay_id = ?
         ORDER BY m.given_at DESC
     """, (stay_id,)).fetchall()
 
@@ -273,7 +282,7 @@ def update_status(stay_id: int):
 
     conn = db.get_db()
     conn.execute(
-        "UPDATE inpatient_stays SET status=%s, updated_at=NOW() WHERE id=%s",
+        "UPDATE inpatient_stays SET status=?, updated_at=datetime('now') WHERE id=?",
         (new_status, stay_id)
     )
     conn.commit()
@@ -295,7 +304,7 @@ def add_round(stay_id: int):
               (stay_id, recorded_by, round_time, temp_c, heart_rate, resp_rate,
                weight_kg, pain_score, food_intake, fluid_input, fluid_output,
                observations, treatment_given)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             stay_id, session["user"]["id"],
             f.get("round_time") or datetime.now().isoformat(timespec="minutes"),
@@ -331,7 +340,7 @@ def add_med(stay_id: int):
         conn.execute("""
             INSERT INTO inpatient_meds
               (stay_id, given_by, medication, dose, route, given_at, notes)
-            VALUES (%s,%s,%s,%s,%s,%s,%s)
+            VALUES (?,?,?,?,?,?,?)
         """, (
             stay_id, session["user"]["id"],
             f["medication"],
@@ -358,9 +367,9 @@ def discharge(stay_id: int):
     conn  = db.get_db()
     conn.execute("""
         UPDATE inpatient_stays
-        SET status='Discharged', discharged_at=NOW(),
-            discharge_notes=%s, updated_at=NOW()
-        WHERE id=%s AND status != 'Discharged'
+        SET status='Discharged', discharged_at=datetime('now'),
+            discharge_notes=?, updated_at=datetime('now')
+        WHERE id=? AND status != 'Discharged'
     """, (notes, stay_id))
     conn.commit()
     conn.close()
@@ -375,7 +384,7 @@ def discharge(stay_id: int):
 def api_owner_pets(owner_id: int):
     conn = db.get_db()
     pets = conn.execute(
-        "SELECT id, pet_name, species, breed FROM pets WHERE owner_id=%s ORDER BY pet_name",
+        "SELECT id, pet_name, species, breed FROM pets WHERE owner_id=? ORDER BY pet_name",
         (owner_id,)
     ).fetchall()
     conn.close()

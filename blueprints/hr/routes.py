@@ -4,6 +4,7 @@ Covers: HR dashboard, staff CRUD with full profile, shift assignment,
         performance reviews, roles management.
 """
 import hashlib
+import logging
 from datetime import date
 from flask import (
     render_template, request, redirect, url_for,
@@ -12,6 +13,8 @@ from flask import (
 from . import hr_bp
 from blueprints.auth.routes import login_required, role_required
 import models.database as db
+
+logger = logging.getLogger(__name__)
 
 _ROLES = [
     "super_admin", "clinic_owner", "branch_manager", "doctor", "nurse",
@@ -47,28 +50,48 @@ def _hash(pw: str) -> str:
     return hashlib.sha256(f"{_SALT}{pw}".encode()).hexdigest()
 
 
+def _add_column(conn, ddl: str) -> None:
+    """Run an idempotent ALTER TABLE ... ADD COLUMN.
+
+    `ADD COLUMN IF NOT EXISTS` is PostgreSQL-only (SQLite raises a syntax error),
+    so the DDL is written plainly and the already-applied case is detected from
+    the error text. On PostgreSQL the statement runs inside a SAVEPOINT so a
+    failure does not abort the surrounding transaction.
+    """
+    try:
+        if isinstance(conn, db._PGConn):
+            conn.execute(ddl, _protect=True)
+        else:
+            conn.execute(ddl)
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "duplicate column" in msg or "already exists" in msg:
+            logger.debug("HR schema: column already present — %s", ddl)
+        else:
+            logger.warning("HR schema: ALTER failed — %s (%s)", ddl, exc)
+
+
 def _ensure_hr_tables():
     global _hr_ready
     if _hr_ready:
         return
     conn = db.get_db()
     for ddl in [
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS hire_date DATE",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS contract_type VARCHAR(30) DEFAULT 'Full-time'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS national_id VARCHAR(20)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact TEXT",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_phone VARCHAR(20)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS job_title VARCHAR(100)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS dob DATE",
+        "ALTER TABLE users ADD COLUMN hire_date DATE",
+        "ALTER TABLE users ADD COLUMN contract_type VARCHAR(30) DEFAULT 'Full-time'",
+        "ALTER TABLE users ADD COLUMN national_id VARCHAR(20)",
+        "ALTER TABLE users ADD COLUMN emergency_contact TEXT",
+        "ALTER TABLE users ADD COLUMN emergency_phone VARCHAR(20)",
+        "ALTER TABLE users ADD COLUMN job_title VARCHAR(100)",
+        "ALTER TABLE users ADD COLUMN gender VARCHAR(10)",
+        "ALTER TABLE users ADD COLUMN dob DATE",
     ]:
-        try:
-            conn.execute(ddl)
-        except Exception:
-            pass
+        _add_column(conn, ddl)
+    # DDL below is SQLite-flavoured on purpose: models.database._fix_sql translates
+    # it to PostgreSQL on the PG path, and there is no reverse translation.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS performance_reviews (
-            id           SERIAL PRIMARY KEY,
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id      INTEGER NOT NULL,
             reviewer_id  INTEGER,
             period       VARCHAR(20) NOT NULL,
@@ -79,13 +102,13 @@ def _ensure_hr_tables():
             comments     TEXT,
             status       VARCHAR(20) DEFAULT 'Draft',
             reviewed_at  DATE,
-            created_at   TIMESTAMPTZ DEFAULT NOW(),
-            updated_at   TIMESTAMPTZ DEFAULT NOW()
+            created_at   TEXT DEFAULT (datetime('now')),
+            updated_at   TEXT DEFAULT (datetime('now'))
         )
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS staff_warnings (
-            id           SERIAL PRIMARY KEY,
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id      INTEGER NOT NULL,
             issued_by    INTEGER,
             warning_type VARCHAR(20) DEFAULT 'Verbal',
@@ -94,12 +117,12 @@ def _ensure_hr_tables():
             issued_date  DATE DEFAULT CURRENT_DATE,
             expiry_date  DATE,
             acknowledged BOOLEAN DEFAULT FALSE,
-            created_at   TIMESTAMPTZ DEFAULT NOW()
+            created_at   TEXT DEFAULT (datetime('now'))
         )
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS staff_certifications (
-            id          SERIAL PRIMARY KEY,
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id     INTEGER NOT NULL,
             cert_name   VARCHAR(200) NOT NULL,
             issued_by   VARCHAR(200),
@@ -108,29 +131,29 @@ def _ensure_hr_tables():
             expiry_date DATE,
             status      VARCHAR(20) DEFAULT 'Active',
             notes       TEXT,
-            created_at  TIMESTAMPTZ DEFAULT NOW()
+            created_at  TEXT DEFAULT (datetime('now'))
         )
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS staff_notes (
-            id         SERIAL PRIMARY KEY,
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id    INTEGER NOT NULL,
             author_id  INTEGER,
             note       TEXT NOT NULL,
             is_private BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMPTZ DEFAULT NOW()
+            created_at TEXT DEFAULT (datetime('now'))
         )
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS overtime_log (
-            id          SERIAL PRIMARY KEY,
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id     INTEGER NOT NULL,
             work_date   DATE NOT NULL,
             hours       NUMERIC(4,1) NOT NULL DEFAULT 0,
             reason      TEXT,
             approved_by INTEGER,
             status      VARCHAR(20) DEFAULT 'Pending',
-            created_at  TIMESTAMPTZ DEFAULT NOW()
+            created_at  TEXT DEFAULT (datetime('now'))
         )
     """)
     conn.commit()
@@ -385,7 +408,7 @@ def _save_staff_fields(f, conn, user_id=None):
                 role=?, branch_id=?, is_active=?,
                 job_title=?, contract_type=?, hire_date=?,
                 national_id=?, emergency_contact=?, emergency_phone=?,
-                gender=?, dob=?, updated_at=NOW()
+                gender=?, dob=?, updated_at=datetime('now')
             WHERE id=?
         """, (full_name, full_name_ar, email, phone,
               role, branch_id, is_active,
@@ -672,7 +695,7 @@ def staff_reset_password(user_id):
         return redirect(url_for("hr.staff_detail", user_id=user_id))
     try:
         conn = db.get_db()
-        conn.execute("UPDATE users SET password_hash=?, updated_at=NOW() WHERE id=?",
+        conn.execute("UPDATE users SET password_hash=?, updated_at=datetime('now') WHERE id=?",
                      (_hash(new_password), user_id))
         conn.commit()
         conn.close()
@@ -856,7 +879,7 @@ def performance_edit(rev_id):
             conn.execute("""
                 UPDATE performance_reviews SET
                     period=?, rating=?, strengths=?, improvements=?,
-                    goals=?, comments=?, status=?, reviewed_at=?, updated_at=NOW()
+                    goals=?, comments=?, status=?, reviewed_at=?, updated_at=datetime('now')
                 WHERE id=?
             """, (f.get("period"), int(f.get("rating") or 3),
                   f.get("strengths"), f.get("improvements"),
@@ -884,7 +907,7 @@ def performance_edit(rev_id):
 def performance_acknowledge(rev_id):
     conn = db.get_db()
     conn.execute(
-        "UPDATE performance_reviews SET status='Acknowledged',updated_at=NOW() WHERE id=?",
+        "UPDATE performance_reviews SET status='Acknowledged',updated_at=datetime('now') WHERE id=?",
         (rev_id,)
     )
     conn.commit()

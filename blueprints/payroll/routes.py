@@ -24,22 +24,32 @@ _STATUS_COLORS = {
     "Cancelled": "#dc2626",
 }
 
+# Set only after the DDL below has actually succeeded, so a failed run retries.
+# Each gunicorn worker has its own copy and ensures once — harmless, the DDL is
+# CREATE TABLE IF NOT EXISTS.
+_payroll_ready = False
+
 
 def _ensure_tables():
+    global _payroll_ready
+    if _payroll_ready:
+        return
     conn = db.get_db()
+    # DDL below is SQLite-flavoured on purpose: models.database._fix_sql translates
+    # it to PostgreSQL on the PG path, and there is no reverse translation.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS salary_grades (
-            id            SERIAL PRIMARY KEY,
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
             role          VARCHAR(60) UNIQUE NOT NULL,
             basic_salary  NUMERIC(12,2) NOT NULL DEFAULT 0,
             overtime_rate NUMERIC(8,2)  NOT NULL DEFAULT 0,
             notes         TEXT,
-            created_at    TIMESTAMPTZ DEFAULT NOW()
+            created_at    TEXT DEFAULT (datetime('now'))
         )
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS salaries (
-            id                SERIAL PRIMARY KEY,
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id           INTEGER NOT NULL,
             period_year       INTEGER NOT NULL,
             period_month      INTEGER NOT NULL,
@@ -58,13 +68,14 @@ def _ensure_tables():
             notes             TEXT,
             paid_by           INTEGER,
             created_by        INTEGER,
-            created_at        TIMESTAMPTZ DEFAULT NOW(),
-            updated_at        TIMESTAMPTZ DEFAULT NOW(),
+            created_at        TEXT DEFAULT (datetime('now')),
+            updated_at        TEXT DEFAULT (datetime('now')),
             UNIQUE (user_id, period_year, period_month)
         )
     """)
     conn.commit()
     conn.close()
+    _payroll_ready = True
 
 
 @payroll_bp.before_request
@@ -98,9 +109,9 @@ def _get_attendance_summary(conn, user_id: int, year: int, month: int) -> dict:
     records = conn.execute("""
         SELECT work_date, status, hours_worked
         FROM attendance_records
-        WHERE user_id = %s
-          AND EXTRACT(YEAR  FROM work_date::date) = %s
-          AND EXTRACT(MONTH FROM work_date::date) = %s
+        WHERE user_id = ?
+          AND EXTRACT(YEAR  FROM work_date::date) = ?
+          AND EXTRACT(MONTH FROM work_date::date) = ?
     """, (user_id, year, month)).fetchall()
 
     # Get the staff member's standard shift hours (default 8h if no shift assigned)
@@ -108,7 +119,7 @@ def _get_attendance_summary(conn, user_id: int, year: int, month: int) -> dict:
         SELECT sh.start_time, sh.end_time, sh.break_minutes
         FROM staff_shifts ss
         JOIN shifts sh ON sh.id = ss.shift_id
-        WHERE ss.user_id = %s
+        WHERE ss.user_id = ?
           AND (ss.effective_to IS NULL OR ss.effective_to >= CURRENT_DATE)
         ORDER BY ss.effective_from DESC LIMIT 1
     """, (user_id,)).fetchone()
@@ -171,14 +182,14 @@ def dashboard():
             COALESCE(SUM(net) FILTER (WHERE status='Paid'),0)      AS total_paid,
             COALESCE(SUM(net) FILTER (WHERE status IN ('Draft','Approved')),0) AS total_pending
         FROM salaries
-        WHERE period_year=%s AND period_month=%s
+        WHERE period_year=? AND period_month=?
     """, (year, month)).fetchone()
 
     recent = conn.execute("""
         SELECT s.*, u.full_name, u.role
         FROM salaries s
         JOIN users u ON u.id = s.user_id
-        WHERE s.period_year=%s AND s.period_month=%s
+        WHERE s.period_year=? AND s.period_month=?
         ORDER BY s.updated_at DESC LIMIT 20
     """, (year, month)).fetchall()
     recent = [dict(r) for r in recent]
@@ -207,10 +218,10 @@ def salaries_list():
     month = int(request.args.get("month", today.month))
     status_f = request.args.get("status", "")
 
-    where  = ["s.period_year=%s", "s.period_month=%s"]
+    where  = ["s.period_year=?", "s.period_month=?"]
     params = [year, month]
     if status_f:
-        where.append("s.status=%s")
+        where.append("s.status=?")
         params.append(status_f)
 
     rows = conn.execute(f"""
@@ -248,7 +259,7 @@ def salaries_export_xlsx():
                s.net_salary, s.status, s.payment_date
         FROM salaries s
         JOIN users u ON u.id = s.user_id
-        WHERE s.period_year=%s AND s.period_month=%s
+        WHERE s.period_year=? AND s.period_month=?
         ORDER BY u.full_name
     """, (year, month)).fetchall()
     conn.close()
@@ -312,7 +323,7 @@ def salary_new():
                   (user_id,period_year,period_month,basic_salary,allowances,
                    overtime_hours,overtime_rate,deductions,absence_deduction,
                    tax_deduction,gross,net,status,notes,created_by)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'Draft',%s,%s)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'Draft',?,?)
             """, (uid, year, month, basic, allow, ot_h, ot_r, ded, abs_d,
                   tax_d, gross, net, f.get("notes",""), session["user"]["id"]))
             conn.commit()
@@ -347,7 +358,7 @@ def salary_detail(sid):
     row = conn.execute("""
         SELECT s.*, u.full_name, u.role, u.email, u.phone
         FROM salaries s JOIN users u ON u.id=s.user_id
-        WHERE s.id=%s
+        WHERE s.id=?
     """, (sid,)).fetchone()
     if not row:
         conn.close()
@@ -357,7 +368,7 @@ def salary_detail(sid):
     payer = None
     if row.get("paid_by"):
         payer = conn.execute(
-            "SELECT full_name FROM users WHERE id=%s", (row["paid_by"],)
+            "SELECT full_name FROM users WHERE id=?", (row["paid_by"],)
         ).fetchone()
     conn.close()
     return render_template("payroll/salary_detail.html",
@@ -374,7 +385,7 @@ def salary_edit(sid):
     conn = db.get_db()
     row = conn.execute("""
         SELECT s.*, u.full_name, u.role FROM salaries s
-        JOIN users u ON u.id=s.user_id WHERE s.id=%s
+        JOIN users u ON u.id=s.user_id WHERE s.id=?
     """, (sid,)).fetchone()
     if not row:
         conn.close()
@@ -397,10 +408,10 @@ def salary_edit(sid):
         tax_d = float(f.get("tax_deduction", 0))
         gross, net = _calc_gross_net(basic, allow, ot_h, ot_r, ded, abs_d, tax_d)
         conn.execute("""
-            UPDATE salaries SET basic_salary=%s,allowances=%s,overtime_hours=%s,
-              overtime_rate=%s,deductions=%s,absence_deduction=%s,tax_deduction=%s,
-              gross=%s,net=%s,notes=%s,updated_at=NOW()
-            WHERE id=%s
+            UPDATE salaries SET basic_salary=?,allowances=?,overtime_hours=?,
+              overtime_rate=?,deductions=?,absence_deduction=?,tax_deduction=?,
+              gross=?,net=?,notes=?,updated_at=datetime('now')
+            WHERE id=?
         """, (basic, allow, ot_h, ot_r, ded, abs_d, tax_d, gross, net,
               f.get("notes",""), sid))
         conn.commit()
@@ -429,7 +440,7 @@ def salary_edit(sid):
 def salary_approve(sid):
     conn = db.get_db()
     conn.execute(
-        "UPDATE salaries SET status='Approved', updated_at=NOW() WHERE id=%s AND status='Draft'",
+        "UPDATE salaries SET status='Approved', updated_at=datetime('now') WHERE id=? AND status='Draft'",
         (sid,)
     )
     conn.commit()
@@ -445,9 +456,9 @@ def salary_pay(sid):
     method = request.form.get("payment_method", "Cash")
     pay_date = request.form.get("payment_date") or date.today().isoformat()
     conn.execute("""
-        UPDATE salaries SET status='Paid', payment_method=%s, payment_date=%s,
-          paid_by=%s, updated_at=NOW()
-        WHERE id=%s AND status='Approved'
+        UPDATE salaries SET status='Paid', payment_method=?, payment_date=?,
+          paid_by=?, updated_at=datetime('now')
+        WHERE id=? AND status='Approved'
     """, (method, pay_date, session["user"]["id"], sid))
     conn.commit()
     conn.close()
@@ -470,7 +481,7 @@ def bulk_generate():
         WHERE u.is_active=1 AND u.role != 'super_admin'
           AND NOT EXISTS (
             SELECT 1 FROM salaries s
-            WHERE s.user_id=u.id AND s.period_year=%s AND s.period_month=%s
+            WHERE s.user_id=u.id AND s.period_year=? AND s.period_month=?
           )
     """, (year, month)).fetchall()
 
@@ -497,7 +508,7 @@ def bulk_generate():
                 INSERT INTO salaries
                   (user_id,period_year,period_month,basic_salary,overtime_hours,
                    overtime_rate,absence_deduction,gross,net,status,notes,created_by)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'Draft',%s,%s)
+                VALUES (?,?,?,?,?,?,?,?,?,'Draft',?,?)
             """, (s["id"], year, month, basic, ot_h, ot_r, abs_d, gross, net,
                   f"Auto: {att['absent_days']} absent, {ot_h}h OT",
                   session["user"]["id"]))
@@ -524,7 +535,7 @@ def salary_grades():
             notes = request.form.get(f"notes_{role}", "")
             conn.execute("""
                 INSERT INTO salary_grades (role, basic_salary, overtime_rate, notes)
-                VALUES (%s, %s, %s, %s)
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT (role) DO UPDATE
                   SET basic_salary=EXCLUDED.basic_salary,
                       overtime_rate=EXCLUDED.overtime_rate,
@@ -556,7 +567,7 @@ def salary_payslip(sid):
         SELECT s.*, u.full_name, u.role, u.email, u.phone,
                u.hire_date, u.contract_type, u.job_title, u.national_id
         FROM salaries s JOIN users u ON u.id=s.user_id
-        WHERE s.id=%s
+        WHERE s.id=?
     """, (sid,)).fetchone()
     conn.close()
     if not row:
@@ -591,7 +602,7 @@ def api_attendance_summary(uid, year, month):
 def api_grade(role):
     conn = db.get_db()
     row = conn.execute(
-        "SELECT * FROM salary_grades WHERE role=%s", (role,)
+        "SELECT * FROM salary_grades WHERE role=?", (role,)
     ).fetchone()
     conn.close()
     if row:

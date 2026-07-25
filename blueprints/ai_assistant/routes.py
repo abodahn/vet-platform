@@ -131,7 +131,7 @@ def _build_patient_context(visit_id: int) -> str:
             FROM visits v
             JOIN pets  p ON p.id = v.pet_id
             JOIN owners o ON o.id = v.owner_id
-            WHERE v.id = %s
+            WHERE v.id = ?
         """, (visit_id,)).fetchone()
         if not visit:
             return ""
@@ -154,7 +154,7 @@ def _build_patient_context(visit_id: int) -> str:
         # Last 5 diagnoses
         diags = conn.execute("""
             SELECT diagnosis, severity, created_at
-            FROM diagnoses WHERE pet_id = %s
+            FROM diagnoses WHERE pet_id = ?
             ORDER BY created_at DESC LIMIT 5
         """, (visit["pet_id"],)).fetchall()
 
@@ -163,7 +163,7 @@ def _build_patient_context(visit_id: int) -> str:
             SELECT pi.medication_name, pi.dosage, pi.frequency, pi.duration_days
             FROM prescriptions pr
             JOIN prescription_items pi ON pi.prescription_id = pr.id
-            WHERE pr.pet_id = %s AND pr.status IN ('Active','Dispensed')
+            WHERE pr.pet_id = ? AND pr.status IN ('Active','Dispensed')
             ORDER BY pr.created_at DESC LIMIT 5
         """, (visit["pet_id"],)).fetchall()
 
@@ -171,7 +171,7 @@ def _build_patient_context(visit_id: int) -> str:
         vax = conn.execute("""
             SELECT vaccine_name, next_due_at
             FROM vaccinations
-            WHERE pet_id = %s AND next_due_at >= CURRENT_DATE
+            WHERE pet_id = ? AND next_due_at >= CURRENT_DATE
             ORDER BY next_due_at LIMIT 5
         """, (visit["pet_id"],)).fetchall()
 
@@ -307,7 +307,7 @@ def context_visit(visit_id: int):
         conn = db.get_db()
         try:
             row = conn.execute(
-                "SELECT branch FROM visits WHERE id=%s LIMIT 1", (visit_id,)
+                "SELECT branch FROM visits WHERE id=? LIMIT 1", (visit_id,)
             ).fetchone()
             if row and row["branch"] and str(row["branch"]) != str(user_branch):
                 _logger.warning(
