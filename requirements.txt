@@ -29,3 +29,9 @@ openai>=1.0.0
 
 # ── HTTP client (WhatsApp / webhooks) ────────────────────
 requests>=2.28.0
+
+# ── OPTIONAL — error aggregation ─────────────────────────
+# Not required. models/logging_setup.py initialises Sentry only if the
+# SENTRY_DSN env var is set AND this package is installed; otherwise it
+# skips silently. Uncomment to enable:
+# sentry-sdk>=2.0.0

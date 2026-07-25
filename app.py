@@ -9,6 +9,7 @@ from config import Config
 import models.database as db
 import models.security as sec
 import models.backup as bk
+from models.logging_setup import init_logging
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,9 @@ def create_app(cfg=None) -> Flask:
         template_folder="templates",
     )
     app.config.from_object(cfg or Config)
+
+    # Logging first — so the POSTGRES_DSN fallback warning below is captured
+    init_logging(app)
 
     # Secure cookie flags
     app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)

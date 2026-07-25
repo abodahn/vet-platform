@@ -57,6 +57,7 @@ _load_env()
 
 from app import create_app
 from config import Config
+from models.logging_setup import mask_dsn
 
 # ── freellmapi location ───────────────────────────────────────────────────────
 _FREELLM_DIR  = os.path.join(os.path.expanduser("~"), "freellmapi")
@@ -133,8 +134,8 @@ def _open_browser(url: str, delay: float = 1.4):
     time.sleep(delay)
     try:
         webbrowser.open(url)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  browser      : could not open {url} — {e}")
 
 
 def main():
@@ -155,9 +156,16 @@ def main():
     print(f"  Legacy App   : {Config.LEGACY_APP_URL}")
     print(f"  freellmapi   : http://localhost:{_FREELLM_PORT}/v1")
     print(f"  Debug mode   : {debug}")
-    print(f"  Database     : {Config.DATABASE_PATH}")
+    # Never print the DSN raw — stdout is redirected into startup.log by the launchers.
+    print(f"  Database     : {mask_dsn(Config.POSTGRES_DSN) or Config.DATABASE_PATH}")
     print(f"{'='*60}\n")
-    print(f"  Default login:  {Config.SEED_ADMIN_USER} / {Config.SEED_ADMIN_PASS}")
+    # Username only. The password is a live credential and this output is
+    # redirected to startup.log by the .bat launchers.
+    print(f"  Admin user   : {Config.SEED_ADMIN_USER}")
+    if not Config.SEED_ADMIN_PASS:
+        print("  Admin pass   : NOT SET — set PLATFORM_ADMIN_PASS in .env "
+              f"(or .env.{os.environ.get('FLASK_ENV', 'development').lower()}) "
+              "before the first run, then delete the DB to re-seed.")
     print("  Press Ctrl+C to stop.\n")
 
     if not debug:

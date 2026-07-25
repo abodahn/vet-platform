@@ -82,11 +82,10 @@ class DevelopmentConfig(Config):
     DEBUG   = True
     TESTING = False
 
-    # Dev uses local PostgreSQL (or falls back to SQLite automatically)
-    POSTGRES_DSN = os.environ.get(
-        "POSTGRES_DSN",
-        f"postgresql://postgres:1234@localhost:5432/vetclinic"
-    )
+    # Dev uses local PostgreSQL when POSTGRES_DSN is set (see .env.development),
+    # otherwise falls back to SQLite. No hardcoded credentials — a default DSN
+    # here would also make the SQLite fallback unreachable.
+    POSTGRES_DSN = os.environ.get("POSTGRES_DSN", "")
 
     # Relaxed cookie security — no HTTPS on localhost
     SESSION_COOKIE_SECURE = False
@@ -123,18 +122,26 @@ class ProductionConfig(Config):
             errors.append("POSTGRES_DSN is not set")
         if not cls.SECRET_KEY or "CHANGE" in cls.SECRET_KEY:
             errors.append("PLATFORM_SECRET_KEY is not set or still default")
+        elif len(cls.SECRET_KEY) < 32:
+            errors.append(
+                f"PLATFORM_SECRET_KEY is too short ({len(cls.SECRET_KEY)} chars, need >= 32). "
+                'Generate one with: python -c "import secrets; print(secrets.token_hex(64))"'
+            )
         seed_pass = os.environ.get("PLATFORM_ADMIN_PASS", "")
         if not seed_pass:
             errors.append("PLATFORM_ADMIN_PASS is not set (required for first DB seed)")
         if seed_pass in ("admin", "1234", "password", "Admin", "admin123"):
             errors.append("PLATFORM_ADMIN_PASS is set to a trivially weak value")
-        if os.environ.get("CORS_ALLOWED_ORIGIN", "") == "*":
-            # Warn but don't block — wildcard may be intentional in some setups
-            import warnings
-            warnings.warn(
-                "CORS_ALLOWED_ORIGIN is '*' in production. "
-                "Set it to your website domain for security.",
-                stacklevel=2,
+        # CORS: blueprints/public_api/routes.py defaults _CORS_ORIGIN to "*", so an
+        # UNSET var is a live wildcard — the old check only caught a literal "*" and
+        # therefore never fired. Both cases are now hard errors. Escape hatch for a
+        # deployment that genuinely needs the wildcard: CORS_ALLOW_WILDCARD=1.
+        cors = os.environ.get("CORS_ALLOWED_ORIGIN", "")
+        if (not cors or cors == "*") and os.environ.get("CORS_ALLOW_WILDCARD", "") != "1":
+            errors.append(
+                "CORS_ALLOWED_ORIGIN is unset or '*' — the public API would answer any "
+                "origin. Set it to your website domain (e.g. https://aleefy.vet), or set "
+                "CORS_ALLOW_WILDCARD=1 to accept the wildcard deliberately."
             )
         if errors:
             raise RuntimeError(
