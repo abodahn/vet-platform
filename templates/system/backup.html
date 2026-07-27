@@ -1,86 +1,157 @@
 {% extends "base.html" %}
-{% block title %}{{ t('Backup Manager', 'مدير النسخ الاحتياطية') }}{% endblock %}
-{% block page_title %}{{ t('Backup Manager', 'مدير النسخ الاحتياطية') }}{% endblock %}
-{% block page_sub %}{{ t('Automated daily backups + manual trigger', 'نسخ احتياطي يومي تلقائي + تشغيل يدوي') }}{% endblock %}
+{% block title %}{{ t('Backup & Restore', 'النسخ الاحتياطي والاستعادة') }}{% endblock %}
+{% block page_title %}{{ t('Backup & Restore', 'النسخ الاحتياطي والاستعادة') }}{% endblock %}
+{% block page_sub %}{{ t('Your clinic records, and how to get them back', 'سجلات عيادتك وكيفية استعادتها') }}{% endblock %}
 
 {% block topbar_actions %}
 <a href="{{ url_for('system.monitor') }}" class="pf-btn pf-btn-secondary">{{ t('← Monitor', '← المراقبة') }}</a>
-<form method="post" action="{{ url_for('system.backup_run') }}" style="display:inline"
-      onsubmit="return confirm('Run a manual backup now?')">
+<form method="post" action="{{ url_for('system.backup_run') }}" style="display:inline">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-  <button class="pf-btn pf-btn-primary">{{ t('💾 Run Backup Now', '💾 تشغيل النسخ الاحتياطي الآن') }}</button>
+  <button class="pf-btn pf-btn-primary">{{ t('💾 Back Up Now', '💾 انسخ احتياطياً الآن') }}</button>
 </form>
 {% endblock %}
 
 {% block content %}
 
-<!-- Latest backup status -->
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px">
-  <div class="pf-card" style="padding:18px;border-left:5px solid {{ 'var(--cl-success)' if latest else 'var(--cl-warning)' }}">
-    <div style="font-size:11px;text-transform:uppercase;font-weight:700;color:var(--cl-text-light);margin-bottom:6px">{{ t('Last Backup', 'آخر نسخة احتياطية') }}</div>
-    {% if latest %}
-    <div style="font-weight:700;font-size:15px">{{ latest.filename }}</div>
-    <div style="font-size:12px;color:var(--cl-text-light);margin-top:4px">
-      {{ latest.created_at[:16] if latest.created_at else '—' }} · {{ latest.size_kb }} KB
+{% if maintenance %}
+<div class="pf-flash warning" style="margin-bottom:18px;align-items:flex-start">
+  <div>
+    <strong>{{ t('The system is in maintenance mode.', 'النظام في وضع الصيانة.') }}</strong>
+    {{ maintenance.reason }} — {{ t('started', 'بدأت منذ') }} {{ maintenance.age_minutes }} {{ t('minutes ago', 'دقيقة') }}.
+    {{ t('Staff cannot use the platform until it clears.', 'لا يمكن للموظفين استخدام النظام حتى تنتهي.') }}
+    <form method="post" action="{{ url_for('system.backup_maintenance_off') }}" style="display:inline;margin-inline-start:8px">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <button class="pf-btn pf-btn-secondary pf-btn-sm">{{ t('Clear maintenance mode', 'إلغاء وضع الصيانة') }}</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Last successful backup — the headline number ─────────────── -->
+<div class="pf-card" style="padding:22px 26px;margin-bottom:18px;
+     border-left:6px solid {{ 'var(--cl-danger)' if health.stale else 'var(--cl-success)' }}">
+  <div style="font-size:11px;text-transform:uppercase;font-weight:800;letter-spacing:.07em;color:var(--cl-text-muted)">
+    {{ t('Last successful backup', 'آخر نسخة احتياطية ناجحة') }}
+  </div>
+
+  {% if health.has_backup %}
+    <div style="font-size:30px;font-weight:900;line-height:1.15;margin-top:6px;
+         color:{{ 'var(--cl-danger)' if health.stale else 'var(--cl-success)' }}">
+      {% if health.age_hours < 24 %}
+        {{ health.age_hours|round(0)|int }} {{ t('hours ago', 'ساعة مضت') }}
+      {% else %}
+        {{ health.age_days }} {{ t('days ago', 'يوم مضى') }}
+      {% endif %}
     </div>
-    <div style="margin-top:6px">
-      <span class="pf-badge {{ 'success' if latest.integrity == 'ok' else 'danger' }}">
-        Integrity: {{ latest.integrity or '—' }}
-      </span>
+    <div style="font-size:13px;color:var(--cl-text-muted);margin-top:4px">
+      {{ health.latest.timestamp }} · <code>{{ health.latest.filename }}</code> ·
+      {{ health.latest.size_mb }} MB
     </div>
+    {% if health.stale %}
+    <div class="pf-flash danger" style="margin:12px 0 0">
+      ⚠️ {{ t('Backups appear to have stopped.', 'يبدو أن النسخ الاحتياطي توقف.') }}
+      {{ t('Nothing newer than', 'لا توجد نسخة أحدث من') }} {{ health.stale_after_days }}
+      {{ t('day(s) exists. Press “Back Up Now”, and if it fails, call your IT support today.',
+            'يوم. اضغط «انسخ احتياطياً الآن»، وإذا فشل فاتصل بالدعم الفني اليوم.') }}
+    </div>
+    {% endif %}
+  {% else %}
+    <div style="font-size:28px;font-weight:900;color:var(--cl-danger);margin-top:6px">
+      {{ t('Never', 'أبداً') }}
+    </div>
+    <div class="pf-flash danger" style="margin:12px 0 0">
+      ⚠️ {{ t('This server has no backup at all. If the disk fails today, every record is lost. Press “Back Up Now”.',
+              'لا توجد أي نسخة احتياطية على هذا الخادم. إذا تعطل القرص اليوم ستفقد كل السجلات. اضغط «انسخ احتياطياً الآن».') }}
+    </div>
+  {% endif %}
+</div>
+
+<!-- ── Where the copies live ───────────────────────────────────── -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-bottom:20px">
+  <div class="pf-card" style="padding:18px">
+    <div style="font-size:11px;text-transform:uppercase;font-weight:800;color:var(--cl-text-muted);margin-bottom:6px">{{ t('Copies kept', 'النسخ المحفوظة') }}</div>
+    <div style="font-weight:900;font-size:28px;color:var(--cl-primary)">{{ backups|length }}</div>
+    <div style="font-size:12px;color:var(--cl-text-light)">{{ t('30-day retention · daily at 02:00', 'احتفاظ 30 يوماً · يومياً 02:00') }}</div>
+  </div>
+
+  <div class="pf-card" style="padding:18px;border-left:5px solid {{ 'var(--cl-success)' if health.offsite else 'var(--cl-warning)' }}">
+    <div style="font-size:11px;text-transform:uppercase;font-weight:800;color:var(--cl-text-muted);margin-bottom:6px">{{ t('Off-site copy', 'نسخة خارج الموقع') }}</div>
+    {% if health.offsite %}
+      {% for o in health.offsite %}
+      <div style="font-size:12.5px;font-weight:700">{{ '📁' if o.kind == 'folder' else '☁️' }} <code>{{ o.label }}</code></div>
+      {% endfor %}
     {% else %}
-    <div style="color:var(--cl-text-light);font-size:13px">{{ t('No backups found', 'لا توجد نسخ احتياطية') }}</div>
+      <div style="font-size:13px;color:var(--cl-warning);font-weight:700">{{ t('None configured', 'غير مُعدّة') }}</div>
+      <div style="font-size:12px;color:var(--cl-text-light);margin-top:4px">
+        {{ t('Backups sit on the same disk as the database. One disk failure loses both. See deploy/BACKUP_RUNBOOK.md.',
+              'النسخ الاحتياطية على نفس قرص قاعدة البيانات. عطل واحد يفقدهما معاً. راجع deploy/BACKUP_RUNBOOK.md.') }}
+      </div>
     {% endif %}
   </div>
-  <div class="pf-card" style="padding:18px;border-left:5px solid var(--cl-primary)">
-    <div style="font-size:11px;text-transform:uppercase;font-weight:700;color:var(--cl-text-light);margin-bottom:6px">{{ t('Total Backups', 'إجمالي النسخ') }}</div>
-    <div style="font-weight:800;font-size:28px;color:var(--cl-primary)">{{ backups|length }}</div>
-    <div style="font-size:12px;color:var(--cl-text-light)">{{ t('30-day retention policy', 'سياسة احتفاظ 30 يوماً') }}</div>
-  </div>
-  <div class="pf-card" style="padding:18px;border-left:5px solid var(--cl-info,#3b82f6)">
-    <div style="font-size:11px;text-transform:uppercase;font-weight:700;color:var(--cl-text-light);margin-bottom:6px">{{ t('Schedule', 'الجدول') }}</div>
-    <div style="font-weight:700;font-size:15px">{{ t('Daily @ 02:00', 'يومياً الساعة 02:00') }}</div>
-    <div style="font-size:12px;color:var(--cl-text-light)">SQLite online backup API · WAL safe</div>
+
+  <div class="pf-card" style="padding:18px">
+    <div style="font-size:11px;text-transform:uppercase;font-weight:800;color:var(--cl-text-muted);margin-bottom:6px">{{ t('Restore from USB', 'استعادة من ذاكرة USB') }}</div>
+    <form method="post" action="{{ url_for('system.backup_upload') }}" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <input class="pf-input" type="file" name="archive" accept=".db,.dump" required
+             style="padding:6px;font-size:12px">
+      <button class="pf-btn pf-btn-secondary pf-btn-sm" style="margin-top:8px">{{ t('Upload backup file', 'رفع ملف النسخة') }}</button>
+    </form>
+    <div style="font-size:11.5px;color:var(--cl-text-light);margin-top:6px">
+      {{ t('The file is checked before it is kept.', 'يتم فحص الملف قبل الاحتفاظ به.') }}
+    </div>
   </div>
 </div>
 
-<!-- Backup list -->
+<!-- ── Backup list ─────────────────────────────────────────────── -->
 <div class="pf-card">
-  <div style="font-weight:700;font-size:15px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--cl-border)">
-    {{ t('Backup History', 'سجل النسخ الاحتياطية') }}
+  <div style="font-weight:800;font-size:15px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--cl-border)">
+    {{ t('Available backups', 'النسخ المتاحة') }}
   </div>
   {% if backups %}
-  <div style="overflow-x:auto">
+  <div class="pf-table-wrap">
     <table class="pf-table">
       <thead>
         <tr>
-          <th>#</th>
-          <th>{{ t('Filename', 'اسم الملف') }}</th>
-          <th>{{ t('Created', 'تاريخ الإنشاء') }}</th>
+          <th>{{ t('Date & time', 'التاريخ والوقت') }}</th>
+          <th>{{ t('File', 'الملف') }}</th>
           <th style="text-align:right">{{ t('Size', 'الحجم') }}</th>
-          <th>{{ t('Integrity', 'السلامة') }}</th>
+          <th>{{ t('Type', 'النوع') }}</th>
           <th>{{ t('Actions', 'إجراءات') }}</th>
         </tr>
       </thead>
       <tbody>
         {% for b in backups %}
         <tr>
-          <td>{{ loop.index }}</td>
-          <td><code style="font-size:12px">{{ b.filename }}</code></td>
-          <td style="font-size:12px">{{ b.timestamp[:16] if b.timestamp else '—' }}</td>
-          <td style="text-align:right">{{ b.size_kb }} KB</td>
+          <td style="white-space:nowrap">
+            <strong>{{ b.timestamp[:16] }}</strong>
+            <div style="font-size:11.5px;color:var(--cl-text-light)">
+              {% if b.age_hours < 24 %}{{ b.age_hours|round(0)|int }} {{ t('h ago', 'ساعة') }}
+              {% else %}{{ b.age_days }} {{ t('days ago', 'يوم') }}{% endif %}
+            </div>
+          </td>
+          <td><code style="font-size:11.5px">{{ b.filename }}</code></td>
+          <td style="text-align:right;white-space:nowrap">{{ b.size_mb }} MB</td>
           <td>
-            <span class="pf-badge {{ 'success' if b.integrity == 'ok' else ('danger' if b.integrity else '') }}">
-              {{ b.integrity or 'not checked' }}
+            <span class="pf-badge {{ 'warning' if b.kind != 'backup' else '' }}">
+              {% if b.kind == 'pre-restore' %}{{ t('Safety snapshot', 'لقطة أمان') }}
+              {% elif b.kind == 'uploaded' %}{{ t('Uploaded', 'مرفوع') }}
+              {% else %}{{ t('Automatic', 'تلقائي') }}{% endif %}
             </span>
           </td>
-          <td>
-            <!-- Restore button with confirmation modal -->
-            <button type="button"
-                    onclick="confirmRestore('{{ b.filename }}')"
-                    class="pf-btn pf-btn-secondary"
-                    style="font-size:.78rem;padding:4px 10px;color:#dc2626;border-color:#fca5a5">
-              {{ t('🔄 Restore', '🔄 استعادة') }}
+          <td style="white-space:nowrap">
+            <a class="pf-btn pf-btn-secondary pf-btn-sm"
+               href="{{ url_for('system.backup_download', filename=b.filename) }}">
+              {{ t('⬇ Download', '⬇ تنزيل') }}
+            </a>
+            <form method="post" style="display:inline"
+                  action="{{ url_for('system.backup_verify', filename=b.filename) }}">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+              <button class="pf-btn pf-btn-secondary pf-btn-sm">{{ t('✓ Check', '✓ فحص') }}</button>
+            </form>
+            <button type="button" class="pf-btn pf-btn-danger pf-btn-sm"
+                    onclick="openRestore('{{ b.filename }}', '{{ b.timestamp[:16] }}')">
+              {{ t('↺ Restore', '↺ استعادة') }}
             </button>
           </td>
         </tr>
@@ -89,73 +160,80 @@
     </table>
   </div>
   {% else %}
-  <div class="pf-empty" style="padding:40px;text-align:center">
-    No backups yet. Click "Run Backup Now" to create the first backup.
+  <div class="pf-empty">
+    {{ t('No backups yet. Press “Back Up Now” to make the first one.',
+          'لا توجد نسخ احتياطية بعد. اضغط «انسخ احتياطياً الآن» لإنشاء أول نسخة.') }}
   </div>
   {% endif %}
 </div>
 
-<!-- ── Restore confirmation modal ─────────────────────────────────── -->
-<div id="restoreModal"
-     style="display:none;position:fixed;inset:0;z-index:2000;
-            background:rgba(0,0,0,.5);align-items:center;justify-content:center">
-  <div style="background:var(--cl-surface);border-radius:16px;padding:28px 32px;
-              max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25)">
-    <div style="font-size:2rem;text-align:center;margin-bottom:8px">⚠️</div>
-    <h3 style="text-align:center;margin:0 0 12px;color:#dc2626">{{ t('Confirm Restore', 'تأكيد الاستعادة') }}</h3>
-    <p style="font-size:.9rem;color:var(--cl-text);margin-bottom:6px">
-      {{ t('You are about to restore the database from:', 'أنت على وشك استعادة قاعدة البيانات من:') }}
+<!-- ── Restore confirmation ────────────────────────────────────── -->
+<div id="restoreModal" role="dialog" aria-modal="true" aria-labelledby="restoreTitle"
+     style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);
+            align-items:center;justify-content:center;padding:16px">
+  <form method="post" id="restoreForm"
+        style="background:var(--cl-surface);border-radius:16px;padding:26px 30px;
+               max-width:540px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.3)">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+    <h3 id="restoreTitle" style="margin:0 0 14px;color:var(--cl-danger);font-size:1.15rem">
+      ⚠️ {{ t('Read this before you restore', 'اقرأ هذا قبل الاستعادة') }}
+    </h3>
+
+    <p style="font-size:.9rem;margin-bottom:10px">
+      {{ t('You are about to replace ALL current data with the backup taken on',
+            'أنت على وشك استبدال كل البيانات الحالية بالنسخة المأخوذة في') }}
+      <strong id="restoreWhen"></strong>.
     </p>
-    <p id="restoreFilename"
-       style="font-family:monospace;background:var(--cl-bg);border:1px solid var(--cl-border);
-              border-radius:6px;padding:8px 12px;font-size:.85rem;word-break:break-all;
-              margin-bottom:12px"></p>
-    <p style="font-size:.85rem;color:#dc2626;margin-bottom:20px">
-      {{ t('⚠️ This will', '⚠️ سيؤدي هذا إلى') }} <strong>{{ t('overwrite the current live database', 'استبدال قاعدة البيانات الحالية') }}</strong>.
-      A safety snapshot of your current data will be created automatically before restore.
-      This action cannot be undone.
+
+    <ul style="font-size:.88rem;color:var(--cl-text);line-height:1.75;margin:0 0 14px 20px">
+      <li>{{ t('Every visit, invoice, payment and prescription entered SINCE that date will be gone.',
+                'كل زيارة وفاتورة ودفعة ووصفة تم إدخالها بعد ذلك التاريخ ستختفي.') }}</li>
+      <li>{{ t('Staff will be locked out of the system for a few minutes.',
+                'سيتعذر على الموظفين استخدام النظام لبضع دقائق.') }}</li>
+      <li>{{ t('A safety snapshot of the CURRENT data is taken first, so this can be undone.',
+                'يتم أخذ لقطة أمان للبيانات الحالية أولاً، لذا يمكن التراجع عن هذا.') }}</li>
+    </ul>
+
+    <label class="pf-label">
+      {{ t('Type the file name to confirm', 'اكتب اسم الملف للتأكيد') }}
+    </label>
+    <p style="font-family:monospace;background:var(--cl-surface-2);border:1px solid var(--cl-border);
+              border-radius:6px;padding:7px 11px;font-size:.82rem;word-break:break-all;margin-bottom:8px">
+      <span id="restoreFilename"></span>
     </p>
-    <div style="display:flex;gap:10px;justify-content:flex-end">
-      <button type="button" onclick="closeRestoreModal()"
-              class="pf-btn pf-btn-secondary">{{ t('Cancel', 'إلغاء') }}</button>
-      <button type="button" id="restoreConfirmBtn"
-              onclick="submitRestore()"
-              style="background:#dc2626;color:#fff;border:none;
-                     padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:700">
-        {{ t('Yes, Restore Now', 'نعم، استعد الآن') }}
+    <input class="pf-input" type="text" name="confirm_filename" id="restoreConfirmInput"
+           autocomplete="off" spellcheck="false" required
+           placeholder="{{ t('Type the file name exactly', 'اكتب اسم الملف بالضبط') }}">
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button type="button" class="pf-btn pf-btn-secondary"
+              onclick="closeRestore()">{{ t('Cancel', 'إلغاء') }}</button>
+      <button type="submit" class="pf-btn pf-btn-danger">
+        {{ t('Restore and lose newer data', 'استعادة وفقدان البيانات الأحدث') }}
       </button>
     </div>
-  </div>
+  </form>
 </div>
 
-<!-- Hidden form for POST restore -->
-<form id="restoreForm" method="post" style="display:none">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-</form>
-
 <script>
-let _restoreFile = '';
-
-function confirmRestore(filename) {
-  _restoreFile = filename;
+function openRestore(filename, when) {
   document.getElementById('restoreFilename').textContent = filename;
-  const modal = document.getElementById('restoreModal');
-  modal.style.display = 'flex';
+  document.getElementById('restoreWhen').textContent = when;
+  var form = document.getElementById('restoreForm');
+  form.action = '/system/backup/' + encodeURIComponent(filename) + '/restore';
+  document.getElementById('restoreConfirmInput').value = '';
+  document.getElementById('restoreModal').style.display = 'flex';
+  document.getElementById('restoreConfirmInput').focus();
 }
-
-function closeRestoreModal() {
+function closeRestore() {
   document.getElementById('restoreModal').style.display = 'none';
 }
-
-function submitRestore() {
-  const form = document.getElementById('restoreForm');
-  form.action = '/system/backup/' + encodeURIComponent(_restoreFile) + '/restore';
-  form.submit();
-}
-
-// Close modal on backdrop click
-document.getElementById('restoreModal').addEventListener('click', function(e) {
-  if (e.target === this) closeRestoreModal();
+document.getElementById('restoreModal').addEventListener('click', function (e) {
+  if (e.target === this) closeRestore();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeRestore();
 });
 </script>
 {% endblock %}

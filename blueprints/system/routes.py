@@ -6,7 +6,8 @@ import sys
 import glob
 import platform as _platform
 from datetime import date, datetime, timedelta
-from flask import render_template, request, redirect, url_for, session, flash, current_app, jsonify
+from flask import (render_template, request, redirect, url_for, session, flash,
+                   current_app, jsonify, send_file, abort)
 from . import system_bp
 from blueprints.auth.routes import login_required, role_required
 import models.database as db
@@ -17,6 +18,48 @@ from models.sync import get_sync_status_summary, resolve_conflict
 
 def _db_path():
     return current_app.config.get("DATABASE_PATH", "")
+
+
+# A patient photo is 16 MB; a clinic database is not. The app-wide
+# MAX_CONTENT_LENGTH is raised for the backup-upload route only.
+_UPLOAD_LIMIT = 2 * 1024 * 1024 * 1024  # 2 GB
+
+
+@system_bp.before_app_request
+def _backup_maintenance_gate():
+    """Hold traffic off the database while a restore is swapping it.
+
+    Registered on this blueprint but applied app-wide via before_app_request,
+    so app.py needs no change. How quiescence is achieved, and what it does
+    not achieve:
+
+      · The marker is a FILE, so every gunicorn worker process sees it — an
+        in-process flag would gate one worker of N.
+      · It is checked when a request STARTS. A request already inside a view
+        keeps its open connection and is NOT interrupted. On SQLite that is
+        safe anyway: the restore goes through SQLite's backup API, which takes
+        the write lock and makes stragglers wait or fail, never corrupt.
+      · Between the marker being written and the last in-flight request
+        finishing there is a window of at most one request. Restoring during
+        clinic hours is still a bad idea; restoring while closed is fine.
+      · The marker self-expires after MAINTENANCE_MAX_MINUTES so a crashed
+        restore cannot lock a clinic out of its own records forever.
+    """
+    if request.path.startswith(("/static/", "/auth/")):
+        return None
+    if request.path == "/system/backup/upload" and request.method == "POST":
+        # Must happen before app.py's CSRF check touches request.form, which
+        # is what triggers the 16 MB limit.
+        request.max_content_length = _UPLOAD_LIMIT
+    if request.path.startswith("/system/backup"):
+        return None
+    info = bk.maintenance_active()
+    if not info:
+        return None
+    return render_template(
+        "error.html", code=503,
+        msg=(f"Maintenance in progress: {info.get('reason', 'database restore')}. "
+             f"The system will be back in a few minutes.")), 503
 
 
 @system_bp.route("/")
@@ -143,10 +186,14 @@ def monitor():
         "release_date":    os.environ.get("RELEASE_DATE", "2026-05-24"),
     }
 
-    latest_backup = bk.get_latest_backup()
+    # Second place a stale backup gets noticed — the monitor page is opened far
+    # more often than the backup page, and this is the whole point of T3.
+    backup_health = bk.check_and_notify()
+    latest_backup = backup_health.get("latest")
 
     return render_template(
         "system/monitor.html",
+        backup_health=backup_health,
         sys_info=sys_info,
         row_counts=row_counts,
         recent_logs=recent_logs,
@@ -317,15 +364,46 @@ def settings():
     )
 
 
+def _archive_or_abort(filename):
+    """Resolve a URL-supplied backup name, or refuse outright.
+
+    Refusal is a 4xx, never a flash-and-redirect: a redirect reads as "wrong
+    file" when the caller is a person and as "keep probing" when it is not.
+    400 = the name could not have come from us (traversal, wrong extension);
+    404 = a legitimate name for a file that is not here.
+    """
+    path = bk.resolve_archive(filename)
+    if not path:
+        abort(400)
+    if not os.path.exists(path):
+        abort(404)
+    return path
+
+
+def _audit_backup(action: str, details: str) -> None:
+    user = session.get("user") or {}
+    db.log_audit(
+        username=user.get("username", "?"),
+        role=user.get("role", "?"),
+        action=action,
+        module="system",
+        entity_type="backup",
+        details=details,
+    )
+
+
 @system_bp.route("/backup")
 @role_required("super_admin", "clinic_owner", "support_admin")
 def backup():
-    backups = bk.list_backups()
-    latest  = bk.get_latest_backup()
+    # Page load is the one thing guaranteed to still happen when the scheduler
+    # has quietly died, so this is where a stale backup gets noticed.
+    health = bk.check_and_notify()
     return render_template(
         "system/backup.html",
-        backups=backups,
-        latest=latest,
+        backups=bk.list_backups(),
+        latest=health.get("latest"),
+        health=health,
+        maintenance=bk.maintenance_active(),
         active="backup",
     )
 
@@ -335,41 +413,93 @@ def backup():
 def backup_run():
     result = bk.run_backup()
     if result.get("success"):
-        db.log_audit(
-            username=session["user"]["username"],
-            role=session["user"]["role"],
-            action="manual_backup",
-            module="system",
-            entity_type="backup",
-            details=f"Manual backup: {result.get('filename')} ({result.get('size_kb')} KB)",
-        )
+        _audit_backup("manual_backup",
+                      f"Manual backup: {result.get('filename')} ({result.get('size_kb')} KB)")
         flash(f"Backup completed: {result['filename']} ({result['size_kb']} KB)", "success")
+        for off in result.get("offsite") or []:
+            if not off.get("ok"):
+                flash(f"Off-site copy to {off['label']} FAILED: {off.get('error')}. "
+                      f"The local backup is fine, but there is no second copy.", "danger")
     else:
         flash(f"Backup failed: {result.get('error', 'Unknown error')}", "error")
+    return redirect(url_for("system.backup"))
+
+
+@system_bp.route("/backup/<filename>/verify", methods=["POST"])
+@role_required("super_admin", "clinic_owner", "support_admin")
+def backup_verify(filename):
+    """Check a backup is readable — without restoring it."""
+    _archive_or_abort(filename)
+    result = bk.verify_backup(filename)
+    if result.get("success"):
+        flash(f"{filename} is readable and complete.", "success")
+    else:
+        flash(f"{filename} is NOT usable: {result.get('integrity')}", "danger")
+    return redirect(url_for("system.backup"))
+
+
+@system_bp.route("/backup/<filename>/download")
+@role_required("super_admin", "clinic_owner")
+def backup_download(filename):
+    """Download a backup, e.g. onto a USB stick."""
+    path = _archive_or_abort(filename)
+    _audit_backup("backup_download", f"Downloaded: {os.path.basename(path)}")
+    return send_file(path, as_attachment=True,
+                     download_name=os.path.basename(path))
+
+
+@system_bp.route("/backup/upload", methods=["POST"])
+@role_required("super_admin", "clinic_owner")
+def backup_upload():
+    """Accept a backup file from a USB stick. Verified before it is kept."""
+    fileobj = request.files.get("archive")
+    if not fileobj or not fileobj.filename:
+        flash("Choose a backup file first.", "warning")
+        return redirect(url_for("system.backup"))
+    result = bk.accept_upload(fileobj, fileobj.filename)
+    if result["success"]:
+        _audit_backup("backup_upload", f"Uploaded: {result['filename']}")
+        flash(result["message"], "success")
+    else:
+        flash(result["message"], "danger")
     return redirect(url_for("system.backup"))
 
 
 @system_bp.route("/backup/<filename>/restore", methods=["POST"])
 @role_required("super_admin", "clinic_owner")
 def backup_restore(filename):
-    """Restore the database from a named backup file."""
+    """Restore the database from a named backup file.
+
+    Typing the filename is the confirmation: a modal a tired owner can click
+    through at 22:00 is not one.
+    """
+    _archive_or_abort(filename)
+    if (request.form.get("confirm_filename") or "").strip() != filename:
+        flash("Restore cancelled — the filename you typed did not match.", "warning")
+        return redirect(url_for("system.backup"))
+
     result = bk.restore_backup(filename)
 
     if result.get("skipped"):
         flash(result["message"], "warning")
     elif result.get("success"):
-        db.log_audit(
-            username=session["user"]["username"],
-            role=session["user"]["role"],
-            action="backup_restore",
-            module="system",
-            entity_type="backup",
-            details=f"Restored from: {filename}",
-        )
+        _audit_backup("backup_restore",
+                      f"Restored from {filename}; previous data saved as "
+                      f"{result.get('snapshot')}")
         flash(result["message"], "success")
     else:
         flash(result["message"], "danger")
 
+    return redirect(url_for("system.backup"))
+
+
+@system_bp.route("/backup/maintenance/off", methods=["POST"])
+@role_required("super_admin", "clinic_owner")
+def backup_maintenance_off():
+    """Escape hatch: clear a maintenance marker left by a crashed restore."""
+    bk.maintenance_off()
+    _audit_backup("maintenance_cleared", "Maintenance mode cleared manually")
+    flash("Maintenance mode cleared. The system is serving again.", "success")
     return redirect(url_for("system.backup"))
 
 
