@@ -20,7 +20,12 @@ except ImportError:
     _OpenAI = None
     _OK = False
 
+import logging as _log
 import os as _os
+import models.security as _sec
+
+_logger = _log.getLogger(__name__)
+
 _BASE_URL = _os.environ.get("AI_BASE_URL", "http://localhost:3001/v1")
 _API_KEY  = _os.environ.get("AI_API_KEY",  "")   # Must be set via env var — no hardcoded fallback
 _MODEL    = _os.environ.get("AI_MODEL",    "gemini-2.5-flash")
@@ -38,6 +43,71 @@ def _allow(ip: str) -> bool:
         return False
     _rate[ip].append(now)
     return True
+
+
+# ── Spend protection for the public endpoint ──────────────────────────────────
+# /petsy/chat is unauthenticated by design (it is the customer-facing widget)
+# and every call costs real money at the AI provider. The per-IP limiter above
+# is necessary but not sufficient: it lives in a module-level dict, so each
+# gunicorn worker has its own copy, and anyone with a pool of addresses gets
+# a fresh bucket per address. Neither bounds the bill.
+#
+# This adds a hard global ceiling on ANONYMOUS calls per day, counted in the
+# database so every worker sees the same number. Signed-in staff are exempt —
+# they are not the abuse vector and must never be locked out of their own tool.
+_PUBLIC_DAILY_CAP = int(_os.environ.get("PETSY_PUBLIC_DAILY_CAP", "500") or 500)
+
+# Anything longer is abuse or a paste accident, not a question about a cat.
+_MAX_MSG_CHARS = 1500
+_MAX_HISTORY_CHARS = 6000
+
+
+def _ensure_usage_table(conn) -> None:
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS petsy_usage ("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " day TEXT NOT NULL,"
+        " ip TEXT,"
+        " created_at TEXT DEFAULT (datetime('now')))"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_petsy_usage_day ON petsy_usage(day)")
+
+
+def _public_budget_left(ip: str) -> bool:
+    """Count today's anonymous calls and record this one. False when spent.
+
+    Append-only rather than a counter row: concurrent workers cannot lose an
+    increment, and it needs no dialect-specific UPSERT.
+    """
+    try:
+        import models.database as db
+    except ImportError:                                   # pragma: no cover
+        return True
+    today = date.today().isoformat()
+    conn = db.get_db()
+    try:
+        _ensure_usage_table(conn)
+        row = conn.execute(
+            "SELECT COUNT(*) FROM petsy_usage WHERE day=?", (today,)
+        ).fetchone()
+        used = int((row[0] if row else 0) or 0)
+        if used >= _PUBLIC_DAILY_CAP:
+            _logger.warning(
+                "Petsy public daily cap reached (%d) — refusing anonymous AI "
+                "calls until tomorrow. Raise PETSY_PUBLIC_DAILY_CAP if this is "
+                "legitimate traffic.", _PUBLIC_DAILY_CAP,
+            )
+            return False
+        with conn:
+            conn.execute("INSERT INTO petsy_usage(day, ip) VALUES(?,?)", (today, ip))
+        return True
+    except Exception:
+        # Never let bookkeeping break the widget — but log it, because a
+        # silently broken cap is an unbounded bill.
+        _logger.exception("Petsy usage accounting failed; allowing the call")
+        return True
+    finally:
+        conn.close()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -648,7 +718,10 @@ def _call_petsy(messages: list, system: str) -> tuple[str, str]:
 
 @petsy_bp.route("/chat", methods=["POST"])
 def chat():
-    ip = request.remote_addr or "unknown"
+    # request.remote_addr is the PROXY's address behind nginx/Koyeb/Cloudflare,
+    # so every public visitor shared one rate-limit bucket — the limiter was
+    # simultaneously blocking legitimate users and failing to isolate abusers.
+    ip = _sec.get_real_ip(request)
     if not _allow(ip):
         return jsonify({"error": "Too many requests — please wait a moment."}), 429
 
@@ -658,13 +731,26 @@ def chat():
 
     if not message:
         return jsonify({"error": "Empty message"}), 400
+    if len(message) > _MAX_MSG_CHARS:
+        return jsonify({"error": f"Message too long (max {_MAX_MSG_CHARS} characters)."}), 400
 
     # Build conversation turns
     messages = [
         {"role": m["role"], "content": m["content"]}
         for m in history[-8:]
-        if m.get("role") in ("user", "assistant") and m.get("content")
+        if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)
+        and m.get("content")
     ]
+    # Cap the whole history too: eight turns of 100 KB each is the same bill as
+    # a thousand short questions, and the per-message check alone misses it.
+    total = 0
+    trimmed = []
+    for m in reversed(messages):
+        total += len(m["content"])
+        if total > _MAX_HISTORY_CHARS:
+            break
+        trimmed.insert(0, m)
+    messages = trimmed
     messages.append({"role": "user", "content": message})
 
     # ── Staff mode (authenticated) ────────────────────────────────────────────
@@ -694,6 +780,13 @@ def chat():
         })
 
     # ── Public mode (not authenticated) ──────────────────────────────────────
+    # Signed-in staff returned above and are never counted against this cap.
+    if not _public_budget_left(ip):
+        return jsonify({
+            "reply": ("Petsy is resting for today 🐾 Please contact the clinic "
+                      "directly, or try again tomorrow."),
+            "model": "", "staff_mode": False, "capped": True,
+        }), 429
     reply, model = _call_petsy(messages, _PUBLIC_SYSTEM)
     return jsonify({"reply": reply, "model": model, "staff_mode": False})
 
