@@ -88,7 +88,11 @@
           {% endif %}
         </td>
         <td>
-          {% if log.status == 'Sent' %}
+          {% if log.status == 'Not Configured' %}
+            {# Never render as sent. WhatsApp is not connected, so this message
+               never left the building — the clinic must be able to see that. #}
+            <span class="status-failed" title="{{ log.error }}">{{ t('⚠ Not sent — WhatsApp not connected', '⚠ لم تُرسل — واتساب غير متصل') }}</span>
+          {% elif log.status == 'Sent' %}
             <span class="status-sent">{{ t('✓ Sent', '✓ أُرسلت') }}</span>
           {% elif log.status == 'Failed' %}
             <span class="status-failed">{{ t('✗ Failed', '✗ فشلت') }}</span>

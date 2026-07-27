@@ -48,7 +48,18 @@ def _send_whatsapp(conn, phone: str, message: str, owner_id=None, template_name=
             status = "Failed"
             error = str(e)
     else:
-        status = "Sent"  # stub mode — logged as sent
+        # NEVER report "Sent" for a message that was never transmitted. This
+        # previously logged stub-mode sends as Sent, so a clinic saw a green
+        # column of reminders that had not left the building — and then blamed
+        # clients for not turning up. A reminder system that lies about
+        # delivery is worse than having none.
+        status = "Not Configured"
+        error = ("WhatsApp is not connected — no API token is set. "
+                 "Connect it under WhatsApp → Settings.")
+        logger.warning(
+            "WhatsApp reminder NOT sent to %s (%s): no token configured",
+            phone, template_name or "reminder",
+        )
 
     conn.execute(
         "INSERT INTO whatsapp_log(owner_id, phone, message, template_name, status, error, sent_at) VALUES(?,?,?,?,?,?,datetime('now'))",
