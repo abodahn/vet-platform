@@ -222,7 +222,17 @@ def create_app(cfg=None) -> Flask:
 
     @app.errorhandler(413)
     def _413(e):
-        return render_template("error.html", code=413, msg="File too large (max 16 MB)"), 413
+        # Werkzeug rejects the body before any view runs, so the import wizard
+        # cannot catch this itself. Say what to do, not just what went wrong —
+        # a clinic hitting this is mid-migration with its whole history in one
+        # spreadsheet and needs to know splitting it is the answer.
+        limit_mb = int(app.config.get("MAX_CONTENT_LENGTH", 16 * 1024 * 1024) / (1024 * 1024))
+        return render_template(
+            "error.html", code=413,
+            msg=(f"That file is larger than {limit_mb} MB. Split it into smaller "
+                 f"files — for example one sheet per year, or owners and pets "
+                 f"separately — and import them one after another."),
+        ), 413
 
     @app.after_request
     def _security_headers(response):
