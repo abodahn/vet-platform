@@ -2001,8 +2001,14 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
         # clinic
         if conn.execute("SELECT COUNT(*) FROM clinic").fetchone()[0] == 0:
             conn.execute(
+                # Seed BLANK, not the vendor's own brand. A fresh clinic that
+                # has not opened Settings yet would otherwise print "Aleefy" on
+                # the invoices it hands its own customers. Blank lets the
+                # neutral fallbacks in pdf_generator and base.html take over.
+                # Only the INSERT is changed — the column DEFAULTs are left
+                # alone so the Alembic baseline does not drift.
                 "INSERT INTO clinic (name, name_ar, doctor_name) VALUES (?,?,?)",
-                ("Aleefy","اليفي","Lead Veterinarian"),
+                ("", "", ""),
             )
         # branches
         if conn.execute("SELECT COUNT(*) FROM branches").fetchone()[0] == 0:

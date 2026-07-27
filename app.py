@@ -234,6 +234,57 @@ def create_app(cfg=None) -> Flask:
                  f"separately — and import them one after another."),
         ), 413
 
+    # ── Health ───────────────────────────────────────────────────────────────
+    # The public body is a status word and the version — nothing an
+    # unauthenticated caller cannot already read from the X-App-Version header
+    # on the login page. Deliberately NOT public: FLASK_ENV, file paths, row
+    # counts, DB latency. api_v1 stays unregistered; registering it to get a
+    # health route would expose eleven other endpoints.
+    @app.route("/healthz")
+    def _healthz():
+        import hmac
+        from flask import jsonify
+        from config import VERSION_INFO
+
+        checks = {}
+        try:
+            conn = db.get_db()
+            conn.execute("SELECT 1").fetchone()
+            conn.close()
+            checks["database"] = "ok"
+        except Exception as exc:
+            logger.warning("healthz: database probe failed: %s", exc)
+            checks["database"] = "unavailable"
+
+        sched = app.config.get("_SCHEDULER")
+        if sched is None:
+            # No handle: either another gunicorn worker owns it (fine) or it died.
+            checks["scheduler"] = ("elsewhere"
+                                   if app.config.get("_SCHEDULER_LOCK") is None
+                                   else "stopped")
+        else:
+            checks["scheduler"] = "running" if sched.running else "stopped"
+
+        backup = bk.health()
+        checks["backup"] = "ok" if backup.get("ok") else "stale"
+
+        healthy = (checks["database"] == "ok"
+                   and checks["scheduler"] != "stopped"
+                   and checks["backup"] == "ok")
+
+        body = {"status": "ok" if healthy else "degraded",
+                "version": VERSION_INFO["full"]}
+
+        # Operator detail behind the key clinic_env.py already provisions.
+        key = (app.config.get("API_V1_KEY") or os.environ.get("API_V1_KEY", "")).strip()
+        supplied = request.headers.get("Authorization", "").partition(" ")[2].strip()
+        if key and supplied and hmac.compare_digest(supplied, key):
+            body["clinic"] = app.config.get("CLINIC_ID", "")
+            body["checks"] = checks
+            body["last_backup_hours"] = backup.get("age_hours")
+            body["commit"] = VERSION_INFO["commit"]
+        return jsonify(body), 200 if healthy else 503
+
     @app.after_request
     def _security_headers(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -372,6 +423,9 @@ def _start_scheduler(app, backup_dir: str) -> None:
                           id="backup_health")
 
         scheduler.start()
+        # Exposed so /healthz can tell "scheduler dead" from "another worker
+        # owns it" — without the handle those two look identical.
+        app.config["_SCHEDULER"] = scheduler
         logger.info("APScheduler started in pid %s — backup@02:00, "
                     "reminders@09:00, backup health@09:05", os.getpid())
     except Exception as e:

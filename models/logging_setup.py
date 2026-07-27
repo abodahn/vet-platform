@@ -27,6 +27,8 @@ from logging.handlers import RotatingFileHandler
 
 from flask import g, has_request_context, request
 
+from config import CLINIC_ID, VERSION_INFO
+
 # ── DSN masking ───────────────────────────────────────────────────────────────
 # postgresql://user:pa$$w0rd@host:5432/db  ->  postgresql://user:***@host:5432/db
 _DSN_RE = re.compile(r"(?P<head>[A-Za-z][A-Za-z0-9+.\-]*://[^:/@\s]+:)(?P<pw>[^@\s]+)(?P<tail>@)")
@@ -108,6 +110,17 @@ def init_logging(app) -> None:
         return          # request hooks already registered on this app
     app.extensions["vet_logging"] = True
 
+    # Place 1 of 3 the version is visible: the first line of every log file.
+    # "Which build is this clinic on" is answerable from the log they email you.
+    logging.getLogger(__name__).info(
+        "Starting version %s (commit %s, built %s) — clinic=%s env=%s level=%s",
+        VERSION_INFO["version"], VERSION_INFO["commit"] or "n/a",
+        VERSION_INFO["built"], CLINIC_ID,
+        os.environ.get("FLASK_ENV", "development"), logging.getLevelName(level),
+    )
+
+    _purge_expired_json_logs()
+
     log = logging.getLogger("request")
 
     @app.before_request
@@ -126,9 +139,135 @@ def init_logging(app) -> None:
         # Scrub to the url_rule pattern if even ids become too much.
         log.info("%s %s -> %s in %.1fms", request.method, request.path, response.status_code, ms)
         response.headers["X-Request-ID"] = getattr(g, "request_id", "-")
+        # Place 2 of 3: on every response, so `curl -sI https://clinic/auth/login`
+        # answers "which build" without an account, a login or an SSH session.
+        # A header rather than a new endpoint — nothing to register, nothing to
+        # authorise, and it cannot be more exposed than the login page already is.
+        response.headers["X-App-Version"] = _VERSION_HEADER
         return response
 
     _init_sentry(app)
+
+
+# ── Log retention ─────────────────────────────────────────────────────────────
+def _purge_expired_json_logs() -> None:
+    """Apply LOG_FILE_RETENTION_DAYS to the JSON logs in logs/backend|frontend.
+
+    models/logging_db.py has shipped cleanup_old_logs() since it was written and
+    nothing ever called it, so /system/monitor's "expires in N days" column was
+    counting down to nothing and the files grew forever. Startup is the cheapest
+    place that is guaranteed to run.
+
+    # ponytail: startup sweep only. Ceiling: an instance that stays up longer
+    # than the retention window keeps expired files until the next restart.
+    # Upgrade path is a daily scheduler job — see the app.py snippet in the
+    # observability notes.
+    """
+    log = logging.getLogger(__name__)
+    try:
+        from models.logging_db import cleanup_old_logs
+        deleted = cleanup_old_logs()
+    except Exception as exc:   # import chain reaches models.database; never fatal
+        log.warning("Log retention sweep skipped (%s: %s)", type(exc).__name__, exc)
+        return
+    if deleted:
+        log.info("Log retention: deleted %d expired JSON log file(s)", deleted)
+
+
+# ── Sentry (optional) ─────────────────────────────────────────────────────────
+# The no-payload-on-disk policy at the top of this module applies with more
+# force to a third-party service. Any key whose NAME matches this has its VALUE
+# replaced before the event leaves the process.
+_SCRUB_KEY_RE = re.compile(
+    # clinical
+    r"pet|animal|patient|owner|client|customer|visit|diagnos|treatment|prescri|"
+    r"medicat|drug|dose|vaccin|lab_|specimen|result|symptom|note|chart|weight|"
+    # financial
+    r"invoice|receipt|payment|price|cost|amount|subtotal|total|discount|tax|"
+    r"salary|payroll|wage|balance|credit|iban|card|"
+    # identifying
+    r"name|phone|mobile|email|address|national|passport|"
+    # secrets
+    r"password|passwd|secret|token|api_key|apikey|dsn|cookie|authorization",
+    re.I,
+)
+_SCRUBBED = "[scrubbed]"
+
+# Contexts the SDK builds itself (runtime version, OS, device). Left alone so
+# the event stays diagnosable — otherwise contexts.runtime.name reads "[scrubbed]".
+_SDK_CONTEXTS = {"runtime", "os", "device", "trace", "app", "browser", "profile"}
+
+_VERSION_HEADER = VERSION_INFO["full"]
+_RELEASE = f"vet-platform@{VERSION_INFO['full']}"
+
+
+def _redact(value, _depth: int = 0):
+    """Blank the value of any key matching _SCRUB_KEY_RE, recursively.
+
+    Sentry events are JSON-serialisable, so this cannot meet a cycle; the depth
+    cap is only there so a pathological nesting cannot burn the stack.
+    """
+    if _depth > 8:
+        return value
+    if isinstance(value, dict):
+        return {
+            k: (_SCRUBBED if _SCRUB_KEY_RE.search(str(k)) else _redact(v, _depth + 1))
+            for k, v in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_redact(v, _depth + 1) for v in value]
+    return value
+
+
+def _scrub_event(event, hint=None):
+    """Sentry `before_send`. Strips payload, tags the event so it is attributable.
+
+    Without the tags this is unusable at 20 single-tenant deployments: an
+    untagged event says something broke, not whose clinic it broke in.
+    """
+    if not isinstance(event, dict):
+        return event
+
+    # Request sections exist only to carry payload — the query string holds
+    # tokens, the body holds the patient record, the headers hold the session.
+    req = event.get("request")
+    if isinstance(req, dict):
+        for key in ("data", "cookies", "headers", "env", "query_string"):
+            req.pop(key, None)
+        url = req.get("url")
+        if isinstance(url, str):
+            req["url"] = url.split("?", 1)[0]
+
+    # Traceback locals: one frame of add_invoice() holds the whole invoice, one
+    # frame of save_visit() holds the whole record. include_local_variables=False
+    # already stops these being collected — this is the second lock, because a
+    # patient record posted to a third party cannot be un-posted.
+    for group in (event.get("exception"), event.get("threads")):
+        for entry in (group or {}).get("values") or []:
+            for frame in ((entry.get("stacktrace") or {}).get("frames") or []):
+                if isinstance(frame, dict):
+                    frame.pop("vars", None)
+
+    for section in ("extra", "user"):
+        if isinstance(event.get(section), dict):
+            event[section] = _redact(event[section])
+    ctx = event.get("contexts")
+    if isinstance(ctx, dict):
+        event["contexts"] = {
+            k: (v if k in _SDK_CONTEXTS else _redact(v)) for k, v in ctx.items()
+        }
+
+    tags = event.get("tags")
+    if not isinstance(tags, dict):
+        tags = event["tags"] = {}
+    tags.setdefault("clinic", CLINIC_ID)
+    tags.setdefault("version", VERSION_INFO["version"])
+    tags.setdefault("commit", VERSION_INFO["commit"] or "n/a")
+    # Bridges the Sentry event to the clinic's own log file: grep app.log for
+    # this id and the surrounding request lines are right there.
+    if has_request_context():
+        tags.setdefault("request_id", getattr(g, "request_id", "-"))
+    return event
 
 
 def _init_sentry(app) -> None:
@@ -147,7 +286,20 @@ def _init_sentry(app) -> None:
     sentry_sdk.init(
         dsn=dsn,
         environment=os.environ.get("FLASK_ENV", "development"),
-        send_default_pii=False,   # never ship patient data to a third party
-        traces_sample_rate=0.0,
+        release=_RELEASE,               # regressions become attributable to a build
+        send_default_pii=False,         # never ship patient data to a third party
+        include_local_variables=False,  # a traceback frame holds whole records
+        max_breadcrumbs=0,              # breadcrumbs replay log lines verbatim
+        before_send=_scrub_event,
+        # Errors: keep all of them. 20 clinics do not generate the volume that
+        # makes sampling worthwhile, and a dropped event is a support call you
+        # cannot answer. Turn down only if the free-tier quota actually bites.
+        sample_rate=float(os.environ.get("SENTRY_SAMPLE_RATE", "1.0")),
+        # Performance tracing off: it burns the same quota as errors and adds
+        # URL and SQL spans that would each need scrubbing, for no support value.
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
     )
-    logging.getLogger(__name__).info("Sentry error reporting enabled")
+    sentry_sdk.set_tag("clinic", CLINIC_ID)
+    logging.getLogger(__name__).info(
+        "Sentry enabled — release %s, clinic %s", _RELEASE, CLINIC_ID
+    )

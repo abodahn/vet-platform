@@ -1,10 +1,95 @@
+import base64
+import io
+import logging
+
 from flask import request, session, redirect, url_for, jsonify
 from . import settings_bp
 import models.database as db
 
+logger = logging.getLogger(__name__)
 
 # Only "medical" is supported — the legacy "logo" theme was removed in Gap-C cleanup.
 _VALID_THEMES = {"medical"}
+
+
+# ── Clinic logo ────────────────────────────────────────────────────────────────
+# WHERE IT LIVES: clinic.logo_data, as a `data:image/png;base64,...` URI.
+#
+# Not the filesystem. models/backup.py copies the *database* (sqlite backup /
+# pg_dump) and nothing else, so a logo under uploads/ would survive a backup but
+# vanish on restore — every clinic would silently lose its branding on the one
+# day it was already having a bad time. TEXT in the row that is backed up is the
+# only storage here that survives the round trip.
+#
+# Being a full data URI means templates can do `<img src="{{ clinic.logo_data }}">`
+# with no serving route, and get_clinic()'s existing 5-minute cache covers it.
+
+try:
+    from PIL import Image           # ships with qrcode[pil], already required
+    _PIL_OK = True
+except ImportError:                 # pragma: no cover
+    _PIL_OK = False
+
+# Magic-byte signatures, same approach as blueprints/uploads/routes.py: the
+# extension is attacker-controlled and says nothing about the bytes.
+_IMAGE_MAGIC = (
+    (b"\xff\xd8\xff",       "JPEG"),
+    (b"\x89PNG\r\n\x1a\n",  "PNG"),
+    (b"GIF87a",             "GIF"),
+    (b"GIF89a",             "GIF"),
+    (b"RIFF",               "WEBP"),   # confirmed further at offset 8
+)
+
+LOGO_MAX_UPLOAD = 2 * 1024 * 1024   # bytes accepted from the browser
+LOGO_MAX_PX     = 400               # longest side after normalisation
+
+# ponytail: the stored blob is re-encoded PNG at <=400px, which lands at roughly
+# 20-80 KB (~30-110 KB once base64'd) and is inlined into every page that renders
+# it — no browser caching, and it rides along in every DB backup. Ceiling: if a
+# clinic ever wants a large or animated mark, move to an attachments row served
+# by blueprints/uploads and add that folder to models/backup.py's archive.
+
+
+class LogoError(ValueError):
+    """Upload rejected. The message is safe to show the user verbatim."""
+
+
+def sniff_image(head: bytes) -> str | None:
+    """Identify an image from its first bytes. None when it is not one."""
+    for sig, kind in _IMAGE_MAGIC:
+        if head[:len(sig)] == sig:
+            if kind == "WEBP" and head[8:12] != b"WEBP":
+                return None
+            return kind
+    return None
+
+
+def encode_logo(raw: bytes) -> str:
+    """Validate, downscale and encode an uploaded logo as a `data:` URI.
+
+    Raises LogoError with a user-facing reason for anything not accepted.
+    """
+    if not raw:
+        raise LogoError("No file received.")
+    if len(raw) > LOGO_MAX_UPLOAD:
+        raise LogoError(
+            f"Logo is too large. Maximum {LOGO_MAX_UPLOAD // (1024 * 1024)} MB."
+        )
+    if not sniff_image(raw[:16]):
+        raise LogoError("That file is not a PNG, JPEG, GIF or WebP image.")
+    if not _PIL_OK:                 # pragma: no cover
+        raise LogoError("Image support is unavailable on this server (Pillow missing).")
+
+    try:
+        img = Image.open(io.BytesIO(raw))
+        img.load()                  # forces decode: truncated and bomb images fail here
+    except Exception as exc:
+        raise LogoError("That image could not be read. Try re-saving it as a PNG.") from exc
+
+    img.thumbnail((LOGO_MAX_PX, LOGO_MAX_PX))
+    out = io.BytesIO()
+    img.convert("RGBA").save(out, format="PNG", optimize=True)
+    return "data:image/png;base64," + base64.b64encode(out.getvalue()).decode("ascii")
 
 
 @settings_bp.route("/")

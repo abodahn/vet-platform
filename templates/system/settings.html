@@ -33,12 +33,18 @@
 .theme-swatch { width:40px; height:40px; border-radius:8px; border:3px solid transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#fff; }
 .theme-swatch.selected { border-color:var(--cl-primary); }
 .hint { font-size:12px; color:var(--cl-muted); margin-top:3px; }
+.logo-row { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+.logo-frame { width:104px; height:104px; flex:0 0 auto; border:1.5px dashed var(--cl-border); border-radius:12px;
+  display:flex; align-items:center; justify-content:center; background:#fff; overflow:hidden; }
+.logo-frame img { max-width:88px; max-height:88px; object-fit:contain; }
+.logo-frame .logo-empty { font-size:11px; color:var(--cl-muted); text-align:center; padding:6px; }
+.logo-fields { flex:1 1 260px; min-width:240px; }
 @media(max-width:600px){ .form-grid{ grid-template-columns:1fr; } }
 </style>
 {% endblock %}
 
 {% block content %}
-<form method="post" class="settings-form">
+<form method="post" class="settings-form" enctype="multipart/form-data">
 
   <!-- Clinic Info -->
   <div class="form-card">
@@ -69,8 +75,18 @@
         <input type="url" name="website" value="{{ clinic.get('website','') }}" placeholder="https://premiumvet.com">
       </div>
       <div class="form-group full">
-        <label>{{ t('Address', 'العنوان') }}</label>
+        <label>{{ t('Tagline', 'الشعار النصي') }}</label>
+        <input type="text" name="tagline" value="{{ clinic.get('tagline','') }}"
+               placeholder="{{ t('Happy Pets, Healthy Lives', 'حيوانات سعيدة، حياة صحية') }}">
+        <div class="hint">{{ t('Shown beside your clinic name in the app', 'يظهر بجوار اسم العيادة داخل النظام') }}</div>
+      </div>
+      <div class="form-group">
+        <label>{{ t('Address (English)', 'العنوان (إنجليزي)') }}</label>
         <textarea name="address" placeholder="123 Nile Street, Cairo, Egypt">{{ clinic.get('address','') }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>{{ t('Address (Arabic)', 'العنوان (عربي)') }}</label>
+        <textarea name="address_ar" dir="rtl" placeholder="١٢٣ شارع النيل، القاهرة، مصر">{{ clinic.get('address_ar','') }}</textarea>
       </div>
       <div class="form-group">
         <label>{{ t('License Number', 'رقم الترخيص') }}</label>
@@ -79,6 +95,41 @@
       <div class="form-group">
         <label>{{ t('Tax / VAT Number', 'الرقم الضريبي') }}</label>
         <input type="text" name="tax_number" value="{{ clinic.get('tax_number','') }}" placeholder="000-000-000">
+      </div>
+    </div>
+  </div>
+
+  <!-- Clinic Logo -->
+  <div class="form-card">
+    <div class="form-card-title">{{ t('🖼️ Clinic Logo', '🖼️ شعار العيادة') }}</div>
+    <div class="logo-row">
+      <div class="logo-frame">
+        {% if clinic.get('logo_data') %}
+          <img src="{{ clinic.get('logo_data') }}" alt="{{ clinic.get('name','') }}">
+        {% else %}
+          <span class="logo-empty">{{ t('No logo yet', 'لا يوجد شعار بعد') }}</span>
+        {% endif %}
+      </div>
+      <div class="logo-fields">
+        <div class="form-group">
+          <label>{{ t('Upload a New Logo', 'رفع شعار جديد') }}</label>
+          <input type="file" name="logo" accept="image/png,image/jpeg,image/gif,image/webp">
+          <div class="hint">
+            {{ t('PNG, JPEG, GIF or WebP · up to 2 MB · resized to 400 px and stored inside the database, so it is kept in every backup.',
+                 'صيغ PNG أو JPEG أو GIF أو WebP · بحد أقصى ٢ ميجابايت · يُصغَّر إلى ٤٠٠ بكسل ويُحفظ داخل قاعدة البيانات، فيبقى ضمن كل نسخة احتياطية.') }}
+          </div>
+          <div class="hint">
+            {{ t('The logo appears on invoices, vaccination certificates and payslips.',
+                 'يظهر الشعار على الفواتير وشهادات التطعيم وقسائم الرواتب.') }}
+          </div>
+        </div>
+        {% if clinic.get('logo_data') %}
+        <div class="form-group">
+          <label style="text-transform:none;">
+            <input type="checkbox" name="remove_logo" value="1"> {{ t('Remove the current logo when saving', 'حذف الشعار الحالي عند الحفظ') }}
+          </label>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>

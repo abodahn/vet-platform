@@ -10,6 +10,7 @@ from flask import (render_template, request, redirect, url_for, session, flash,
                    current_app, jsonify, send_file, abort)
 from . import system_bp
 from blueprints.auth.routes import login_required, role_required
+from blueprints.settings.routes import LogoError, encode_logo
 import models.database as db
 import models.audit as audit
 import models.backup as bk
@@ -318,14 +319,33 @@ def audit_log():
 def settings():
     if request.method == "POST":
         f = request.form
+        # The logo is resolved first so a rejected image reports its own reason
+        # ("not an image", "too large") instead of a generic save failure, and
+        # so a bad upload never half-writes the text fields.
+        logo_set, logo_val = "", ()
+        try:
+            if f.get("remove_logo"):
+                logo_set, logo_val = ", logo_data=?", (None,)
+            else:
+                up = request.files.get("logo")
+                if up and up.filename:
+                    logo_set, logo_val = ", logo_data=?", (encode_logo(up.read()),)
+        except LogoError as e:
+            flash(str(e), "danger")
+            return redirect(url_for("system.settings"))
+
         try:
             conn = db.get_db()
             conn.execute(
-                "UPDATE clinic SET name=?, name_ar=?, doctor_name=?, phone=?, email=?, address=?, website=?, license_number=?, tax_number=?, currency=?, timezone=?, updated_at=datetime('now') WHERE id=1",
-                (f.get("name",""), f.get("name_ar",""), f.get("doctor_name",""),
+                "UPDATE clinic SET name=?, name_ar=?, tagline=?, doctor_name=?, phone=?, "
+                "email=?, address=?, address_ar=?, website=?, license_number=?, tax_number=?, "
+                "currency=?, timezone=?, updated_at=datetime('now')" + logo_set + " WHERE id=1",
+                (f.get("name",""), f.get("name_ar",""), f.get("tagline",""),
+                 f.get("doctor_name",""),
                  f.get("phone",""), f.get("email",""), f.get("address",""),
+                 f.get("address_ar",""),
                  f.get("website",""), f.get("license_number",""), f.get("tax_number",""),
-                 f.get("currency","EGP"), f.get("timezone","Africa/Cairo"))
+                 f.get("currency","EGP"), f.get("timezone","Africa/Cairo")) + logo_val
             )
             conn.commit()
             # Appearance settings
@@ -339,6 +359,10 @@ def settings():
                     )
             conn.commit()
             conn.close()
+            # get_clinic() caches for 5 minutes and every page, invoice and
+            # certificate reads through it. Without this the clinic saves its own
+            # name and watches nothing change, then saves again.
+            db.cache_invalidate("clinic_row")
             db.log_audit(
                 username=session["user"]["username"],
                 role=session["user"]["role"],

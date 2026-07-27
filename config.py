@@ -14,8 +14,86 @@ Usage:
 """
 
 import os
+import socket
+from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+# ═══════════════════════════════════════════════════════════════
+#  VERSION — one source of truth for "which build is this clinic on"
+#
+#  20 clinics, two people, no remote access. When one of them calls,
+#  the first question is which build they are running. The VERSION file
+#  answers it; the commit says exactly which code; the date says when it
+#  landed on that machine.
+# ═══════════════════════════════════════════════════════════════
+_VERSION_FILE = os.path.join(BASE_DIR, "VERSION")
+
+
+def _git_commit() -> str:
+    """Short commit hash, or "" when there is no .git — the normal deployed case.
+
+    Reads .git/HEAD directly instead of shelling out to `git`: a clinic
+    workstation has no git binary, and a subprocess on every boot buys nothing.
+
+    # ponytail: loose refs only. Ceiling: a repo whose current branch ref has
+    # been packed into .git/packed-refs reports "" instead of the hash. Set
+    # GIT_COMMIT in the build/deploy step if that ever bites.
+    """
+    env = os.environ.get("GIT_COMMIT", "").strip()
+    if env:
+        return env[:12]
+    git_dir = os.path.join(BASE_DIR, ".git")
+    try:
+        with open(os.path.join(git_dir, "HEAD"), encoding="utf-8") as fh:
+            head = fh.read().strip()
+        if head.startswith("ref:"):
+            ref = head.split(None, 1)[1]
+            with open(os.path.join(git_dir, *ref.split("/")), encoding="utf-8") as fh:
+                head = fh.read().strip()
+    except (OSError, IndexError, UnicodeDecodeError):
+        return ""      # no .git, or .git is a worktree pointer file — expected
+    ok = len(head) == 40 and all(c in "0123456789abcdef" for c in head.lower())
+    return head[:12] if ok else ""
+
+
+def _read_version() -> dict:
+    """{version, commit, built, full}. Never raises — a missing file is not fatal."""
+    try:
+        with open(_VERSION_FILE, encoding="utf-8") as fh:
+            number = fh.read().strip().splitlines()[0].strip()
+        # No build step in this project, so the file's mtime is the honest
+        # answer to "when did this code land on this machine".
+        built = datetime.fromtimestamp(os.path.getmtime(_VERSION_FILE)).strftime("%Y-%m-%d")
+    except (OSError, IndexError):
+        number, built = "0.0.0-unknown", "unknown"
+    commit = _git_commit()
+    return {
+        "version": number,
+        "commit":  commit,
+        "built":   os.environ.get("BUILD_DATE", "").strip() or built,
+        "full":    f"{number}+{commit}" if commit else number,
+    }
+
+
+VERSION_INFO = _read_version()
+
+# blueprints/system/routes.py and blueprints/api_v1/routes.py already read these
+# three names from the environment. Seeding them here makes the VERSION file the
+# single source of truth without editing those files; an explicitly-set env var
+# still wins, so a container can override.
+os.environ.setdefault("APP_VERSION",  VERSION_INFO["version"])
+os.environ.setdefault("BUILD_NUMBER", VERSION_INFO["commit"] or "source")
+os.environ.setdefault("RELEASE_DATE", VERSION_INFO["built"])
+
+# ── Deployment identity ────────────────────────────────────────
+# One deployment = one clinic (see docs/market/05_PRODUCT_READINESS.md §3.1).
+# Without this, an aggregated error report cannot say whose clinic it came from,
+# which is the difference between a useful alert and noise. Hostname is the
+# honest default: it is what the clinic's own machine calls itself.
+_CLINIC_ID = os.environ.get("CLINIC_ID", "").strip() or socket.gethostname()
+CLINIC_ID = _CLINIC_ID
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -23,6 +101,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ═══════════════════════════════════════════════════════════════
 class Config:
     # ── Identity ──────────────────────────────────────────────
+    VERSION      = VERSION_INFO["version"]
+    VERSION_FULL = VERSION_INFO["full"]
+    CLINIC_ID    = _CLINIC_ID
     APP_TITLE    = os.environ.get("PLATFORM_TITLE",    "Aleefy")
     APP_TITLE_AR = os.environ.get("PLATFORM_TITLE_AR", "اليفي")
     APP_SUBTITLE = os.environ.get("PLATFORM_SUBTITLE", "Dr. Hatem El Khateeb")

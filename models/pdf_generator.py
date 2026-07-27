@@ -3,6 +3,7 @@ Invoice PDF Generator - uses fpdf2 (pure Python, no system dependencies).
 Install: pip install fpdf2
 """
 from __future__ import annotations
+import base64
 import io
 import logging
 import os
@@ -34,6 +35,19 @@ try:
     _AR_SHAPING_OK = True
 except ImportError:                                    # pragma: no cover
     _AR_SHAPING_OK = False
+
+# ...and a fourth thing, found while putting clinic names on documents: Cairo
+# carries the whole base Arabic block but only part of Presentation Forms-B —
+# 54 codepoints in FE70..FEFF are absent, and they are the *isolated* forms.
+# A clinic name as ordinary as "عيادة النيل" therefore lost its alef and its teh
+# marbuta to notdef, silently, on every invoice. Telling the reshaper to emit the
+# unshaped base letter where it would otherwise emit an isolated form gives the
+# identical shape from a codepoint the font actually has.
+_RESHAPER = (
+    arabic_reshaper.ArabicReshaper(
+        configuration={"use_unshaped_instead_of_isolated": True})
+    if _AR_SHAPING_OK else None
+)
 
 _FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                          "static", "fonts")
@@ -75,7 +89,7 @@ def ar(text) -> str:
                            "text will render disconnected and reversed.")
         return s
     try:
-        return get_display(arabic_reshaper.reshape(s))
+        return get_display(_RESHAPER.reshape(s))
     except Exception:                                   # pragma: no cover
         logger.exception("Arabic reshaping failed; drawing raw text")
         return s
@@ -114,6 +128,117 @@ def _status_color(status: str):
         "Cancelled": _MUTED,
     }
     return m.get(status, _MUTED)
+
+
+# ── Clinic branding ───────────────────────────────────────────────────────────
+# These three documents are handed to the clinic's own customers. Printing
+# somebody else's company name on them is the fastest way to look unprofessional
+# in front of a paying client, so every generator pulls its identity from here.
+
+# Used only when the clinic row carries no name at all. Deliberately generic:
+# a neutral noun beats a placeholder like "Your Clinic Here", and beats hard-
+# coding the vendor's own brand onto a customer's invoice.
+_FALLBACK_NAME = "Veterinary Clinic"
+
+
+def _clinic_name(clinic: dict | None) -> str:
+    """The name to print. Never blank, never another company's."""
+    c = clinic or {}
+    return ((c.get("name") or "").strip()
+            or (c.get("name_ar") or "").strip()
+            or _FALLBACK_NAME)
+
+
+def _clinic_logo(clinic: dict | None):
+    """clinic.logo_data (a `data:` URI) as a stream fpdf2 can place, else None.
+
+    Absent, blank or corrupt all return None. A logo that cannot be decoded must
+    never stop an invoice from being printed.
+    """
+    uri = (clinic or {}).get("logo_data") or ""
+    if not uri.startswith("data:image/") or "," not in uri:
+        return None
+    try:
+        return io.BytesIO(base64.b64decode(uri.split(",", 1)[1]))
+    except Exception:
+        logger.warning("clinic.logo_data is not decodable base64 — "
+                       "document will print without a logo")
+        return None
+
+
+def _draw_logo(pdf, clinic: dict | None, x: float, y: float, size: float) -> float:
+    """Place the logo on a white tile inside a coloured band.
+
+    Returns the x coordinate the caller should start its text at — unchanged
+    when there is no logo, so the header collapses cleanly instead of leaving a
+    hole.
+    """
+    img = _clinic_logo(clinic)
+    if img is None:
+        return x
+    try:
+        pdf.set_fill_color(*_WHITE)
+        pdf.rect(x, y, size, size, "F")
+        pdf.image(img, x=x + 1.5, y=y + 1.5, w=size - 3, h=size - 3,
+                  keep_aspect_ratio=True)
+    except Exception:
+        logger.warning("clinic logo could not be drawn — continuing without it",
+                       exc_info=True)
+        return x
+    return x + size + 5
+
+
+def _draw_clinic_brand(pdf, clinic: dict | None, x: float, y: float,
+                       right: float, name_size: float = 14,
+                       logo_size: float = 24) -> float:
+    """Draw logo + clinic identity into a document's coloured header band.
+
+    One helper, three documents: a clinic that fills Settings in once is branded
+    on its invoices, its certificates and its payslips without three chances to
+    drift apart. The caller owns the band and the text colour; `right` is the x
+    the block must not cross (there is a number or a badge on that side).
+
+    Arabic is safe throughout — every string goes out via cell(), which the
+    Arabic mixin reshapes and reorders.
+    """
+    c = clinic or {}
+    tx = _draw_logo(pdf, c, x, y, logo_size)
+    tw = right - tx
+
+    name = _clinic_name(c)
+    rows = [(name_size, True, name)]
+
+    name_ar = (c.get("name_ar") or "").strip()
+    if name_ar and name_ar != name:
+        rows.append((name_size - 5, False, name_ar))
+
+    contact = "    |    ".join(v for v in (
+        (c.get("doctor_name") or "").strip(),
+        (c.get("phone") or "").strip(),
+    ) if v)
+    if contact:
+        rows.append((8, False, contact))
+
+    addr = ((c.get("address") or "").strip() or (c.get("address_ar") or "").strip())
+    if addr:
+        rows.append((7.5, False, " ".join(addr.split())[:88]))
+
+    meta = "    |    ".join(v for v in (
+        f"Tax {c['tax_number']}" if (c.get("tax_number") or "").strip() else "",
+        f"Lic. {c['license_number']}" if (c.get("license_number") or "").strip() else "",
+        (c.get("website") or "").strip(),
+    ) if v)
+    if meta:
+        rows.append((7.5, False, meta))
+
+    cy = y
+    for size, bold, text in rows:
+        h = size * 0.5 + 1.2
+        pdf.set_xy(tx, cy)
+        pdf.set_font("Helvetica", "B" if bold else "", size)
+        pdf.cell(tw, h, text, new_x=XPos.LEFT, new_y=YPos.NEXT)
+        cy += h
+    return cy
 
 
 class _ArabicPDFMixin:
@@ -197,21 +322,11 @@ class _InvoicePDF(_ArabicPDFMixin, FPDF):
         self.set_fill_color(*_NAVY)
         self.rect(0, 0, 210, 38, "F")
 
-        # Clinic name
-        self.set_xy(18, 9)
-        self.set_font("Helvetica", "B", 14)
+        # Clinic identity — logo, name (EN + AR), doctor, phone, address,
+        # tax and licence numbers. Kept clear of x=118, where the invoice
+        # number / date / status column starts.
         self.set_text_color(*_WHITE)
-        cname = self._clinic.get("name") or "Aleefy"
-        self.cell(120, 7, cname, new_x=XPos.LEFT, new_y=YPos.NEXT)
-
-        # Sub-line: doctor name + phone
-        self.set_x(18)
-        self.set_font("Helvetica", "", 9)
-        sub = self._clinic.get("doctor_name") or "Lead Veterinarian"
-        phone = self._clinic.get("phone", "")
-        if phone:
-            sub += f"    |    {phone}"
-        self.cell(120, 5, sub, new_x=XPos.LEFT, new_y=YPos.NEXT)
+        _draw_clinic_brand(self, self._clinic, 18, 5.5, 118, name_size=14)
 
         # Invoice number (right side)
         inv_num = self._invoice.get("invoice_number", "INV-0000")
@@ -242,7 +357,7 @@ class _InvoicePDF(_ArabicPDFMixin, FPDF):
         self.set_y(-14)
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(*_MUTED)
-        cname = self._clinic.get("name") or "Aleefy"
+        cname = _clinic_name(self._clinic)
         self.cell(0, 5,
                   f"Thank you for choosing {cname}  ·  Page {self.page_no()}",
                   align="C")
@@ -455,9 +570,7 @@ def generate_vaccination_certificate_pdf(vacc: dict, pet: dict, clinic: dict | N
         raise RuntimeError("fpdf2 is not installed. Run: pip install fpdf2")
 
     clinic = clinic or {}
-    cname  = clinic.get("name") or "Aleefy Veterinary Clinic"
-    cphone = clinic.get("phone") or ""
-    caddr  = clinic.get("address") or ""
+    cname  = _clinic_name(clinic)
 
     pdf = _ArabicFPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=20)
@@ -470,19 +583,11 @@ def generate_vaccination_certificate_pdf(vacc: dict, pet: dict, clinic: dict | N
     pdf.set_fill_color(*_TEAL)
     pdf.rect(0, 0, 210, 42, "F")
 
-    pdf.set_xy(20, 10)
-    pdf.set_font("Helvetica", "B", 16)
+    # Clinic identity — this is the document a customer carries to a vet abroad,
+    # a groomer or an airline, so it has to say who issued it. Kept clear of
+    # x=128, where the certificate number column starts.
     pdf.set_text_color(*_WHITE)
-    pdf.cell(W, 8, cname, new_x=XPos.LEFT, new_y=YPos.NEXT)
-
-    pdf.set_x(20)
-    pdf.set_font("Helvetica", "", 9)
-    sub = "Vaccination Certificate"
-    if cphone:
-        sub += f"    |    {cphone}"
-    if caddr:
-        sub += f"    |    {caddr}"
-    pdf.cell(W, 5, sub, new_x=XPos.LEFT, new_y=YPos.NEXT)
+    _draw_clinic_brand(pdf, clinic, 20, 7, 128, name_size=16)
 
     # Certificate number top-right
     cert_no = f"CERT-{vacc.get('id', 0):05d}"
@@ -636,9 +741,7 @@ def generate_payslip_pdf(salary: dict, clinic: dict | None = None) -> bytes:
         raise RuntimeError("fpdf2 is not installed. Run: pip install fpdf2")
 
     clinic = clinic or {}
-    cname  = clinic.get("name") or "Premium Animal Hospital"
-    cphone = clinic.get("phone") or ""
-    caddr  = clinic.get("address") or ""
+    cname  = _clinic_name(clinic)
 
     MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
               "Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -670,24 +773,21 @@ def generate_payslip_pdf(salary: dict, clinic: dict | None = None) -> bytes:
     pdf.set_fill_color(*_NAVY)
     pdf.rect(0, 0, 210, 40, "F")
 
-    pdf.set_xy(18, 9)
-    pdf.set_font("Helvetica", "B", 16)
+    # Clinic identity — kept clear of x=138, where the PAY SLIP badge starts.
     pdf.set_text_color(*_WHITE)
-    pdf.cell(W * 0.6, 9, cname[:50], ln=False)
+    _draw_clinic_brand(pdf, clinic, 18, 5, 138, name_size=15, logo_size=22)
 
     pdf.set_xy(210 - 18 - 52, 9)
     pdf.set_fill_color(*_PURPLE)
     pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(*_WHITE)
     pdf.cell(52, 9, "  PAY SLIP  ", fill=True, align="C",
              new_x=XPos.LEFT, new_y=YPos.NEXT)
 
-    pdf.set_xy(18, 20)
+    pdf.set_xy(210 - 18 - 52, 20)
     pdf.set_font("Helvetica", "", 8)
     pdf.set_text_color(200, 220, 255)
-    pdf.cell(W * 0.6, 5, f"Period: {period_label}", ln=False)
-    if cphone or caddr:
-        pdf.set_xy(18, 26)
-        pdf.cell(W, 5, f"{cphone}  {caddr}".strip())
+    pdf.cell(52, 5, f"Period: {period_label}", align="C")
 
     # ── Employee info boxes ───────────────────────────────────────────────────
     pdf.set_y(46)
