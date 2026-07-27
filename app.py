@@ -263,8 +263,53 @@ def create_app(cfg=None) -> Flask:
     return app
 
 
+def _acquire_scheduler_lock(backup_dir: str):
+    """Return an open lock file if THIS process should own the scheduler.
+
+    create_app() runs in every gunicorn worker, and workers default to
+    cpu*2+1. Without this, 02:00 fires N concurrent backups and 09:00 sends
+    every WhatsApp reminder N times — a clinic's clients get the same message
+    five times and blame the clinic.
+
+    An OS-level exclusive lock is used rather than a PID file because it is
+    released automatically when the process dies, so a crashed worker cannot
+    leave the scheduler permanently disabled.
+    """
+    lock_path = os.path.join(backup_dir, ".scheduler.lock")
+    try:
+        fh = open(lock_path, "w")
+    except OSError as exc:
+        logger.warning("Cannot open scheduler lock (%s) — running scheduler "
+                       "in this process without exclusion", exc)
+        return None
+    try:
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        fh.close()
+        return None          # another worker already owns it — expected
+    fh.write(str(os.getpid()))
+    fh.flush()
+    return fh
+
+
 def _start_scheduler(app, backup_dir: str) -> None:
-    """Start APScheduler with daily backup and WhatsApp reminder jobs."""
+    """Start APScheduler with daily backup and WhatsApp reminder jobs.
+
+    Only one process wins the lock; the rest return immediately.
+    """
+    lock = _acquire_scheduler_lock(backup_dir)
+    if lock is None:
+        logger.info("Scheduler owned by another worker — not starting here")
+        return
+    # Held for the process lifetime; releasing it would let a second worker
+    # start a duplicate scheduler.
+    app.config["_SCHEDULER_LOCK"] = lock
+
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.cron import CronTrigger
@@ -303,7 +348,21 @@ def _start_scheduler(app, backup_dir: str) -> None:
             sec.cleanup_rate_limits()
         scheduler.add_job(_cleanup, CronTrigger(minute=0), id="rl_cleanup")
 
+        # Backup health at 09:05. The nightly job can only report a backup it
+        # actually attempted — if the job itself stops firing, nothing complains.
+        # This checks the archives on disk instead, so a silently dead scheduler
+        # is still caught.
+        def _backup_health():
+            with app.app_context():
+                try:
+                    bk.check_and_notify()
+                except Exception:
+                    logger.exception("Backup health check failed")
+        scheduler.add_job(_backup_health, CronTrigger(hour=9, minute=5),
+                          id="backup_health")
+
         scheduler.start()
-        logger.info("APScheduler started — backup@02:00, reminders@09:00")
+        logger.info("APScheduler started in pid %s — backup@02:00, "
+                    "reminders@09:00, backup health@09:05", os.getpid())
     except Exception as e:
         logger.warning(f"Scheduler not started: {e}")
