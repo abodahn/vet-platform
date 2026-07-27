@@ -35,6 +35,15 @@ APScheduler>=3.10.0
 # ── Reports & Exports ────────────────────────────────────
 openpyxl>=3.1.0
 fpdf2>=2.7.0
+
+# Arabic text in PDFs. Without these, invoices/certificates/payslips crash with
+# FPDFUnicodeEncodingException the moment any Arabic appears — including a
+# clinic simply entering its own name in Settings.
+#   arabic-reshaper — joins letters into their positional forms
+#   python-bidi     — reorders RTL runs for a LTR renderer
+# The Cairo TTFs in static/fonts/ supply the glyphs; all three are required.
+arabic-reshaper>=3.0.0
+python-bidi>=0.4.2
 matplotlib>=3.7.0
 
 # ── AI integration ────────────────────────────────────────

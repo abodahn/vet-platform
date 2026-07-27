@@ -4,6 +4,9 @@ Install: pip install fpdf2
 """
 from __future__ import annotations
 import io
+import logging
+import os
+import re
 from datetime import date
 from typing import Optional
 
@@ -12,6 +15,83 @@ try:
     _FPDF_OK = True
 except ImportError:
     _FPDF_OK = False
+
+logger = logging.getLogger(__name__)
+
+# ── Arabic text support ───────────────────────────────────────────────────────
+# Three separate things are required to put Arabic in a PDF, and missing any one
+# of them produces either a crash or unreadable output:
+#   1. a font containing Arabic glyphs   — Helvetica has none, so the core fonts
+#      raise FPDFUnicodeEncodingException on the first Arabic character;
+#   2. letter shaping                    — Arabic letters change form depending
+#      on their position in a word (م / ـم / ـمـ / مـ). Without reshaping you get
+#      disconnected isolated forms that a reader will not accept;
+#   3. bidi reordering                    — fpdf2 draws runs left-to-right, so
+#      RTL text must be visually reordered before it is handed over.
+try:
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+    _AR_SHAPING_OK = True
+except ImportError:                                    # pragma: no cover
+    _AR_SHAPING_OK = False
+
+_FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "static", "fonts")
+_FONT_REGULAR = os.path.join(_FONT_DIR, "Cairo-Regular.ttf")
+_FONT_BOLD = os.path.join(_FONT_DIR, "Cairo-Bold.ttf")
+
+# Cairo covers Arabic and Latin, so it is used for every document rather than
+# switching fonts mid-line. That also means a clinic with a mixed-script name
+# renders in one consistent typeface, matching the on-screen UI.
+_UNICODE_FONT = "Cairo"
+_FONTS_AVAILABLE = os.path.exists(_FONT_REGULAR) and os.path.exists(_FONT_BOLD)
+if not _FONTS_AVAILABLE:                               # pragma: no cover
+    logger.warning(
+        "Arabic PDF fonts missing from %s — PDFs will fall back to Helvetica and "
+        "will FAIL on any Arabic text. Expected Cairo-Regular.ttf and Cairo-Bold.ttf.",
+        _FONT_DIR,
+    )
+
+_ARABIC_RE = re.compile(r"[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]")
+
+
+def has_arabic(text) -> bool:
+    """True when the string contains any Arabic-script character."""
+    return bool(text) and bool(_ARABIC_RE.search(str(text)))
+
+
+def ar(text) -> str:
+    """Prepare a string for drawing into a PDF.
+
+    Non-Arabic text is returned unchanged, so Latin documents are byte-identical
+    to before. Arabic text is reshaped and bidi-reordered.
+    """
+    if text is None:
+        return ""
+    s = str(text)
+    if not has_arabic(s) or not _AR_SHAPING_OK:
+        if has_arabic(s) and not _AR_SHAPING_OK:       # pragma: no cover
+            logger.warning("arabic_reshaper/python-bidi not installed — Arabic "
+                           "text will render disconnected and reversed.")
+        return s
+    try:
+        return get_display(arabic_reshaper.reshape(s))
+    except Exception:                                   # pragma: no cover
+        logger.exception("Arabic reshaping failed; drawing raw text")
+        return s
+
+
+def _register_unicode_fonts(pdf) -> bool:
+    """Register Cairo on a PDF instance. Returns False if unavailable."""
+    if not _FONTS_AVAILABLE:
+        return False
+    try:
+        pdf.add_font(_UNICODE_FONT, "", _FONT_REGULAR)
+        pdf.add_font(_UNICODE_FONT, "B", _FONT_BOLD)
+        return True
+    except Exception:                                   # pragma: no cover
+        logger.exception("Could not register Cairo fonts for PDF output")
+        return False
 
 
 # ── Colour palette ────────────────────────────────────────────────────────────
@@ -36,11 +116,75 @@ def _status_color(status: str):
     return m.get(status, _MUTED)
 
 
-class _InvoicePDF(FPDF):
+class _ArabicPDFMixin:
+    """Makes an FPDF subclass Arabic-safe without touching its call sites.
+
+    There are 51 set_font and 62 cell/multi_cell calls across the three
+    generators in this module. Patching each one would work until somebody adds
+    the 63rd and a clinic with an Arabic name gets a 500 on its invoice. Doing
+    it at the boundary means new call sites are covered automatically.
+
+    - set_font() redirects the core Helvetica family to Cairo, which has Arabic
+      glyphs. Falls back to Helvetica untouched if the fonts are missing, so a
+      deployment without them still produces Latin PDFs rather than failing.
+    - cell()/multi_cell() reshape and bidi-reorder their text. Latin strings are
+      returned unchanged by ar(), so English output is unaffected.
+    """
+
+    _unicode_ready = False
+
+    def _init_unicode(self):
+        self._unicode_ready = _register_unicode_fonts(self)
+
+    def set_font(self, family="", style="", size=0):
+        if self._unicode_ready and (family or "").lower() in ("helvetica", "arial", ""):
+            # Cairo ships Regular and Bold only. Italic requests degrade to the
+            # nearest available weight rather than raising.
+            family = _UNICODE_FONT
+            style = "B" if "B" in (style or "").upper() else ""
+        return super().set_font(family, style, size)
+
+    @staticmethod
+    def _shape(args, kwargs):
+        """Apply ar() whether the text came in positionally or by keyword.
+
+        fpdf2's signature is cell(w, h, text, ...) and this module passes the
+        text positionally in most places, so a keyword-only implementation
+        would silently skip nearly every call.
+        """
+        for key in ("text", "txt"):
+            if key in kwargs:
+                kwargs[key] = ar(kwargs[key])
+                return args, kwargs
+        if len(args) >= 3 and isinstance(args[2], str):
+            args = list(args)
+            args[2] = ar(args[2])
+            return tuple(args), kwargs
+        return args, kwargs
+
+    def cell(self, *args, **kwargs):
+        args, kwargs = self._shape(args, kwargs)
+        return super().cell(*args, **kwargs)
+
+    def multi_cell(self, *args, **kwargs):
+        args, kwargs = self._shape(args, kwargs)
+        return super().multi_cell(*args, **kwargs)
+
+
+class _ArabicFPDF(_ArabicPDFMixin, FPDF):
+    """Plain Arabic-safe FPDF for generators that don't need a custom header."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._init_unicode()
+
+
+class _InvoicePDF(_ArabicPDFMixin, FPDF):
     """Internal PDF class with header/footer pre-configured."""
 
     def __init__(self, clinic: dict, invoice: dict):
         super().__init__(orientation="P", unit="mm", format="A4")
+        self._init_unicode()
         self._clinic  = clinic or {}
         self._invoice = invoice or {}
         self.set_auto_page_break(auto=True, margin=15)
@@ -315,7 +459,7 @@ def generate_vaccination_certificate_pdf(vacc: dict, pet: dict, clinic: dict | N
     cphone = clinic.get("phone") or ""
     caddr  = clinic.get("address") or ""
 
-    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf = _ArabicFPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.set_margins(20, 20, 20)
     pdf.add_page()
@@ -516,7 +660,7 @@ def generate_payslip_pdf(salary: dict, clinic: dict | None = None) -> bytes:
     tax_d  = _f("tax_deduction")
     net    = _f("net") or round(gross - ded - abs_d - tax_d, 2)
 
-    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf = _ArabicFPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.set_margins(18, 18, 18)
     pdf.add_page()
