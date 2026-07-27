@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Import Finished', 'انتهى الاستيراد') }}{% endblock %}
+{% block page_title %}{{ t('Import finished', 'انتهى الاستيراد') }}{% endblock %}
+{% block page_sub %}{{ filename }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('migration.index') }}" class="pf-btn pf-btn-secondary">
+  {{ t('Import another file', 'استيراد ملف آخر') }}
+</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-alert pf-alert-success pf-mb-4">
+  <strong>{{ t('Your data is in.', 'تم إدخال بياناتك.') }}</strong>
+  {{ t('A backup was taken before anything was written:', 'تم أخذ نسخة احتياطية قبل كتابة أي شيء:') }}
+  <code>{{ backup.filename }}</code>
+  {% if backup.size_kb %}({{ backup.size_kb }} KB){% endif %}
+</div>
+
+<div class="pf-grid pf-grid-3 pf-mb-4">
+  {% for entity, label_en, label_ar in [
+        ('owners', 'Owners', 'العملاء'),
+        ('pets', 'Pets', 'الحيوانات'),
+        ('visits', 'Visits', 'الزيارات')] %}
+  {% set c = report.counts[entity] %}
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div class="pf-card-title">{{ t(label_en, label_ar) }}</div>
+    </div>
+    <table class="pf-table">
+      <tr>
+        <td>{{ t('Created', 'تم إنشاؤها') }}</td>
+        <td class="pf-text-success" style="text-align:end;font-weight:800">{{ c.created }}</td>
+      </tr>
+      <tr>
+        <td>{{ t('Updated', 'تم تحديثها') }}</td>
+        <td class="pf-text-accent" style="text-align:end;font-weight:800">{{ c.updated }}</td>
+      </tr>
+      <tr>
+        <td>{{ t('Skipped', 'تم تخطّيها') }}</td>
+        <td class="pf-text-muted" style="text-align:end;font-weight:800">{{ c.skipped }}</td>
+      </tr>
+    </table>
+  </div>
+  {% endfor %}
+</div>
+
+{% if report.rows_failed %}
+<div class="pf-card pf-mb-4">
+  <div class="pf-card-header">
+    <div>
+      <div class="pf-card-title pf-text-danger">
+        {{ report.rows_failed }} {{ t('rows were not imported', 'صفاً لم يتم استيراده') }}
+      </div>
+      <div class="pf-card-sub">
+        {{ t('Download them, fix them in Excel, and upload the corrected file. '
+             'Rows that came in successfully will not be duplicated.',
+             'نزّلها وصحّحها في إكسل ثم ارفع الملف المصحَّح. '
+             'الصفوف التي تم استيرادها بنجاح لن تتكرر.') }}
+      </div>
+    </div>
+    {% if has_failed_csv %}
+    <a class="pf-btn pf-btn-primary pf-btn-sm" href="{{ url_for('migration.failed_rows') }}">
+      {{ t('Download rows to fix', 'تنزيل الصفوف المطلوب تصحيحها') }}
+    </a>
+    {% endif %}
+  </div>
+  <div class="pf-table-wrap">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th style="width:120px">{{ t('Row in your file', 'الصف في ملفك') }}</th>
+          <th>{{ t('What to fix', 'ما يجب تصحيحه') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in report.errors %}
+        <tr>
+          <td style="font-weight:800">{{ e.row }}</td>
+          <td>{{ t(e.en, e.ar) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="pf-card">
+  <div class="pf-card-header">
+    <div class="pf-card-title">{{ t('Where to find your data', 'أين تجد بياناتك') }}</div>
+  </div>
+  <a href="{{ url_for('crm.owners_list') }}" class="pf-btn pf-btn-secondary">
+    {{ t('Owners', 'العملاء') }}
+  </a>
+  <a href="{{ url_for('visits.visits_list') }}" class="pf-btn pf-btn-secondary">
+    {{ t('Visits', 'الزيارات') }}
+  </a>
+  <div class="pf-text-xs pf-text-muted" style="margin-top:12px">
+    {{ t('Started', 'البداية') }}: {{ report.started_at }} ·
+    {{ t('Finished', 'النهاية') }}: {{ report.finished_at }}
+  </div>
+</div>
+
+{% endblock %}

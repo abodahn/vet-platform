@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Match Your Columns', 'مطابقة الأعمدة') }}{% endblock %}
+{% block page_title %}{{ t('Step 2 — Match your columns', 'الخطوة ٢ — مطابقة الأعمدة') }}{% endblock %}
+{% block page_sub %}{{ filename }} — {{ row_count }} {{ t('rows', 'صف') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('migration.index') }}" class="pf-btn pf-btn-secondary">
+  {{ t('Choose a different file', 'اختيار ملف آخر') }}
+</a>
+{% endblock %}
+
+{% block content %}
+
+{% if remembered %}
+<div class="pf-alert pf-alert-success pf-mb-4">
+  {{ t('We recognised this file layout from a previous import and filled in your '
+       'earlier choices. Change any of them if you need to.',
+       'تعرّفنا على تنسيق هذا الملف من عملية استيراد سابقة وملأنا اختياراتك السابقة. '
+       'يمكنك تعديل أي منها عند الحاجة.') }}
+</div>
+{% else %}
+<div class="pf-alert pf-alert-info pf-mb-4">
+  {{ t('We have made a first guess for each column. Check them and correct anything '
+       'that is wrong. Set a column to "Do not import" to leave it out.',
+       'قمنا بتخمين معنى كل عمود. راجع الاختيارات وصحّح ما يلزم. '
+       'اختر «عدم الاستيراد» لتجاهل أي عمود.') }}
+</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('migration.preview') }}" id="mapForm">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+  <div class="pf-card pf-mb-4">
+    <div class="pf-card-header">
+      <div class="pf-card-title">{{ t('Your columns', 'أعمدة ملفك') }}</div>
+    </div>
+    <div class="pf-table-wrap">
+      <table class="pf-table">
+        <thead>
+          <tr>
+            <th>{{ t('Column in your file', 'العمود في ملفك') }}</th>
+            <th>{{ t('Example values', 'أمثلة من البيانات') }}</th>
+            <th style="min-width:230px">{{ t('Import it as', 'استيراده كـ') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for header in headers %}
+          {% set ci = loop.index0 %}
+          {% set bits = [] %}
+          {% for row in sample %}
+            {% if row[ci] is not none and row[ci]|string|trim %}
+              {% set _ = bits.append(row[ci]|string|trim|truncate(28, true)) %}
+            {% endif %}
+          {% endfor %}
+          <tr>
+            <td style="font-weight:700">{{ header }}</td>
+            <td class="pf-text-sm pf-text-muted">{{ bits | join(' · ') or '—' }}</td>
+            <td>
+              <select class="pf-select mapsel" name="col_{{ ci }}">
+                <option value="">{{ t('Do not import', 'عدم الاستيراد') }}</option>
+                {% for group_key, labels in group_labels.items() %}
+                <optgroup label="{{ t(labels[0], labels[1]) }}">
+                  {% for key, en, ar, group in target_fields %}
+                  {% if group == group_key %}
+                  <option value="{{ key }}" {% if mapping.get(ci) == key %}selected{% endif %}>
+                    {{ t(en, ar) }}
+                  </option>
+                  {% endif %}
+                  {% endfor %}
+                </optgroup>
+                {% endfor %}
+              </select>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="pf-card pf-mb-4">
+    <div class="pf-card-header">
+      <div>
+        <div class="pf-card-title">
+          {{ t('If a record is already in the system', 'إذا كان السجل موجوداً بالفعل') }}
+        </div>
+        <div class="pf-card-sub">
+          {{ t('Owners are matched by phone number, pets by name plus owner, '
+               'visits by pet plus date.',
+               'تتم مطابقة العملاء برقم الهاتف، والحيوانات بالاسم مع المالك، '
+               'والزيارات بالحيوان مع التاريخ.') }}
+        </div>
+      </div>
+    </div>
+    <div class="pf-form-group">
+      <label style="display:block;margin-bottom:8px">
+        <input type="radio" name="strategy" value="skip" checked>
+        <strong>{{ t('Leave it as it is', 'تركه كما هو') }}</strong> —
+        {{ t('keep what is already in the system and do not import that row again. '
+             'This is the safe choice.',
+             'الإبقاء على ما هو موجود في النظام وعدم استيراد هذا الصف مرة أخرى. '
+             'وهذا هو الخيار الآمن.') }}
+      </label>
+      <label style="display:block;margin-bottom:8px">
+        <input type="radio" name="strategy" value="update">
+        <strong>{{ t('Update it', 'تحديثه') }}</strong> —
+        {{ t('fill in details from the file. Empty cells in the file never erase '
+             'information you already have.',
+             'إضافة البيانات من الملف. الخانات الفارغة في الملف لا تمسح أي معلومات موجودة.') }}
+      </label>
+      <label style="display:block">
+        <input type="radio" name="strategy" value="create">
+        <strong>{{ t('Add it anyway', 'إضافته على أي حال') }}</strong> —
+        {{ t('create a second record. Only choose this if you know the matches are '
+             'different people or animals.',
+             'إنشاء سجل ثانٍ. اختر هذا فقط إذا كنت متأكداً أن السجلات المتطابقة '
+             'تخص أشخاصاً أو حيوانات مختلفة.') }}
+      </label>
+    </div>
+  </div>
+
+  <button type="submit" class="pf-btn pf-btn-primary pf-btn-lg">
+    {{ t('Preview the import', 'معاينة الاستيراد') }}
+  </button>
+  <span class="pf-text-sm pf-text-muted" style="margin-inline-start:10px">
+    {{ t('Nothing is saved at this step.', 'لا يتم حفظ أي شيء في هذه الخطوة.') }}
+  </span>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('mapForm').addEventListener('submit', function (e) {
+  var seen = {}, dupes = [];
+  document.querySelectorAll('.mapsel').forEach(function (sel) {
+    if (!sel.value) return;
+    if (seen[sel.value]) { dupes.push(sel.options[sel.selectedIndex].text); }
+    seen[sel.value] = true;
+  });
+  if (dupes.length) {
+    e.preventDefault();
+    alert({{ t('Two columns are set to the same thing: ',
+               'يوجد عمودان مضبوطان على نفس الحقل: ') | tojson }} + dupes.join(', ') +
+          {{ t('. Please pick a different field for one of them.',
+               '. من فضلك اختر حقلاً مختلفاً لأحدهما.') | tojson }});
+  }
+});
+</script>
+{% endblock %}

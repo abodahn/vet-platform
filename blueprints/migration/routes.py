@@ -1,445 +1,372 @@
 """
-Legacy XLSX → Platform SQLite Migration
-Reads Excel files from C:\vet\ppc_diagnostics_work\data\
-and safely imports them into the platform database.
+Data Import — bring a clinic's existing Excel/CSV records into the platform.
+
+Four steps, each one reversible until the last:
+    1. upload    the owner picks their own file from their own computer
+    2. map       they confirm which column is which (we pre-select a guess)
+    3. preview   a dry run that writes nothing and shows exactly what will happen
+    4. import    a verified backup, then one transaction
+
+The previous version of this file read fixed filenames out of a hardcoded
+developer path and had no preview, so it could not be handed to a customer.
 """
-import os, uuid, traceback
-from datetime import datetime
-from flask import render_template, request, redirect, url_for, session, flash, current_app
+import json
+import logging
+import os
+import time
+import uuid
+
+from flask import (
+    Response, current_app, flash, redirect, render_template, request,
+    session, url_for,
+)
+from werkzeug.exceptions import RequestEntityTooLarge
+
 from . import migration_bp
 from blueprints.auth.routes import role_required
+import models.backup as bk
 import models.database as db
+from migrations import excel_import as xi
 
-LEGACY_DATA_DIR = r"C:\vet\ppc_diagnostics_work\data"
+logger = logging.getLogger(__name__)
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+STAGING_SUBDIR = "import_staging"
+STAGING_MAX_AGE = 24 * 3600          # uploads left behind by an abandoned wizard
+SESSION_KEY = "import_file"
+MAPPING_SETTING_PREFIX = "import_map_"
 
-def _xlsx_rows(filename):
-    """Read an xlsx file and return list of dicts keyed by header row."""
-    path = os.path.join(LEGACY_DATA_DIR, filename)
-    if not os.path.exists(path):
-        return None, f"File not found: {path}"
+READ_ROLES = ("super_admin", "clinic_owner", "support_admin")
+WRITE_ROLES = ("super_admin", "clinic_owner")
+
+
+# ── staging area ─────────────────────────────────────────────────────────
+
+def _staging_dir() -> str:
+    base = current_app.config.get("UPLOADS_PATH") or os.path.join(
+        os.path.dirname(current_app.config.get("DATABASE_PATH", "data/x")), "uploads"
+    )
+    path = os.path.join(base, STAGING_SUBDIR)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _purge_stale_uploads() -> None:
+    """Drop staged files older than a day.
+
+    ponytail: swept on upload rather than on a schedule. Ceiling — a site that
+    never imports again keeps its last file for good; move this to the
+    APScheduler job in app.py if that ever matters.
+    """
+    cutoff = time.time() - STAGING_MAX_AGE
     try:
-        import openpyxl
-        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-        ws = wb.active
-        rows = list(ws.iter_rows(values_only=True))
-        if not rows:
-            return [], None
-        headers = [str(h).strip() if h is not None else f"col_{i}" for i, h in enumerate(rows[0])]
-        result = []
-        for row in rows[1:]:
-            if all(v is None for v in row):
-                continue
-            result.append(dict(zip(headers, row)))
-        wb.close()
-        return result, None
-    except Exception as e:
-        return None, str(e)
+        entries = os.listdir(_staging_dir())
+    except OSError:
+        logger.warning("import staging directory unreadable", exc_info=True)
+        return
+    for name in entries:
+        path = os.path.join(_staging_dir(), name)
+        try:
+            if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                os.remove(path)
+        except OSError:
+            logger.warning("could not remove stale import file %s", name, exc_info=True)
 
 
-def _safe_str(v, default=""):
-    if v is None:
-        return default
-    return str(v).strip()
+def _staged_path(token: str, suffix: str = "") -> str | None:
+    """Absolute path for a staged file. None if the token is not a plain hex id."""
+    if not token or not all(c in "0123456789abcdef" for c in token):
+        return None
+    return os.path.join(_staging_dir(), f"{token}{suffix}")
 
 
-def _safe_float(v, default=0.0):
+def _load_staged():
+    """(headers, rows, original filename) for the file in this session.
+
+    Returns (None, None, None) when there is nothing staged — the caller sends
+    the user back to step 1 with an explanation.
+    """
+    info = session.get(SESSION_KEY) or {}
+    path = _staged_path(info.get("token", ""), info.get("ext", ""))
+    if not path or not os.path.exists(path):
+        return None, None, None
+    with open(path, "rb") as fh:
+        data = fh.read()
+    headers, rows = xi.read_table(data, info.get("name", "upload.xlsx"))
+    return headers, rows, info.get("name", "")
+
+
+def _no_file_redirect():
+    flash("Your uploaded file is no longer available. Please upload it again. | "
+          "لم يعد الملف الذي رفعته متاحاً. من فضلك ارفعه مرة أخرى.", "warning")
+    return redirect(url_for("migration.index"))
+
+
+def _remembered_mapping(headers):
+    raw = db.get_setting(MAPPING_SETTING_PREFIX + xi.mapping_signature(headers), "")
+    if not raw:
+        return None
     try:
-        return float(v) if v is not None else default
-    except Exception:
-        return default
+        stored = json.loads(raw)
+    except ValueError:
+        logger.warning("stored import mapping was not valid JSON; ignoring it")
+        return None
+    return xi.clean_mapping(stored, headers) or None
 
 
-def _now():
-    return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+def _remember_mapping(headers, mapping):
+    db.set_setting(
+        MAPPING_SETTING_PREFIX + xi.mapping_signature(headers),
+        json.dumps({str(k): v for k, v in mapping.items()}),
+        category="migration",
+        updated_by=session.get("user", {}).get("username", "system"),
+    )
 
 
-def _log_audit(action, entity_type, entity_id, details):
-    try:
-        user = session.get("user", {})
-        db.log_audit(
-            username=user.get("username", "migration"),
-            role=user.get("role", "system"),
-            action=action,
-            module="migration",
-            entity_type=entity_type,
-            entity_id=str(entity_id),
-            details=details,
-        )
-    except Exception:
-        pass
+def _write_failed_csv(token, failed_rows) -> bool:
+    path = _staged_path(token, ".failed.csv")
+    if not path:
+        return False
+    if not failed_rows:
+        if os.path.exists(path):
+            os.remove(path)
+        return False
+    with open(path, "w", encoding="utf-8-sig", newline="") as fh:
+        fh.write(xi.failed_rows_csv(failed_rows))
+    return True
 
 
-# ── MAIN VIEW ─────────────────────────────────────────────────────────────────
+# ── step 1: choose a file ────────────────────────────────────────────────
 
 @migration_bp.route("/")
-@role_required("super_admin", "clinic_owner", "support_admin")
+@role_required(*READ_ROLES)
 def index():
-    legacy_exists = os.path.isdir(LEGACY_DATA_DIR)
-    files_found = {}
-    if legacy_exists:
-        for fname in ["owners.xlsx", "pets.xlsx", "bookings.xlsx", "services.xlsx", "users.xlsx"]:
-            files_found[fname] = os.path.exists(os.path.join(LEGACY_DATA_DIR, fname))
-
-    # Count existing platform records for comparison
     conn = db.get_db()
-    counts = {}
-    for tbl in ["owners", "pets", "visits", "appointments"]:
-        try:
-            counts[tbl] = conn.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0]
-        except Exception:
-            counts[tbl] = "N/A"
-    conn.close()
+    try:
+        counts = {}
+        for table in ("owners", "pets", "visits"):
+            counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        history = [dict(r) for r in conn.execute(
+            "SELECT * FROM audit_log WHERE module='migration' ORDER BY timestamp DESC LIMIT 20"
+        ).fetchall()]
+    finally:
+        conn.close()
 
-    # Migration history from audit log
-    conn = db.get_db()
-    history = conn.execute(
-        "SELECT * FROM audit_log WHERE module='migration' ORDER BY timestamp DESC LIMIT 50"
-    ).fetchall()
-    conn.close()
+    latest_backup = bk.get_latest_backup()
 
     return render_template(
         "migration/index.html",
-        legacy_exists=legacy_exists,
-        legacy_dir=LEGACY_DATA_DIR,
-        files_found=files_found,
         platform_counts=counts,
-        history=[dict(h) for h in history],
+        history=history,
+        latest_backup=latest_backup,
+        max_mb=int(current_app.config.get("MAX_CONTENT_LENGTH", 16 * 1024 * 1024) / 1024 / 1024),
         active="migration",
     )
 
 
-# ── RUN MIGRATION ─────────────────────────────────────────────────────────────
+@migration_bp.route("/upload", methods=["POST"])
+@role_required(*READ_ROLES)
+def upload():
+    max_mb = int(current_app.config.get("MAX_CONTENT_LENGTH", 16 * 1024 * 1024) / 1024 / 1024)
+    try:
+        uploaded = request.files.get("file")
+    except RequestEntityTooLarge:
+        # This Flask version rejects an over-sized body before the view runs, so
+        # the generic 413 page wins and this branch does not fire. Left in place
+        # because it is the correct handling if form parsing ever goes lazy
+        # again; the friendly message for the common case has to live in a
+        # 413 handler in app.py, which this blueprint does not own.
+        flash(f"That file is larger than {max_mb} MB. Split it into smaller files and "
+              f"import them one at a time. | حجم الملف أكبر من {max_mb} ميجابايت. "
+              "قسّمه إلى ملفات أصغر واستوردها واحداً تلو الآخر.", "danger")
+        return redirect(url_for("migration.index"))
 
-@migration_bp.route("/run", methods=["POST"])
-@role_required("super_admin", "clinic_owner")
-def run_migration():
-    dry_run = request.form.get("dry_run") == "1"
-    report = {
-        "owners":  {"imported": 0, "skipped": 0, "duplicate": 0, "failed": 0, "errors": []},
-        "pets":    {"imported": 0, "skipped": 0, "duplicate": 0, "failed": 0, "errors": []},
-        "bookings":{"imported": 0, "skipped": 0, "duplicate": 0, "failed": 0, "errors": []},
-        "services":{"imported": 0, "skipped": 0, "duplicate": 0, "failed": 0, "errors": []},
-        "dry_run": dry_run,
-        "started_at": _now(),
-        "completed_at": None,
-    }
+    if uploaded is None or not uploaded.filename:
+        flash("No file was chosen. Click Choose file and pick your Excel or CSV file. | "
+              "لم يتم اختيار أي ملف. اضغط «اختيار ملف» واختر ملف إكسل أو ‎CSV.", "warning")
+        return redirect(url_for("migration.index"))
 
-    # Auto-backup before migration
-    if not dry_run:
-        try:
-            import models.backup as bk
-            bk.run_backup(current_app.config.get("DATABASE_PATH", ""))
-        except Exception as e:
-            report["backup_error"] = str(e)
+    data = uploaded.read()
+    filename = os.path.basename(uploaded.filename)
 
-    # ── 1. OWNERS ──────────────────────────────────────────────────────────────
-    owner_id_map = {}   # legacy_id → platform_id
+    try:
+        headers, rows = xi.read_table(data, filename)
+    except xi.SpreadsheetError as exc:
+        flash(f"{exc.en} | {exc.ar}", "danger")
+        return redirect(url_for("migration.index"))
 
-    rows, err = _xlsx_rows("owners.xlsx")
-    if err:
-        report["owners"]["errors"].append(f"Cannot read owners.xlsx: {err}")
-    elif rows is not None:
-        conn = db.get_db()
-        for row in rows:
-            legacy_id   = _safe_str(row.get("id"))
-            owner_name  = _safe_str(row.get("owner_name"))
-            phone       = _safe_str(row.get("phone"))
-            email       = _safe_str(row.get("email"))
-            address     = _safe_str(row.get("address"))
-            notes       = _safe_str(row.get("notes"))
-            created_at  = _safe_str(row.get("created_at")) or _now()
+    _purge_stale_uploads()
+    token = uuid.uuid4().hex
+    ext = ".xlsx" if filename.lower().endswith(".xlsx") else ".csv"
+    path = _staged_path(token, ext)
+    with open(path, "wb") as fh:
+        fh.write(data)
+    session[SESSION_KEY] = {"token": token, "name": filename, "ext": ext}
 
-            if not owner_name:
-                report["owners"]["skipped"] += 1
-                continue
-
-            # Dedup: match by phone (primary) or name
-            existing = None
-            if phone:
-                existing = conn.execute(
-                    "SELECT id FROM owners WHERE phone=? OR whatsapp_phone=?", (phone, phone)
-                ).fetchone()
-            if not existing:
-                existing = conn.execute(
-                    "SELECT id FROM owners WHERE full_name=?", (owner_name,)
-                ).fetchone()
-
-            if existing:
-                owner_id_map[legacy_id] = existing["id"]
-                report["owners"]["duplicate"] += 1
-                continue
-
-            if dry_run:
-                report["owners"]["imported"] += 1
-                owner_id_map[legacy_id] = f"(dry-run-{legacy_id})"
-                continue
-
-            try:
-                with conn:
-                    cur = conn.execute(
-                        """INSERT INTO owners(full_name, phone, whatsapp_phone, email, address,
-                                            preferred_contact, notes, created_by, created_at, updated_at)
-                           VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                        (owner_name, phone, phone, email, address,
-                         _safe_str(row.get("preferred_contact"), "WhatsApp"),
-                         notes, "migration", created_at, created_at)
-                    )
-                    new_id = cur.lastrowid
-                owner_id_map[legacy_id] = new_id
-                report["owners"]["imported"] += 1
-                _log_audit("legacy_migrated", "owner", new_id,
-                           f"Migrated from legacy id={legacy_id}, name={owner_name}")
-            except Exception as e:
-                report["owners"]["failed"] += 1
-                report["owners"]["errors"].append(f"Owner '{owner_name}': {e}")
-        conn.close()
-
-    # ── 2. PETS ────────────────────────────────────────────────────────────────
-    pet_id_map = {}   # legacy_id → platform_id
-
-    rows, err = _xlsx_rows("pets.xlsx")
-    if err:
-        report["pets"]["errors"].append(f"Cannot read pets.xlsx: {err}")
-    elif rows is not None:
-        conn = db.get_db()
-        for row in rows:
-            legacy_id   = _safe_str(row.get("id"))
-            pet_name    = _safe_str(row.get("pet_name"))
-            legacy_oid  = _safe_str(row.get("owner_id"))
-            platform_oid = owner_id_map.get(legacy_oid)
-
-            if not pet_name:
-                report["pets"]["skipped"] += 1
-                continue
-
-            # Dedup: same pet_name + owner_id
-            existing = None
-            if platform_oid and str(platform_oid).isdigit():
-                existing = conn.execute(
-                    "SELECT id FROM pets WHERE pet_name=? AND owner_id=?",
-                    (pet_name, platform_oid)
-                ).fetchone()
-            if existing:
-                pet_id_map[legacy_id] = existing["id"]
-                report["pets"]["duplicate"] += 1
-                continue
-
-            if dry_run:
-                report["pets"]["imported"] += 1
-                pet_id_map[legacy_id] = f"(dry-run-{legacy_id})"
-                continue
-
-            try:
-                owner_id_val = int(platform_oid) if platform_oid and str(platform_oid).isdigit() else None
-                created_at   = _safe_str(row.get("created_at")) or _now()
-                dob_raw      = _safe_str(row.get("dob"))
-                # Normalise dob to YYYY-MM-DD
-                dob = None
-                if dob_raw:
-                    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"):
-                        try:
-                            dob = datetime.strptime(dob_raw[:10], fmt).strftime("%Y-%m-%d")
-                            break
-                        except Exception:
-                            pass
-
-                with conn:
-                    cur = conn.execute(
-                        """INSERT INTO pets(owner_id, pet_name, species, breed, sex, dob,
-                                           weight_kg, color, microchip_id, neutered,
-                                           allergies, chronic_conditions, notes,
-                                           is_active, created_at, updated_at)
-                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)""",
-                        (owner_id_val, pet_name,
-                         _safe_str(row.get("species"), "Unknown"),
-                         _safe_str(row.get("breed")),
-                         _safe_str(row.get("sex")),
-                         dob,
-                         _safe_float(row.get("weight_kg")),
-                         _safe_str(row.get("color")),
-                         _safe_str(row.get("microchip_id")),
-                         1 if _safe_str(row.get("spayed_neutered","")).lower() in ("yes","true","1") else 0,
-                         _safe_str(row.get("allergies")),
-                         _safe_str(row.get("chronic_conditions")),
-                         _safe_str(row.get("notes")),
-                         created_at, created_at)
-                    )
-                    new_id = cur.lastrowid
-                pet_id_map[legacy_id] = new_id
-                report["pets"]["imported"] += 1
-                _log_audit("legacy_migrated", "pet", new_id,
-                           f"Migrated from legacy id={legacy_id}, name={pet_name}")
-            except Exception as e:
-                report["pets"]["failed"] += 1
-                report["pets"]["errors"].append(f"Pet '{pet_name}': {e}")
-        conn.close()
-
-    # ── 3. BOOKINGS → VISITS ──────────────────────────────────────────────────
-    rows, err = _xlsx_rows("bookings.xlsx")
-    if err:
-        report["bookings"]["errors"].append(f"Cannot read bookings.xlsx: {err}")
-    elif rows is not None:
-        conn = db.get_db()
-
-        # Get list of already-migrated visit legacy refs from audit log
-        already_migrated = set(
-            r[0] for r in conn.execute(
-                "SELECT entity_id FROM audit_log WHERE module='migration' AND entity_type='visit'"
-            ).fetchall()
-        )
-
-        for row in rows:
-            legacy_id  = _safe_str(row.get("id"))
-            if legacy_id in already_migrated:
-                report["bookings"]["duplicate"] += 1
-                continue
-
-            legacy_oid = _safe_str(row.get("owner_id"))
-            legacy_pid = _safe_str(row.get("pet_id"))
-            platform_oid = owner_id_map.get(legacy_oid)
-            platform_pid = pet_id_map.get(legacy_pid)
-
-            appt_start = _safe_str(row.get("appointment_start"))
-            status_raw = _safe_str(row.get("status"), "Completed")
-            # Map legacy statuses → platform visit status
-            visit_status = "Completed" if status_raw in ("Completed","completed") else "Open"
-
-            visit_type_raw = _safe_str(row.get("appointment_type"), "Consultation")
-            # Normalise to platform allowed types
-            type_map = {
-                "Consultation": "Consultation", "consultation": "Consultation",
-                "Vaccination": "Vaccination",   "vaccination": "Vaccination",
-                "Surgery": "Surgery",           "surgery": "Surgery",
-                "Grooming": "Wellness",         "grooming": "Wellness",
-                "Lab Test": "Wellness",         "lab test": "Wellness",
-                "Follow-up": "Follow-up",       "follow-up": "Follow-up",
-                "Emergency": "Emergency",       "emergency": "Emergency",
-            }
-            visit_type = type_map.get(visit_type_raw, "Consultation")
-
-            if dry_run:
-                report["bookings"]["imported"] += 1
-                continue
-
-            try:
-                owner_id_val = int(platform_oid) if platform_oid and str(platform_oid).isdigit() else None
-                pet_id_val   = int(platform_pid)  if platform_pid  and str(platform_pid).isdigit()  else None
-                created_at   = _safe_str(row.get("created_at")) or _now()
-                visit_date   = appt_start[:10] if appt_start else created_at[:10]
-
-                with conn:
-                    cur = conn.execute(
-                        """INSERT INTO visits(
-                              owner_id, pet_id, doctor_name, room,
-                              visit_date, visit_type, status,
-                              chief_complaint, symptoms, notes,
-                              weight_kg, temp_c,
-                              soap_subjective, soap_objective, soap_assessment, soap_plan,
-                              created_by, created_at, updated_at
-                           ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (owner_id_val, pet_id_val,
-                         _safe_str(row.get("vet_name")),
-                         _safe_str(row.get("room")),
-                         visit_date, visit_type, visit_status,
-                         _safe_str(row.get("reason")),
-                         _safe_str(row.get("symptoms")),
-                         _safe_str(row.get("notes")),
-                         _safe_float(row.get("visit_weight_kg")),
-                         _safe_float(row.get("visit_temp_c")),
-                         _safe_str(row.get("symptoms")),       # subjective
-                         "",                                   # objective (vitals captured separately)
-                         _safe_str(row.get("diagnosis")),      # assessment
-                         _safe_str(row.get("treatment_plan")), # plan
-                         "migration", created_at, created_at)
-                    )
-                    visit_id = cur.lastrowid
-
-                # Add diagnosis record if present
-                diag_text = _safe_str(row.get("diagnosis"))
-                if diag_text and visit_id:
-                    try:
-                        with conn:
-                            conn.execute(
-                                """INSERT INTO diagnoses(visit_id, pet_id, diagnosis, severity, created_by, created_at)
-                                   VALUES(?,?,?,?,?,?)""",
-                                (visit_id, pet_id_val, diag_text, "Moderate", "migration", created_at)
-                            )
-                    except Exception:
-                        pass
-
-                # Add prescription record if present
-                rx_text = _safe_str(row.get("prescription"))
-                if rx_text and visit_id:
-                    try:
-                        with conn:
-                            prx_cur = conn.execute(
-                                """INSERT INTO prescriptions(visit_id, pet_id, owner_id, prescribed_by, status, notes, created_at)
-                                   VALUES(?,?,?,?,?,?,?)""",
-                                (visit_id, pet_id_val, owner_id_val, _safe_str(row.get("vet_name"), "migration"),
-                                 "Active", rx_text, created_at)
-                            )
-                            prx_id = prx_cur.lastrowid
-                            # Single item containing the full rx text
-                            conn.execute(
-                                """INSERT INTO prescription_items(prescription_id, medication_name, dosage,
-                                      frequency, route, quantity, unit, instructions)
-                                   VALUES(?,?,?,?,?,?,?,?)""",
-                                (prx_id, "Legacy Prescription", "As prescribed",
-                                 "As directed", "Oral", 1, "unit", rx_text)
-                            )
-                    except Exception:
-                        pass
-
-                report["bookings"]["imported"] += 1
-                _log_audit("legacy_migrated", "visit", legacy_id,
-                           f"Migrated booking id={legacy_id}, type={visit_type}, date={visit_date}")
-
-            except Exception as e:
-                report["bookings"]["failed"] += 1
-                report["bookings"]["errors"].append(f"Booking '{legacy_id}': {e}")
-        conn.close()
-
-    # ── 4. SERVICES → service_catalog ─────────────────────────────────────────
-    rows, err = _xlsx_rows("services.xlsx")
-    if err:
-        report["services"]["errors"].append(f"Cannot read services.xlsx: {err}")
-    elif rows is not None and not dry_run:
-        conn = db.get_db()
-        for row in rows:
-            name = _safe_str(row.get("name"))
-            if not name:
-                report["services"]["skipped"] += 1
-                continue
-            existing = conn.execute("SELECT id FROM service_catalog WHERE name=?", (name,)).fetchone()
-            if existing:
-                report["services"]["duplicate"] += 1
-                continue
-            try:
-                with conn:
-                    conn.execute(
-                        """INSERT INTO service_catalog(name, base_price, is_active, created_at)
-                           VALUES(?,?,1,?)""",
-                        (name, _safe_float(row.get("fee")), _now())
-                    )
-                report["services"]["imported"] += 1
-            except Exception as e:
-                report["services"]["failed"] += 1
-                report["services"]["errors"].append(f"Service '{name}': {e}")
-        conn.close()
-
-    report["completed_at"] = _now()
-
-    # Store summary in audit log
-    if not dry_run:
-        summary = (f"Migration complete: owners={report['owners']['imported']} imported, "
-                   f"pets={report['pets']['imported']} imported, "
-                   f"bookings={report['bookings']['imported']} imported")
-        _log_audit("migration_complete", "migration", "full", summary)
+    remembered = _remembered_mapping(headers)
+    mapping = remembered or xi.guess_mapping(headers)
 
     return render_template(
-        "migration/report.html",
-        report=report,
+        "migration/map.html",
+        filename=filename,
+        headers=headers,
+        sample=rows[:3],
+        row_count=len(rows),
+        mapping=mapping,
+        remembered=bool(remembered),
+        target_fields=xi.TARGET_FIELDS,
+        group_labels=xi.GROUP_LABELS,
         active="migration",
+    )
+
+
+# ── step 3: dry run ──────────────────────────────────────────────────────
+
+@migration_bp.route("/preview", methods=["POST"])
+@role_required(*READ_ROLES)
+def preview():
+    try:
+        headers, rows, filename = _load_staged()
+    except xi.SpreadsheetError as exc:
+        flash(f"{exc.en} | {exc.ar}", "danger")
+        return redirect(url_for("migration.index"))
+    if headers is None:
+        return _no_file_redirect()
+
+    mapping = xi.clean_mapping(
+        {k[4:]: v for k, v in request.form.items() if k.startswith("col_")}, headers
+    )
+    strategy = request.form.get("strategy", "skip")
+
+    if "owner_name" not in mapping.values() and "owner_phone" not in mapping.values():
+        flash("Choose which column holds the owner's name or phone number — "
+              "records cannot be imported without one of them. | "
+              "اختر العمود الذي يحتوي على اسم العميل أو رقم هاتفه؛ "
+              "لا يمكن استيراد السجلات بدون أحدهما.", "warning")
+        return render_template(
+            "migration/map.html", filename=filename, headers=headers,
+            sample=rows[:3], row_count=len(rows), mapping=mapping, remembered=False,
+            target_fields=xi.TARGET_FIELDS, group_labels=xi.GROUP_LABELS,
+            active="migration",
+        )
+
+    conn = db.get_db()
+    try:
+        report = xi.run_import(conn, headers, rows, mapping,
+                               strategy=strategy, dry_run=True)
+    finally:
+        conn.close()
+
+    _remember_mapping(headers, mapping)
+    has_failed_csv = _write_failed_csv((session.get(SESSION_KEY) or {}).get("token", ""),
+                                       report["failed_rows"])
+
+    return render_template(
+        "migration/preview.html",
+        filename=filename,
+        report=report,
+        mapping=mapping,
+        headers=headers,
+        strategy=strategy,
+        has_failed_csv=has_failed_csv,
+        field_labels={f[0]: (f[1], f[2]) for f in xi.TARGET_FIELDS},
+        active="migration",
+    )
+
+
+# ── step 4: for real ─────────────────────────────────────────────────────
+
+@migration_bp.route("/commit", methods=["POST"])
+@role_required(*WRITE_ROLES)
+def commit():
+    try:
+        headers, rows, filename = _load_staged()
+    except xi.SpreadsheetError as exc:
+        flash(f"{exc.en} | {exc.ar}", "danger")
+        return redirect(url_for("migration.index"))
+    if headers is None:
+        return _no_file_redirect()
+
+    mapping = xi.clean_mapping(
+        {k[4:]: v for k, v in request.form.items() if k.startswith("col_")}, headers
+    )
+    strategy = request.form.get("strategy", "skip")
+
+    # ── the backup gate ──────────────────────────────────────────────────
+    # A failed backup stops the import. It used to be a bare call whose
+    # TypeError was swallowed into the results page, so every destructive
+    # import ran with no backup at all and nobody could tell.
+    backup = bk.run_backup()
+    if not backup.get("success"):
+        reason = backup.get("error") or "unknown error"
+        logger.error("import refused: backup failed (%s)", reason)
+        flash("Nothing was imported. The safety backup could not be created, so we "
+              "stopped before changing any of your data. Ask your administrator to "
+              f"check the Backup Manager. Reason: {reason} | "
+              "لم يتم استيراد أي شيء. تعذّر إنشاء النسخة الاحتياطية، لذلك توقّفنا قبل "
+              "تغيير أي من بياناتك. اطلب من مسؤول النظام مراجعة مدير النسخ الاحتياطي. "
+              f"السبب: {reason}", "danger")
+        return redirect(url_for("migration.index"))
+
+    username = session.get("user", {}).get("username", "import")
+
+    # One transaction: a failure half way through a file leaves nothing behind.
+    conn = db.get_db()
+    try:
+        with conn:
+            report = xi.run_import(conn, headers, rows, mapping,
+                                   strategy=strategy, dry_run=False,
+                                   created_by=f"import:{username}")
+    except Exception as exc:
+        logger.exception("import failed and was rolled back")
+        flash("The import stopped and every change was undone — your data is exactly "
+              "as it was before. Please send this message to support so they can help: "
+              f"{exc} | "
+              "توقّف الاستيراد وتم التراجع عن كل التغييرات، وبياناتك كما كانت تماماً. "
+              f"من فضلك أرسل هذه الرسالة للدعم الفني: {exc}", "danger")
+        return redirect(url_for("migration.index"))
+    finally:
+        conn.close()
+
+    report["backup"] = backup
+    counts = report["counts"]
+    db.log_audit(
+        username=username,
+        role=session.get("user", {}).get("role", ""),
+        action="data_import",
+        module="migration",
+        entity_type="import",
+        entity_id=(session.get(SESSION_KEY) or {}).get("token", ""),
+        details=(f"Imported {filename}: owners +{counts['owners']['created']}/"
+                 f"~{counts['owners']['updated']}, pets +{counts['pets']['created']}/"
+                 f"~{counts['pets']['updated']}, visits +{counts['visits']['created']}; "
+                 f"{report['rows_failed']} rows failed; backup={backup.get('filename')}"),
+    )
+
+    has_failed_csv = _write_failed_csv((session.get(SESSION_KEY) or {}).get("token", ""),
+                                       report["failed_rows"])
+
+    return render_template(
+        "migration/result.html",
+        filename=filename,
+        report=report,
+        backup=backup,
+        has_failed_csv=has_failed_csv,
+        active="migration",
+    )
+
+
+@migration_bp.route("/failed-rows.csv")
+@role_required(*READ_ROLES)
+def failed_rows():
+    """The rows that did not import, so the owner can fix them and re-run."""
+    path = _staged_path((session.get(SESSION_KEY) or {}).get("token", ""), ".failed.csv")
+    if not path or not os.path.exists(path):
+        return _no_file_redirect()
+    with open(path, "r", encoding="utf-8-sig") as fh:
+        body = fh.read()
+    # utf-8-sig so Excel opens the Arabic columns correctly instead of as mojibake.
+    return Response(
+        body.encode("utf-8-sig"),
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="rows_to_fix.csv"'},
     )

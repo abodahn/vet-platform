@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Preview the Import', 'معاينة الاستيراد') }}{% endblock %}
+{% block page_title %}{{ t('Step 3 — Preview', 'الخطوة ٣ — المعاينة') }}{% endblock %}
+{% block page_sub %}{{ filename }} — {{ report.rows_total }} {{ t('rows read', 'صف تمت قراءته') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('migration.index') }}" class="pf-btn pf-btn-secondary">
+  {{ t('Start over', 'البدء من جديد') }}
+</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="pf-alert pf-alert-warning pf-mb-4">
+  <strong>{{ t('Nothing has been saved yet.', 'لم يتم حفظ أي شيء حتى الآن.') }}</strong>
+  {{ t('This is a preview of what will happen. Your database has not been touched. '
+       'Review the numbers below, then confirm at the bottom of the page.',
+       'هذه معاينة لما سيحدث. لم يتم المساس بقاعدة بياناتك. '
+       'راجع الأرقام أدناه ثم أكّد في أسفل الصفحة.') }}
+</div>
+
+<div class="pf-grid pf-grid-3 pf-mb-4">
+  {% for entity, label_en, label_ar in [
+        ('owners', 'Owners', 'العملاء'),
+        ('pets', 'Pets', 'الحيوانات'),
+        ('visits', 'Visits', 'الزيارات')] %}
+  {% set c = report.counts[entity] %}
+  <div class="pf-card">
+    <div class="pf-card-header">
+      <div class="pf-card-title">{{ t(label_en, label_ar) }}</div>
+    </div>
+    <table class="pf-table">
+      <tr>
+        <td>{{ t('Will be created', 'سيتم إنشاؤها') }}</td>
+        <td class="pf-text-success" style="text-align:end;font-weight:800">{{ c.created }}</td>
+      </tr>
+      <tr>
+        <td>{{ t('Will be updated', 'سيتم تحديثها') }}</td>
+        <td class="pf-text-accent" style="text-align:end;font-weight:800">{{ c.updated }}</td>
+      </tr>
+      <tr>
+        <td>{{ t('Will be skipped', 'سيتم تخطّيها') }}</td>
+        <td class="pf-text-muted" style="text-align:end;font-weight:800">{{ c.skipped }}</td>
+      </tr>
+    </table>
+  </div>
+  {% endfor %}
+</div>
+
+{% if report.rows_failed %}
+<div class="pf-card pf-mb-4">
+  <div class="pf-card-header">
+    <div>
+      <div class="pf-card-title pf-text-danger">
+        {{ report.rows_failed }}
+        {{ t('rows cannot be imported', 'صفاً لا يمكن استيراده') }}
+      </div>
+      <div class="pf-card-sub">
+        {{ t('The rest of the file will still import. Fix these rows in your file and '
+             'upload it again afterwards — nothing will be duplicated.',
+             'سيتم استيراد بقية الملف. صحّح هذه الصفوف في ملفك ثم ارفعه مرة أخرى — '
+             'لن يتم تكرار أي شيء.') }}
+      </div>
+    </div>
+    {% if has_failed_csv %}
+    <a class="pf-btn pf-btn-secondary pf-btn-sm" href="{{ url_for('migration.failed_rows') }}">
+      {{ t('Download these rows', 'تنزيل هذه الصفوف') }}
+    </a>
+    {% endif %}
+  </div>
+  <div class="pf-table-wrap">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th style="width:120px">{{ t('Row in your file', 'الصف في ملفك') }}</th>
+          <th>{{ t('What to fix', 'ما يجب تصحيحه') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in report.errors %}
+        <tr>
+          <td style="font-weight:800">{{ e.row }}</td>
+          <td>{{ t(e.en, e.ar) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if report.duplicates %}
+<div class="pf-card pf-mb-4">
+  <div class="pf-card-header">
+    <div>
+      <div class="pf-card-title">
+        {{ t('Records already in the system', 'سجلات موجودة بالفعل في النظام') }}
+      </div>
+      <div class="pf-card-sub">
+        {% if report.strategy == 'update' %}
+          {{ t('You chose to update these.', 'اخترت تحديث هذه السجلات.') }}
+        {% elif report.strategy == 'create' %}
+          {{ t('You chose to add them anyway.', 'اخترت إضافتها على أي حال.') }}
+        {% else %}
+          {{ t('You chose to leave these as they are.', 'اخترت ترك هذه السجلات كما هي.') }}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="pf-table-wrap">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th style="width:120px">{{ t('Row', 'الصف') }}</th>
+          <th>{{ t('What we found', 'ما وجدناه') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in report.duplicates %}
+        <tr>
+          <td style="font-weight:800">{{ d.row }}</td>
+          <td>{{ t(d.en, d.ar) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="pf-card pf-mb-4">
+  <div class="pf-card-header">
+    <div>
+      <div class="pf-card-title">
+        {{ t('First rows, exactly as they will be stored', 'أول الصفوف كما سيتم حفظها تماماً') }}
+      </div>
+      <div class="pf-card-sub">
+        {{ t('Phone numbers are stored in one standard form: Arabic digits become '
+             'English digits, spaces and “+” are removed, and the country code 20 '
+             'becomes a leading 0. So 01012345678, +201012345678 and 0020 101 234 5678 '
+             'are all stored as 01012345678 and count as the same person.',
+             'تُحفظ أرقام الهاتف بصيغة موحّدة: تتحوّل الأرقام العربية إلى إنجليزية، '
+             'وتُحذف المسافات وعلامة «+»، ويتحوّل مفتاح الدولة ‎20 إلى صفر في البداية. '
+             'لذلك تُحفظ ‎01012345678 و‎+201012345678 و‎0020 101 234 5678 جميعها '
+             'كرقم ‎01012345678 وتُعتبر لنفس الشخص.') }}
+      </div>
+    </div>
+  </div>
+  <div class="pf-table-wrap">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th>{{ t('Row', 'الصف') }}</th>
+          <th>{{ t('Owner', 'العميل') }}</th>
+          <th>{{ t('Phone', 'الهاتف') }}</th>
+          <th>{{ t('Pet', 'الحيوان') }}</th>
+          <th>{{ t('Species', 'النوع') }}</th>
+          <th>{{ t('Date of birth', 'تاريخ الميلاد') }}</th>
+          <th>{{ t('Visit', 'الزيارة') }}</th>
+          <th>{{ t('Action', 'الإجراء') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in report.preview %}
+        <tr>
+          <td>{{ p.row }}</td>
+          <td>{{ p.owner_name or '—' }}</td>
+          <td dir="ltr" style="font-family:monospace">
+            {{ p.owner_phone or '—' }}
+            {% if p.owner_phone_original and p.owner_phone_original != p.owner_phone %}
+            <span class="pf-text-xs pf-text-muted">({{ p.owner_phone_original }})</span>
+            {% endif %}
+          </td>
+          <td>{{ p.pet_name or '—' }}</td>
+          <td>{{ p.pet_species or '—' }}</td>
+          <td>{{ p.pet_dob or '—' }}</td>
+          <td>{{ (p.visit_date ~ ' ' ~ p.visit_type) if p.visit_date else '—' }}</td>
+          <td class="pf-text-xs">
+            {% for part in [p.owner_action, p.pet_action, p.visit_action] %}
+              {% if part %}<span class="pf-badge">{{ part }}</span>{% endif %}
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="pf-card">
+  <div class="pf-card-header">
+    <div class="pf-card-title">{{ t('Step 4 — Import for real', 'الخطوة ٤ — تنفيذ الاستيراد') }}</div>
+  </div>
+  <p class="pf-text-sm pf-mb-4">
+    {{ t('A full backup will be taken first. If the backup cannot be created, the '
+         'import will not run and your data stays untouched. Everything is imported '
+         'in one go — if any part fails, nothing at all is saved.',
+         'سيتم أخذ نسخة احتياطية كاملة أولاً. وإذا تعذّر إنشاؤها فلن يتم الاستيراد '
+         'وتبقى بياناتك كما هي. ويتم استيراد كل شيء دفعة واحدة — فإذا فشل أي جزء '
+         'فلن يُحفظ شيء على الإطلاق.') }}
+  </p>
+  <form method="post" action="{{ url_for('migration.commit') }}"
+        onsubmit="return confirm({{ t('Import this file now? A backup will be taken first.',
+                                      'هل تريد استيراد هذا الملف الآن؟ سيتم أخذ نسخة احتياطية أولاً.') | tojson }});">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="strategy" value="{{ strategy }}">
+    {% for ci, field in mapping.items() %}
+    <input type="hidden" name="col_{{ ci }}" value="{{ field }}">
+    {% endfor %}
+    <button type="submit" class="pf-btn pf-btn-primary pf-btn-lg">
+      {{ t('Import now', 'تنفيذ الاستيراد الآن') }}
+    </button>
+    <a href="{{ url_for('migration.index') }}" class="pf-btn pf-btn-ghost">
+      {{ t('Cancel', 'إلغاء') }}
+    </a>
+  </form>
+</div>
+
+{% endblock %}
