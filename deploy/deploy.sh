@@ -57,7 +57,12 @@ log ".env file found."
 # ── 6. PostgreSQL — create DB and user ───────────────────
 log "Setting up PostgreSQL..."
 sudo -u postgres psql -c "CREATE DATABASE vetclinic;" 2>/dev/null || warn "Database 'vetclinic' already exists — skipping."
-sudo -u postgres psql -c "CREATE USER vetapp WITH PASSWORD 'Ahmed@1122';" 2>/dev/null || warn "User 'vetapp' already exists — skipping."
+# Generate a unique database password per installation. This script used to
+# hardcode one, so every clinic that ever ran it shared the same PostgreSQL
+# credential — in a file committed to the repository.
+PG_PASS="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-24)"
+sudo -u postgres psql -c "CREATE USER vetapp WITH PASSWORD '${PG_PASS}';" 2>/dev/null \
+    || warn "User 'vetapp' already exists — leaving its password unchanged. To rotate it: sudo -u postgres psql -c \"ALTER USER vetapp WITH PASSWORD '<new>';\""
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE vetclinic TO vetapp;" 2>/dev/null
 
 # ── 7. Systemd service ────────────────────────────────────
@@ -100,7 +105,12 @@ echo -e "  ${GREEN}Deployment complete!${NC}"
 echo "═══════════════════════════════════════════════════"
 echo ""
 echo "  Platform:  http://$(hostname -I | awk '{print $1}'):5100"
-echo "  Login:     admin / Ahmed@1122"
+echo "  Login:     admin / (the PLATFORM_ADMIN_PASS you set in .env)"
+echo ""
+echo "  A unique PostgreSQL password was generated for this install."
+echo "  Put it in .env as POSTGRES_DSN before starting the service:"
+echo "    POSTGRES_DSN=postgresql://vetapp:${PG_PASS}@localhost:5432/vetclinic"
+echo "  Store it somewhere safe — it is not written to disk by this script."
 echo "  Logs:      sudo journalctl -u vetplatform -f"
 echo "             $PLATFORM_DIR/logs/error.log"
 echo ""

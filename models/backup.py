@@ -5,6 +5,7 @@ Daily timestamped backups, 30-day retention, integrity check, status tracking.
 import os
 import shutil
 import sqlite3
+import subprocess
 import threading
 import logging
 from datetime import datetime, timedelta
@@ -25,12 +26,85 @@ def configure(db_path: str, backup_dir: str) -> None:
     Path(backup_dir).mkdir(parents=True, exist_ok=True)
 
 
-def run_backup() -> dict:
+def _postgres_dsn() -> str:
+    """The DSN this deployment is actually using, or '' when on SQLite."""
+    return os.environ.get("POSTGRES_DSN", "").strip()
+
+
+def _run_pg_backup(backup_dir: str) -> dict:
+    """pg_dump the live PostgreSQL database.
+
+    Previously absent entirely: run_backup() only ever spoke sqlite3, so a
+    PostgreSQL deployment produced NO backup while the nightly job logged
+    success. That is the worst possible failure — it looks healthy until the
+    day you need to restore.
     """
-    Create a timestamped backup of the SQLite database.
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    name = f"platform_backup_{ts}.dump"
+    path = os.path.join(backup_dir, name)
+    dsn = _postgres_dsn()
+
+    exe = shutil.which("pg_dump")
+    if not exe:
+        # Do NOT report success. A missing tool means no backup exists.
+        msg = ("pg_dump not found on PATH — PostgreSQL backup cannot run. "
+               "Install postgresql-client on the host.")
+        logger.error(msg)
+        return {"success": False, "error": msg, "filename": "",
+                "timestamp": datetime.now().isoformat()}
+
+    try:
+        # -Fc = custom format, compressed and restorable with pg_restore.
+        proc = subprocess.run(
+            [exe, "--no-password", "-Fc", "-f", path, dsn],
+            capture_output=True, text=True, timeout=1800,
+        )
+        if proc.returncode != 0 or not os.path.exists(path):
+            err = (proc.stderr or "").strip()[:500] or f"pg_dump exited {proc.returncode}"
+            logger.error("PostgreSQL backup failed: %s", err)
+            if os.path.exists(path):
+                os.remove(path)
+            return {"success": False, "error": err, "filename": "",
+                    "timestamp": datetime.now().isoformat()}
+
+        size_kb = round(os.path.getsize(path) / 1024, 1)
+        if size_kb <= 0:
+            os.remove(path)
+            return {"success": False, "error": "pg_dump produced an empty file",
+                    "filename": "", "timestamp": datetime.now().isoformat()}
+
+        _purge_old_backups()
+        logger.info("PostgreSQL backup completed: %s (%s KB)", name, size_kb)
+        return {"success": True, "filename": name, "filepath": path,
+                "size_kb": size_kb, "engine": "postgresql",
+                "integrity": "ok", "timestamp": datetime.now().isoformat(),
+                "error": None}
+    except subprocess.TimeoutExpired:
+        msg = "pg_dump timed out after 30 minutes"
+        logger.error(msg)
+        return {"success": False, "error": msg, "filename": "",
+                "timestamp": datetime.now().isoformat()}
+
+
+def run_backup(db_path: str = "") -> dict:
+    """
+    Create a timestamped backup of the database this deployment actually uses.
+
+    `db_path` is accepted and ignored for SQLite — blueprints/migration
+    passed one positional argument against a zero-arg signature, so every
+    destructive Excel import raised TypeError and ran with NO backup, with the
+    error swallowed into the results page.
+
     Returns a status dict with success, filename, size_kb, error.
     """
-    if not _db_path or not _backup_dir:
+    if not _backup_dir:
+        return {"success": False, "error": "Backup not configured", "filename": ""}
+
+    # PostgreSQL deployments must be dumped with pg_dump, not sqlite3.
+    if _postgres_dsn():
+        return _run_pg_backup(_backup_dir)
+
+    if not _db_path:
         return {"success": False, "error": "Backup not configured", "filename": ""}
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -114,10 +114,20 @@ Click **Environment Variables** → Add each one:
 |-----|-------|
 | `FLASK_ENV` | `production` |
 | `POSTGRES_DSN` | *(paste your Neon connection string from Part 1 Step 4)* |
-| `PLATFORM_SECRET_KEY` | `5d1ba3d1364fac932c8780849f158723d31ab8c5c180d2a0a0cc3e45bfc207f639b90b48669df334e96160db566f4b45ecc29f674f19b77967eddd07fdd77fd5` |
+| `PLATFORM_SECRET_KEY` | *(generate your own — see below. NEVER reuse one from a document.)* |
+
+> **Generate a unique secret key per deployment:**
+> ```bash
+> python -c "import secrets; print(secrets.token_hex(64))"
+> ```
+> This key signs session cookies. Anyone who has it can forge a logged-in
+> session as any user, including an administrator. A previous version of this
+> guide printed a real key here — if that key was ever deployed anywhere,
+> rotate it now. Rotating invalidates all active sessions (everyone is logged
+> out once) and orphans any enrolled 2FA secrets, which then need an admin reset.
 | `SESSION_COOKIE_SECURE` | `true` |
 | `PLATFORM_ADMIN_USER` | `admin` |
-| `PLATFORM_ADMIN_PASS` | `Ahmed@1122` |
+| `PLATFORM_ADMIN_PASS` | *(generate a unique strong password per install — never reuse)* |
 | `PLATFORM_PORT` | `8000` |
 | `PLATFORM_DEBUG` | `0` |
 | `LEGACY_APP_ENABLED` | `0` |
@@ -132,7 +142,7 @@ Click **Environment Variables** → Add each one:
 ## PART 4 — First Login on Production
 
 1. Open: `https://your-app-name.koyeb.app`
-2. Login: `admin` / `Ahmed@1122`
+2. Login: `admin` / *(the PLATFORM_ADMIN_PASS you set above)*
 3. Go to **Settings → Clinic Info** and fill in your clinic details
 4. Go to **HR → Staff** and create real staff accounts
 5. Go to **Catalog → Services** and add your services with prices
@@ -182,4 +192,4 @@ git push origin main
 | **URL** | http://localhost:5100 | https://your-app.koyeb.app |
 | **DEBUG** | ON | OFF |
 | **HTTPS** | Not needed | Automatic |
-| **Login** | admin / Ahmed@1122 | admin / Ahmed@1122 |
+| **Login** | admin / *(your PLATFORM_ADMIN_PASS)* | admin / *(your PLATFORM_ADMIN_PASS)* |
