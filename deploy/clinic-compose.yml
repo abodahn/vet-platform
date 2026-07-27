@@ -1,0 +1,48 @@
+# ══════════════════════════════════════════════════════════════════════
+#  One clinic = one compose project = one container.
+#  Copied verbatim into /srv/aleefy/clinics/<slug>/docker-compose.yml by
+#  scripts/provision/provision.sh. Every dollar-brace placeholder below is
+#  substituted from the .env sitting next to it.
+#
+#  Do not add a second clinic to this file. The whole isolation story is
+#  "clinic A's compose project knows nothing about clinic B's".
+# ══════════════════════════════════════════════════════════════════════
+name: clinic-${CLINIC_SLUG}
+
+services:
+  app:
+    image: ${APP_IMAGE}
+    container_name: clinic-${CLINIC_SLUG}
+    env_file: .env
+    ports:
+      # Bound to loopback ONLY. The shared nginx is the single way in from the
+      # internet; without the 127.0.0.1 prefix Docker punches its own hole
+      # through ufw and every clinic is directly reachable on its raw port.
+      - "127.0.0.1:${CLINIC_HOST_PORT}:5100"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+    # Blast radius. A runaway report on clinic A must not OOM the VPS and take
+    # clinic B down with it — the kernel kills the container that overran,
+    # Docker restarts it, the neighbours never notice.
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 0.75
+    pids_limit: 256
+
+    healthcheck:
+      # Public, no auth, and it actually probes the database (blueprints/api_v1).
+      test: ["CMD", "curl", "-fsS", "http://localhost:5100/api/v1/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Without this one clinic's debug log fills the disk for all of them.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

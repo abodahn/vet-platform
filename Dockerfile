@@ -2,9 +2,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# postgresql-client supplies pg_dump and pg_restore. Without them
+# models/backup.py cannot back up a PostgreSQL clinic from inside the
+# container — and it correctly refuses rather than reporting a success it
+# did not achieve, which would leave the clinic with no backup at all.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     curl \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

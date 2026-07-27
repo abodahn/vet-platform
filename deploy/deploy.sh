@@ -1,118 +1,102 @@
-#!/bin/bash
-# ═══════════════════════════════════════════════════════════
-#  One-click deployment script — Premium Animal Hospital Platform
-#  Run as: bash deploy.sh
-#  Tested on: Ubuntu 22.04 LTS
-# ═══════════════════════════════════════════════════════════
+#!/usr/bin/env bash
+# ══════════════════════════════════════════════════════════════════════
+#  HOST BOOTSTRAP — run ONCE per machine, before the first clinic.
+#
+#      sudo bash deploy/deploy.sh
+#
+#  This script used to deploy a single clinic and, in doing so, shipped the
+#  same PostgreSQL password to every customer from a committed file. It no
+#  longer creates databases, users, secrets or services: it only makes a bare
+#  Ubuntu box able to host clinics.
+#
+#  One clinic is now:
+#      scripts/provision/provision.sh --clinic <slug> --domain <fqdn>
+#
+#  Tested on Ubuntu 22.04 LTS.
+# ══════════════════════════════════════════════════════════════════════
+set -euo pipefail
 
-set -e   # stop on first error
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'; NC=$'\033[0m'
+log()  { echo "${GREEN}[OK]${NC}  $*"; }
+warn() { echo "${YELLOW}[!!]${NC}  $*" >&2; }
+fail() { echo "${RED}[ERR]${NC} $*" >&2; exit 1; }
 
-log()  { echo -e "${GREEN}[OK]${NC} $1"; }
-warn() { echo -e "${YELLOW}[!!]${NC} $1"; }
-fail() { echo -e "${RED}[ERR]${NC} $1"; exit 1; }
+WITH_POSTGRES=1
+[[ "${1:-}" == "--no-postgres" ]] && WITH_POSTGRES=0   # SQLite-only clinic PC
 
-PLATFORM_DIR="/home/ahmed/vet/platform"
-VENV_DIR="/home/ahmed/.venv"
-SERVICE_NAME="vetplatform"
+[[ "$(uname -s)" == "Linux" ]] || fail "Linux only. On Windows, use WSL."
 
-echo ""
+echo
 echo "═══════════════════════════════════════════════════"
-echo "  Premium Animal Hospital — Production Deployment"
+echo "  Aleefy — host bootstrap"
 echo "═══════════════════════════════════════════════════"
-echo ""
+echo
 
-# ── 1. System packages ────────────────────────────────────
-log "Installing system packages..."
+# ── 1. base packages ────────────────────────────────────────────────────────
+log "installing base packages..."
 sudo apt-get update -qq
 sudo apt-get install -y -qq \
-    python3-pip python3-venv \
-    postgresql postgresql-contrib \
-    nginx certbot python3-certbot-nginx \
-    ufw git curl
+    ca-certificates curl git python3 python3-venv \
+    nginx certbot python3-certbot-nginx ufw
 
-# ── 2. Python virtual environment ─────────────────────────
-log "Setting up Python virtual environment..."
-python3 -m venv "$VENV_DIR"
-source "$VENV_DIR/bin/activate"
-
-# ── 3. Install Python packages ────────────────────────────
-log "Installing Python dependencies..."
-pip install --upgrade pip -q
-pip install gunicorn -q
-pip install -r "$PLATFORM_DIR/requirements.txt" -q
-log "All packages installed."
-
-# ── 4. Create logs directory ──────────────────────────────
-log "Creating log directory..."
-mkdir -p "$PLATFORM_DIR/logs"
-mkdir -p "$PLATFORM_DIR/data/backups"
-
-# ── 5. Check .env file exists ─────────────────────────────
-if [ ! -f "$PLATFORM_DIR/.env" ]; then
-    fail ".env file not found at $PLATFORM_DIR/.env — create it first! See deploy/README.txt"
+# ── 2. docker (official repo — the distro package lags badly) ───────────────
+if command -v docker >/dev/null && docker compose version >/dev/null 2>&1; then
+  log "docker already present"
+else
+  log "installing docker..."
+  sudo install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  sudo chmod a+r /etc/apt/keyrings/docker.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+    | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io \
+       docker-buildx-plugin docker-compose-plugin
 fi
-log ".env file found."
+sudo systemctl enable --now docker
+log "docker ready"
 
-# ── 6. PostgreSQL — create DB and user ───────────────────
-log "Setting up PostgreSQL..."
-sudo -u postgres psql -c "CREATE DATABASE vetclinic;" 2>/dev/null || warn "Database 'vetclinic' already exists — skipping."
-# Generate a unique database password per installation. This script used to
-# hardcode one, so every clinic that ever ran it shared the same PostgreSQL
-# credential — in a file committed to the repository.
-PG_PASS="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-24)"
-sudo -u postgres psql -c "CREATE USER vetapp WITH PASSWORD '${PG_PASS}';" 2>/dev/null \
-    || warn "User 'vetapp' already exists — leaving its password unchanged. To rotate it: sudo -u postgres psql -c \"ALTER USER vetapp WITH PASSWORD '<new>';\""
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE vetclinic TO vetapp;" 2>/dev/null
+# ── 3. postgresql — ONE server, one database per clinic ─────────────────────
+# Not one PostgreSQL per clinic: 10 postgres containers would not fit in the
+# RAM of a EUR 5-7 VPS. Isolation comes from a per-clinic database + role with
+# CONNECT revoked from PUBLIC (provision.sh does that per clinic).
+if [[ $WITH_POSTGRES == 1 ]]; then
+  sudo apt-get install -y -qq postgresql postgresql-contrib postgresql-client
+  sudo systemctl enable --now postgresql
+  log "postgresql ready (no databases created — provision.sh does that)"
+else
+  warn "--no-postgres: clinics on this host must use provision.sh --sqlite"
+fi
 
-# ── 7. Systemd service ────────────────────────────────────
-log "Installing systemd service..."
-sudo cp "$PLATFORM_DIR/deploy/vetplatform.service" /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable $SERVICE_NAME
-sudo systemctl restart $SERVICE_NAME
-sleep 2
-sudo systemctl is-active --quiet $SERVICE_NAME && log "Service is running." || fail "Service failed to start. Check: sudo journalctl -u $SERVICE_NAME -n 50"
-
-# ── 8. Nginx ──────────────────────────────────────────────
-log "Configuring Nginx..."
-sudo cp "$PLATFORM_DIR/deploy/nginx.conf" /etc/nginx/sites-available/vetplatform
-sudo ln -sf /etc/nginx/sites-available/vetplatform /etc/nginx/sites-enabled/vetplatform
-sudo rm -f /etc/nginx/sites-enabled/default   # remove default placeholder
-sudo nginx -t && sudo systemctl reload nginx
-log "Nginx configured."
-
-# ── 9. Firewall ───────────────────────────────────────────
-log "Configuring firewall..."
-sudo ufw --force enable
+# ── 4. firewall ─────────────────────────────────────────────────────────────
+# Clinic containers publish on 127.0.0.1 only, so nothing but nginx is exposed.
+log "configuring firewall..."
 sudo ufw allow ssh
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
-sudo ufw deny 5100/tcp   # block direct Gunicorn access from outside
-log "Firewall: SSH, HTTP, HTTPS allowed. Port 5100 blocked externally."
+sudo ufw --force enable
+log "firewall: ssh, http, https"
 
-# ── 10. SSL certificate ───────────────────────────────────
-warn "SSL certificate: run this manually after pointing your domain DNS to this server:"
-echo ""
-echo "  sudo certbot --nginx -d YOUR_DOMAIN_HERE"
-echo "  Then update deploy/nginx.conf with your actual domain and reload nginx."
-echo ""
+# ── 5. clinic root ──────────────────────────────────────────────────────────
+ROOT="${ALEEFY_ROOT:-/srv/aleefy}"
+sudo mkdir -p "$ROOT/clinics"
+sudo chmod 700 "$ROOT" "$ROOT/clinics"
+log "clinic root: $ROOT (mode 700 — it holds every clinic's secrets)"
 
-# ── Done ─────────────────────────────────────────────────
-echo ""
+# ── 6. nightly inventory mail (optional, one line) ──────────────────────────
+warn "Optional: get told when a clinic is down or has a stale backup.
+     Add to root's crontab (crontab -e):
+       0 8 * * * python3 $(pwd)/scripts/provision/inventory.py --quiet"
+
+echo
 echo "═══════════════════════════════════════════════════"
-echo -e "  ${GREEN}Deployment complete!${NC}"
+echo -e "  ${GREEN}Host ready.${NC} Now add a clinic:"
+echo
+echo "    scripts/provision/provision.sh --clinic acme --domain acme.aleefy.vet"
+echo "    sudo certbot --nginx -d acme.aleefy.vet"
+echo
+echo "  See PROVISIONING.md."
 echo "═══════════════════════════════════════════════════"
-echo ""
-echo "  Platform:  http://$(hostname -I | awk '{print $1}'):5100"
-echo "  Login:     admin / (the PLATFORM_ADMIN_PASS you set in .env)"
-echo ""
-echo "  A unique PostgreSQL password was generated for this install."
-echo "  Put it in .env as POSTGRES_DSN before starting the service:"
-echo "    POSTGRES_DSN=postgresql://vetapp:${PG_PASS}@localhost:5432/vetclinic"
-echo "  Store it somewhere safe — it is not written to disk by this script."
-echo "  Logs:      sudo journalctl -u vetplatform -f"
-echo "             $PLATFORM_DIR/logs/error.log"
-echo ""
-warn "Change the admin password after first login!"
-echo ""
+echo
