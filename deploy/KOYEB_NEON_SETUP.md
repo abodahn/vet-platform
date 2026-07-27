@@ -2,6 +2,43 @@
 ## Koyeb (Free Web Hosting) + Neon.tech (Free PostgreSQL)
 ### Premium Animal Hospital Platform
 
+> ## ⚠️ OUT OF DATE — DO NOT USE FOR A PAYING CUSTOMER (checked 2026-07-28)
+>
+> The claim below that "both services are 100% free… never sleep" is **no longer
+> true**, and was never true for a production clinic.
+>
+> **Koyeb was acquired by Mistral AI (Feb 2026) and is removing its free tier.**
+> Koyeb's own announcement: the Starter plan "will soon be removed and new users
+> will instead need to subscribe to the Pro, Scale, or Enterprise plan." The
+> pricing page now lists only Pro ($29/mo) and above. Existing free orgs are
+> grandfathered — new ones are not.
+>
+> **Both free tiers sleep.** Koyeb free deep-sleeps after 1 hour idle with a 1–5 s
+> cold start that cannot be disabled; Neon free scale-to-zero after 5 min is
+> mandatory. The first person to touch the app after lunch waits several seconds.
+>
+> **Neon free cannot run an always-on clinic database.** 100 CU-hours/month at the
+> minimum 0.25 CU = 400 hours, against ~730 hours in a month. Storage caps at
+> 0.5 GB — a clinic with visit notes and lab attachments passes that in months,
+> and there is no soft landing: writes fail.
+>
+> **No SLA and 6 hours of restore history.** For medical records with legal and
+> clinical weight, that is not an acceptable backup position on any tier.
+>
+> ### What to do instead
+> - **Development and demos:** free tiers are fine. Keep using them here.
+> - **First paying clinic:** a single Hetzner CX23 (2 vCPU / 4 GB / 40 GB) in
+>   **Falkenstein or Nuremberg** running app + PostgreSQL + Caddy on one box, at
+>   roughly €5–7/month. No cold starts, no sleep, no compute-hour ceiling.
+>   Frankfurt-region hosting is ~55–90 ms RTT from Cairo; US East is ~140–190 ms
+>   and will feel slow on a form-heavy clinical UI.
+> - Managed equivalent (Koyeb Pro + Neon Launch) lands near **$50/month**, which is
+>   the point a VPS is obviously better value for a one-developer business.
+> - **Set up automated off-box backups on day one** (Hetzner Storage Box or
+>   Backblaze B2). Self-hosting means restores are yours to own.
+>
+> Full sourced analysis: `docs/market/03_PRICING_AND_ECONOMICS.md`.
+
 Both services are 100% free. No credit card required. Never sleep.
 
 ---
