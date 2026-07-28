@@ -38,13 +38,21 @@
   {% if low_stock %}
   <div class="alert-cards">
     {% for item in low_stock %}
-    {% set pct = [(item.current_stock / item.reorder_level * 100 if item.reorder_level else 0)|int, 100]|min %}
+    {# list_items() aliases the computed batch sum as stock_qty; the
+       blueprint's own query in inventory/routes.py:66 calls the same thing
+       current_stock. This page is fed by the model function, so it reads
+       stock_qty — with current_stock as a fallback so it keeps working if it
+       is ever fed from the blueprint query instead. The mismatch only showed
+       when the low-stock list was non-empty, which an empty demo database
+       hides entirely. #}
+    {% set _stock = item.get('stock_qty', item.get('current_stock', 0)) or 0 %}
+    {% set pct = [(_stock / item.reorder_level * 100 if item.reorder_level else 0)|int, 100]|min %}
     <div class="alert-card danger">
       <div class="alert-name">{{ item.name }}</div>
       <div class="alert-meta">{{ item.category_name or 'Uncategorized' }} · {{ item.unit or 'unit' }}</div>
       <div class="stock-bar-wrap"><div class="stock-bar danger" style="width:{{ pct }}%"></div></div>
       <div class="stock-nums">
-        <span>{{ t('Current:', 'الحالي:') }} <strong>{{ item.current_stock|int }}</strong></span>
+        <span>{{ t('Current:', 'الحالي:') }} <strong>{{ _stock|int }}</strong></span>
         <span>Reorder at: {{ item.reorder_level|int }}</span>
       </div>
       <div style="margin-top:12px;">
