@@ -2801,10 +2801,16 @@ def _next_invoice_number() -> str:
 
 def create_invoice(data: dict, lines: list) -> int:
     inv_no = _next_invoice_number()
-    subtotal = sum(float(l.get("total",0)) for l in lines)
+    # Round at EVERY money step, not just the last few. subtotal and disc_amt
+    # were the two left unrounded here, so a stored invoice could have a
+    # subtotal that is not representable to 2dp while its total was — meaning
+    # the header did not equal the sum of its own lines, and the discrepancy
+    # was invisible on screen because the template formats to 2dp anyway.
+    # ponytail: real fix is NUMERIC(12,2) end to end — see docs/MONEY_PRECISION.md
+    subtotal = round(sum(round(float(l.get("total", 0)), 2) for l in lines), 2)
     disc_type = data.get("discount_type","value")
     disc_val  = float(data.get("discount_value",0))
-    disc_amt  = disc_val if disc_type == "value" else round(subtotal * disc_val / 100, 2)
+    disc_amt  = round(disc_val, 2) if disc_type == "value" else round(subtotal * disc_val / 100, 2)
     tax_rate  = float(data.get("tax_rate",0))
     tax_amt   = round((subtotal - disc_amt) * tax_rate / 100, 2)
     total     = round(subtotal - disc_amt + tax_amt, 2)
