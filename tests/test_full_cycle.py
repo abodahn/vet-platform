@@ -139,6 +139,44 @@ def test_full_clinic_cycle(app, client, vet):
         conn.close()
     assert dx == 1, f"diagnosis not recorded against the visit (found {dx})"
 
+    # 4b. Prescription. This step was in this test's DOCSTRING but not in the
+    #     test, which is exactly why it passed while add_prescription was
+    #     500ing on every call — the INSERT named a column that does not exist
+    #     and omitted two NOT NULL ones. A chain test that skips a link proves
+    #     nothing about that link.
+    r = _post(client, f"/visits/{visit_id}/prescription", {
+        "rx_notes": "Topical, 7 days",
+        "medication_name_1": "Amoxicillin 250mg", "dosage_1": "1 tab",
+        "frequency_1": "BID", "duration_1": "7 days", "quantity_1": "14",
+        "unit_1": "tab", "route_1": "Oral",
+        "instructions_1": "Give with food",
+    })
+    assert r.status_code == 200, "prescription POST failed"
+
+    with app.app_context():
+        conn = db.get_db()
+        rx = conn.execute(
+            "SELECT * FROM prescriptions WHERE visit_id=? ORDER BY id DESC LIMIT 1",
+            (visit_id,)).fetchone()
+        conn.close()
+    assert rx, "prescription was not written"
+    # Without these the pharmacy queue's joins drop it and it 404s if opened.
+    assert rx["pet_id"] == pet_id, "prescription lost its patient"
+    assert rx["owner_id"] == owner_id, "prescription lost its owner"
+
+    with app.app_context():
+        conn = db.get_db()
+        items = conn.execute(
+            "SELECT * FROM prescription_items WHERE prescription_id=?",
+            (rx["id"],)).fetchall()
+        conn.close()
+    assert len(items) == 1, f"prescription line items not written ({len(items)})"
+    assert items[0]["medication_name"] == "Amoxicillin 250mg"
+
+    # And the pharmacist must actually be able to see it.
+    queue = client.get("/pharmacy/").get_data(as_text=True)
+    assert "Simba" in queue or str(rx["id"]) in queue,         "prescription does not appear in the dispensing queue"
+
     # 5. Completing the visit must raise an invoice — the clinical-to-money
     #    bridge, and the single most important link in the product.
     r = _post(client, f"/visits/{visit_id}/complete", {})
