@@ -6,7 +6,7 @@ Rate-limited by the platform security layer.
 import os
 import logging
 from flask import request, jsonify, make_response
-from datetime import date as _date
+from datetime import date as _date, datetime
 import models.database as db
 import models.security as sec
 from . import public_api_bp
@@ -123,6 +123,18 @@ def book():
     reminder    = (data.get("reminder") or "").strip()
     wa_opt_in   = (data.get("whatsappOptIn") or "No").strip()
 
+    # Provenance and branch go into columns that EXIST. The previous version
+    # wrote owners.source, pets.source, appointments.service_name and
+    # appointments.branch — none of which are in the schema — so every booking
+    # the website ever sent raised OperationalError and came back as the
+    # generic "Booking failed" 500. Website leads have to land somewhere real:
+    #   source  -> owners.created_by / appointments.channel
+    #   service -> appointments.appointment_type
+    #   branch  -> prefixed onto appointments.notes (branch_id is an integer id,
+    #              and the website sends a branch NAME)
+    if branch:
+        notes = f"Branch: {branch}\n{notes}".strip()
+
     conn = db.get_db()
     try:
         # 1. Find or create owner
@@ -135,7 +147,7 @@ def book():
             owner_id = row["id"]
         else:
             cur = conn.execute(
-                "INSERT INTO owners (full_name, phone, whatsapp_phone, email, source) "
+                "INSERT INTO owners (full_name, phone, whatsapp_phone, email, created_by) "
                 "VALUES (?, ?, ?, ?, ?)",
                 (owner_name, mobile, whatsapp, email, "website")
             )
@@ -151,20 +163,20 @@ def book():
             pet_id = row["id"]
         else:
             cur = conn.execute(
-                "INSERT INTO pets (owner_id, pet_name, species, breed, source) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (owner_id, pet_name, species, breed, "website")
+                "INSERT INTO pets (owner_id, pet_name, species, breed) "
+                "VALUES (?, ?, ?, ?)",
+                (owner_id, pet_name, species, breed)
             )
             pet_id = cur.lastrowid
 
         # 3. Insert appointment
         cur = conn.execute(
             "INSERT INTO appointments "
-            "(owner_id, pet_id, appt_date, appt_start, doctor_name, service_name, "
-            " branch, notes, status, source) "
+            "(owner_id, pet_id, appt_date, appt_start, doctor_name, appointment_type, "
+            " notes, status, channel, created_by) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (owner_id, pet_id, appt_date, appt_time, doctor, service,
-             branch, notes, "Pending", "website")
+            (owner_id, pet_id, appt_date, appt_time, doctor,
+             service or "Consultation", notes, "Pending", "Website", "website")
         )
         appointment_id = cur.lastrowid
 
@@ -279,9 +291,15 @@ def emergency():
     if missing:
         return jsonify({"ok": False, "error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    pet_name = (data.get("petName") or "").strip()
+    # appointments.pet_id is NOT NULL. A panicking caller who does not give a
+    # pet name still has to be recorded, so an unnamed patient gets a real row
+    # the clinic can rename — not a NULL that loses the whole emergency.
+    pet_name = (data.get("petName") or "").strip() or "Unknown"
     branch   = (data.get("branch") or "").strip()
     today    = str(_date.today())
+    # Same schema correction as /book — see the comment there.
+    if branch:
+        description = f"Branch: {branch}\n{description}".strip()
 
     conn = db.get_db()
     try:
@@ -295,13 +313,13 @@ def emergency():
             owner_id = row["id"]
         else:
             cur = conn.execute(
-                "INSERT INTO owners (full_name, phone, whatsapp_phone, source) "
+                "INSERT INTO owners (full_name, phone, whatsapp_phone, created_by) "
                 "VALUES (?, ?, ?, ?)",
                 (owner_name, mobile, mobile, "website")
             )
             owner_id = cur.lastrowid
 
-        # Find or create pet (if provided)
+        # Find or create pet
         pet_id = None
         if pet_name and owner_id:
             cur = conn.execute(
@@ -313,17 +331,20 @@ def emergency():
                 pet_id = row["id"]
             else:
                 cur = conn.execute(
-                    "INSERT INTO pets (owner_id, pet_name, source) VALUES (?, ?, ?)",
-                    (owner_id, pet_name, "website")
+                    "INSERT INTO pets (owner_id, pet_name) VALUES (?, ?)",
+                    (owner_id, pet_name)
                 )
                 pet_id = cur.lastrowid
 
-        # Insert emergency appointment
+        # Insert emergency appointment. appt_start is NOT NULL — an emergency
+        # has no booked slot, so it is stamped with the time it came in.
         cur = conn.execute(
             "INSERT INTO appointments "
-            "(owner_id, pet_id, appt_date, branch, notes, status, source) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (owner_id, pet_id, today, branch, description, "Emergency", "website")
+            "(owner_id, pet_id, appt_date, appt_start, notes, status, priority,"
+            " channel, created_by) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (owner_id, pet_id, today, datetime.now().strftime("%H:%M"),
+             description, "Emergency", "Urgent", "Website", "website")
         )
         appointment_id = cur.lastrowid
 

@@ -34,7 +34,10 @@ SOURCES = {
         "label": "Appointments",
         "table": "appointments a JOIN owners o ON o.id=a.owner_id JOIN pets p ON p.id=a.pet_id",
         "cols": {
-            "a.id": "ID", "a.appt_date": "Date", "a.appt_time": "Time",
+            # appt_start, not appt_time. Every column here is pasted straight
+            # into the SELECT, so one wrong name turns the whole report into a
+            # "Query error" flash and an empty page.
+            "a.id": "ID", "a.appt_date": "Date", "a.appt_start": "Time",
             "o.full_name": "Owner Name", "o.phone": "Phone",
             "p.pet_name": "Pet Name", "p.species": "Species",
             "a.appointment_type": "Type", "a.doctor_name": "Doctor",
@@ -79,7 +82,7 @@ SOURCES = {
         "cols": {
             "o.id": "ID", "o.full_name": "Full Name",
             "o.phone": "Phone", "o.email": "Email",
-            "o.address": "Address", "o.city": "City",
+            "o.address": "Address", "o.preferred_contact": "Preferred Contact",
             "o.created_at": "Joined Date", "o.loyalty_balance": "Loyalty Points",
         },
         "date_col": "o.created_at",
@@ -91,8 +94,9 @@ SOURCES = {
         "table": "pets p JOIN owners o ON o.id=p.owner_id",
         "cols": {
             "p.id": "Pet ID", "p.pet_name": "Pet Name", "p.species": "Species",
-            "p.breed": "Breed", "p.gender": "Gender", "p.dob": "Date of Birth",
-            "p.weight": "Weight", "o.full_name": "Owner", "o.phone": "Owner Phone",
+            "p.breed": "Breed", "p.sex": "Sex", "p.dob": "Date of Birth",
+            "p.weight_kg": "Weight (kg)",
+            "o.full_name": "Owner", "o.phone": "Owner Phone",
             "p.created_at": "Registered",
         },
         "date_col": "p.created_at",
@@ -113,15 +117,33 @@ SOURCES = {
         "status_vals": [],
     },
     "inventory": {
+        # There is no `inventory_items` table — the stock catalogue is `items`,
+        # with its category in item_categories and its supplier in suppliers.
+        # Every column below used to be unresolvable, so picking "Inventory"
+        # produced a "Query error" flash and nothing else, always.
+        #
+        # Stock ON HAND is deliberately absent: it is SUM(batches.quantity) per
+        # item, and this builder emits a flat `SELECT <cols> FROM <table>` with
+        # no room for an aggregate. /reports/inventory and its xlsx export
+        # already compute it correctly.
         "label": "Inventory",
-        "table": "inventory_items",
+        # The joined tables are wrapped so their `name` column arrives under a
+        # distinct alias: both the CSV writer and the results template key each
+        # value on the text after the last dot, so three columns called `name`
+        # would all render the item's name.
+        "table": ("items i "
+                  "LEFT JOIN (SELECT id, name AS category_name FROM item_categories)"
+                  " ic ON ic.id = i.category_id "
+                  "LEFT JOIN (SELECT id, name AS supplier_name FROM suppliers)"
+                  " s ON s.id = i.supplier_id"),
         "cols": {
-            "id": "ID", "name": "Product Name", "category": "Category",
-            "sku": "SKU", "unit": "Unit", "quantity": "Qty in Stock",
-            "reorder_level": "Reorder Level", "unit_price": "Unit Price",
-            "supplier": "Supplier",
+            "i.id": "ID", "i.name": "Product Name",
+            "ic.category_name": "Category",
+            "i.sku": "SKU", "i.unit": "Unit",
+            "i.reorder_level": "Reorder Level", "i.cost_price": "Cost Price",
+            "i.sell_price": "Sell Price", "s.supplier_name": "Supplier",
         },
-        "date_col": None,
+        "date_col": "i.created_at",
         "status_col": None,
         "status_vals": [],
     },

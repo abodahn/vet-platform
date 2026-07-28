@@ -160,7 +160,7 @@ def _build_patient_context(visit_id: int) -> str:
 
         # Active prescriptions
         rxs = conn.execute("""
-            SELECT pi.medication_name, pi.dosage, pi.frequency, pi.duration_days
+            SELECT pi.medication_name, pi.dosage, pi.frequency, pi.duration
             FROM prescriptions pr
             JOIN prescription_items pi ON pi.prescription_id = pr.id
             WHERE pr.pet_id = ? AND pr.status IN ('Active','Dispensed')
@@ -306,18 +306,21 @@ def context_visit(visit_id: int):
     if role == "doctor" and user_branch:
         conn = db.get_db()
         try:
+            # The column is branch_id. This read named `branch`, which does not
+            # exist, so it raised on every request and the `except: pass` below
+            # let every branch through — the guard had never once fired.
             row = conn.execute(
-                "SELECT branch FROM visits WHERE id=? LIMIT 1", (visit_id,)
+                "SELECT branch_id FROM visits WHERE id=? LIMIT 1", (visit_id,)
             ).fetchone()
-            if row and row["branch"] and str(row["branch"]) != str(user_branch):
+            if row and row["branch_id"] and str(row["branch_id"]) != str(user_branch):
                 _logger.warning(
                     f"Branch IDOR attempt: user {user.get('username')} "
                     f"(branch={user_branch}) tried to access visit {visit_id} "
-                    f"from branch {row['branch']}"
+                    f"from branch {row['branch_id']}"
                 )
                 return jsonify({"error": "Access denied"}), 403
         except Exception:
-            pass  # If branch check fails, allow (don't block doctors on schema diffs)
+            _logger.exception("Branch check failed for visit %s — allowing", visit_id)
         finally:
             conn.close()
 
@@ -499,7 +502,11 @@ def pet_summary(pet_id):
             WHERE pr.pet_id=? ORDER BY pr.created_at DESC LIMIT 8
         """, (pet_id,)).fetchall()
         vax = conn.execute(
-            "SELECT vaccine_name, vaccinated_at, next_due_at FROM vaccinations WHERE pet_id=? ORDER BY vaccinated_at DESC LIMIT 8",
+            # administered_at, not vaccinated_at — the wrong name made this whole
+            # route a 500 for every pet, since the except below turns any
+            # OperationalError into {"error": ...}.
+            "SELECT vaccine_name, administered_at, next_due_at FROM vaccinations "
+            "WHERE pet_id=? ORDER BY administered_at DESC LIMIT 8",
             (pet_id,)).fetchall()
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -763,7 +770,7 @@ def discharge_instructions(visit_id):
             "SELECT diagnosis, severity FROM diagnoses WHERE visit_id=? ORDER BY id",
             (visit_id,)).fetchall()
         rxs = conn.execute("""
-            SELECT pi.medication_name, pi.dosage, pi.frequency, pi.duration_days, pi.instructions
+            SELECT pi.medication_name, pi.dosage, pi.frequency, pi.duration, pi.instructions
             FROM prescriptions pr JOIN prescription_items pi ON pi.prescription_id=pr.id
             WHERE pr.visit_id=?
         """, (visit_id,)).fetchall()
@@ -777,7 +784,7 @@ def discharge_instructions(visit_id):
 
     diag_list = ", ".join(d["diagnosis"] for d in diags) if diags else "Not specified"
     med_lines = "\n".join(
-        f"  • {r['medication_name']}: {r.get('dosage','')} — {r.get('frequency','')} for {r.get('duration_days','')} days"
+        f"  • {r['medication_name']}: {r.get('dosage','')} — {r.get('frequency','')} for {r.get('duration','')}"
         for r in rxs
     ) if rxs else "  None prescribed"
     followup = ""

@@ -289,9 +289,14 @@ def financial_compare():
             return None
         return round((curr_val - prev_val) / prev_val * 100, 1)
 
-    revenue_change  = _pct_change(curr.get("total_revenue", 0),  prev.get("total_revenue", 0))
-    invoices_change = _pct_change(curr.get("invoice_count", 0),  prev.get("invoice_count", 0))
-    paid_change     = _pct_change(curr.get("total_paid", 0),     prev.get("total_paid", 0))
+    # get_finance_summary() returns revenue / invoiced / outstanding / expenses /
+    # net / invoice_count. It has never returned "total_revenue" or "total_paid",
+    # so both of those lookups fell to the 0 default and _pct_change(0, 0)
+    # returned None: the comparison badge next to Collected was blank no matter
+    # how the month had actually gone.
+    revenue_change  = _pct_change(curr.get("revenue", 0),       prev.get("revenue", 0))
+    invoices_change = _pct_change(curr.get("invoice_count", 0), prev.get("invoice_count", 0))
+    paid_change     = _pct_change(curr.get("invoiced", 0),      prev.get("invoiced", 0))
 
     revenue_by_day = db.get_revenue_by_day(delta + 1 if delta < 90 else 30)
 

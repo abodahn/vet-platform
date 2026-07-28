@@ -175,3 +175,13 @@ def test_role_required_names_are_seeded():
                 if name not in seeded:
                     bad.append(f"{rel}:{i} {name}")
     assert not bad, f"unknown role names in @role_required: {bad}"
+
+
+# ── /system/roles renders ─────────────────────────────────────────────────────
+
+def test_system_roles_page_renders(auth_client):
+    """The template indexes system_role_colors/_perms by role key. A key that
+    is not in _SEED_ROLES resolves to Undefined and blows up in `| tojson`.
+    """
+    resp = auth_client.get("/system/roles")
+    assert resp.status_code == 200

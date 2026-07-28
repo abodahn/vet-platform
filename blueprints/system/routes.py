@@ -9,7 +9,8 @@ from datetime import date, datetime, timedelta
 from flask import (render_template, request, redirect, url_for, session, flash,
                    current_app, jsonify, send_file, abort)
 from . import system_bp
-from blueprints.auth.routes import login_required, role_required
+from blueprints.auth.routes import (login_required, role_required,
+                                    clear_permission_cache)
 from blueprints.settings.routes import LogoError, encode_logo
 import models.database as db
 import models.audit as audit
@@ -760,6 +761,7 @@ def role_create():
         return redirect(url_for("system.roles_list"))
     try:
         db.create_role(name, display_name, display_ar, permissions, color)
+        clear_permission_cache()
         db.log_audit(username=session["user"]["username"], role=session["user"]["role"],
                      action="create_role", module="system", entity_type="role", details=f"Created role: {name}")
         flash(f"Role '{display_name}' created successfully.", "success")
@@ -791,6 +793,7 @@ def role_edit(role_id):
         # to reconcile for one action. This one is strictly more informative.
         with audit.audit_row("roles", role_id, module="system", action="edit_role"):
             db.update_role(role_id, display_name, display_ar, permissions, color)
+        clear_permission_cache()
         flash("Role updated successfully.", "success")
     except Exception as e:
         flash(f"Error updating role: {e}", "danger")
@@ -803,6 +806,7 @@ def role_delete(role_id):
     try:
         role = db.get_role(role_id)
         db.delete_role(role_id)
+        clear_permission_cache()
         db.log_audit(username=session["user"]["username"], role=session["user"]["role"],
                      action="delete_role", module="system", entity_type="role", entity_id=str(role_id),
                      details=f"Deleted role: {role.get('name') if role else role_id}")

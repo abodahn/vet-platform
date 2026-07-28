@@ -3,7 +3,8 @@ import socket
 import subprocess
 import time
 
-from flask import render_template, session, redirect, url_for, current_app
+from flask import (render_template, session, redirect, url_for, current_app,
+                   flash, abort)
 from . import launcher_bp
 from blueprints.auth.routes import login_required
 import models.database as db
@@ -633,14 +634,14 @@ def open_module(module_id: str):
 
     mod = next((m for m in MODULES if m["id"] == module_id), None)
     if not mod:
-        from flask import abort
         abort(404)
 
-    # Access check
+    # Access check.
+    # These names are imported at module scope on purpose. Importing `redirect`
+    # and `url_for` inside this branch made them function-locals for the WHOLE
+    # body, so the success path below raised UnboundLocalError and every module
+    # card was a 500 for every user who *did* have access.
     if role not in mod["roles"] and role != "super_admin":
-        from flask import flash
-        from flask import redirect
-        from flask import url_for
         flash("You don't have access to this module.", "danger")
         return redirect(url_for("launcher.index"))
 
@@ -654,12 +655,9 @@ def open_module(module_id: str):
     )
 
     if mod.get("legacy"):
-        path = mod.get("legacy_path", "/")
-        from flask import redirect as redir
-        return redir(legacy_url + path)
+        return redirect(legacy_url + mod.get("legacy_path", "/"))
 
-    from flask import redirect as redir
-    return redir(url_for("launcher.stub", module_id=module_id))
+    return redirect(url_for("launcher.stub", module_id=module_id))
 
 
 @launcher_bp.route("/module/<module_id>/stub")

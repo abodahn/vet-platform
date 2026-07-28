@@ -167,6 +167,13 @@ def _sqlite_copy(src_path: str, dst_path: str) -> None:
     half-written file. If it cannot get the destination write lock within the
     busy timeout it raises — loudly failing beats quietly corrupting.
     """
+    # sqlite3.connect() CREATES a database when the file is not there, and a
+    # brand-new empty one passes integrity_check. Copying that onto the live
+    # file erases the clinic and reports success, so the source is checked
+    # here — the one place every caller (backup, snapshot, restore) goes
+    # through — rather than in each of them.
+    if not os.path.exists(src_path):
+        raise FileNotFoundError(f"source database is not there: {src_path}")
     src = sqlite3.connect(src_path, timeout=30)
     dst = sqlite3.connect(dst_path, timeout=30)
     try:
@@ -186,7 +193,6 @@ def _run_sqlite_backup(dest_path: str) -> dict:
         if check != "ok":
             os.remove(dest_path)
             return _fail(f"Backup failed integrity check: {check}")
-        _purge_dir(_backup_dir)
         logger.info("Backup completed: %s (%s KB), integrity=ok",
                     os.path.basename(dest_path), size_kb)
         return {"success": True, "filename": os.path.basename(dest_path),
@@ -230,7 +236,6 @@ def _run_pg_backup(dest_path: str) -> dict:
             os.remove(dest_path)
             return _fail("pg_dump produced an empty file")
 
-        _purge_dir(_backup_dir)
         logger.info("PostgreSQL backup completed: %s (%s KB)",
                     os.path.basename(dest_path), size_kb)
         return {"success": True, "filename": os.path.basename(dest_path),
@@ -282,6 +287,12 @@ def run_backup(db_path: str = "") -> dict:
     result = _create_archive("platform_backup_")
 
     if result["success"]:
+        # Retention runs HERE and nowhere else. It used to run inside
+        # _run_sqlite_backup, which restore_backup() also reaches through its
+        # pre-restore snapshot: restoring an archive older than RETENTION_DAYS
+        # purged that archive mid-restore, and the copy that followed put an
+        # empty database over the live one and called it a success.
+        _purge_dir(_backup_dir)
         result["offsite"] = copy_offsite(result["filepath"])
     else:
         # Every caller — scheduler, manual button, Excel import — routes through
@@ -536,7 +547,15 @@ def accept_upload(fileobj, filename: str) -> dict:
                            "can be uploaded."}
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    name = f"uploaded_{ts}{os.path.splitext(base)[1]}"
+    ext = os.path.splitext(base)[1]
+    # Same-second uploads must not share a name, for the same reason
+    # _create_archive() disambiguates: a second upload would overwrite the
+    # first, and if the second fails verification the os.remove() below would
+    # delete the archive that was already there and already good.
+    name, n = f"uploaded_{ts}{ext}", 1
+    while os.path.exists(os.path.join(_backup_dir, name)):
+        name = f"uploaded_{ts}_{n}{ext}"
+        n += 1
     dest = resolve_archive(name)
     if not dest:
         return {"success": False, "message": "Could not store the uploaded file."}
