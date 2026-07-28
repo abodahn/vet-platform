@@ -7,7 +7,7 @@ from datetime import date
 from . import payroll_bp
 import models.database as db
 from blueprints.auth.routes import login_required, role_required
-from blueprints.hr.routes import can_view_staff
+from blueprints.hr.routes import can_view_staff, _ensure_hr_tables, _db_target
 from models.excel_export import make_workbook
 
 # Roles that may create, approve or pay a salary. Every write route below is
@@ -39,16 +39,23 @@ _STATUS_COLORS = {
     "Cancelled": "#dc2626",
 }
 
-# Set only after the DDL below has actually succeeded, so a failed run retries.
-# Each gunicorn worker has its own copy and ensures once — harmless, the DDL is
-# CREATE TABLE IF NOT EXISTS.
-_payroll_ready = False
+# Which database the payroll DDL has run against — see _db_target(). Set only
+# after the DDL below has actually succeeded, so a failed run retries. Each
+# gunicorn worker has its own copy and ensures once per database — harmless,
+# the DDL is CREATE TABLE IF NOT EXISTS.
+_payroll_ready = None
 
 
 def _ensure_tables():
     global _payroll_ready
-    if _payroll_ready:
+    target = _db_target()
+    if _payroll_ready == target:
         return
+    # The payslip selects users.hire_date / contract_type / job_title /
+    # national_id. Those columns are added by HR's lazy ALTERs, so on a clinic
+    # where nobody has opened /hr yet every payslip download raised
+    # "no such column: u.hire_date". Payroll ensures the schema it reads.
+    _ensure_hr_tables()
     conn = db.get_db()
     # DDL below is SQLite-flavoured on purpose: models.database._fix_sql translates
     # it to PostgreSQL on the PG path, and there is no reverse translation.
@@ -90,7 +97,7 @@ def _ensure_tables():
     """)
     conn.commit()
     conn.close()
-    _payroll_ready = True
+    _payroll_ready = target
 
 
 @payroll_bp.before_request
@@ -295,8 +302,16 @@ def salaries_export_xlsx():
     year  = int(request.args.get("year",  today.year))
     month = int(request.args.get("month", today.month))
 
+    # Same scoping as salaries_list — the list was fixed but this export beside
+    # it still handed every employee's pay to any logged-in user.
+    where  = ["s.period_year=?", "s.period_month=?"]
+    params = [year, month]
+    if (session.get("user") or {}).get("role") not in _PAYROLL_VIEW_ROLES:
+        where.append("s.user_id=?")
+        params.append((session.get("user") or {}).get("id"))
+
     conn = db.get_db()
-    rows_raw = conn.execute("""
+    rows_raw = conn.execute(f"""
         SELECT u.full_name, u.role,
                s.period_year, s.period_month,
                s.basic_salary, s.allowances,
@@ -306,9 +321,9 @@ def salaries_export_xlsx():
                s.net, s.status, s.payment_date
         FROM salaries s
         JOIN users u ON u.id = s.user_id
-        WHERE s.period_year=? AND s.period_month=?
+        WHERE {' AND '.join(where)}
         ORDER BY u.full_name
-    """, (year, month)).fetchall()
+    """, params).fetchall()
     conn.close()
 
     month_names = ["Jan","Feb","Mar","Apr","May","Jun",
@@ -661,7 +676,7 @@ def api_attendance_summary(uid, year, month):
 # ── API — get grade by role (used by JS autocomplete) ─────────────────────────
 
 @payroll_bp.route("/api/grade/<role>")
-@login_required
+@role_required(*_PAYROLL_VIEW_ROLES)
 def api_grade(role):
     conn = db.get_db()
     row = conn.execute(

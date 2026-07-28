@@ -145,6 +145,14 @@ def checkin():
 
     if request.method == "POST":
         target_user_id = request.form.get("user_id", user["id"])
+        # Only a manager may record attendance for someone else. The GET only
+        # renders the staff picker for managers, but the POST honoured any
+        # user_id sent — so any employee could fabricate a colleague's hours,
+        # and hours_worked is what payroll pays overtime on.
+        if str(target_user_id) != str(user["id"]) and not _allowed_manager(user):
+            conn.close()
+            flash("Access denied.", "error")
+            return redirect(url_for("attendance.checkin"))
         action         = request.form.get("action", "checkin")
         notes          = request.form.get("notes", "")
         break_min      = int(request.form.get("break_minutes", 0) or 0)
@@ -403,7 +411,7 @@ def leave_new():
             """INSERT INTO leave_requests
                    (user_id,username,full_name,leave_type_id,leave_type_name,
                     start_date,end_date,days_requested,reason,status)
-               VALUES(?,?,?,?,?,?,?,?,'Pending')""",
+               VALUES(?,?,?,?,?,?,?,?,?,'Pending')""",
             (user["id"], user["username"], user.get("full_name",""),
              lt_id, lt_row["name"] if lt_row else "",
              start_date, end_date, days_req, reason))

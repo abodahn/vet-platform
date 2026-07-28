@@ -52,12 +52,58 @@ def can_view_staff(user) -> bool:
     return (user or {}).get("role") in STAFF_VIEW_ROLES
 
 
+def _may_act_on(subject_user_id) -> bool:
+    """May the caller read or act on a record belonging to `subject_user_id`?
+
+    HR staff may act on anyone; everyone else only on themselves. Reviews and
+    warnings were @login_required only, which let any logged-in colleague read
+    a review and flip an "acknowledged" flag on someone else's disciplinary
+    record. The subject id must come from the stored row, never from the URL —
+    the URL is attacker-controlled.
+    """
+    u = session.get("user") or {}
+    if u.get("role") in STAFF_VIEW_ROLES:
+        return True
+    try:
+        return int(u.get("id")) == int(subject_user_id)
+    except (TypeError, ValueError):
+        return False
+
+
+def _days_left(expiry) -> int | None:
+    """Days from today until `expiry`, or None if there is no expiry date.
+
+    This used to be computed in SQL as `(expiry_date - CURRENT_DATE)`. That is
+    PostgreSQL date arithmetic; on SQLite the same expression coerces two ISO
+    strings to numbers and returns 0 for every row, so every certification
+    rendered as "expiring in 0 days" regardless of its real expiry.
+    """
+    if not expiry:
+        return None
+    try:
+        return (date.fromisoformat(str(expiry)[:10]) - date.today()).days
+    except ValueError:
+        return None
+
+
 _CONTRACT_TYPES = ["Full-time", "Part-time", "Contract", "Probation", "Intern"]
 _GENDERS        = ["Male", "Female", "Not specified"]
 _REVIEW_STATUSES = ["Draft", "Submitted", "Acknowledged"]
 
 _SALT = "pah_platform_2026"
-_hr_ready = False
+
+# Which database the HR schema has been ensured against — not a bare bool.
+# A plain "already done" flag is wrong the moment the process talks to more
+# than one database (a re-provisioned tenant, a test pointing db._db_path at a
+# temp file): the flag latches on the first database and every later one is
+# left without users.hire_date / contract_type / the HR tables, which surfaces
+# as "no such column: contract_type" from routes that look fine in isolation.
+_hr_ready = None
+
+
+def _db_target():
+    """A value identifying the database db.get_db() will hand back."""
+    return repr((db._db_path, db._PG_CONFIG))
 
 
 def _hash(pw: str) -> str:
@@ -87,7 +133,8 @@ def _add_column(conn, ddl: str) -> None:
 
 def _ensure_hr_tables():
     global _hr_ready
-    if _hr_ready:
+    target = _db_target()
+    if _hr_ready == target:
         return
     conn = db.get_db()
     for ddl in [
@@ -172,7 +219,7 @@ def _ensure_hr_tables():
     """)
     conn.commit()
     conn.close()
-    _hr_ready = True
+    _hr_ready = target
 
 
 @hr_bp.before_request
@@ -297,14 +344,15 @@ def dashboard():
     expiring_certs = []
     try:
         expiring_certs = [dict(r) for r in conn.execute("""
-            SELECT sc.id, sc.cert_name, sc.expiry_date, u.full_name, u.id AS user_id,
-                   (sc.expiry_date - CURRENT_DATE) AS days_left
+            SELECT sc.id, sc.cert_name, sc.expiry_date, u.full_name, u.id AS user_id
             FROM staff_certifications sc
             JOIN users u ON u.id=sc.user_id
             WHERE sc.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
               AND sc.status='Active'
             ORDER BY sc.expiry_date
         """).fetchall()]
+        for c in expiring_certs:
+            c["days_left"] = _days_left(c["expiry_date"])
     except Exception:
         pass
 
@@ -867,6 +915,9 @@ def performance_detail(rev_id):
     if not rev:
         flash("Review not found.", "danger")
         return redirect(url_for("hr.performance_list"))
+    if not _may_act_on(rev["user_id"]):
+        flash("You don't have permission to view this review.", "danger")
+        return redirect(url_for("launcher.index"))
     return render_template("hr/performance_detail.html",
         review=dict(rev), role_colors=_ROLE_COLORS, active="hr")
 
@@ -920,6 +971,13 @@ def performance_edit(rev_id):
 @login_required
 def performance_acknowledge(rev_id):
     conn = db.get_db()
+    # Only the employee the review is about (or HR) may acknowledge it.
+    rev = conn.execute(
+        "SELECT user_id FROM performance_reviews WHERE id=?", (rev_id,)).fetchone()
+    if not rev or not _may_act_on(rev["user_id"]):
+        conn.close()
+        flash("You don't have permission to acknowledge this review.", "danger")
+        return redirect(url_for("launcher.index"))
     conn.execute(
         "UPDATE performance_reviews SET status='Acknowledged',updated_at=datetime('now') WHERE id=?",
         (rev_id,)
@@ -965,6 +1023,13 @@ def add_warning(user_id):
 @login_required
 def acknowledge_warning(user_id, warn_id):
     conn = db.get_db()
+    # The subject comes from the stored warning, not from the URL.
+    warn = conn.execute(
+        "SELECT user_id FROM staff_warnings WHERE id=?", (warn_id,)).fetchone()
+    if not warn or not _may_act_on(warn["user_id"]):
+        conn.close()
+        flash("You don't have permission to acknowledge this warning.", "danger")
+        return redirect(url_for("launcher.index"))
     conn.execute("UPDATE staff_warnings SET acknowledged=TRUE WHERE id=?", (warn_id,))
     conn.commit()
     conn.close()
@@ -990,11 +1055,12 @@ def delete_warning(user_id, warn_id):
 def certifications_list():
     conn = db.get_db()
     certs = [dict(r) for r in conn.execute("""
-        SELECT sc.*, u.full_name, u.role, u.id AS uid,
-               (sc.expiry_date - CURRENT_DATE) AS days_left
+        SELECT sc.*, u.full_name, u.role, u.id AS uid
         FROM staff_certifications sc JOIN users u ON u.id=sc.user_id
         ORDER BY sc.expiry_date ASC NULLS LAST
     """).fetchall()]
+    for c in certs:
+        c["days_left"] = _days_left(c["expiry_date"])
     conn.close()
     return render_template("hr/certifications_list.html",
         certs=certs, active="hr")
@@ -1416,21 +1482,30 @@ def hr_attendance_add():
             if diff > 0:
                 hours_worked = round(diff, 2)
 
-        conn.execute("""
-            INSERT INTO attendance_records
-                (user_id, username, full_name, work_date, status,
-                 check_in, check_out, hours_worked, notes, recorded_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT (user_id, work_date) DO UPDATE SET
-                status=EXCLUDED.status,
-                check_in=EXCLUDED.check_in,
-                check_out=EXCLUDED.check_out,
-                hours_worked=EXCLUDED.hours_worked,
-                notes=EXCLUDED.notes,
-                recorded_by=EXCLUDED.recorded_by
-        """, (uid, user["username"], user["full_name"], wdate, status,
-              check_in, check_out, hours_worked, notes,
-              session["user"]["username"]))
+        # attendance_records carries no UNIQUE(user_id, work_date), so the
+        # ON CONFLICT upsert this used to run raised on every call — the route
+        # flashed an error, redirected, and wrote nothing. Read-then-write is
+        # the same pattern attendance.checkin already uses and needs no index.
+        existing = conn.execute(
+            "SELECT id FROM attendance_records WHERE user_id=? AND work_date=?",
+            (uid, wdate)).fetchone()
+        if existing:
+            conn.execute("""
+                UPDATE attendance_records
+                   SET status=?, check_in=?, check_out=?, hours_worked=?,
+                       notes=?, recorded_by=?, updated_at=datetime('now')
+                 WHERE id=?
+            """, (status, check_in, check_out, hours_worked, notes,
+                  session["user"]["username"], existing["id"]))
+        else:
+            conn.execute("""
+                INSERT INTO attendance_records
+                    (user_id, username, full_name, work_date, status,
+                     check_in, check_out, hours_worked, notes, recorded_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+            """, (uid, user["username"], user["full_name"], wdate, status,
+                  check_in, check_out, hours_worked, notes,
+                  session["user"]["username"]))
         conn.commit()
         flash("Attendance record saved.", "success")
     except Exception as e:
