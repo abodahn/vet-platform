@@ -7,10 +7,16 @@
   <script>(function(){var t=localStorage.getItem('al-theme')||'light';document.documentElement.setAttribute('data-theme',t);if(t==='dark')document.documentElement.style.background='#101810'})();</script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="application-name" content="Aleefy">
+  {#- Clinic identity, not the vendor's. A clinic paying for this should see
+      its own name in the browser tab, not the name of whoever wrote it. -#}
+  <meta name="application-name" content="{{ clinic.get('name') or 'Veterinary Clinic' }}">
   <meta name="csrf-token" content="{{ csrf_token }}">
-  <title>{% block title %}{{ app_title or page_title or 'Dashboard' }}{% endblock %} — Aleefy</title>
+  <title>{% block title %}{{ page_title or 'Dashboard' }}{% endblock %} — {{ clinic.get('name') or 'Veterinary Clinic' }}</title>
+  {% if clinic.get('logo_data') %}
+  <link rel="icon" href="{{ clinic.get('logo_data') }}">
+  {% else %}
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/aleefy-logo.png') }}">
+  {% endif %}
 
   {#-
     ASSET_V — cache-busting content hash, STAMPED AUTOMATICALLY by
@@ -66,12 +72,20 @@
   <aside id="v3-sidebar" class="v3-sidebar" role="navigation" aria-label="{{ t('Main navigation', 'التنقل الرئيسي') }}">
 
     <!-- 1. BRAND AREA -->
-    <div class="v3-brand">
+    {#- When no logo is uploaded the tile is omitted entirely rather than
+        falling back to the vendor mark — showing someone else's logo in a
+        clinic's own sidebar is the bug being fixed here. .v3-brand-name is
+        nowrap, so the name is truncated in Jinja with the full value in the
+        parent title attribute. -#}
+    {% set _cname = clinic.get('name') or 'Veterinary Clinic' %}
+    <div class="v3-brand" title="{{ _cname }}{% if clinic.get('tagline') %} — {{ clinic.get('tagline') }}{% endif %}">
+      {% if clinic.get('logo_data') %}
       <div class="v3-brand-logo">
-        <img src="{{ url_for('static', filename='images/aleefy-logo.png') }}" alt="Aleefy" width="44" height="44">
+        <img src="{{ clinic.get('logo_data') }}" alt="{{ _cname }}" width="44" height="44">
       </div>
+      {% endif %}
       <div class="v3-brand-text">
-        <div class="v3-brand-name">Aleefy <span class="v3-brand-ar">اليفي</span></div>
+        <div class="v3-brand-name">{{ _cname[:22] }}{% if _cname|length > 22 %}…{% endif %}{% if clinic.get('name_ar') and clinic.get('name_ar') != _cname %} <span class="v3-brand-ar">{{ clinic.get('name_ar')[:18] }}{% if clinic.get('name_ar')|length > 18 %}…{% endif %}</span>{% endif %}</div>
         <span class="v3-version-badge">V3</span>
       </div>
     </div>
@@ -330,7 +344,10 @@
         </a>
         {% endif %}
       </div>
-      <div class="v3-sidebar-version">ALEEFY V3 · اليفي</div>
+      {#- The clinic's own tagline. .v3-brand is a single topbar-height flex
+          row with no space for a second line, so it lives here — which is
+          also where the vendor mark belongs rather than in the brand slot. -#}
+      <div class="v3-sidebar-version">{{ clinic.get('tagline') or 'ALEEFY V3 · اليفي' }}</div>
     </div>
 
   </aside>
