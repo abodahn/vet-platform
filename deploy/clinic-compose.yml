@@ -34,7 +34,7 @@ services:
 
     healthcheck:
       # Public, no auth, and it actually probes the database (blueprints/api_v1).
-      test: ["CMD", "curl", "-fsS", "http://localhost:5100/api/v1/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:5100/healthz"]
       interval: 60s
       timeout: 10s
       retries: 3

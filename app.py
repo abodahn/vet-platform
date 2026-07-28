@@ -268,12 +268,28 @@ def create_app(cfg=None) -> Flask:
         backup = bk.health()
         checks["backup"] = "ok" if backup.get("ok") else "stale"
 
-        healthy = (checks["database"] == "ok"
-                   and checks["scheduler"] != "stopped"
-                   and checks["backup"] == "ok")
+        # The HTTP status answers ONE question: can this instance serve
+        # traffic? Only an unreachable database makes that false.
+        #
+        # Backup staleness and scheduler state are reported in the body but do
+        # NOT fail the probe. Container health checks and upgrade.sh use
+        # `curl -fsS`, which treats any non-2xx as failure — so returning 503
+        # for a stale backup would restart healthy containers and, worse, make
+        # upgrade.sh roll back every upgrade *after* it had already applied the
+        # Alembic revision, leaving a new schema running old code. A fresh
+        # install legitimately has no backup until the first 02:00 run.
+        # Staleness already reaches the operator via notify_managers() and the
+        # backup page; it must not also masquerade as a liveness failure.
+        serving = checks["database"] == "ok"
+        degraded = [k for k, v in checks.items()
+                    if (k == "backup" and v != "ok")
+                    or (k == "scheduler" and v == "stopped")]
 
-        body = {"status": "ok" if healthy else "degraded",
+        body = {"status": "ok" if serving and not degraded
+                          else "degraded" if serving else "down",
                 "version": VERSION_INFO["full"]}
+        if degraded:
+            body["degraded"] = degraded
 
         # Operator detail behind the key clinic_env.py already provisions.
         key = (app.config.get("API_V1_KEY") or os.environ.get("API_V1_KEY", "")).strip()
@@ -283,7 +299,7 @@ def create_app(cfg=None) -> Flask:
             body["checks"] = checks
             body["last_backup_hours"] = backup.get("age_hours")
             body["commit"] = VERSION_INFO["commit"]
-        return jsonify(body), 200 if healthy else 503
+        return jsonify(body), 200 if serving else 503
 
     @app.after_request
     def _security_headers(response):

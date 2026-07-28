@@ -6,7 +6,7 @@ What is running, what version, when did it last back up.
     python3 inventory.py --json       # for a cron job / monitor
     python3 inventory.py --quiet      # only clinics with a problem
 
-Reads each clinic's .env for its port and version, probes /api/v1/health, and
+Reads each clinic's .env for its port and version, probes /healthz, and
 takes the newest archive in its backup directory as the last-backup record —
 the same rule models/backup.py uses, deliberately: a status table that can
 disagree with the files on disk is how "nightly backup OK" gets logged while
@@ -35,8 +35,8 @@ STALE_AFTER_DAYS = 2       # matches models/backup.py BACKUP_STALE_DAYS default
 
 
 def probe(port: str, timeout: float = 4.0) -> dict:
-    """GET /api/v1/health. 503 is a real answer (degraded), not a failure."""
-    url = f"http://127.0.0.1:{port}/api/v1/health"
+    """GET /healthz. 503 is a real answer (degraded), not a failure."""
+    url = f"http://127.0.0.1:{port}/healthz"
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             return {"up": True, **json.loads(resp.read().decode())}
