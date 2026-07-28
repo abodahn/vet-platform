@@ -13,7 +13,19 @@
     <div class="pf-card-header">
       <div>
         <div class="pf-card-title">{{ t('✏️ Edit Record', '✏️ تعديل السجل') }}</div>
-        <div class="pf-card-sub">{{ staff_name }} · {{ rec.work_date }}</div>
+        <div class="pf-card-sub">
+          {% if staff and can_view_staff %}
+          <a href="{{ url_for('hr.staff_detail', user_id=staff.id) }}">{{ staff_name }}</a>
+          {% else %}{{ staff_name or t('Unknown staff member', 'موظف غير معروف') }}{% endif %}
+          · {{ rec.work_date }}
+          ·
+          {% if shift %}
+          <a href="{{ url_for('attendance.shifts_list') }}">{{ shift.name }}</a>
+          <span style="color:var(--cl-text-muted)">({{ shift.start_time }}–{{ shift.end_time }})</span>
+          {% else %}
+          <span style="color:var(--cl-text-muted)">{{ t('No shift assigned', 'لا توجد مناوبة مسندة') }}</span>
+          {% endif %}
+        </div>
       </div>
     </div>
     <form method="POST">

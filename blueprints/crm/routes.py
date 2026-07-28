@@ -7,7 +7,7 @@ from flask import render_template, request, redirect, url_for, flash, session, j
 from . import crm_bp
 from blueprints.auth.routes import login_required
 import models.database as db
-from models.database import get_db
+from models.database import get_db, _try_stmt
 from datetime import date, datetime
 
 
@@ -57,26 +57,156 @@ def _species_emoji(species):
     return "🐾"
 
 
-def _get_owner_stats(owner_id):
-    """Return aggregate stats for an owner: visit count, last visit, balance."""
-    conn = get_db()
-    visit_count = conn.execute(
-        "SELECT COUNT(*) FROM visits WHERE owner_id=?", (owner_id,)
-    ).fetchone()[0]
-    last_visit_row = conn.execute(
-        "SELECT MAX(visit_date) FROM visits WHERE owner_id=?", (owner_id,)
+def _get_owner_stats(conn, owner_id):
+    """Aggregate stats for an owner: visit count, last visit, outstanding balance.
+
+    Two queries on a caller-supplied connection. `balance` is the sum of
+    due_amount over invoices that are neither Paid nor Cancelled — the same
+    definition finance uses, so the number on the CRM screen and the number on
+    the invoice screen agree.
+    """
+    v = conn.execute(
+        "SELECT COUNT(*), MAX(visit_date) FROM visits WHERE owner_id=?", (owner_id,)
     ).fetchone()
-    last_visit = last_visit_row[0] if last_visit_row else None
     balance = conn.execute(
-        "SELECT COALESCE(SUM(due_amount),0) FROM invoices WHERE owner_id=? AND status NOT IN ('Cancelled','Paid')",
+        "SELECT COALESCE(SUM(due_amount),0) FROM invoices"
+        " WHERE owner_id=? AND status NOT IN ('Cancelled','Paid')",
         (owner_id,)
     ).fetchone()[0]
-    conn.close()
     return {
-        "visit_count": visit_count,
-        "last_visit": last_visit,
+        "visit_count": v[0] or 0,
+        "last_visit": v[1],
         "balance": float(balance or 0),
     }
+
+
+# ─────────────────────────────────────────────────────────────
+# PATIENT 360 — the rest of the clinical picture
+# ─────────────────────────────────────────────────────────────
+#
+# db.get_pet_timeline() (models/database.py, read-only) already covers six
+# record types in six queries: visits, vaccinations, surgeries, grooming,
+# invoices and lab requests. Everything a vet also needs to see on the animal
+# — diagnoses, prescriptions, inpatient stays, boarding, imaging, telemedicine,
+# pet-shop purchases and follow-ups due — is assembled here.
+#
+# Cost: FOUR more queries, not one per record type. The five tables guaranteed
+# by the core schema go in a single UNION ALL; the three tables that are created
+# lazily by their own blueprint or seed script (imaging_studies,
+# telemedicine_sessions, ps_orders) get one guarded query each, because a
+# missing table would otherwise take the whole UNION down with it.
+
+_CORE_EVENTS_SQL = """
+SELECT 'diagnosis' AS etype, d.id AS eid, d.created_at AS dt,
+       d.diagnosis AS title, COALESCE(d.severity,'') AS summary,
+       COALESCE(d.visit_id,0) AS ref, 0 AS n
+  FROM diagnoses d WHERE d.pet_id = ?
+UNION ALL
+SELECT 'prescription', p.id, p.created_at,
+       '', COALESCE(p.status,''), COALESCE(p.visit_id,0),
+       (SELECT COUNT(*) FROM prescription_items pi WHERE pi.prescription_id = p.id)
+  FROM prescriptions p WHERE p.pet_id = ?
+UNION ALL
+SELECT 'inpatient', s.id, s.admitted_at,
+       COALESCE(s.reason,''), COALESCE(s.ward,''), 0, 0
+  FROM inpatient_stays s WHERE s.pet_id = ?
+UNION ALL
+SELECT 'boarding', b.id, b.check_in,
+       '', COALESCE(b.status,''), 0, 0
+  FROM boarding_bookings b WHERE b.pet_id = ?
+UNION ALL
+SELECT 'followup', f.id, f.due_date,
+       COALESCE(f.reason,''), COALESCE(f.status,''), 0, 0
+  FROM followups f WHERE f.pet_id = ?
+"""
+
+# Tables that may not exist yet: imaging_studies is only created by the
+# PostgreSQL migration path and the demo seed, telemedicine_sessions and
+# ps_orders are created the first time their module is opened. _try_stmt logs
+# and returns None instead of raising — an absent module is an expected state
+# on a fresh install, a genuine SQL error still shows up in the log.
+_OPTIONAL_EVENTS_SQL = [
+    ("imaging", """SELECT i.id, i.created_at, i.study_type, COALESCE(i.body_region,'')
+                     FROM imaging_studies i WHERE i.pet_id = ?"""),
+    ("telemed", """SELECT ts.id, ts.scheduled_at, COALESCE(ts.chief_complaint,''),
+                          COALESCE(ts.status,'')
+                     FROM telemedicine_sessions ts WHERE ts.pet_id = ?"""),
+    ("purchase", """SELECT o.id, o.created_at, COALESCE(o.order_number,''),
+                           COALESCE(o.status,'')
+                      FROM ps_orders o WHERE o.pet_id = ?"""),
+]
+
+_EVENT_ICONS = {
+    "diagnosis": "🧬", "prescription": "💊", "inpatient": "🏥", "boarding": "🏨",
+    "followup": "🔔", "imaging": "🩻", "telemed": "📹", "purchase": "🛍️",
+}
+
+
+def _event_url(etype, eid, ref):
+    """Deep-link for a timeline event, or None when the module has no detail page."""
+    if etype in ("diagnosis", "followup"):
+        # Diagnoses and follow-ups live inside the visit that produced them.
+        return url_for("visits.visit_detail", visit_id=ref) if ref else None
+    if etype == "prescription":
+        return url_for("pharmacy.rx_detail", rx_id=eid)
+    if etype == "inpatient":
+        return url_for("inpatient.stay_detail", stay_id=eid)
+    if etype == "boarding":
+        return url_for("boarding.booking_edit_form", booking_id=eid)
+    if etype == "imaging":
+        return url_for("imaging.study_detail", study_id=eid)
+    if etype == "telemed":
+        return url_for("telemedicine.session_detail", sid=eid)
+    if etype == "purchase":
+        return url_for("petshop.order_detail", oid=eid)
+    return None
+
+
+def _model_event_url(ev):
+    """Deep-link for the six event types db.get_pet_timeline() produces."""
+    etype, eid = ev.get("type"), ev.get("id")
+    if not eid:
+        return None
+    if etype == "visit":
+        return url_for("visits.visit_detail", visit_id=eid)
+    if etype == "invoice":
+        return url_for("finance.invoice_detail", inv_id=eid)
+    if etype == "lab":
+        return url_for("clinical.lab_detail", lab_id=eid)
+    if etype == "grooming":
+        return url_for("grooming.booking_edit_form", booking_id=eid)
+    if etype == "vaccine":
+        return url_for("clinical.vaccination_certificate", vacc_id=eid)
+    return None
+
+
+def _extra_pet_events(conn, pet_id):
+    """Timeline events db.get_pet_timeline() does not cover. Four queries."""
+    events = []
+    for r in conn.execute(_CORE_EVENTS_SQL, (pet_id,) * 5).fetchall():
+        etype = r["etype"]
+        summary = r["summary"] or ""
+        if etype == "prescription" and r["n"]:
+            # "Active · 3 💊" — the pill counts the items without needing a
+            # translatable unit word next to a DB-supplied status.
+            summary = f"{summary} · {r['n']} 💊" if summary else f"{r['n']} 💊"
+        events.append({
+            "dt": r["dt"], "type": etype, "icon": _EVENT_ICONS[etype],
+            "title": r["title"] or "", "summary": summary, "id": r["eid"],
+            "url": _event_url(etype, r["eid"], r["ref"]),
+        })
+
+    for etype, sql in _OPTIONAL_EVENTS_SQL:
+        cur = _try_stmt(conn, sql, (pet_id,))
+        if cur is None:
+            continue   # module never opened on this install — not an error
+        for r in cur.fetchall():
+            events.append({
+                "dt": r[1], "type": etype, "icon": _EVENT_ICONS[etype],
+                "title": r[2] or "", "summary": r[3] or "", "id": r[0],
+                "url": _event_url(etype, r[0], 0),
+            })
+    return events
 
 
 # ─────────────────────────────────────────────────────────────
@@ -180,9 +310,10 @@ def owner_detail(owner_id):
         return redirect(url_for("crm.owners_list"))
 
     pets = db.list_pets(owner_id=owner_id)
-    stats = _get_owner_stats(owner_id)
 
     conn = get_db()
+    stats = _get_owner_stats(conn, owner_id)
+
     # Recent visits
     rows = conn.execute(
         """SELECT v.id, v.visit_date, v.visit_type, v.chief_complaint,
@@ -195,6 +326,62 @@ def owner_detail(owner_id):
         (owner_id,)
     ).fetchall()
     recent_visits = [dict(r) for r in rows]
+
+    # Invoices — the receptionist on the phone about an unpaid bill needs the
+    # list, not just the total. Unpaid ones first, then newest.
+    invoices = [dict(r) for r in conn.execute(
+        """SELECT i.id, i.invoice_number, i.issue_date, i.due_date, i.status,
+                  i.total, i.paid_amount, i.due_amount, p.pet_name
+           FROM invoices i
+           LEFT JOIN pets p ON p.id = i.pet_id
+           WHERE i.owner_id = ?
+           ORDER BY CASE WHEN i.status IN ('Cancelled','Paid') THEN 1 ELSE 0 END,
+                    i.issue_date DESC
+           LIMIT 25""",
+        (owner_id,)
+    ).fetchall()]
+
+    # Appointment history, no-shows included — a client who does not turn up is
+    # a fact the desk needs before booking the next slot.
+    appointments = [dict(r) for r in conn.execute(
+        """SELECT a.id, a.appt_date, a.appt_start, a.appointment_type, a.status,
+                  a.doctor_name, p.pet_name
+           FROM appointments a
+           LEFT JOIN pets p ON p.id = a.pet_id
+           WHERE a.owner_id = ?
+           ORDER BY a.appt_date DESC, a.appt_start DESC
+           LIMIT 25""",
+        (owner_id,)
+    ).fetchall()]
+    appt_totals = conn.execute(
+        """SELECT COUNT(*),
+                  SUM(CASE WHEN status='No-Show'   THEN 1 ELSE 0 END),
+                  SUM(CASE WHEN status='Cancelled' THEN 1 ELSE 0 END)
+           FROM appointments WHERE owner_id = ?""",
+        (owner_id,)
+    ).fetchone()
+    appt_stats = {
+        "total":     appt_totals[0] or 0,
+        "no_shows":  appt_totals[1] or 0,
+        "cancelled": appt_totals[2] or 0,
+    }
+
+    # Communication history — what was actually sent, and what is queued to go.
+    comms = [dict(r) for r in conn.execute(
+        """SELECT sent_at AS at, 'WhatsApp' AS channel, status,
+                  COALESCE(template_name,'') AS subject, COALESCE(message,'') AS body
+           FROM whatsapp_log WHERE owner_id = ?
+           ORDER BY sent_at DESC LIMIT 20""",
+        (owner_id,)
+    ).fetchall()]
+    comms += [dict(r) for r in conn.execute(
+        """SELECT scheduled_for AS at, COALESCE(channel,'') AS channel, status,
+                  COALESCE(reminder_type,'') AS subject, COALESCE(message,'') AS body
+           FROM reminders WHERE owner_id = ?
+           ORDER BY scheduled_for DESC LIMIT 20""",
+        (owner_id,)
+    ).fetchall()]
+    comms.sort(key=lambda c: c["at"] or "", reverse=True)
 
     # Loyalty points history (last 30 rows)
     lp_rows = conn.execute(
@@ -223,6 +410,10 @@ def owner_detail(owner_id):
         pets=pets,
         stats=stats,
         recent_visits=recent_visits,
+        invoices=invoices,
+        appointments=appointments,
+        appt_stats=appt_stats,
+        comms=comms,
         loyalty_history=loyalty_history,
         loyalty_balance=loyalty_balance,
         redeem_rate=REDEEM_RATE,
@@ -515,11 +706,20 @@ def pet_detail(pet_id):
         return redirect(url_for("crm.owners_list"))
 
     owner = db.get_owner(pet["owner_id"])
-    timeline = db.get_pet_timeline(pet_id)
     vaccinations = db.list_vaccinations(pet_id=pet_id)
 
-    # Weight history for chart
+    # Timeline = the six types the model covers + everything else recorded about
+    # this animal anywhere in the product. Ten queries in total, all constant —
+    # no per-record lookups.
+    timeline = db.get_pet_timeline(pet_id)
+    for ev in timeline:
+        ev["url"] = _model_event_url(ev)
+
     conn = get_db()
+    timeline += _extra_pet_events(conn, pet_id)
+    timeline.sort(key=lambda e: e["dt"] or "", reverse=True)
+
+    # Weight history for chart
     weight_rows = conn.execute(
         "SELECT visit_date, weight_kg FROM visits WHERE pet_id=? AND weight_kg IS NOT NULL ORDER BY visit_date ASC LIMIT 20",
         (pet_id,)

@@ -37,7 +37,7 @@
           {% for s in suppliers %}
           <tr>
             <td><strong>{{ s['name'] }}</strong></td>
-            <td>{{ s['contact_person'] or '—' }}</td>
+            <td>{{ s['contact_name'] or '—' }}</td>
             <td>{{ s['phone'] or '—' }}</td>
             <td>{{ s['email'] or '—' }}</td>
             <td>{{ s['payment_terms'] or '—' }}</td>

@@ -30,7 +30,7 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;padding:.5rem 0;">
     <div>
       <div class="pf-label">{{ t('Contact Person', 'مسؤول التواصل') }}</div>
-      <div style="font-weight:500;">{{ supplier['contact_person'] or '—' }}</div>
+      <div style="font-weight:500;">{{ supplier['contact_name'] or '—' }}</div>
     </div>
     <div>
       <div class="pf-label">{{ t('Phone', 'الهاتف') }}</div>
@@ -86,7 +86,8 @@
       <tbody>
         {% for po in pos %}
         <tr>
-          <td><strong>#{{ po['id'] }}</strong></td>
+          <td><a href="{{ url_for('procurement.order_detail', order_id=po['id']) }}"><strong>{{ po['po_number'] or ('#' ~ po['id']) }}</strong></a>
+              <div style="color:var(--pf-text-muted);font-size:.78rem;">{{ po['item_count'] }} {{ t('lines', 'بنود') }}</div></td>
           <td>{{ po['order_date'] or '—' }}</td>
           <td>{{ po['expected_date'] or '—' }}</td>
           <td>
@@ -100,7 +101,9 @@
               <span class="pf-badge">{{ t('Draft', 'مسودة') }}</span>
             {% endif %}
           </td>
-          <td>{{ "%.2f"|format(po['total_amount'] or 0) }}</td>
+          {# Column is purchase_orders.total; total_amount does not exist, so
+             every supplier's order value rendered as 0.00. #}
+          <td>{{ "%.2f"|format(po['total'] or 0) }}</td>
           <td style="color:var(--pf-text-muted);font-size:.85rem;">{{ po['notes'] or '—' }}</td>
           <td>
             <a href="{{ url_for('procurement.order_detail', order_id=po['id']) }}"
@@ -114,6 +117,58 @@
   {% else %}
   <div style="padding:2rem;text-align:center;color:var(--pf-text-muted);">
     {{ t('No purchase orders for this supplier yet.', 'لا توجد أوامر شراء لهذا المورد بعد.') }}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Items supplied -->
+<div class="pf-card" style="margin-top:1.5rem;">
+  <div class="pf-card-header">
+    <div class="pf-card-title">{{ t('Items Supplied', 'الأصناف المورَّدة') }} ({{ supplied_items|length }})</div>
+    {% if supplied_items %}
+    {# Start a PO already holding everything this supplier provides. #}
+    <a href="{{ url_for('procurement.order_new_form', supplier_id=supplier['id'],
+                        item_id=supplied_items|map(attribute='id')|list) }}"
+       class="pf-btn pf-btn-primary" style="font-size:.85rem;">{{ t('+ Order from this supplier', '+ الطلب من هذا المورد') }}</a>
+    {% endif %}
+  </div>
+
+  {% if supplied_items %}
+  <div style="overflow-x:auto;">
+    <table class="pf-table">
+      <thead>
+        <tr>
+          <th>{{ t('Item', 'الصنف') }}</th>
+          <th>{{ t('In Stock', 'المتوفر') }}</th>
+          <th>{{ t('Reorder Level', 'مستوى إعادة الطلب') }}</th>
+          <th>{{ t('Orders', 'الطلبات') }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in supplied_items %}
+        <tr>
+          <td><strong>{{ it['name'] }}</strong></td>
+          <td>
+            {{ it['stock_qty'] | round(1) }} {{ it['unit'] }}
+            {% if it['stock_qty'] <= it['reorder_level'] %}
+              <span class="pf-badge error">{{ t('Low', 'منخفض') }}</span>
+            {% endif %}
+          </td>
+          <td>{{ it['reorder_level'] | int }}</td>
+          <td>{{ it['po_count'] }}</td>
+          <td>
+            <a href="{{ url_for('inventory.item_detail', item_id=it['id']) }}"
+               class="pf-btn pf-btn-ghost" style="font-size:.8rem;">{{ t('View item →', 'عرض الصنف ←') }}</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:2rem;text-align:center;color:var(--pf-text-muted);">
+    {{ t('No items linked to this supplier yet.', 'لا توجد أصناف مرتبطة بهذا المورد بعد.') }}
   </div>
   {% endif %}
 </div>

@@ -99,32 +99,32 @@
         {% set att = att_map.get((a.user_id, d.isoformat()), {}) %}
         {% set on_leave = (a.user_id, d.isoformat()) in leave_users %}
         {% if on_leave %}
-          <div class="staff-chip chip-leave">
+          <a href="{{ url_for('hr.staff_detail', user_id=a.user_id) }}" class="staff-chip chip-leave" style="text-decoration:none;color:inherit">
             <span class="dot" style="background:#3b82f6"></span>
             {{ a.full_name.split(' ')[0] }} ({{ t('Leave','إجازة') }})
-          </div>
+          </a>
         {% elif att %}
           {% if att.status == 'Present' %}
-            <div class="staff-chip chip-present">
+            <a href="{{ url_for('hr.staff_detail', user_id=a.user_id) }}" class="staff-chip chip-present" style="text-decoration:none;color:inherit">
               <span class="dot" style="background:#16a34a"></span>
               {{ a.full_name.split(' ')[0] }}
-            </div>
+            </a>
           {% elif att.status == 'Late' %}
-            <div class="staff-chip chip-late">
+            <a href="{{ url_for('hr.staff_detail', user_id=a.user_id) }}" class="staff-chip chip-late" style="text-decoration:none;color:inherit">
               <span class="dot" style="background:#d97706"></span>
               {{ a.full_name.split(' ')[0] }} ({{ t('Late','متأخر') }})
-            </div>
+            </a>
           {% else %}
-            <div class="staff-chip chip-absent">
+            <a href="{{ url_for('hr.staff_detail', user_id=a.user_id) }}" class="staff-chip chip-absent" style="text-decoration:none;color:inherit">
               <span class="dot" style="background:#dc2626"></span>
               {{ a.full_name.split(' ')[0] }}
-            </div>
+            </a>
           {% endif %}
         {% else %}
-          <div class="staff-chip chip-off">
+          <a href="{{ url_for('hr.staff_detail', user_id=a.user_id) }}" class="staff-chip chip-off" style="text-decoration:none;color:inherit">
             <span class="dot" style="background:#9ca3af"></span>
             {{ a.full_name.split(' ')[0] }}
-          </div>
+          </a>
         {% endif %}
         {% endfor %}
       {% endif %}

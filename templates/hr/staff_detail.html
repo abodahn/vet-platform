@@ -194,10 +194,13 @@
     </div>
     {% endif %}
 
-    <!-- Leave Balances -->
-    {% if leave_balances %}
+    <!-- Leave Balances — rendered even with no balance allocated, so the link
+         to this person's leave requests is always reachable from their file. -->
     <div class="d-card">
       <div class="d-card-title">{{ t('Leave Balances (This Year)','أرصدة الإجازات (هذا العام)') }}</div>
+      {% if not leave_balances %}
+      <p style="color:var(--cl-muted);text-align:center;padding:14px 0;font-size:13px">{{ t('No leave balance allocated yet.','لم يُخصَّص رصيد إجازات بعد.') }}</p>
+      {% endif %}
       {% for lb in leave_balances %}
       <div class="leave-row">
         <div style="flex:1;font-weight:600">{{ lb.name or t('Annual','سنوية') }}</div>
@@ -217,7 +220,6 @@
         <a href="{{ url_for('attendance.leaves_list', user_id=staff.id) }}" style="font-size:12px;color:var(--cl-primary)">{{ t('View leave requests →','عرض طلبات الإجازة ←') }}</a>
       </div>
     </div>
-    {% endif %}
 
     <!-- Performance Reviews -->
     <div class="d-card">
@@ -351,7 +353,7 @@
           </div>
           <div style="text-align:right">
             {% if c.expiry_date %}
-              {% set today_str = today %}
+              {% set today_str = today.isoformat() if today else '' %}
               <div style="font-size:12px;font-weight:600;color:{% if c.expiry_date < today_str %}#dc2626{% else %}#16a34a{% endif %}">
                 Exp: {{ c.expiry_date }}
               </div>

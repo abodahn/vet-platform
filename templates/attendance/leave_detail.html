@@ -54,11 +54,19 @@
     </div>
     {% endif %}
 
-    {% if req.approved_by %}
     <div style="font-size:12px;color:var(--cl-text-muted);margin-top:12px">
-      {{ req.status }} by <strong>{{ req.approved_by }}</strong> on {{ req.approved_at[:10] if req.approved_at else '' }}
+      {% if req.approved_by %}
+        {{ req.status }} {{ t('by', 'بواسطة') }}
+        {% if approver and can_view_staff %}
+          <a href="{{ url_for('hr.staff_detail', user_id=approver.id) }}"><strong>{{ approver.full_name }}</strong></a>
+        {% else %}
+          <strong>{{ approver.full_name if approver else req.approved_by }}</strong>
+        {% endif %}
+        {{ t('on', 'في') }} {{ req.approved_at[:10] if req.approved_at else '' }}
+      {% else %}
+        {{ t('Not reviewed by anyone yet.', 'لم تتم مراجعته من أي مسؤول بعد.') }}
+      {% endif %}
     </div>
-    {% endif %}
 
     <!-- Manager Actions -->
     {% if is_manager and req.status == 'Pending' %}
@@ -89,8 +97,18 @@
     <div class="pf-card">
       <div class="pf-card-header"><div class="pf-card-title">{{ t('👤 Staff', '👤 الموظف') }}</div></div>
       <div style="padding:4px 0">
-        <div style="font-weight:700;font-size:15px">{{ req.staff_name }}</div>
+        <div style="font-weight:700;font-size:15px">
+          {% if can_view_staff %}
+          <a href="{{ url_for('hr.staff_detail', user_id=req.user_id) }}">{{ req.staff_name }}</a>
+          {% else %}{{ req.staff_name }}{% endif %}
+        </div>
         <div style="font-size:12px;color:var(--cl-text-muted);margin-top:2px">{{ req.staff_role }}</div>
+        <div style="font-size:12px;margin-top:6px">
+          <a href="{{ url_for('attendance.records_list', user_id=req.user_id,
+                              date_from=req.start_date, date_to=req.end_date) }}">
+            {{ t('Attendance over these dates →', 'الحضور خلال هذه التواريخ ←') }}
+          </a>
+        </div>
         <div style="margin-top:8px">
           {% if req.is_paid %}
           <span class="pf-badge active">{{ t('Paid Leave', 'إجازة مدفوعة') }}</span>
@@ -116,6 +134,18 @@
           <span style="font-weight:700;color:{{ color }}">{{ '%.1f'|format(val or 0) }} days</span>
         </div>
         {% endfor %}
+      </div>
+      {% if is_manager %}
+      <div style="margin-top:10px;font-size:12px">
+        <a href="{{ url_for('attendance.balances', year=bal.year) }}">{{ t('All leave balances →', 'جميع أرصدة الإجازات ←') }}</a>
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="pf-card">
+      <div class="pf-card-header"><div class="pf-card-title">⚖️ {{ t('Balance', 'الرصيد') }}</div></div>
+      <div style="padding:4px 0;font-size:13px;color:var(--cl-text-muted)">
+        {{ t('No balance has been allocated for this leave type.', 'لم يُخصَّص رصيد لهذا النوع من الإجازات.') }}
       </div>
     </div>
     {% endif %}

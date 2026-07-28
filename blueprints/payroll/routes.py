@@ -7,7 +7,22 @@ from datetime import date
 from . import payroll_bp
 import models.database as db
 from blueprints.auth.routes import login_required, role_required
+from blueprints.hr.routes import can_view_staff
 from models.excel_export import make_workbook
+
+# Roles that may create, approve or pay a salary. Every write route below is
+# decorated with this tuple so the list cannot drift between them.
+_PAYROLL_ROLES = ("super_admin", "clinic_owner", "branch_manager", "finance")
+
+# Roles that may READ another employee's pay — the four above plus the two that
+# base.html already shows the Payroll nav item to. Everyone else reads only
+# their own payslip (see _may_see_salary): a nurse must not be able to open a
+# colleague's net pay by guessing a URL.
+# "hr" is deliberately EXCLUDED. The owner's decision when the role was
+# created was explicit: HR gets attendance and staff documents, NOT salary
+# or payroll data. An HR officer still sees their OWN payslip via the
+# self-service branch in _may_see_salary().
+_PAYROLL_VIEW_ROLES = _PAYROLL_ROLES + ("support_admin",)
 
 _ROLES = [
     "super_admin", "clinic_owner", "branch_manager", "doctor", "nurse",
@@ -91,6 +106,23 @@ def _calc_gross_net(basic, allowances, ot_hours, ot_rate, deductions, absence_de
     return round(gross, 2), round(net, 2)
 
 
+def _period_range(year: int, month: int):
+    """First and last calendar day of a payroll period, as ISO date strings.
+
+    The attendance link on a payslip carries exactly this range, so the days
+    shown on the payslip and the rows behind the link are the same rows.
+    """
+    import calendar
+    last = calendar.monthrange(int(year), int(month))[1]
+    return f"{int(year):04d}-{int(month):02d}-01", f"{int(year):04d}-{int(month):02d}-{last:02d}"
+
+
+def _may_see_salary(row) -> bool:
+    """Payroll staff see every payslip; everyone else sees only their own."""
+    u = session.get("user") or {}
+    return u.get("role") in _PAYROLL_VIEW_ROLES or u.get("id") == row["user_id"]
+
+
 def _get_attendance_summary(conn, user_id: int, year: int, month: int) -> dict:
     """Pull attendance data for a staff member for the given month.
 
@@ -103,26 +135,27 @@ def _get_attendance_summary(conn, user_id: int, year: int, month: int) -> dict:
         absence_deduction_factor – absent_days / working_days (apply to basic)
     """
     import calendar
-    from datetime import date as _date
 
-    # All attendance records for this user/period
+    period_start, period_end = _period_range(year, month)
+
+    # All attendance records for this user/period. Plain BETWEEN on ISO dates
+    # rather than EXTRACT(... ::date) so the same query runs on SQLite and
+    # PostgreSQL, and so it matches the range the payslip links to.
     records = conn.execute("""
         SELECT work_date, status, hours_worked
         FROM attendance_records
-        WHERE user_id = ?
-          AND EXTRACT(YEAR  FROM work_date::date) = ?
-          AND EXTRACT(MONTH FROM work_date::date) = ?
-    """, (user_id, year, month)).fetchall()
+        WHERE user_id = ? AND work_date BETWEEN ? AND ?
+    """, (user_id, period_start, period_end)).fetchall()
 
     # Get the staff member's standard shift hours (default 8h if no shift assigned)
     shift_row = conn.execute("""
-        SELECT sh.start_time, sh.end_time, sh.break_minutes
+        SELECT sh.name, sh.start_time, sh.end_time, sh.break_minutes
         FROM staff_shifts ss
         JOIN shifts sh ON sh.id = ss.shift_id
         WHERE ss.user_id = ?
-          AND (ss.effective_to IS NULL OR ss.effective_to >= CURRENT_DATE)
+          AND (ss.effective_to IS NULL OR ss.effective_to >= ?)
         ORDER BY ss.effective_from DESC LIMIT 1
-    """, (user_id,)).fetchone()
+    """, (user_id, date.today().isoformat())).fetchone()
 
     if shift_row:
         try:
@@ -160,13 +193,16 @@ def _get_attendance_summary(conn, user_id: int, year: int, month: int) -> dict:
         "late_count":    late_count,
         "overtime_hours": round(overtime_hours, 2),
         "working_days":  working_days,
+        "period_start":  period_start,
+        "period_end":    period_end,
+        "shift_name":    shift_row["name"] if shift_row else None,
     }
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
 
 @payroll_bp.route("/")
-@login_required
+@role_required(*_PAYROLL_VIEW_ROLES)
 def dashboard():
     conn = db.get_db()
     today = date.today()
@@ -204,6 +240,7 @@ def dashboard():
         active="payroll", stats=dict(stats), recent=recent,
         year=year, month=month, active_staff=active_staff,
         status_colors=_STATUS_COLORS,
+        can_view_staff=can_view_staff(session.get("user")),
     )
 
 
@@ -224,6 +261,15 @@ def salaries_list():
         where.append("s.status=?")
         params.append(status_f)
 
+    # This list was @login_required only, so ANY logged-in user — a nurse, a
+    # groomer, reception — could read every colleague's pay. Payroll staff keep
+    # the full list; everyone else is scoped to their own rows rather than
+    # bounced, because an employee has a legitimate reason to see their own
+    # payslip and no other route offers one.
+    if (session.get("user") or {}).get("role") not in _PAYROLL_VIEW_ROLES:
+        where.append("s.user_id=?")
+        params.append((session.get("user") or {}).get("id"))
+
     rows = conn.execute(f"""
         SELECT s.*, u.full_name, u.role
         FROM salaries s
@@ -236,6 +282,7 @@ def salaries_list():
     return render_template("payroll/salaries_list.html",
         active="payroll", rows=rows, year=year, month=month,
         status_f=status_f, status_colors=_STATUS_COLORS,
+        can_view_staff=can_view_staff(session.get("user")),
     )
 
 
@@ -254,9 +301,9 @@ def salaries_export_xlsx():
                s.period_year, s.period_month,
                s.basic_salary, s.allowances,
                s.overtime_hours, s.overtime_rate,
-               s.gross_salary, s.deductions,
+               s.gross, s.deductions,
                s.absence_deduction, s.tax_deduction,
-               s.net_salary, s.status, s.payment_date
+               s.net, s.status, s.payment_date
         FROM salaries s
         JOIN users u ON u.id = s.user_id
         WHERE s.period_year=? AND s.period_month=?
@@ -275,9 +322,9 @@ def salaries_export_xlsx():
          month_names[int(r["period_month"]) - 1],
          float(r["basic_salary"] or 0), float(r["allowances"] or 0),
          float(r["overtime_hours"] or 0), float(r["overtime_rate"] or 0),
-         float(r["gross_salary"] or 0), float(r["deductions"] or 0),
+         float(r["gross"] or 0), float(r["deductions"] or 0),
          float(r["absence_deduction"] or 0), float(r["tax_deduction"] or 0),
-         float(r["net_salary"] or 0), r["status"],
+         float(r["net"] or 0), r["status"],
          str(r["payment_date"] or "")[:10]]
         for r in rows_raw
     ]
@@ -301,7 +348,7 @@ def salaries_export_xlsx():
 
 
 @payroll_bp.route("/salaries/new", methods=["GET", "POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "finance")
+@role_required(*_PAYROLL_ROLES)
 def salary_new():
     conn = db.get_db()
     if request.method == "POST":
@@ -355,9 +402,11 @@ def salary_new():
 @login_required
 def salary_detail(sid):
     conn = db.get_db()
+    # LEFT JOIN: a payslip for a since-deleted employee must still open, with
+    # the name rendered as plain text instead of a link to a missing profile.
     row = conn.execute("""
         SELECT s.*, u.full_name, u.role, u.email, u.phone
-        FROM salaries s JOIN users u ON u.id=s.user_id
+        FROM salaries s LEFT JOIN users u ON u.id=s.user_id
         WHERE s.id=?
     """, (sid,)).fetchone()
     if not row:
@@ -365,22 +414,31 @@ def salary_detail(sid):
         flash("Record not found.", "danger")
         return redirect(url_for("payroll.salaries_list"))
     row = dict(row)
+    if not _may_see_salary(row):
+        conn.close()
+        flash("You don't have permission to view this salary record.", "danger")
+        return redirect(url_for("launcher.index"))
     payer = None
     if row.get("paid_by"):
         payer = conn.execute(
-            "SELECT full_name FROM users WHERE id=?", (row["paid_by"],)
+            "SELECT id, full_name FROM users WHERE id=?", (row["paid_by"],)
         ).fetchone()
+    # The attendance that produced this payslip — same employee, same period.
+    att = _get_attendance_summary(
+        conn, row["user_id"], row["period_year"], row["period_month"])
     conn.close()
     return render_template("payroll/salary_detail.html",
-        active="payroll", salary=row, payer=payer,
-        status_colors=_STATUS_COLORS,
+        active="payroll", salary=row, payer=payer, att=att,
+        status_colors=_STATUS_COLORS, today=date.today(),
+        staff_exists=bool(row.get("full_name")),
+        can_view_staff=can_view_staff(session.get("user")),
     )
 
 
 # ── Edit ──────────────────────────────────────────────────────────────────────
 
 @payroll_bp.route("/salaries/<int:sid>/edit", methods=["GET", "POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "finance")
+@role_required(*_PAYROLL_ROLES)
 def salary_edit(sid):
     conn = db.get_db()
     row = conn.execute("""
@@ -436,7 +494,7 @@ def salary_edit(sid):
 # ── Approve / Pay ─────────────────────────────────────────────────────────────
 
 @payroll_bp.route("/salaries/<int:sid>/approve", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "finance")
+@role_required(*_PAYROLL_ROLES)
 def salary_approve(sid):
     conn = db.get_db()
     conn.execute(
@@ -450,7 +508,7 @@ def salary_approve(sid):
 
 
 @payroll_bp.route("/salaries/<int:sid>/pay", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "finance")
+@role_required(*_PAYROLL_ROLES)
 def salary_pay(sid):
     conn = db.get_db()
     method = request.form.get("payment_method", "Cash")
@@ -469,7 +527,7 @@ def salary_pay(sid):
 # ── Bulk generate for a period ────────────────────────────────────────────────
 
 @payroll_bp.route("/bulk-generate", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "finance")
+@role_required(*_PAYROLL_ROLES)
 def bulk_generate():
     year  = int(request.form.get("year",  date.today().year))
     month = int(request.form.get("month", date.today().month))
@@ -525,7 +583,7 @@ def bulk_generate():
 # ── Salary grades ─────────────────────────────────────────────────────────────
 
 @payroll_bp.route("/grades", methods=["GET", "POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "finance")
+@role_required(*_PAYROLL_ROLES)
 def salary_grades():
     conn = db.get_db()
     if request.method == "POST":
@@ -573,6 +631,9 @@ def salary_payslip(sid):
     if not row:
         abort(404)
     salary = dict(row)
+    if not _may_see_salary(salary):
+        flash("You don't have permission to view this salary record.", "danger")
+        return redirect(url_for("launcher.index"))
     clinic = db.get_clinic()
     try:
         pdf_bytes = generate_payslip_pdf(salary=salary, clinic=clinic)
@@ -589,6 +650,8 @@ def salary_payslip(sid):
 @payroll_bp.route("/api/attendance/<int:uid>/<int:year>/<int:month>")
 @login_required
 def api_attendance_summary(uid, year, month):
+    if not _may_see_salary({"user_id": uid}):
+        return jsonify({"error": "forbidden"}), 403
     conn = db.get_db()
     summary = _get_attendance_summary(conn, uid, year, month)
     conn.close()

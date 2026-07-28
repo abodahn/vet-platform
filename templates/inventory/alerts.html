@@ -34,7 +34,19 @@
 </style>
 
 <div class="alert-section">
-  <div class="section-title">🔴 Low Stock ({{ low_stock|length }} items)</div>
+  <div class="section-title">
+    <span>🔴 {{ t('Low Stock', 'مخزون منخفض') }} ({{ low_stock|length }} {{ t('items', 'صنف') }})</span>
+    {% if low_stock %}
+    {# One PO covering every short item, quantities pre-filled to top each back
+       up to its max_stock. url_for repeats item_id/qty pairwise. #}
+    <a href="{{ url_for('procurement.order_new_form',
+                        item_id=low_stock|map(attribute='id')|list,
+                        qty=low_stock|map(attribute='suggest_qty')|list) }}"
+       class="btn btn-primary" style="margin-inline-start:auto; font-size:13px;">
+      {{ t('Order All Short Items →', '← طلب جميع الأصناف الناقصة') }}
+    </a>
+    {% endif %}
+  </div>
   {% if low_stock %}
   <div class="alert-cards">
     {% for item in low_stock %}
@@ -55,9 +67,17 @@
         <span>{{ t('Current:', 'الحالي:') }} <strong>{{ _stock|int }}</strong></span>
         <span>Reorder at: {{ item.reorder_level|int }}</span>
       </div>
-      <div style="margin-top:12px;">
+      <div style="margin-top:12px; display:flex; gap:14px; flex-wrap:wrap;">
         <a href="{{ url_for('inventory.item_detail', item_id=item.id) }}"
            style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">{{ t('View Item →', 'عرض الصنف ←') }}</a>
+        {# Straight from "this is short" to a purchase order that already holds
+           it, quantity pre-filled to top the item back up to max_stock. #}
+        <a href="{{ url_for('procurement.order_new_form', item_id=item.id,
+                            qty=item.suggest_qty, supplier_id=item.supplier_id or none) }}"
+           style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">
+          {% set _q = item.suggest_qty ~ ' ' ~ (item.unit or 'unit') %}
+          {{ t('Order ' ~ _q ~ ' →', '← طلب ' ~ _q) }}
+        </a>
       </div>
     </div>
     {% endfor %}
@@ -88,8 +108,20 @@
       <tbody>
         {% for b in expiry_alerts %}
         <tr style="border-bottom:1px solid var(--cl-border);">
-          <td style="padding:12px 16px; font-weight:600;">{{ b.item_name or '—' }}</td>
-          <td style="padding:12px 16px; font-size:13px; color:var(--cl-muted);">{{ b.batch_number or '—' }}</td>
+          <td style="padding:12px 16px; font-weight:600;">
+            {% if b.item_id %}
+              <a href="{{ url_for('inventory.item_detail', item_id=b.item_id) }}"
+                 style="color:var(--cl-primary); text-decoration:none;">{{ b.item_name or t('Item', 'الصنف') ~ ' #' ~ b.item_id }}</a>
+            {% else %}{{ b.item_name or '—' }}{% endif %}
+          </td>
+          {# No batch detail route exists; the item page lists every batch, so
+             point at that section rather than at nothing. #}
+          <td style="padding:12px 16px; font-size:13px; color:var(--cl-muted);">
+            {% if b.batch_number and b.item_id %}
+              <a href="{{ url_for('inventory.item_detail', item_id=b.item_id) }}#batches"
+                 style="color:var(--cl-primary); text-decoration:none;">{{ b.batch_number }}</a>
+            {% else %}{{ b.batch_number or '—' }}{% endif %}
+          </td>
           <td style="padding:12px 16px; font-size:13px;">
             {% if b.expiry_date %}
               {{ b.expiry_date }}
@@ -105,9 +137,13 @@
               <span class="badge-exp badge-warning">{{ t('Warning', 'تحذير') }}</span>
             {% endif %}
           </td>
-          <td style="padding:12px 16px; text-align:center;">
-            <a href="{{ url_for('inventory.item_detail', item_id=b.item_id) }}"
-               style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">{{ t('View →', 'عرض ←') }}</a>
+          <td style="padding:12px 16px; text-align:center; white-space:nowrap;">
+            <a href="{{ url_for('inventory.item_detail', item_id=b.item_id) }}#batches"
+               style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none;">{{ t('Batch →', 'الدفعة ←') }}</a>
+            {# Expiring stock has to be replaced, so offer the same order path
+               the low-stock cards use. No write-off route exists to link to. #}
+            <a href="{{ url_for('procurement.order_new_form', item_id=b.item_id, qty=b.quantity) }}"
+               style="font-size:12px; color:var(--cl-primary); font-weight:600; text-decoration:none; margin-inline-start:10px;">{{ t('Replace →', 'استبدال ←') }}</a>
           </td>
         </tr>
         {% endfor %}

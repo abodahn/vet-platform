@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Salary — {{ salary.full_name }}{% endblock %}
+{% block title %}Salary — {{ salary.full_name or t('Former employee', 'موظف سابق') }}{% endblock %}
+{% set staff_name = salary.full_name or t('Former employee', 'موظف سابق') %}
 {% block content %}
 <div class="pf-page-header">
   <div>
     <h1 class="pf-page-title">{{ t('💰 Salary Record', '💰 سجل الراتب') }}</h1>
-    <p class="pf-page-subtitle">{{ salary.full_name }} — {{ salary.period_year }}-{{ '%02d'|format(salary.period_month) }}</p>
+    <p class="pf-page-subtitle">{{ staff_name }} — {{ salary.period_year }}-{{ '%02d'|format(salary.period_month) }}</p>
   </div>
   <div class="pf-topbar-actions">
     <a href="{{ url_for('payroll.salaries_list', year=salary.period_year, month=salary.period_month) }}" class="pf-btn pf-btn-secondary">{{ t('← Back', '← رجوع') }}</a>
@@ -20,7 +21,13 @@
   <!-- Main card -->
   <div class="pf-card">
     <div class="pf-card-header">
-      <h2 class="pf-card-title">{{ salary.full_name }}</h2>
+      <h2 class="pf-card-title">
+        {% if staff_exists and can_view_staff %}
+        <a href="{{ url_for('hr.staff_detail', user_id=salary.user_id) }}">{{ staff_name }}</a>
+        {% else %}
+        {{ staff_name }}
+        {% endif %}
+      </h2>
       <span class="pf-badge" style="background:{{ status_colors.get(salary.status,'#6b7280') }}20;color:{{ status_colors.get(salary.status,'#6b7280') }}">
         {{ salary.status }}
       </span>
@@ -35,7 +42,17 @@
           <tr><td>Overtime ({{ salary.overtime_hours }}h × EGP {{ salary.overtime_rate }})</td>
               <td>EGP {{ '{:,.2f}'.format(salary.overtime_hours * salary.overtime_rate) }}</td></tr>
           <tr style="color:#dc2626"><td>{{ t('Deductions', 'الاستقطاعات') }}</td><td>EGP {{ '{:,.2f}'.format(salary.deductions) }}</td></tr>
-          <tr style="color:#dc2626"><td>{{ t('Absence Deduction', 'استقطاع الغياب') }}</td><td>EGP {{ '{:,.2f}'.format(salary.absence_deduction) }}</td></tr>
+          <tr style="color:#dc2626">
+            <td>
+              {{ t('Absence Deduction', 'استقطاع الغياب') }}
+              <a href="{{ url_for('attendance.records_list', user_id=salary.user_id,
+                                  date_from=att.period_start, date_to=att.period_end, status='Absent') }}"
+                 style="font-size:11px;font-weight:400">
+                ({{ att.absent_days }} {{ t('absent days', 'يوم غياب') }})
+              </a>
+            </td>
+            <td>EGP {{ '{:,.2f}'.format(salary.absence_deduction) }}</td>
+          </tr>
           <tr style="color:#dc2626"><td>{{ t('Tax Deduction', 'استقطاع الضريبة') }}</td><td>EGP {{ '{:,.2f}'.format(salary.tax_deduction) }}</td></tr>
           <tr style="font-weight:700"><td>{{ t('Gross', 'الإجمالي') }}</td><td>EGP {{ '{:,.2f}'.format(salary.gross) }}</td></tr>
           <tr style="font-weight:700;font-size:1.1em;color:#16a34a"><td>{{ t('Net Pay', 'صافي الراتب') }}</td><td>EGP {{ '{:,.2f}'.format(salary.net) }}</td></tr>
@@ -87,10 +104,56 @@
       <div style="padding:16px">
         <h3 style="margin:0 0 4px;color:#16a34a">{{ t('✅ Paid', '✅ مدفوع') }}</h3>
         <p style="margin:0;font-size:.9rem">{{ salary.payment_method }}<br>{{ salary.payment_date }}</p>
-        {% if payer %}<p style="margin:4px 0 0;font-size:.85rem;color:#6b7280">By {{ payer.full_name }}</p>{% endif %}
+        {% if payer %}
+        <p style="margin:4px 0 0;font-size:.85rem;color:#6b7280">
+          {{ t('By', 'بواسطة') }}
+          {% if can_view_staff %}<a href="{{ url_for('hr.staff_detail', user_id=payer.id) }}">{{ payer.full_name }}</a>
+          {% else %}{{ payer.full_name }}{% endif %}
+        </p>
+        {% endif %}
       </div>
     </div>
     {% endif %}
+
+    <!-- The attendance this payslip was calculated from -->
+    <div class="pf-card">
+      <div class="pf-card-header">
+        <h3 class="pf-card-title">{{ t('🗓 Attendance This Period', '🗓 الحضور عن هذه الفترة') }}</h3>
+      </div>
+      <div style="padding:12px 16px">
+        {% if att.total_days %}
+        <table class="pf-table">
+          <tbody>
+            <tr><td>{{ t('Days Recorded', 'الأيام المسجلة') }}</td><td>{{ att.total_days }}</td></tr>
+            <tr><td>{{ t('Days Present', 'أيام الحضور') }}</td><td>{{ att.present_days }}</td></tr>
+            <tr style="color:#dc2626"><td>{{ t('Days Absent', 'أيام الغياب') }}</td><td>{{ att.absent_days }}</td></tr>
+            <tr><td>{{ t('Late Arrivals', 'مرات التأخير') }}</td><td>{{ att.late_count }}</td></tr>
+            <tr><td>{{ t('Overtime Hours', 'ساعات العمل الإضافي') }}</td><td>{{ '%.2f'|format(att.overtime_hours) }}</td></tr>
+            <tr><td>{{ t('Shift', 'المناوبة') }}</td>
+                <td>{% if att.shift_name %}<a href="{{ url_for('attendance.shifts_list') }}">{{ att.shift_name }}</a>{% else %}{{ t('No shift assigned', 'لا توجد مناوبة مسندة') }}{% endif %}</td></tr>
+          </tbody>
+        </table>
+        {% else %}
+        <p style="margin:0 0 10px;font-size:.85rem;color:#6b7280">
+          {{ t('No attendance was recorded for this period.', 'لم يُسجَّل حضور عن هذه الفترة.') }}
+        </p>
+        {% endif %}
+        <div style="margin-top:10px">
+          <a href="{{ url_for('attendance.records_list', user_id=salary.user_id,
+                              date_from=att.period_start, date_to=att.period_end) }}"
+             style="font-size:12px;color:var(--cl-primary)">
+            {{ t('View the days behind this payslip →', 'عرض الأيام المحتسبة في هذه القسيمة ←') }}
+          </a>
+        </div>
+        <div style="margin-top:6px">
+          <a href="{{ url_for('attendance.report', year=salary.period_year,
+                              month=salary.period_month, user_id=salary.user_id) }}"
+             style="font-size:12px;color:var(--cl-primary)">
+            {{ t('Monthly attendance report →', 'تقرير الحضور الشهري ←') }}
+          </a>
+        </div>
+      </div>
+    </div>
 
     <div class="pf-card">
       <div style="padding:12px 16px;font-size:.85rem;color:#6b7280">

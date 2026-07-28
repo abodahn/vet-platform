@@ -44,7 +44,11 @@
       <tbody>
         {% for r in rows %}
         <tr>
-          <td><strong>{{ r.full_name }}</strong></td>
+          <td><strong>
+            {% if can_view_staff %}
+            <a href="{{ url_for('hr.staff_detail', user_id=r.user_id) }}">{{ r.full_name }}</a>
+            {% else %}{{ r.full_name }}{% endif %}
+          </strong></td>
           <td><span class="pf-badge">{{ r.role }}</span></td>
           <td>{{ '{:,.0f}'.format(r.basic_salary) }}</td>
           <td>{{ '{:,.0f}'.format(r.overtime_hours * r.overtime_rate) }}</td>

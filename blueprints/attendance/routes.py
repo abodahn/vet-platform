@@ -6,6 +6,7 @@ from flask import render_template, request, redirect, url_for, flash, session, j
 from datetime import date, datetime, timedelta
 from . import attendance_bp
 from blueprints.auth.routes import login_required
+from blueprints.hr.routes import can_view_staff
 from models.database import get_db
 from models.excel_export import make_workbook
 
@@ -268,6 +269,7 @@ def records_list():
         present=present, late=late,
         staff_list=staff_list,
         is_manager=_allowed_manager(user),
+        can_view_staff=can_view_staff(user),
     )
 
 
@@ -304,10 +306,23 @@ def record_edit(rec_id):
         flash("Attendance record updated.", "success")
         return redirect(url_for("attendance.records_list"))
 
-    u_row = conn.execute("SELECT full_name FROM users WHERE id=?", (rec["user_id"],)).fetchone()
+    u_row = conn.execute("SELECT id, full_name FROM users WHERE id=?",
+                         (rec["user_id"],)).fetchone()
+    # The shift this record belongs to: the assignment in force on the work
+    # date. Attendance carries no shift_id, so it is resolved through
+    # staff_shifts — and is legitimately absent for unrostered staff.
+    shift = conn.execute("""
+        SELECT sh.id, sh.name, sh.start_time, sh.end_time
+        FROM staff_shifts ss JOIN shifts sh ON sh.id = ss.shift_id
+        WHERE ss.user_id = ? AND ss.effective_from <= ?
+          AND (ss.effective_to IS NULL OR ss.effective_to >= ?)
+        ORDER BY ss.effective_from DESC LIMIT 1
+    """, (rec["user_id"], rec["work_date"], rec["work_date"])).fetchone()
     conn.close()
     return render_template("attendance/record_edit.html", active="attendance",
-                           rec=rec, staff_name=u_row["full_name"] if u_row else "")
+                           rec=rec, staff=u_row, shift=shift,
+                           staff_name=u_row["full_name"] if u_row else "",
+                           can_view_staff=can_view_staff(user))
 
 
 # ── LEAVE REQUESTS ────────────────────────────────────────────────────────────
@@ -345,6 +360,7 @@ def leaves_list():
         active="attendance",
         leaves=leaves, status_f=status_f, user_filter=user_filter,
         staff_list=staff_list, is_manager=_allowed_manager(user),
+        can_view_staff=can_view_staff(user),
     )
 
 
@@ -442,11 +458,20 @@ def leave_detail(req_id):
     bal = conn.execute(
         "SELECT * FROM leave_balances WHERE user_id=? AND leave_type_id=? AND year=?",
         (req["user_id"], req["leave_type_id"], date.today().year)).fetchone()
+    # leave_requests.approved_by holds a username, not a user id, so the
+    # approver has to be looked up. Still-pending requests have none.
+    approver = None
+    if req["approved_by"]:
+        approver = conn.execute(
+            "SELECT id, full_name FROM users WHERE username=?",
+            (req["approved_by"],)).fetchone()
     conn.close()
     return render_template(
         "attendance/leave_detail.html",
         active="attendance",
-        req=req, bal=bal, is_manager=_allowed_manager(user),
+        req=req, bal=bal, approver=approver,
+        is_manager=_allowed_manager(user),
+        can_view_staff=can_view_staff(user),
     )
 
 
@@ -515,8 +540,21 @@ def shifts_list():
         return redirect(url_for("attendance.dashboard"))
     conn = get_db()
     shifts = conn.execute("SELECT * FROM shifts ORDER BY name").fetchall()
+    # Who is on each shift today — one query, grouped in Python rather than a
+    # lookup per shift row.
+    roster = {}
+    for r in conn.execute("""
+        SELECT ss.shift_id, u.id, u.full_name, u.role
+        FROM staff_shifts ss JOIN users u ON u.id = ss.user_id
+        WHERE u.is_active = 1 AND ss.effective_from <= ?
+          AND (ss.effective_to IS NULL OR ss.effective_to >= ?)
+        ORDER BY u.full_name
+    """, (date.today().isoformat(), date.today().isoformat())).fetchall():
+        roster.setdefault(r["shift_id"], []).append(dict(r))
     conn.close()
-    return render_template("attendance/shifts.html", active="attendance", shifts=shifts)
+    return render_template("attendance/shifts.html", active="attendance",
+                           shifts=shifts, roster=roster,
+                           can_view_staff=can_view_staff(session["user"]))
 
 
 @attendance_bp.route("/shifts/save", methods=["POST"])
@@ -665,7 +703,10 @@ def report():
     user   = session["user"]
     year   = int(request.args.get("year",  date.today().year))
     month  = int(request.args.get("month", date.today().month))
-    uid    = request.args.get("user_id", "" if _allowed_manager(user) else str(user["id"]))
+    # Non-managers only ever see themselves — an explicit ?user_id= must not
+    # widen that, the same rule records_list already enforces.
+    uid    = (request.args.get("user_id", "") if _allowed_manager(user)
+              else str(user["id"]))
 
     month_start = date(year, month, 1).isoformat()
     if month == 12:

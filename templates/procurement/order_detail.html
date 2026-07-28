@@ -27,7 +27,15 @@
           {% for line in lines %}
           <tr>
             <td style="color:var(--pf-muted)">{{ loop.index }}</td>
-            <td><strong>{{ line.item_name or '—' }}</strong></td>
+            {# The item this line replenishes. A line whose item row was deleted
+               keeps its text and gains no link. #}
+            <td>
+              {% if line.item_id and line.item_name %}
+                <a href="{{ url_for('inventory.item_detail', item_id=line.item_id) }}"><strong>{{ line.item_name }}</strong></a>
+              {% else %}
+                <strong>{{ line.item_name or t('Deleted item', 'صنف محذوف') }}</strong>
+              {% endif %}
+            </td>
             <td style="color:var(--pf-muted)">{{ line.unit or '—' }}</td>
             <td style="text-align:right">{{ line.quantity }}</td>
             <td style="text-align:right">{{ '%.2f'|format(line.unit_cost or 0) }}</td>

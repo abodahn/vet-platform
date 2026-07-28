@@ -13,6 +13,78 @@ from blueprints.auth.routes import login_required, role_required
 
 
 # ─────────────────────────────────────────────
+# MOVEMENT REFERENCES
+# ─────────────────────────────────────────────
+#
+# stock_movements.reference_type says *why* stock moved; reference_id points at
+# the record in the owning module. The writers, and what they store:
+#
+#   'visit'          reference_id = visits.id           (seed / clinical consumption)
+#   'prescription'   reference_id = prescriptions.id    (pharmacy dispensing)
+#   'purchase_order' reference_id = purchase_orders.id  (procurement receiving)
+#   'receiving'      reference_id NULL  (manual batch intake — nothing to link to)
+#   'transfer'       reference_id NULL  (warehouse transfer; detail lives in notes)
+#   'purchase'       reference_id NULL  (opening / supplier delivery, no PO row)
+#   'adjustment'     reference_id NULL  (stock count correction)
+#
+# Only the first three are linkable. Anything else — or a reference whose target
+# row has since been deleted — stays plain text.
+_REF_TARGETS = {
+    "visit":          ("visits",          "visits.visit_detail",      "visit_id"),
+    "prescription":   ("prescriptions",   "pharmacy.rx_detail",       "rx_id"),
+    "purchase_order": ("purchase_orders", "procurement.order_detail", "order_id"),
+}
+
+
+def _link_movement_refs(movements):
+    """Set m['ref_url'] on every movement whose reference still resolves.
+
+    Movements with no reference, an unmapped reference_type, or a reference to a
+    row that no longer exists are left without ref_url so the template falls
+    back to plain text instead of rendering a dead link.
+    """
+    wanted = {}
+    for m in movements:
+        rt, rid = m.get("reference_type"), m.get("reference_id")
+        if rt in _REF_TARGETS and rid:
+            wanted.setdefault(rt, set()).add(int(rid))
+    if not wanted:
+        return movements
+
+    alive = {}
+    conn = db.get_db()
+    for rt, ids in wanted.items():
+        table = _REF_TARGETS[rt][0]
+        ids = list(ids)
+        holes = ",".join("?" * len(ids))
+        alive[rt] = {
+            r[0] for r in conn.execute(
+                f"SELECT id FROM {table} WHERE id IN ({holes})", ids).fetchall()
+        }
+    conn.close()
+
+    for m in movements:
+        rt, rid = m.get("reference_type"), m.get("reference_id")
+        if rt in _REF_TARGETS and rid and int(rid) in alive.get(rt, ()):
+            _, endpoint, arg = _REF_TARGETS[rt]
+            m["ref_url"] = url_for(endpoint, **{arg: int(rid)})
+    return movements
+
+
+def _suggest_order_qty(item) -> int:
+    """How many units to put on a purchase order for a short item.
+
+    Order up to max_stock; never suggest less than the reorder level, and never
+    less than one unit (an item with max_stock below its reorder level would
+    otherwise suggest zero and produce a PO line the form rejects).
+    """
+    stock = float(item.get("stock_qty") or item.get("current_stock") or 0)
+    reorder = float(item.get("reorder_level") or 0)
+    target = float(item.get("max_stock") or 0) or reorder * 2
+    return max(int(round(target - stock)), int(round(reorder)), 1)
+
+
+# ─────────────────────────────────────────────
 # DASHBOARD
 # ─────────────────────────────────────────────
 
@@ -21,7 +93,7 @@ from blueprints.auth.routes import login_required, role_required
 def dashboard():
     low_stock   = db.get_low_stock_items()
     expiry_30   = db.get_expiry_alerts(days=30)
-    movements   = db.list_stock_movements(limit=10)
+    movements   = _link_movement_refs(db.list_stock_movements(limit=10))
 
     conn = db.get_db()
     total_items = conn.execute(
@@ -191,10 +263,37 @@ def item_detail(item_id):
         (item_id,)
     ).fetchall()]
 
-    movements = db.list_stock_movements(item_id=item_id, limit=20)
+    # Purchase orders that carry this item — "where did this stock come from",
+    # and the route back to receiving one when the item runs short.
+    item_pos = [dict(r) for r in conn.execute(
+        "SELECT po.id, po.po_number, po.status, po.order_date, po.expected_date, "
+        "       pl.quantity, pl.unit_cost, s.id AS supplier_id, s.name AS supplier_name "
+        "FROM po_lines pl "
+        "JOIN purchase_orders po ON po.id = pl.po_id "
+        "LEFT JOIN suppliers s ON s.id = po.supplier_id "
+        "WHERE pl.item_id = ? ORDER BY po.order_date DESC, po.id DESC LIMIT 10",
+        (item_id,)
+    ).fetchall()]
+
+    # Suppliers: the item's own preferred supplier plus anyone who has actually
+    # shipped it on a PO.
+    suppliers = [dict(r) for r in conn.execute(
+        "SELECT s.id, s.name, s.phone, s.email, "
+        "       (SELECT COUNT(*) FROM purchase_orders po JOIN po_lines pl ON pl.po_id = po.id "
+        "         WHERE po.supplier_id = s.id AND pl.item_id = ?) AS po_count "
+        "FROM suppliers s "
+        "WHERE s.id = (SELECT supplier_id FROM items WHERE id = ?) "
+        "   OR s.id IN (SELECT po.supplier_id FROM purchase_orders po "
+        "               JOIN po_lines pl ON pl.po_id = po.id WHERE pl.item_id = ?) "
+        "ORDER BY s.name",
+        (item_id, item_id, item_id)
+    ).fetchall()]
+
+    movements = _link_movement_refs(db.list_stock_movements(item_id=item_id, limit=20))
     total_stock = sum(b["quantity"] for b in batches if b["quantity"] > 0)
     conn.close()
 
+    item["stock_qty"] = total_stock
     return render_template(
         "inventory/item_detail.html",
         active="inventory",
@@ -203,6 +302,9 @@ def item_detail(item_id):
         batches=batches,
         stock_by_wh=stock_by_wh,
         movements=movements,
+        item_pos=item_pos,
+        suppliers=suppliers,
+        suggest_qty=_suggest_order_qty(item),
         total_stock=total_stock,
         today=date.today().isoformat(),
     )
@@ -359,16 +461,10 @@ def alerts():
     expiry_30    = db.get_expiry_alerts(days=30)
     today_str    = date.today().isoformat()
 
-    # Mark which are 7-day vs 8-30-day
-    for item in expiry_30:
-        exp = item.get("expiry_date", "")
-        if exp and exp <= (date.today().__str__() if False else
-                           (date.today().replace(day=date.today().day)).isoformat()):
-            item["urgency"] = "expired"
-        elif item in expiry_7:
-            item["urgency"] = "critical"
-        else:
-            item["urgency"] = "warning"
+    # Pre-fill quantity for the "order this" links, so a short item can go
+    # straight onto a purchase order without the user re-deriving the amount.
+    for item in low_stock:
+        item["suggest_qty"] = _suggest_order_qty(item)
 
     return render_template(
         "inventory/alerts.html",
@@ -395,6 +491,7 @@ def movements():
     all_movements = db.list_stock_movements(item_id=item_id, limit=limit)
     if mv_type:
         all_movements = [m for m in all_movements if m.get("movement_type") == mv_type]
+    _link_movement_refs(all_movements)
 
     # For filter dropdown — get items
     conn = db.get_db()

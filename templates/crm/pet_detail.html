@@ -138,6 +138,14 @@
   .dot-grooming { background: color-mix(in srgb, var(--cl-accent) 15%, var(--cl-bg));  border: 2px solid var(--cl-accent); }
   .dot-invoice  { background: color-mix(in srgb, #22c55e 15%, var(--cl-bg));            border: 2px solid #22c55e; }
   .dot-lab      { background: color-mix(in srgb, #06b6d4 15%, var(--cl-bg));            border: 2px solid #06b6d4; }
+  .dot-diagnosis    { background: color-mix(in srgb, #f43f5e 15%, var(--cl-bg));        border: 2px solid #f43f5e; }
+  .dot-prescription { background: color-mix(in srgb, #6366f1 15%, var(--cl-bg));        border: 2px solid #6366f1; }
+  .dot-imaging      { background: color-mix(in srgb, #0ea5e9 15%, var(--cl-bg));        border: 2px solid #0ea5e9; }
+  .dot-inpatient    { background: color-mix(in srgb, #dc2626 15%, var(--cl-bg));        border: 2px solid #dc2626; }
+  .dot-boarding     { background: color-mix(in srgb, #84cc16 15%, var(--cl-bg));        border: 2px solid #84cc16; }
+  .dot-telemed      { background: color-mix(in srgb, #8b5cf6 15%, var(--cl-bg));        border: 2px solid #8b5cf6; }
+  .dot-purchase     { background: color-mix(in srgb, #e8920a 15%, var(--cl-bg));        border: 2px solid #e8920a; }
+  .dot-followup     { background: color-mix(in srgb, var(--cl-warning) 15%, var(--cl-bg)); border: 2px solid var(--cl-warning); }
   .timeline-item a { text-decoration: none; color: inherit; display: contents; }
   .timeline-item:hover { background: color-mix(in srgb, var(--cl-primary) 4%, var(--cl-bg)); border-radius: 8px; }
 
@@ -345,26 +353,34 @@
       </div>
       <div class="section-body">
         {% if timeline %}
+        {#- Labels for the event types the CRM blueprint adds. The six types
+            db.get_pet_timeline() produces arrive with their title already
+            formatted, so they fall through to ev.title unchanged. -#}
+        {% set tl_labels = {
+          'diagnosis':    t('Diagnosis','تشخيص'),
+          'prescription': t('Prescription','وصفة طبية'),
+          'imaging':      t('Imaging study','دراسة تصويرية'),
+          'inpatient':    t('Inpatient admission','إقامة داخلية'),
+          'boarding':     t('Boarding stay','إقامة إيواء'),
+          'telemed':      t('Telemedicine session','جلسة طب عن بُعد'),
+          'purchase':     t('Pet shop purchase','مشتريات من المتجر'),
+          'followup':     t('Follow-up due','متابعة مستحقة')
+        } %}
         <div class="timeline">
           {% for ev in timeline %}
           <div class="timeline-item">
             <div class="timeline-dot dot-{{ ev.type }}">{{ ev.icon }}</div>
             <div class="timeline-content">
-              {# ── Make each event a deep-link ── #}
-              {% if ev.type == 'visit' %}
-                <a href="{{ url_for('visits.visit_detail', visit_id=ev.id) }}" class="timeline-title" style="color:inherit">{{ ev.title }}</a>
-              {% elif ev.type == 'invoice' %}
-                <a href="{{ url_for('finance.invoice_detail', inv_id=ev.id) }}" class="timeline-title" style="color:inherit">{{ ev.title }}</a>
-              {% elif ev.type == 'vaccine' %}
-                <span class="timeline-title">{{ ev.title }}</span>
-              {% elif ev.type == 'surgery' %}
-                <span class="timeline-title">{{ ev.title }}</span>
-              {% elif ev.type == 'grooming' %}
-                <span class="timeline-title">{{ ev.title }}</span>
-              {% elif ev.type == 'lab' %}
-                <span class="timeline-title">{{ ev.title }}</span>
+              {% set label = tl_labels.get(ev.type) %}
+              {% if label %}
+                {% set heading = label ~ (' — ' ~ ev.title if ev.title else '') %}
               {% else %}
-                <span class="timeline-title">{{ ev.title }}</span>
+                {% set heading = ev.title %}
+              {% endif %}
+              {% if ev.url %}
+                <a href="{{ ev.url }}" class="timeline-title" style="color:inherit">{{ heading }}</a>
+              {% else %}
+                <span class="timeline-title">{{ heading }}</span>
               {% endif %}
               <div class="timeline-date">{{ ev.dt[:10] if ev.dt else '—' }}</div>
               {% if ev.summary %}
@@ -380,7 +396,10 @@
       </div>
       <div class="quick-action-btns">
         <a href="{{ url_for('appointments.appt_new', pet_id=pet.id, owner_id=pet.owner_id) }}">📅 {{ t('New Appointment','موعد جديد') }}</a>
-        <a href="/visits/new?pet_id={{ pet.id }}&owner_id={{ pet.owner_id }}">🩺 {{ t('New Visit','زيارة جديدة') }}</a>
+        <a href="{{ url_for('visits.visit_new_form', pet_id=pet.id, owner_id=pet.owner_id) }}">🩺 {{ t('New Visit','زيارة جديدة') }}</a>
+        <a href="{{ url_for('imaging.pet_studies', pet_id=pet.id) }}">🩻 {{ t('Imaging','التصوير الطبي') }}</a>
+        <a href="{{ url_for('inpatient.dashboard') }}">🏥 {{ t('Inpatient','القسم الداخلي') }}</a>
+        <a href="{{ url_for('cds.index') }}">⚕️ {{ t('Drug & Dose Check','فحص الأدوية والجرعات') }}</a>
       </div>
     </div>
 
@@ -388,7 +407,7 @@
     <div class="section-card">
       <div class="section-header">
         <h3>💉 {{ t('Vaccinations','التطعيمات') }}</h3>
-        <a href="/vaccinations/new?pet_id={{ pet.id }}" class="pf-btn pf-btn-primary" style="font-size:0.82rem;padding:6px 14px;">➕ {{ t('Add','إضافة') }}</a>
+        <a href="{{ url_for('clinical.vaccination_new', pet_id=pet.id) }}" class="pf-btn pf-btn-primary" style="font-size:0.82rem;padding:6px 14px;">➕ {{ t('Add','إضافة') }}</a>
       </div>
       <div class="section-body" style="padding:0;">
         {% if vaccinations %}

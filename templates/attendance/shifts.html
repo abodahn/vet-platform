@@ -18,7 +18,7 @@
     {% if shifts %}
     <table class="pf-table">
       <thead>
-        <tr><th>{{ t('Name', 'الاسم') }}</th><th>{{ t('Start', 'البداية') }}</th><th>{{ t('End', 'النهاية') }}</th><th>{{ t('Break', 'الاستراحة') }}</th><th>{{ t('Days', 'الأيام') }}</th><th>{{ t('Status', 'الحالة') }}</th><th></th></tr>
+        <tr><th>{{ t('Name', 'الاسم') }}</th><th>{{ t('Start', 'البداية') }}</th><th>{{ t('End', 'النهاية') }}</th><th>{{ t('Break', 'الاستراحة') }}</th><th>{{ t('Days', 'الأيام') }}</th><th>{{ t('On This Shift', 'على هذه المناوبة') }}</th><th>{{ t('Status', 'الحالة') }}</th><th></th></tr>
       </thead>
       <tbody>
         {% set day_names = {1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',0:'Sun'} %}
@@ -39,6 +39,21 @@
                 {{ day_names.get(d|int, d) }}
               </span>
             {% endfor %}
+          </td>
+          <td style="font-size:12px">
+            {% set on_shift = roster.get(s.id, []) %}
+            {% if on_shift %}
+              {% for m in on_shift %}
+              {% if can_view_staff %}<a href="{{ url_for('hr.staff_detail', user_id=m.id) }}">{{ m.full_name }}</a>{% else %}{{ m.full_name }}{% endif %}{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            {% else %}
+              <span style="color:var(--cl-text-muted)">{{ t('Nobody assigned', 'لا أحد مسند') }}</span>
+            {% endif %}
+            {% if can_view_staff %}
+            <div style="margin-top:4px">
+              <a href="{{ url_for('hr.roster') }}">{{ t('Weekly roster →', 'جدول المناوبات الأسبوعي ←') }}</a>
+            </div>
+            {% endif %}
           </td>
           <td>
             {% if s.is_active %}<span class="pf-badge active">{{ t('Active', 'نشط') }}</span>

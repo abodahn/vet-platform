@@ -80,7 +80,11 @@
       {% for lr in leaves %}
       <tr>
         {% if is_manager %}
-        <td style="font-weight:600">{{ lr.staff_name }}</td>
+        <td style="font-weight:600">
+          {% if can_view_staff %}
+          <a href="{{ url_for('hr.staff_detail', user_id=lr.user_id) }}">{{ lr.staff_name }}</a>
+          {% else %}{{ lr.staff_name }}{% endif %}
+        </td>
         {% endif %}
         <td>
           <span style="display:inline-flex;align-items:center;gap:5px">

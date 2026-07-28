@@ -38,6 +38,20 @@ _ROLE_COLORS = {
     "auditor":        "#6b7280",
 }
 
+# Roles that may open hr.staff_detail. The attendance and payroll blueprints
+# import this so they only render a link to a staff profile the viewer can
+# actually open — a link that lands on "you don't have permission" is worse
+# than plain text. role_required always lets super_admin through as well.
+# The hr role exists in _SEED_ROLES and is granted staff + attendance access.
+# It is deliberately NOT granted password resets, record deletion, RBAC admin
+# or anything under /payroll/ — an HR officer manages people, not security or pay.
+STAFF_VIEW_ROLES = ("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
+
+
+def can_view_staff(user) -> bool:
+    return (user or {}).get("role") in STAFF_VIEW_ROLES
+
+
 _CONTRACT_TYPES = ["Full-time", "Part-time", "Contract", "Probation", "Intern"]
 _GENDERS        = ["Male", "Female", "Not specified"]
 _REVIEW_STATUSES = ["Draft", "Submitted", "Acknowledged"]
@@ -175,7 +189,7 @@ def index():
 
 
 @hr_bp.route("/dashboard")
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def dashboard():
     conn  = db.get_db()
     today = date.today().isoformat()
@@ -343,7 +357,7 @@ def dashboard():
 # ── STAFF LIST ────────────────────────────────────────────────────────────────
 
 @hr_bp.route("/staff")
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def staff_list():
     conn            = db.get_db()
     role_filter     = request.args.get("role", "")
@@ -446,7 +460,7 @@ def _get_form_deps(conn):
 # ── STAFF NEW ─────────────────────────────────────────────────────────────────
 
 @hr_bp.route("/staff/new", methods=["GET", "POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def staff_new():
     conn = db.get_db()
     branches, shifts = _get_form_deps(conn)
@@ -508,7 +522,7 @@ def staff_new():
 # ── STAFF DETAIL ──────────────────────────────────────────────────────────────
 
 @hr_bp.route("/staff/<int:user_id>")
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required(*STAFF_VIEW_ROLES)
 def staff_detail(user_id):
     conn = db.get_db()
     user = conn.execute(
@@ -650,7 +664,7 @@ def staff_detail(user_id):
 # ── STAFF EDIT ────────────────────────────────────────────────────────────────
 
 @hr_bp.route("/staff/<int:user_id>/edit", methods=["GET", "POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def staff_edit(user_id):
     conn = db.get_db()
     user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
@@ -712,7 +726,7 @@ def staff_reset_password(user_id):
 # ── SHIFT ASSIGNMENT ──────────────────────────────────────────────────────────
 
 @hr_bp.route("/staff/<int:user_id>/assign-shift", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def staff_assign_shift(user_id):
     shift_id = request.form.get("shift_id")
     eff_from = request.form.get("effective_from") or date.today().isoformat()
@@ -761,7 +775,7 @@ def roles_list():
 # ── PERFORMANCE REVIEWS ───────────────────────────────────────────────────────
 
 @hr_bp.route("/performance")
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def performance_list():
     conn   = db.get_db()
     period = request.args.get("period", "")
@@ -796,7 +810,7 @@ def performance_list():
 
 
 @hr_bp.route("/performance/new", methods=["GET", "POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager")
+@role_required("super_admin", "clinic_owner", "branch_manager", "hr")
 def performance_new():
     conn  = db.get_db()
     staff = [dict(r) for r in conn.execute(
@@ -858,7 +872,7 @@ def performance_detail(rev_id):
 
 
 @hr_bp.route("/performance/<int:rev_id>/edit", methods=["GET", "POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager")
+@role_required("super_admin", "clinic_owner", "branch_manager", "hr")
 def performance_edit(rev_id):
     conn = db.get_db()
     rev  = conn.execute("SELECT * FROM performance_reviews WHERE id=?", (rev_id,)).fetchone()
@@ -921,7 +935,7 @@ def performance_acknowledge(rev_id):
 _WARNING_TYPES = ["Verbal", "Written", "Final Warning", "Suspension"]
 
 @hr_bp.route("/staff/<int:user_id>/warnings/add", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager")
+@role_required("super_admin", "clinic_owner", "branch_manager", "hr")
 def add_warning(user_id):
     f = request.form
     conn = db.get_db()
@@ -972,7 +986,7 @@ def delete_warning(user_id, warn_id):
 # ── CERTIFICATIONS / TRAINING ─────────────────────────────────────────────────
 
 @hr_bp.route("/certifications")
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def certifications_list():
     conn = db.get_db()
     certs = [dict(r) for r in conn.execute("""
@@ -987,7 +1001,7 @@ def certifications_list():
 
 
 @hr_bp.route("/staff/<int:user_id>/certifications/add", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def add_certification(user_id):
     f = request.form
     conn = db.get_db()
@@ -1014,7 +1028,7 @@ def add_certification(user_id):
 
 
 @hr_bp.route("/staff/<int:user_id>/certifications/<int:cert_id>/delete", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager")
+@role_required("super_admin", "clinic_owner", "branch_manager", "hr")
 def delete_certification(user_id, cert_id):
     conn = db.get_db()
     conn.execute("DELETE FROM staff_certifications WHERE id=? AND user_id=?", (cert_id, user_id))
@@ -1027,7 +1041,7 @@ def delete_certification(user_id, cert_id):
 # ── HR NOTES ─────────────────────────────────────────────────────────────────
 
 @hr_bp.route("/staff/<int:user_id>/notes/add", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def add_note(user_id):
     note_text = request.form.get("note", "").strip()
     if not note_text:
@@ -1064,7 +1078,7 @@ def delete_note(user_id, note_id):
 from datetime import timedelta
 
 @hr_bp.route("/roster")
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def roster():
     week_str = request.args.get("week", date.today().isoformat())
     try:
@@ -1150,7 +1164,7 @@ def roster():
 _OT_STATUSES = ["Pending", "Approved", "Rejected"]
 
 @hr_bp.route("/overtime")
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def overtime_list():
     conn  = db.get_db()
     uid   = request.args.get("user_id", type=int)
@@ -1202,7 +1216,7 @@ def overtime_list():
 
 
 @hr_bp.route("/staff/<int:user_id>/overtime/add", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager")
+@role_required("super_admin", "clinic_owner", "branch_manager", "hr")
 def add_overtime(user_id):
     f    = request.form
     conn = db.get_db()
@@ -1226,7 +1240,7 @@ def add_overtime(user_id):
 
 
 @hr_bp.route("/overtime/<int:ot_id>/approve", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager")
+@role_required("super_admin", "clinic_owner", "branch_manager", "hr")
 def approve_overtime(ot_id):
     conn = db.get_db()
     conn.execute(
@@ -1240,7 +1254,7 @@ def approve_overtime(ot_id):
 
 
 @hr_bp.route("/overtime/<int:ot_id>/reject", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager")
+@role_required("super_admin", "clinic_owner", "branch_manager", "hr")
 def reject_overtime(ot_id):
     conn = db.get_db()
     conn.execute(
@@ -1255,7 +1269,7 @@ def reject_overtime(ot_id):
 # ── ATTENDANCE SEARCH (HR VIEW) ───────────────────────────────────────────────
 
 @hr_bp.route("/attendance")
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def hr_attendance():
     from datetime import timedelta
     conn    = db.get_db()
@@ -1375,7 +1389,7 @@ def hr_attendance():
 
 
 @hr_bp.route("/attendance/add", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
+@role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def hr_attendance_add():
     f    = request.form
     conn = db.get_db()
@@ -1427,7 +1441,7 @@ def hr_attendance_add():
 
 
 @hr_bp.route("/attendance/<int:rec_id>/delete", methods=["POST"])
-@role_required("super_admin", "clinic_owner", "branch_manager")
+@role_required("super_admin", "clinic_owner", "branch_manager", "hr")
 def hr_attendance_delete(rec_id):
     conn = db.get_db()
     conn.execute("DELETE FROM attendance_records WHERE id=?", (rec_id,))

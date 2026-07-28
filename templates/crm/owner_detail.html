@@ -240,6 +240,37 @@
     font-size: 0.9rem;
   }
 
+  /* ── Owner-360 tables (invoices / appointments) ───────────── */
+  .o360-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .o360-table thead th {
+    /* start/end rather than left/right so the tables flip with dir="rtl" */
+    text-align: start; padding: 8px 12px; font-weight: 600;
+    color: var(--cl-muted); border-bottom: 2px solid var(--cl-border);
+    white-space: nowrap;
+  }
+  .o360-table tbody td { padding: 9px 12px; border-bottom: 1px solid var(--cl-border); }
+  .o360-table tbody tr:last-child td { border-bottom: none; }
+  .o360-table .num { text-align: end; font-variant-numeric: tabular-nums; }
+  .o360-badge {
+    font-size: 0.74rem; font-weight: 700; padding: 2px 9px; border-radius: 20px;
+    background: color-mix(in srgb, var(--cl-info) 15%, transparent); color: var(--cl-info);
+    white-space: nowrap;
+  }
+  .o360-badge.ok   { background: color-mix(in srgb, var(--cl-success) 15%, transparent); color: var(--cl-success); }
+  .o360-badge.warn { background: color-mix(in srgb, var(--cl-warning) 18%, transparent); color: var(--cl-warning); }
+  .o360-badge.bad  { background: color-mix(in srgb, var(--cl-danger) 15%, transparent);  color: var(--cl-danger); }
+  .o360-badge.mute { background: color-mix(in srgb, var(--cl-muted) 15%, transparent);   color: var(--cl-muted); }
+
+  .comms-list { display: flex; flex-direction: column; gap: 8px; }
+  .comm-row {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 14px; border-radius: 9px;
+    border: 1.5px solid var(--cl-border); background: var(--cl-bg);
+  }
+  .comm-meta { min-width: 96px; font-size: 0.78rem; color: var(--cl-muted); font-weight: 600; }
+  .comm-body { flex: 1; font-size: 0.85rem; color: var(--cl-text); }
+  .comm-subject { font-weight: 700; font-size: 0.82rem; margin-bottom: 2px; }
+
   .notes-box {
     background: color-mix(in srgb, var(--cl-accent) 8%, var(--cl-bg));
     border: 1.5px solid color-mix(in srgb, var(--cl-accent) 25%, var(--cl-border));
@@ -366,6 +397,11 @@
         <div class="stat-value" style="font-size:0.9rem;">{{ stats.last_visit[:10] if stats.last_visit else '—' }}</div>
         <div class="stat-label">{{ t('Last Visit','آخر زيارة') }}</div>
       </div>
+      <div class="stat-card {% if appt_stats.no_shows %}danger{% endif %}">
+        <div class="stat-icon">🚫</div>
+        <div class="stat-value">{{ appt_stats.no_shows }}</div>
+        <div class="stat-label">{{ t('No-Shows','عدم حضور') }}</div>
+      </div>
     </div>
 
     <!-- Pets section -->
@@ -428,6 +464,145 @@
         </div>
         {% else %}
         <div class="empty-section">{{ t('No visit history yet.','لا يوجد سجل زيارات بعد.') }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Invoices & outstanding balance -->
+    <div class="section-card">
+      <div class="section-header">
+        <h3>🧾 {{ t('Invoices','الفواتير') }}</h3>
+        <span style="font-size:0.85rem;font-weight:700;
+                     color:{% if stats.balance > 0 %}var(--cl-danger){% else %}var(--cl-success){% endif %}">
+          {{ t('Outstanding','المستحق') }}: {{ "%.2f"|format(stats.balance) }} {{ t('EGP','ج.م') }}
+        </span>
+      </div>
+      <div class="section-body" style="padding:0;">
+        {% if invoices %}
+        <div style="overflow-x:auto">
+          <table class="o360-table">
+            <thead>
+              <tr>
+                <th>{{ t('Invoice','الفاتورة') }}</th>
+                <th>{{ t('Date','التاريخ') }}</th>
+                <th>{{ t('Pet','الحيوان') }}</th>
+                <th>{{ t('Status','الحالة') }}</th>
+                <th class="num">{{ t('Total','الإجمالي') }}</th>
+                <th class="num">{{ t('Due','المستحق') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for inv in invoices %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('finance.invoice_detail', inv_id=inv.id) }}"
+                     style="color:var(--cl-primary);font-weight:700;text-decoration:none">
+                    {{ inv.invoice_number }}
+                  </a>
+                </td>
+                <td>{{ (inv.issue_date or '')[:10] or '—' }}</td>
+                <td>{{ inv.pet_name or '—' }}</td>
+                <td>
+                  <span class="o360-badge {% if inv.status == 'Paid' %}ok{% elif inv.status == 'Cancelled' %}mute{% elif inv.status == 'Partial' %}warn{% else %}bad{% endif %}">
+                    {{ inv.status }}
+                  </span>
+                </td>
+                <td class="num">{{ "%.2f"|format(inv.total or 0) }}</td>
+                <td class="num" style="font-weight:700;{% if (inv.due_amount or 0) > 0 %}color:var(--cl-danger){% endif %}">
+                  {{ "%.2f"|format(inv.due_amount or 0) }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-section">{{ t('No invoices issued yet.','لم تُصدر أي فواتير بعد.') }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Appointment history, no-shows included -->
+    <div class="section-card">
+      <div class="section-header">
+        <h3>📅 {{ t('Appointment History','سجل المواعيد') }}</h3>
+        <span style="font-size:0.82rem;color:var(--cl-muted)">
+          {{ appt_stats.total }} {{ t('booked','موعداً') }} ·
+          {{ appt_stats.no_shows }} {{ t('no-shows','حالة عدم حضور') }} ·
+          {{ appt_stats.cancelled }} {{ t('cancelled','ملغى') }}
+        </span>
+      </div>
+      <div class="section-body" style="padding:0;">
+        {% if appointments %}
+        <div style="overflow-x:auto">
+          <table class="o360-table">
+            <thead>
+              <tr>
+                <th>{{ t('Date','التاريخ') }}</th>
+                <th>{{ t('Time','الوقت') }}</th>
+                <th>{{ t('Pet','الحيوان') }}</th>
+                <th>{{ t('Type','النوع') }}</th>
+                <th>{{ t('Doctor','الطبيب') }}</th>
+                <th>{{ t('Status','الحالة') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in appointments %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('appointments.appt_detail', appt_id=a.id) }}"
+                     style="color:var(--cl-primary);font-weight:700;text-decoration:none">
+                    {{ (a.appt_date or '')[:10] or '—' }}
+                  </a>
+                </td>
+                <td>{{ a.appt_start or '—' }}</td>
+                <td>{{ a.pet_name or '—' }}</td>
+                <td>{{ a.appointment_type or '—' }}</td>
+                <td>{{ a.doctor_name or '—' }}</td>
+                <td>
+                  <span class="o360-badge {% if a.status == 'Completed' %}ok{% elif a.status == 'No-Show' %}bad{% elif a.status == 'Cancelled' %}mute{% endif %}">
+                    {{ a.status }}
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-section">{{ t('No appointments booked yet.','لا توجد مواعيد محجوزة بعد.') }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Communication history -->
+    <div class="section-card">
+      <div class="section-header">
+        <h3>💬 {{ t('Communication History','سجل التواصل') }}</h3>
+        <a href="{{ url_for('whatsapp.send_center') }}" class="pf-btn pf-btn-primary"
+           style="font-size:0.82rem;padding:6px 14px;">✉️ {{ t('Send Message','إرسال رسالة') }}</a>
+      </div>
+      <div class="section-body">
+        {% if comms %}
+        <div class="comms-list">
+          {% for c in comms %}
+          <div class="comm-row">
+            <div class="comm-meta">
+              {{ (c.at or '')[:10] or '—' }}<br>
+              <span style="font-weight:500">{{ c.channel or '—' }}</span>
+            </div>
+            <div class="comm-body">
+              {% if c.subject %}<div class="comm-subject">{{ c.subject }}</div>{% endif %}
+              {{ (c.body or '') | truncate(160) or '—' }}
+            </div>
+            <span class="o360-badge {% if c.status == 'Sent' %}ok{% elif c.status == 'Failed' %}bad{% elif c.status == 'Pending' %}warn{% else %}mute{% endif %}">
+              {{ c.status or '—' }}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-section">{{ t('No messages or reminders recorded for this client yet.','لا توجد رسائل أو تذكيرات مسجلة لهذا العميل بعد.') }}</div>
         {% endif %}
       </div>
     </div>

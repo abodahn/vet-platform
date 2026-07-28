@@ -87,7 +87,15 @@
                    color:{% if m.movement_type == 'in' %}var(--cl-success){% else %}var(--cl-danger){% endif %}">
           {% if m.movement_type == 'in' %}+{% else %}−{% endif %}{{ m.quantity|int }}
         </td>
-        <td style="font-size:12px; color:var(--cl-muted);">{{ m.reference_type or '—' }}{% if m.reference_id %} #{{ m.reference_id }}{% endif %}</td>
+        {# ref_url is set only when the referenced record still exists; a
+           dangling or unlinkable reference stays plain text. #}
+        <td style="font-size:12px; color:var(--cl-muted);">
+          {% if m.ref_url %}
+            <a href="{{ m.ref_url }}" style="color:var(--cl-primary); font-weight:600; text-decoration:none;">{{ m.reference_type }} #{{ m.reference_id }}</a>
+          {% else %}
+            {{ m.reference_type or '—' }}{% if m.reference_id %} #{{ m.reference_id }}{% endif %}
+          {% endif %}
+        </td>
         <td style="font-size:12px;">{{ m.created_by or '—' }}</td>
         <td style="font-size:12px; color:var(--cl-muted);">{{ m.notes or '—' }}</td>
       </tr>

@@ -178,8 +178,13 @@ table.pf-table tbody tr:last-child { border-bottom:none; }
           <div style="color:var(--cl-muted);font-size:0.85rem;text-align:center;padding:10px">{{ t('No stock in warehouses', 'لا يوجد مخزون في المستودعات') }}</div>
           {% endfor %}
         </div>
-        <div style="margin-top:14px;text-align:center">
+        <div style="margin-top:14px;text-align:center;display:flex;flex-direction:column;gap:8px">
           <a href="{{ url_for('inventory.batch_new', item_id=item.id) }}" class="pf-btn pf-btn-primary" style="width:100%;justify-content:center">{{ t('+ Receive Stock', '+ استلام مخزون') }}</a>
+          <a href="{{ url_for('procurement.order_new_form', item_id=item.id, qty=suggest_qty,
+                              supplier_id=item.supplier_id or none) }}"
+             class="pf-btn pf-btn-secondary" style="width:100%;justify-content:center">
+            {{ t('🛒 Order ' ~ suggest_qty ~ ' ' ~ item.unit ~ ' →', '← 🛒 طلب ' ~ suggest_qty ~ ' ' ~ item.unit) }}
+          </a>
         </div>
       </div>
     </div>
@@ -187,7 +192,7 @@ table.pf-table tbody tr:last-child { border-bottom:none; }
 </div>
 
 <!-- Batches -->
-<div class="section-card">
+<div class="section-card" id="batches">
   <div class="section-header-bar">📋 {{ t('Stock Batches', 'دفعات المخزون') }}</div>
   <table class="pf-table">
     <thead>
@@ -236,6 +241,87 @@ table.pf-table tbody tr:last-child { border-bottom:none; }
   </table>
 </div>
 
+<!-- Suppliers -->
+<div class="section-card">
+  <div class="section-header-bar">🏭 {{ t('Suppliers', 'الموردون') }}</div>
+  <table class="pf-table">
+    <thead>
+      <tr>
+        <th>{{ t('Supplier', 'المورد') }}</th>
+        <th>{{ t('Phone', 'الهاتف') }}</th>
+        <th>{{ t('Email', 'البريد الإلكتروني') }}</th>
+        <th>{{ t('Orders for this item', 'طلبات هذا الصنف') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in suppliers %}
+      <tr>
+        <td><strong>{{ s.name }}</strong>{% if item.supplier_id == s.id %} <span class="badge badge-info">{{ t('Preferred', 'المفضل') }}</span>{% endif %}</td>
+        <td>{{ s.phone or '—' }}</td>
+        <td>{{ s.email or '—' }}</td>
+        <td>{{ s.po_count }}</td>
+        <td>
+          <a href="{{ url_for('procurement.supplier_detail', supplier_id=s.id) }}">{{ t('View supplier →', 'عرض المورد ←') }}</a>
+        </td>
+      </tr>
+      {% else %}
+      {# An item with no preferred supplier and no purchase history: plain text,
+         not a link to a supplier that does not exist. #}
+      <tr><td colspan="5" class="empty-state">{{ t('No supplier on record for this item.', 'لا يوجد مورد مسجل لهذا الصنف.') }}
+        <a href="{{ url_for('procurement.suppliers_list') }}">{{ t('Browse suppliers →', 'استعراض الموردين ←') }}</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Purchase Orders -->
+<div class="section-card">
+  <div class="section-header-bar">🧾 {{ t('Purchase Orders', 'أوامر الشراء') }}</div>
+  <table class="pf-table">
+    <thead>
+      <tr>
+        <th>{{ t('PO #', 'أمر الشراء') }}</th>
+        <th>{{ t('Supplier', 'المورد') }}</th>
+        <th>{{ t('Order Date', 'تاريخ الطلب') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
+        <th>{{ t('Qty Ordered', 'الكمية المطلوبة') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for po in item_pos %}
+      <tr>
+        <td><strong>{{ po.po_number or ('#' ~ po.id) }}</strong></td>
+        <td>
+          {% if po.supplier_id %}
+            <a href="{{ url_for('procurement.supplier_detail', supplier_id=po.supplier_id) }}">{{ po.supplier_name }}</a>
+          {% else %}{{ po.supplier_name or '—' }}{% endif %}
+        </td>
+        <td>{{ (po.order_date or '')[:10] or '—' }}</td>
+        <td>
+          {% if po.status == 'Received' %}<span class="badge badge-success">{{ t('Received', 'مستلم') }}</span>
+          {% elif po.status == 'Sent' %}<span class="badge badge-warning">{{ t('Sent', 'مُرسل') }}</span>
+          {% elif po.status == 'Cancelled' %}<span class="badge badge-danger">{{ t('Cancelled', 'ملغى') }}</span>
+          {% else %}<span class="badge badge-secondary">{{ t('Draft', 'مسودة') }}</span>{% endif %}
+        </td>
+        <td><strong>{{ po.quantity | round(2) }}</strong> {{ item.unit }}</td>
+        <td>
+          {# Receiving happens on the PO page, so this is the route from the
+             item that needed the stock to the order that will replenish it. #}
+          <a href="{{ url_for('procurement.order_detail', order_id=po.id) }}">
+            {% if po.status in ('Draft', 'Sent') %}{{ t('Receive →', 'استلام ←') }}{% else %}{{ t('View order →', 'عرض الطلب ←') }}{% endif %}
+          </a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty-state">{{ t('This item has never been on a purchase order.', 'لم يُطلب هذا الصنف في أي أمر شراء.') }}
+        <a href="{{ url_for('procurement.order_new_form', item_id=item.id, qty=suggest_qty) }}">{{ t('Order it now →', 'اطلبه الآن ←') }}</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 <!-- Movement History -->
 <div class="section-card">
   <div class="section-header-bar">🔄 {{ t('Movement History (Last 20)', 'سجل الحركات (آخر 20)') }}</div>
@@ -268,7 +354,15 @@ table.pf-table tbody tr:last-child { border-bottom:none; }
           {% endif %}
         </td>
         <td><strong>{{ m.quantity | round(2) }}</strong></td>
-        <td>{{ m.reference_type or '—' }}{% if m.reference_id %} #{{ m.reference_id }}{% endif %}</td>
+        {# ref_url is set only when the referenced record still exists; a
+           dangling or unlinkable reference stays plain text. #}
+        <td>
+          {% if m.ref_url %}
+            <a href="{{ m.ref_url }}" style="color:var(--cl-primary); font-weight:600; text-decoration:none;">{{ m.reference_type }} #{{ m.reference_id }}</a>
+          {% else %}
+            {{ m.reference_type or '—' }}{% if m.reference_id %} #{{ m.reference_id }}{% endif %}
+          {% endif %}
+        </td>
         <td style="color:var(--cl-muted)">{{ m.notes or '—' }}</td>
         <td>{{ m.created_by or '—' }}</td>
       </tr>

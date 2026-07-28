@@ -96,12 +96,28 @@ def supplier_detail(supplier_id):
         flash("Supplier not found.", "error")
         return redirect(url_for("procurement.suppliers_list"))
     pos = conn.execute(
-        "SELECT * FROM purchase_orders WHERE supplier_id=? ORDER BY created_at DESC",
+        """SELECT po.*, (SELECT COUNT(*) FROM po_lines WHERE po_id = po.id) AS item_count
+           FROM purchase_orders po WHERE po.supplier_id=? ORDER BY po.created_at DESC""",
         (supplier_id,)
+    ).fetchall()
+    # Items this supplier provides: their preferred items plus anything they
+    # have actually shipped on a PO.
+    supplied_items = conn.execute(
+        """SELECT i.id, i.name, i.unit, i.reorder_level,
+                  COALESCE((SELECT SUM(b.quantity) FROM batches b WHERE b.item_id = i.id), 0) AS stock_qty,
+                  (SELECT COUNT(*) FROM po_lines pl JOIN purchase_orders po ON po.id = pl.po_id
+                    WHERE po.supplier_id = ? AND pl.item_id = i.id) AS po_count
+           FROM items i
+           WHERE i.supplier_id = ?
+              OR i.id IN (SELECT pl.item_id FROM po_lines pl
+                          JOIN purchase_orders po ON po.id = pl.po_id
+                          WHERE po.supplier_id = ?)
+           ORDER BY i.name""",
+        (supplier_id, supplier_id, supplier_id)
     ).fetchall()
     conn.close()
     return render_template("procurement/supplier_detail.html", active="procurement",
-                           supplier=supplier, pos=pos)
+                           supplier=supplier, pos=pos, supplied_items=supplied_items)
 
 
 @procurement_bp.route("/suppliers/<int:supplier_id>/edit", methods=["GET", "POST"])
@@ -121,7 +137,9 @@ def supplier_edit(supplier_id):
             conn.close()
             return redirect(url_for("procurement.supplier_edit", supplier_id=supplier_id))
         conn.execute(
-            """UPDATE suppliers SET name=?, contact_person=?, phone=?, email=?,
+            # Column is contact_name; the form field is contact_person. Naming
+            # them the same broke every supplier save with "no such column".
+            """UPDATE suppliers SET name=?, contact_name=?, phone=?, email=?,
                address=?, payment_terms=?, notes=?, is_active=? WHERE id=?""",
             (name,
              f.get("contact_person","").strip(),
@@ -175,12 +193,43 @@ def orders_list():
 @procurement_bp.route("/orders/new", methods=["GET"])
 @login_required
 def order_new_form():
+    """New PO form.
+
+    Accepts repeatable ?item_id= (and optional ?qty= in the same order, plus
+    ?supplier_id=) so the inventory alerts page can hand a user a form already
+    holding the items that are short. Unknown ids are dropped rather than
+    rendering an empty line.
+    """
     conn = get_db()
     suppliers = conn.execute("SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name").fetchall()
     items = conn.execute("SELECT id, name, unit FROM items ORDER BY name").fetchall()
+
+    prefill = []
+    wanted = [i for i in request.args.getlist("item_id", type=int) if i]
+    if wanted:
+        # qty is positional against item_id. getlist(type=float) silently drops
+        # anything unparseable, which would shift every later quantity onto the
+        # wrong item — so a mismatched list is discarded rather than misapplied.
+        qtys = request.args.getlist("qty", type=float)
+        if len(qtys) != len(wanted):
+            qtys = []
+        holes = ",".join("?" * len(wanted))
+        rows = {r["id"]: r for r in conn.execute(
+            f"SELECT id, name, unit, cost_price FROM items WHERE id IN ({holes})",
+            wanted).fetchall()}
+        for n, iid in enumerate(wanted):
+            row = rows.get(iid)
+            if not row:
+                continue
+            qty = qtys[n] if n < len(qtys) and qtys[n] > 0 else 1
+            prefill.append({"item_id": iid, "name": row["name"], "unit": row["unit"],
+                            "quantity": qty, "unit_cost": row["cost_price"] or 0})
+
+    supplier_id = request.args.get("supplier_id", type=int)
     conn.close()
     return render_template("procurement/order_form.html", active="procurement",
-                           suppliers=suppliers, items=items)
+                           suppliers=suppliers, items=items,
+                           prefill=prefill, prefill_supplier_id=supplier_id)
 
 
 @procurement_bp.route("/orders/new", methods=["POST"])
@@ -198,13 +247,17 @@ def order_new_submit():
         flash("Please select a supplier.", "error")
         return redirect(url_for("procurement.order_new_form"))
 
-    # Collect line items (indexed form fields: item_id_1, quantity_1, unit_price_1)
+    # Collect line items (indexed form fields: item_id_1, quantity_1, unit_price_1).
+    # Read the indexes actually present rather than counting up from 1: removing a
+    # middle row leaves a gap, and stopping at the gap silently dropped every line
+    # after it.
     line_items = []
-    i = 1
-    while True:
+    indexes = sorted(
+        int(k.rsplit("_", 1)[1]) for k in request.form
+        if k.startswith("item_id_") and k.rsplit("_", 1)[1].isdigit()
+    )
+    for i in indexes:
         item_id = request.form.get(f"item_id_{i}")
-        if item_id is None:
-            break
         try:
             qty   = float(request.form.get(f"quantity_{i}", 0) or 0)
             price = float(request.form.get(f"unit_price_{i}", 0) or 0)
@@ -213,7 +266,6 @@ def order_new_submit():
         desc = request.form.get(f"description_{i}", "").strip()
         if item_id and qty > 0:
             line_items.append((item_id, desc, qty, price, round(qty * price, 2)))
-        i += 1
 
     if not line_items:
         flash("Please add at least one line item.", "error")

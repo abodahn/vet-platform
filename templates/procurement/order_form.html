@@ -26,21 +26,27 @@
               </tr>
             </thead>
             <tbody id="lineBody">
-              <tr id="line_1">
+              {# `prefill` arrives from ?item_id=&qty= — the inventory alerts page
+                 hands over the items that are short so the user never retypes
+                 them. With no prefill this renders the usual single blank line. #}
+              {% for p in (prefill or [{'item_id': none, 'quantity': 1, 'unit_cost': 0}]) %}
+              {% set n = loop.index %}
+              <tr id="line_{{ n }}">
                 <td>
-                  <select name="item_id_1" class="pf-input" onchange="updateRow(1)" style="font-size:.85rem">
+                  <select name="item_id_{{ n }}" class="pf-input" onchange="updateRow({{ n }})" style="font-size:.85rem">
                     <option value="">{{ t('— Select Item —', '— اختر الصنف —') }}</option>
                     {% for it in items %}
-                    <option value="{{ it.id }}">{{ it.name }} ({{ it.unit }})</option>
+                    <option value="{{ it.id }}" {% if p.item_id == it.id %}selected{% endif %}>{{ it.name }} ({{ it.unit }})</option>
                     {% endfor %}
                   </select>
-                  <input type="hidden" name="description_1" id="desc_1" value="">
+                  <input type="hidden" name="description_{{ n }}" id="desc_{{ n }}" value="">
                 </td>
-                <td><input type="number" name="quantity_1" id="qty_1" class="pf-input" step="0.01" min="0" value="1" onchange="updateRow(1)" style="font-size:.85rem"></td>
-                <td><input type="number" name="unit_price_1" id="price_1" class="pf-input" step="0.01" min="0" value="0" onchange="updateRow(1)" style="font-size:.85rem"></td>
-                <td><span id="total_1" style="font-weight:600;color:var(--pf-primary)">0.00</span></td>
-                <td></td>
+                <td><input type="number" name="quantity_{{ n }}" id="qty_{{ n }}" class="pf-input" step="0.01" min="0" value="{{ p.quantity }}" onchange="updateRow({{ n }})" style="font-size:.85rem"></td>
+                <td><input type="number" name="unit_price_{{ n }}" id="price_{{ n }}" class="pf-input" step="0.01" min="0" value="{{ '%.2f'|format(p.unit_cost or 0) }}" onchange="updateRow({{ n }})" style="font-size:.85rem"></td>
+                <td><span id="total_{{ n }}" style="font-weight:600;color:var(--pf-primary)">0.00</span></td>
+                <td>{% if n > 1 %}<button type="button" onclick="removeLine({{ n }})" class="pf-btn pf-btn-ghost" style="padding:2px 6px;color:#ef4444">✕</button>{% endif %}</td>
               </tr>
+              {% endfor %}
             </tbody>
             <tfoot>
               <tr>
@@ -68,7 +74,7 @@
             <select name="supplier_id" class="pf-input" required>
               <option value="">{{ t('— Select Supplier —', '— اختر المورد —') }}</option>
               {% for s in suppliers %}
-              <option value="{{ s.id }}">{{ s.name }}</option>
+              <option value="{{ s.id }}" {% if prefill_supplier_id == s.id %}selected{% endif %}>{{ s.name }}</option>
               {% endfor %}
             </select>
           </div>
@@ -99,7 +105,8 @@
 </form>
 
 <script>
-var lineCount = 1;
+// Starts past the server-rendered rows so an added line never reuses an index.
+var lineCount = {{ [prefill|length, 1]|max }};
 var itemOptions = `{% for it in items %}<option value="{{ it.id }}">{{ it.name }} ({{ it.unit }})</option>{% endfor %}`;
 
 function addLine() {
@@ -145,5 +152,9 @@ function updateGrandTotal() {
   });
   document.getElementById('grandTotal').textContent = total.toFixed(2) + ' EGP';
 }
+
+// Pre-filled lines arrive with a qty and a cost already set, so show their
+// totals without waiting for the user to touch a field.
+for (var i = 1; i <= lineCount; i++) updateRow(i);
 </script>
 {% endblock %}
