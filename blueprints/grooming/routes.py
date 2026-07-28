@@ -2,8 +2,25 @@ from flask import render_template, request, redirect, url_for, flash, session, j
 from datetime import date, timedelta
 from . import grooming_bp
 from blueprints.auth.routes import login_required
-from models.database import get_db
+from models.database import get_db, _try_stmt
 import models.database as db
+
+
+def _ensure_columns(conn):
+    """Two columns the UI has always used that the schema never had.
+
+    - grooming_services.description: services.html renders it and posts it, and
+      service_new's INSERT/UPDATE named it — so adding or editing ANY grooming
+      service raised "no column named description" and 500'd. The whole services
+      screen was write-only-broken.
+    - grooming_bookings.price_override: see booking_edit_submit.
+
+    Same idiom models/database.py already uses for owners.loyalty_balance and
+    the pet insurance columns — _try_stmt logs and returns None instead of
+    raising, so every call after the first is a no-op, on both engines.
+    """
+    _try_stmt(conn, "ALTER TABLE grooming_services ADD COLUMN description TEXT")
+    _try_stmt(conn, "ALTER TABLE grooming_bookings ADD COLUMN price_override REAL")
 
 
 @grooming_bp.route("/")
@@ -204,24 +221,26 @@ def booking_edit_submit(booking_id):
         conn.close()
         return redirect(url_for("grooming.booking_edit_form", booking_id=booking_id))
 
-    # Update service price if service changed
+    # The edit form has always offered a price override (booking_edit.html:57).
+    # It was parsed into `new_price` and then dropped on the floor: the UPDATE
+    # below never mentioned it and grooming_bookings had no column for it, so a
+    # receptionist could agree a discount, see "Booking updated", and the
+    # invoice would still bill the full catalogue price.
     new_price = None
     if price_override.strip():
         try:
             new_price = float(price_override)
         except ValueError:
             pass
-    if new_price is None and service_id:
-        svc = conn.execute("SELECT price FROM grooming_services WHERE id=?", (service_id,)).fetchone()
-        if svc:
-            new_price = float(svc["price"] or 0)
 
+    _ensure_columns(conn)
     conn.execute("""
         UPDATE grooming_bookings
         SET service_id=?, groomer_name=?, booking_date=?,
-            status=?, notes=?
+            status=?, notes=?, price_override=?
         WHERE id=?
-    """, (service_id, groomer_name, booking_date, status, notes, booking_id))
+    """, (service_id, groomer_name, booking_date, status, notes,
+          new_price, booking_id))
     conn.commit()
     conn.close()
     flash("Grooming booking updated.", "success")
@@ -236,9 +255,10 @@ def update_booking_status(booking_id):
 
     # Auto-create invoice when a grooming session is marked Completed
     if new_status == "Completed":
+        _ensure_columns(conn)
         booking = conn.execute("""
             SELECT gb.id, gb.owner_id, gb.pet_id, gb.invoice_id,
-                   gs.name AS service_name, gs.price,
+                   gs.name AS service_name, gs.price, gb.price_override,
                    gb.booking_date
             FROM grooming_bookings gb
             LEFT JOIN grooming_services gs ON gs.id = gb.service_id
@@ -246,7 +266,10 @@ def update_booking_status(booking_id):
         """, (booking_id,)).fetchone()
 
         if booking and not booking["invoice_id"]:
-            price = float(booking["price"] or 0)
+            # The price agreed on the booking wins over the catalogue price.
+            price = float(booking["price_override"]
+                          if booking["price_override"] is not None
+                          else (booking["price"] or 0))
             inv_data = {
                 "owner_id":   booking["owner_id"],
                 "pet_id":     booking["pet_id"],
@@ -304,6 +327,7 @@ def booking_invoice(booking_id):
 @login_required
 def services_list():
     conn = get_db()
+    _ensure_columns(conn)
     services = conn.execute(
         "SELECT * FROM grooming_services ORDER BY name"
     ).fetchall()
@@ -319,6 +343,7 @@ def services_list():
 @login_required
 def service_new():
     conn = get_db()
+    _ensure_columns(conn)
     name = request.form.get("name", "").strip()
     species = request.form.get("species", "All")
     duration_min = request.form.get("duration_min") or 60

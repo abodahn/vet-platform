@@ -833,7 +833,12 @@ def pet_edit(pet_id):
 @crm_bp.route("/pets/<int:pet_id>/history.pdf")
 @login_required
 def pet_history_pdf(pet_id):
-    from fpdf import FPDF
+    # The Arabic-safe subclass, not the bare FPDF: core Helvetica carries no
+    # Arabic glyphs, so `pdf.cell(0, 8, f"Patient: {pet['pet_name']}")` raised
+    # FPDFUnicodeEncodingException — a 500 — for every Arabic-named patient.
+    # _ArabicFPDF redirects the font and reshapes the text at the boundary, so
+    # every cell() below is covered without touching any of them.
+    from models.pdf_generator import _ArabicFPDF as FPDF
 
     pet = db.get_pet(pet_id)
     if not pet:
@@ -843,8 +848,19 @@ def pet_history_pdf(pet_id):
     owner = db.get_owner(pet["owner_id"])
     conn  = get_db()
 
+    # `diagnosis` and `treatment` are NOT columns on visits — they live in
+    # diagnoses and treatment_plans. Without these two subqueries v.get()
+    # returned None for both and the "Medical History Report" has never
+    # carried a diagnosis or a treatment plan on any patient.
+    # ponytail: first diagnosis per visit; a visit with several would need
+    # an aggregate, and GROUP_CONCAT/STRING_AGG is not portable across both
+    # engines. One per visit is what the visit form writes.
     visits = [dict(r) for r in conn.execute("""
-        SELECT v.*, COUNT(pi.id) rx_items
+        SELECT v.*, COUNT(pi.id) rx_items,
+               (SELECT d.diagnosis FROM diagnoses d
+                 WHERE d.visit_id = v.id ORDER BY d.id LIMIT 1)   AS diagnosis,
+               (SELECT tp.plan_text FROM treatment_plans tp
+                 WHERE tp.visit_id = v.id ORDER BY tp.id DESC LIMIT 1) AS treatment
         FROM visits v
         LEFT JOIN prescriptions pr ON pr.visit_id=v.id
         LEFT JOIN prescription_items pi ON pi.prescription_id=pr.id
