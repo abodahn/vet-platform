@@ -144,6 +144,7 @@ def dispense(rx_id):
 
     errors = []
     dispensed_any = False
+    _today = date.today().isoformat()
 
     with conn:
         for item in items:
@@ -169,15 +170,24 @@ def dispense(rx_id):
                 if not batch:
                     errors.append(f"Invalid batch for {item['medication_name']}")
                     continue
+                if batch["expiry_date"] and str(batch["expiry_date"])[:10] < _today:
+                    errors.append(
+                        f"Batch {batch['batch_number']} of {item['medication_name']} "
+                        f"expired on {str(batch['expiry_date'])[:10]} — cannot dispense")
+                    continue
                 if batch["quantity"] < qty_dispense:
                     errors.append(f"Insufficient stock in selected batch for {item['medication_name']} (have {batch['quantity']}, need {qty_dispense})")
                     continue
                 use_batch_id = int(batch_id)
             else:
-                # FEFO: pick oldest expiry batch with enough stock
+                # FEFO: nearest expiry first — but never a batch already past it.
+                # Ordering by expiry ASC alone put expired stock at the FRONT of
+                # the queue, so the oldest, worst box was the one handed over.
                 fefo = conn.execute(
-                    "SELECT * FROM batches WHERE item_id=? AND quantity>=? ORDER BY expiry_date ASC LIMIT 1",
-                    (item_id, qty_dispense)).fetchone()
+                    "SELECT * FROM batches WHERE item_id=? AND quantity>=? "
+                    "AND (expiry_date IS NULL OR expiry_date >= ?) "
+                    "ORDER BY expiry_date ASC LIMIT 1",
+                    (item_id, qty_dispense, _today)).fetchone()
                 if not fefo:
                     errors.append(f"Insufficient stock for {item['medication_name']}")
                     continue

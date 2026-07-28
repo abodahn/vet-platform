@@ -176,8 +176,11 @@ def visit_detail(visit_id):
         flash("Visit not found.", "error")
         return redirect(url_for("visits.visits_list"))
 
+    # The column is `diagnosis`; both templates read `diagnosis_text`, so
+    # without this alias every diagnosis rendered as an empty line.
     diagnoses = conn.execute(
-        "SELECT * FROM diagnoses WHERE visit_id=? ORDER BY created_at",
+        "SELECT *, diagnosis AS diagnosis_text FROM diagnoses WHERE visit_id=? "
+        "ORDER BY created_at",
         (visit_id,),
     ).fetchall()
 
@@ -264,17 +267,23 @@ def save_treatment(visit_id):
     ).fetchone()
 
     if existing:
+        # treatment_plans has no updated_at column — naming it here made every
+        # edit of a plan raise instead of saving.
         conn.execute(
             """UPDATE treatment_plans SET plan_text=?, goals=?, duration=?,
-               followup_in=?, followup_unit=?, updated_at=datetime('now') WHERE visit_id=?""",
+               followup_in=?, followup_unit=? WHERE visit_id=?""",
             (plan_text, goals, duration, followup_in, followup_unit, visit_id),
         )
     else:
+        # pet_id is NOT NULL. Taken from the visit the same way add_diagnosis
+        # does it, so the plan cannot be filed under a different animal.
         conn.execute(
-            """INSERT INTO treatment_plans(visit_id, plan_text, goals, duration,
+            """INSERT INTO treatment_plans(visit_id, pet_id, plan_text, goals, duration,
                followup_in, followup_unit, created_by, created_at)
-               VALUES(?,?,?,?,?,?,?,datetime('now'))""",
-            (visit_id, plan_text, goals, duration, followup_in, followup_unit, user.get("id")),
+               SELECT ?, pet_id, ?, ?, ?, ?, ?, ?, datetime('now')
+               FROM visits WHERE id=?""",
+            (visit_id, plan_text, goals, duration, followup_in, followup_unit,
+             user.get("id"), visit_id),
         )
 
     conn.commit()
@@ -291,10 +300,23 @@ def add_prescription(visit_id):
 
     rx_notes = request.form.get("rx_notes", "")
 
+    # A prescription carries pet_id and owner_id (both NOT NULL): the pharmacy
+    # queue, the dispensing log and the narcotics register all join on them, so
+    # one without them is invisible to the pharmacist who has to fill it.
+    # There is no `created_by` column here — the prescriber is `prescribed_by`.
+    visit = conn.execute(
+        "SELECT pet_id, owner_id FROM visits WHERE id=?", (visit_id,)).fetchone()
+    if not visit:
+        conn.close()
+        flash("Visit not found.", "error")
+        return redirect(url_for("visits.visits_list"))
+
     cur = conn.execute(
-        """INSERT INTO prescriptions(visit_id, notes, created_by, created_at)
-           VALUES(?,?,?,datetime('now'))""",
-        (visit_id, rx_notes, user.get("id")),
+        """INSERT INTO prescriptions(visit_id, pet_id, owner_id, prescribed_by,
+           status, notes, created_at)
+           VALUES(?,?,?,?,'Active',?,datetime('now'))""",
+        (visit_id, visit["pet_id"], visit["owner_id"],
+         user.get("full_name") or user.get("username", ""), rx_notes),
     )
     rx_id = cur.lastrowid
 
@@ -521,7 +543,8 @@ def visit_print(visit_id):
         return redirect(url_for("visits.visits_list"))
 
     diagnoses = conn.execute(
-        "SELECT * FROM diagnoses WHERE visit_id=? ORDER BY created_at", (visit_id,)
+        "SELECT *, diagnosis AS diagnosis_text FROM diagnoses WHERE visit_id=? "
+        "ORDER BY created_at", (visit_id,)
     ).fetchall()
 
     treatment = conn.execute(
