@@ -111,7 +111,29 @@
       </div>
       <div class="meta-row">
         <span class="meta-label">{{ t('Customer', 'العميل') }}</span>
-        <span class="meta-value">{{ order.owner_name or 'Walk-in' }}</span>
+        <span class="meta-value">
+          {% if order.owner_id %}
+            <a href="{{ url_for('crm.owner_detail', owner_id=order.owner_id) }}">{{ order.owner_name }}</a>
+          {% else %}
+            {{ t('Walk-in', 'عميل عابر') }}
+          {% endif %}
+        </span>
+      </div>
+      {% if order.pet_id and order.pet_name %}
+      <div class="meta-row">
+        <span class="meta-label">{{ t('Pet', 'الحيوان') }}</span>
+        <span class="meta-value"><a href="{{ url_for('crm.pet_detail', pet_id=order.pet_id) }}">{{ order.pet_name }}</a></span>
+      </div>
+      {% endif %}
+      <div class="meta-row">
+        <span class="meta-label">{{ t('Invoice', 'الفاتورة') }}</span>
+        <span class="meta-value">
+          {% if order.invoice_id %}
+            <a href="{{ url_for('finance.invoice_detail', inv_id=order.invoice_id) }}">🧾 #{{ order.invoice_id }}</a>
+          {% else %}
+            <span style="color:var(--cl-text-muted)">{{ t('Not invoiced', 'بدون فاتورة') }}</span>
+          {% endif %}
+        </span>
       </div>
       <div class="meta-row">
         <span class="meta-label">{{ t('Payment', 'الدفع') }}</span>

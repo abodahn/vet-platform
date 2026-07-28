@@ -42,8 +42,15 @@
       <tr>
         <td>{{ b.id }}</td>
         <td style="white-space:nowrap">{{ (b.booking_date or '')[:16] }}</td>
-        <td><strong>{{ b.pet_name }}</strong><br><small style="color:var(--pf-muted)">{{ b.species }}</small></td>
-        <td>{{ b.owner_name }}<br><small style="color:var(--pf-muted)">{{ b.phone }}</small></td>
+        <td>
+          <a href="{{ url_for('crm.pet_detail', pet_id=b.pet_id) }}"
+             title="{{ t('Open medical record', 'فتح السجل الطبي') }}"><strong>{{ b.pet_name }}</strong></a>
+          <br><small style="color:var(--pf-muted)">{{ b.species }}</small>
+        </td>
+        <td>
+          <a href="{{ url_for('crm.owner_detail', owner_id=b.owner_id) }}">{{ b.owner_name }}</a>
+          <br><small style="color:var(--pf-muted)">{{ b.phone }}</small>
+        </td>
         <td>{{ b.service_name or '—' }}</td>
         <td>{{ b.groomer_name or '—' }}</td>
         <td>{{ b.duration_min or '—' }}{% if b.duration_min %} min{% endif %}</td>

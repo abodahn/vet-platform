@@ -52,6 +52,7 @@
           <th style="text-align:right">Tax %</th>
           <th style="text-align:right">{{ t('Duration', 'المدة') }}</th>
           <th>{{ t('Status', 'الحالة') }}</th>
+          <th>{{ t('Billed On', 'مستخدمة في') }}</th>
           {% if is_manager %}<th>{{ t('Actions', 'إجراءات') }}</th>{% endif %}
         </tr>
       </thead>
@@ -73,6 +74,18 @@
               {{ 'Active' if s.is_active else 'Inactive' }}
             </span>
           </td>
+          <td style="white-space:nowrap">
+            {% set used = usage.get(s.name) %}
+            {% if used %}
+              <a href="{{ url_for('finance.invoice_detail', inv_id=used[1]) }}"
+                 title="{{ t('Open the most recent invoice using this service',
+                             'فتح أحدث فاتورة استُخدمت فيها هذه الخدمة') }}">
+                {{ used[0] }} {{ t('invoice line(s) →', 'بند فاتورة ←') }}
+              </a>
+            {% else %}
+              <span style="color:var(--cl-text-light)">{{ t('Never billed', 'لم تُستخدم بعد') }}</span>
+            {% endif %}
+          </td>
           {% if is_manager %}
           <td style="white-space:nowrap">
             <button class="pf-btn pf-btn-sm pf-btn-secondary"
@@ -88,7 +101,7 @@
           {% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="9" class="pf-empty">No services found.</td></tr>
+        <tr><td colspan="10" class="pf-empty">No services found.</td></tr>
         {% endfor %}
       </tbody>
     </table>

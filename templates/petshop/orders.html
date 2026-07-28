@@ -71,7 +71,13 @@
         <td style="color:var(--cl-text-muted);white-space:nowrap">
           {{ o.created_at[:16].replace('T',' ') if o.created_at else '—' }}
         </td>
-        <td style="font-weight:600">{{ o.owner_name or 'Walk-in' }}</td>
+        <td style="font-weight:600">
+          {% if o.owner_id %}
+            <a href="{{ url_for('crm.owner_detail', owner_id=o.owner_id) }}">{{ o.owner_name }}</a>
+          {% else %}
+            <span style="color:var(--cl-text-muted)">{{ t('Walk-in', 'عميل عابر') }}</span>
+          {% endif %}
+        </td>
         <td style="color:var(--cl-text-muted)">{{ o.item_count or '—' }}</td>
         <td><span class="pay-badge">{{ (o.payment_method or 'cash')|capitalize }}</span></td>
         <td style="font-weight:800;color:var(--cl-primary)">{{ "{:,.2f}".format(o.total) }} EGP</td>

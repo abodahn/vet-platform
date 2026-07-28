@@ -110,8 +110,10 @@
     <div class="pf-card" style="margin-bottom:1rem">
       <div class="pf-card-header"><h3 class="pf-card-title">{{ t('Owner', 'المالك') }}</h3></div>
       <div style="padding:1rem">
-        <div style="font-weight:700;margin-bottom:4px">{{ ts.owner_name }}</div>
-        {% if ts.phone %}<div style="font-size:.85rem;color:var(--cl-muted)">📞 {{ ts.phone }}</div>{% endif %}
+        <div style="font-weight:700;margin-bottom:4px">
+          <a href="{{ url_for('crm.owner_detail', owner_id=ts.owner_id) }}">{{ ts.owner_name }}</a>
+        </div>
+        {% if ts.phone %}<div style="font-size:.85rem;color:var(--cl-muted)">📞 <a href="tel:{{ ts.phone }}">{{ ts.phone }}</a></div>{% endif %}
         {% if ts.whatsapp_phone %}<div style="font-size:.85rem;color:#25d366">📱 {{ ts.whatsapp_phone }}</div>{% endif %}
         {% if ts.email %}<div style="font-size:.85rem;color:var(--cl-muted)">✉ {{ ts.email }}</div>{% endif %}
       </div>
@@ -121,8 +123,13 @@
     <div class="pf-card" style="margin-bottom:1rem">
       <div class="pf-card-header"><h3 class="pf-card-title">{{ t('Patient', 'المريض') }}</h3></div>
       <div style="padding:1rem">
-        <div style="font-weight:700">{{ ts.pet_name }}</div>
+        <div style="font-weight:700">
+          <a href="{{ url_for('crm.pet_detail', pet_id=ts.pet_id) }}">{{ ts.pet_name }}</a>
+        </div>
         <div style="font-size:.85rem;color:var(--cl-muted)">{{ ts.species or '' }}{% if ts.breed %} · {{ ts.breed }}{% endif %}</div>
+        <div style="margin-top:8px;font-size:.82rem">
+          <a href="{{ url_for('crm.pet_detail', pet_id=ts.pet_id) }}">{{ t('Medical record & visits →', 'السجل الطبي والزيارات ←') }}</a>
+        </div>
       </div>
     </div>
     {% endif %}

@@ -525,8 +525,11 @@ def order_detail(oid):
     ensure_petshop_tables()
     conn = _get_db()
     order = conn.execute(
-        "SELECT o.*, ow.full_name as owner_name, ow.phone as owner_phone "
-        "FROM ps_orders o LEFT JOIN owners ow ON o.owner_id=ow.id WHERE o.id=?", (oid,)
+        "SELECT o.*, ow.full_name as owner_name, ow.phone as owner_phone, pt.pet_name "
+        "FROM ps_orders o "
+        "LEFT JOIN owners ow ON o.owner_id=ow.id "
+        "LEFT JOIN pets pt ON pt.id=o.pet_id "
+        "WHERE o.id=?", (oid,)
     ).fetchone()
     if not order:
         conn.close()

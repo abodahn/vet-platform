@@ -53,8 +53,8 @@
       </div>
       {% if is_occupied and r.pet_name %}
       <div style="border-top:1px solid {% if is_occupied %}#fcd34d{% else %}#86efac{% endif %};padding-top:.5rem;margin-top:.5rem;font-size:.83rem">
-        <div style="font-weight:600">🐾 {{ r.pet_name }}</div>
-        <div style="color:var(--pf-muted)">{{ r.owner_name }}</div>
+        <div style="font-weight:600">🐾 <a href="{{ url_for('crm.pet_detail', pet_id=r.pet_id) }}">{{ r.pet_name }}</a></div>
+        <div style="color:var(--pf-muted)"><a href="{{ url_for('crm.owner_detail', owner_id=r.owner_id) }}">{{ r.owner_name }}</a></div>
         <div style="color:var(--pf-muted);font-size:.78rem;margin-top:.2rem">
           In: {{ (r.checkin_date or '')[:10] }}<br>
           Out: {{ (r.expected_checkout or '')[:10] }}

@@ -22,6 +22,22 @@ def index():
         q = search.lower()
         services = [s for s in services if q in s["name"].lower() or q in (s.get("code") or "").lower()]
 
+    # Where each service is actually used: invoice lines carry the service NAME,
+    # not its id — service_catalog has no foreign key pointing at it from
+    # anywhere. Match on description, which is exactly what create_invoice
+    # writes. One grouped query, not one per row.
+    # ponytail: MAX(invoice_id) stands in for "latest" — ids are monotonic here.
+    #           Needs an ORDER BY issue_date join only if invoices ever backfill.
+    conn = db.get_db()
+    usage = {
+        r["description"]: (r["uses"], r["last_invoice_id"])
+        for r in conn.execute(
+            "SELECT description, COUNT(*) AS uses, MAX(invoice_id) AS last_invoice_id "
+            "FROM invoice_lines GROUP BY description"
+        ).fetchall()
+    }
+    conn.close()
+
     categories = db.service_categories() or [
         "Consultation","Vaccination","Laboratory","Surgery",
         "Grooming","Boarding","Treatment","Hospitalization"
@@ -34,6 +50,7 @@ def index():
         selected_cat=category,
         search=search,
         show_all=show_all,
+        usage=usage,
         is_manager=_is_manager(),
     )
 

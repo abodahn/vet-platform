@@ -74,7 +74,7 @@ def bookings_list():
 
     query = """
         SELECT gb.id, gb.status, gb.groomer_name, gb.booking_date, gb.notes,
-               gb.invoice_id,
+               gb.invoice_id, gb.pet_id, gb.owner_id,
                p.pet_name, p.species,
                o.full_name AS owner_name, o.phone,
                gs.name AS service_name, gs.duration_min, gs.price

@@ -16,13 +16,18 @@
       <div>
         <label class="pf-label">{{ t('Owner', 'المالك') }}</label>
         <div class="pf-input" style="background:var(--pf-bg-alt,#f8fafc);cursor:default">
-          {{ booking.owner_name }} &nbsp;<small style="color:var(--pf-muted)">{{ booking.phone }}</small>
+          <a href="{{ url_for('crm.owner_detail', owner_id=booking.owner_id) }}">{{ booking.owner_name }}</a>
+          &nbsp;
+          {% if booking.phone %}
+          <small><a href="tel:{{ booking.phone }}" title="{{ t('Call the owner', 'الاتصال بالمالك') }}">{{ booking.phone }}</a></small>
+          {% endif %}
         </div>
       </div>
       <div>
         <label class="pf-label">{{ t('Pet', 'الحيوان') }}</label>
         <div class="pf-input" style="background:var(--pf-bg-alt,#f8fafc);cursor:default">
-          <strong>{{ booking.pet_name }}</strong> &nbsp;<small style="color:var(--pf-muted)">{{ booking.species }}</small>
+          <a href="{{ url_for('crm.pet_detail', pet_id=booking.pet_id) }}"><strong>{{ booking.pet_name }}</strong></a>
+          &nbsp;<small style="color:var(--pf-muted)">{{ booking.species }}</small>
         </div>
       </div>
     </div>
@@ -43,6 +48,9 @@
           </option>
           {% endfor %}
         </select>
+        {% if booking.room_id %}
+        <small><a href="{{ url_for('boarding.rooms_list') }}#room-{{ booking.room_id }}">{{ t('Room details →', 'تفاصيل الغرفة ←') }}</a></small>
+        {% endif %}
       </div>
       <div>
         <label class="pf-label">{{ t('Status', 'الحالة') }}</label>

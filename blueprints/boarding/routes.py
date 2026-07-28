@@ -17,6 +17,7 @@ def dashboard():
                   br.price_per_night AS daily_rate, br.is_active,
                   bb.id AS booking_id, bb.status AS booking_status,
                   bb.check_in AS checkin_date, bb.check_out AS expected_checkout,
+                  bb.pet_id, bb.owner_id,
                   p.pet_name, o.full_name AS owner_name
            FROM boarding_rooms br
            LEFT JOIN boarding_bookings bb ON bb.id = (
@@ -66,6 +67,7 @@ def bookings_list():
 
     query = """
         SELECT bb.id, bb.status, bb.invoice_id,
+               bb.pet_id, bb.owner_id, bb.room_id,
                bb.check_in            AS checkin_date,
                bb.check_out           AS expected_checkout,
                bb.actual_checkout,
