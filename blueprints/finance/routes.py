@@ -756,9 +756,13 @@ def reports_export_xlsx():
     try:
         conn = db.get_db()
         inv_rows = conn.execute(
+            # invoices has no total_amount/net_amount — the gross figure is
+            # subtotal and the net is total. Naming the non-existent columns
+            # raised, and the except below turned every export into a silent
+            # redirect back to the report page.
             """SELECT i.invoice_number, i.issue_date, o.full_name AS owner,
-                      i.total_amount, i.discount_amount, i.tax_amount,
-                      i.net_amount, i.status
+                      i.subtotal AS total_amount, i.discount_amount, i.tax_amount,
+                      i.total AS net_amount, i.status
                FROM invoices i
                LEFT JOIN owners o ON o.id = i.owner_id
                WHERE i.issue_date BETWEEN ? AND ?

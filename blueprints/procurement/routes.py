@@ -324,6 +324,14 @@ def order_receive(order_id):
         flash("Purchase order not found.", "error")
         return redirect(url_for("procurement.orders_list"))
 
+    # Receiving is not idempotent — it inserts a batch and an "in" movement per
+    # line. A second POST (double-click, browser resend) silently doubled the
+    # stock on hand with no trace that it was the same delivery.
+    if po["status"] == "Received":
+        conn.close()
+        flash(f"Purchase Order #{order_id} was already received.", "warning")
+        return redirect(url_for("procurement.order_detail", order_id=order_id))
+
     conn.execute("UPDATE purchase_orders SET status='Received', received_date=date('now') WHERE id=?",
                  (order_id,))
     # Add stock movements for each line

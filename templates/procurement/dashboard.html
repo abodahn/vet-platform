@@ -67,7 +67,8 @@
           <td>{{ po['supplier_name'] or '—' }}</td>
           <td>{{ po['order_date'] or '—' }}</td>
           <td>{{ po['item_count'] }}</td>
-          <td>{{ "%.2f"|format(po['total_amount'] or 0) }}</td>
+          {# purchase_orders.total — total_amount does not exist and renders 0.00. #}
+          <td>{{ "%.2f"|format(po['total'] or 0) }}</td>
           <td>
             {% if po['status'] == 'Received' %}
               <span class="pf-badge success">{{ t('Received', 'مستلم') }}</span>

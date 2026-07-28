@@ -581,16 +581,21 @@ def transfer():
                                  (qty, existing["id"]))
                     dest_batch_id = existing["id"]
                 else:
-                    conn.execute("""
+                    # Three defects lived in this one statement, so the branch
+                    # had never executed: batch is a sqlite3.Row (no .get), the
+                    # column is received_at not received_date, and lastval() is
+                    # PostgreSQL-only. Every transfer to a warehouse that did
+                    # not already hold the batch rolled back with a flash and
+                    # moved nothing.
+                    dest_batch_id = conn.execute("""
                         INSERT INTO batches
                             (item_id, warehouse_id, batch_number, expiry_date,
-                             quantity, unit_cost, received_date)
+                             quantity, unit_cost, received_at)
                         VALUES (?,?,?,?,?,?,?)
                     """, (item_id, to_wh_id,
                           batch["batch_number"], batch["expiry_date"],
-                          qty, batch.get("unit_cost", 0),
-                          date.today().isoformat()))
-                    dest_batch_id = conn.execute("SELECT lastval()").fetchone()[0]
+                          qty, batch["unit_cost"] or 0,
+                          date.today().isoformat())).lastrowid
 
                 # Record movement (out)
                 conn.execute("""

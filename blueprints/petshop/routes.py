@@ -111,6 +111,11 @@ def ensure_petshop_tables():
             created_at  TEXT DEFAULT (datetime('now'))
         );
         """)
+        # CREATE TABLE IF NOT EXISTS never migrates. Any database whose
+        # ps_orders predates the finance bridge has no invoice_id, so every POS
+        # sale failed to link its invoice (inside a warning-only except) and
+        # order_cancel could not reverse it. Idempotent top-up.
+        db._try_stmt(conn, "ALTER TABLE ps_orders ADD COLUMN invoice_id INTEGER")
     conn.close()
 
 
@@ -120,6 +125,40 @@ def _next_order_number():
     conn.close()
     next_id = (row[0] or 0) + 1
     return f"PS-{datetime.utcnow().strftime('%Y%m')}-{next_id:04d}"
+
+
+_WALK_IN_NAME = "Walk-in Customer"
+
+
+def _walk_in_owner_id():
+    """The owner a counter sale is billed to when there is no customer record.
+
+    invoices.owner_id is NOT NULL, so a walk-in sale used to raise inside the
+    finance bridge, get swallowed by its own `except`, and never reach the
+    books — the order and the stock movement existed, the revenue did not.
+    One shared row, created on first use.
+    """
+    conn = _get_db()
+    row = conn.execute(
+        "SELECT id FROM owners WHERE full_name=? ORDER BY id LIMIT 1",
+        (_WALK_IN_NAME,)
+    ).fetchone()
+    if row:
+        conn.close()
+        return row[0]
+    with conn:
+        oid = conn.execute(
+            "INSERT INTO owners(full_name, notes) VALUES(?,?)",
+            (_WALK_IN_NAME, "Auto-created for pet shop counter sales")
+        ).lastrowid
+    conn.close()
+    return oid
+
+
+def _line_net(item):
+    """One order line after its own discount, before tax."""
+    return (float(item["qty"]) * float(item["unit_price"])
+            * (1 - float(item.get("discount", 0)) / 100))
 
 
 def _deduct_stock(product_id, qty, ref_type, ref_id, username):
@@ -426,8 +465,11 @@ def order_create():
         # (measured). Currently masked only because tax rates are all 0% —
         # it would surface the day pet-shop VAT is switched on.
         # ponytail: real fix is NUMERIC(12,2) end to end — see docs/MONEY_PRECISION.md
-        subtotal = round(sum(float(i["qty"]) * float(i["unit_price"]) for i in items), 2)
-        tax_amt  = round(sum(float(i["qty"]) * float(i["unit_price"]) * float(i.get("tax_rate",0))/100 for i in items), 2)
+        # Charge what the lines say. Summing qty*price ignored every per-line
+        # discount, so the till took full price on a discounted line while the
+        # printed line — and the invoice built from it — showed the discount.
+        subtotal = round(sum(_line_net(i) for i in items), 2)
+        tax_amt  = round(sum(_line_net(i) * float(i.get("tax_rate",0))/100 for i in items), 2)
         total    = round(subtotal - discount_g + tax_amt, 2)
         change   = round(max(0, paid_amt - total), 2)
 
@@ -449,7 +491,7 @@ def order_create():
                 price  = float(item["unit_price"])
                 disc   = float(item.get("discount", 0))
                 trate  = float(item.get("tax_rate", 0))
-                ltotal = qty * price * (1 - disc/100)
+                ltotal = round(qty * price * (1 - disc/100), 2)
                 conn.execute(
                     """INSERT INTO ps_order_items(order_id,product_id,product_name,qty,unit_price,discount,tax_rate,line_total)
                        VALUES(?,?,?,?,?,?,?,?)""",
@@ -468,8 +510,9 @@ def order_create():
         inv_id = None
         try:
             from datetime import date as _date
+            bill_to = owner_id or _walk_in_owner_id()
             inv_data = {
-                "owner_id":   owner_id,
+                "owner_id":   bill_to,
                 "pet_id":     pet_id,
                 "issue_date": _date.today().isoformat(),
                 "notes":      f"Pet Shop Order {order_num}",
@@ -495,7 +538,7 @@ def order_create():
             if paid_amt > 0 and inv_id:
                 db.add_payment(
                     invoice_id=inv_id,
-                    owner_id=owner_id or 0,
+                    owner_id=bill_to,
                     amount=min(paid_amt, total),
                     method=pay_method,
                     reference=pay_ref or order_num,
@@ -550,8 +593,17 @@ def order_cancel(oid):
     order = conn.execute("SELECT * FROM ps_orders WHERE id=?", (oid,)).fetchone()
     if order and order["status"] not in ("cancelled", "refunded"):
         items = conn.execute("SELECT * FROM ps_order_items WHERE order_id=?", (oid,)).fetchall()
+        # ps_orders predates invoice_id in some databases; ensure_petshop_tables
+        # creates but never migrates, so ask the row what it has.
+        inv_id = order["invoice_id"] if "invoice_id" in order.keys() else None
         with conn:
             conn.execute("UPDATE ps_orders SET status='cancelled',updated_at=? WHERE id=?", (_now(), oid))
+            # Reverse the books too. Restoring the stock while leaving the
+            # invoice 'Paid' left cancelled sales counted as revenue.
+            if inv_id:
+                conn.execute(
+                    "UPDATE invoices SET status='Cancelled',updated_at=datetime('now')"
+                    " WHERE id=?", (inv_id,))
             for item in items:
                 conn.execute("UPDATE ps_products SET stock_qty=stock_qty+? WHERE id=?",
                              (item["qty"], item["product_id"]))
