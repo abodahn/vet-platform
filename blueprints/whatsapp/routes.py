@@ -3,6 +3,7 @@ WhatsApp Control Center — full Wapilot v2 integration.
 All API calls proxy through the backend so the token stays server-side.
 """
 import json
+import os
 from datetime import datetime
 from flask import (
     render_template, request, redirect, url_for,
@@ -16,15 +17,34 @@ import models.database as db
 
 # ── Wapilot client factory ────────────────────────────────────────
 
+class WapilotNotConfigured(RuntimeError):
+    """Raised when no Wapilot token / instance ID has been configured."""
+
+
+@whatsapp_bp.errorhandler(WapilotNotConfigured)
+def _handle_unconfigured(err):
+    if "/api/" in request.path or request.is_json:
+        return jsonify({"ok": False, "data": {}, "error": str(err)}), 503
+    flash(str(err), "danger")
+    return redirect(url_for("whatsapp.wa_settings"))
+
+
 def _client() -> WapilotClient:
-    """Build a WapilotClient using credentials from the settings table."""
+    """Build a WapilotClient from the settings table, falling back to env vars."""
     conn = db.get_db()
     rows = {r["key"]: r["value"] for r in conn.execute(
         "SELECT key, value FROM settings WHERE category='wapilot'"
     ).fetchall()}
     conn.close()
-    token = rows.get("wapilot_token", "iWmctH6vcBx1RIItK9ucdO94Kv4vHfu6NYTz651yXR")
-    iid   = rows.get("wapilot_instance_id", "instance4042")
+    token = (rows.get("wapilot_token") or os.environ.get("WAPILOT_TOKEN", "")).strip()
+    iid   = (rows.get("wapilot_instance_id")
+             or os.environ.get("WAPILOT_INSTANCE", "")).strip()
+    if not token or not iid:
+        raise WapilotNotConfigured(
+            "WhatsApp is not configured. Set the Wapilot API token and instance ID "
+            "under WhatsApp → Settings, or via the WAPILOT_TOKEN / WAPILOT_INSTANCE "
+            "environment variables."
+        )
     return WapilotClient(token=token, instance_id=iid)
 
 
@@ -737,10 +757,6 @@ def wa_settings():
     ).fetchall()}
     conn.close()
     # Inject defaults
-    defaults = {"wapilot_token": "iWmctH6vcBx1RIItK9ucdO94Kv4vHfu6NYTz651yXR",
-                "wapilot_instance_id": "instance4042"}
-    for k, v in defaults.items():
-        rows.setdefault(k, v)
     for key, default, _lbl, _desc in REMINDER_KEYS:
         rows.setdefault(key, default)
 

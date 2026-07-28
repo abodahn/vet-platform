@@ -1,0 +1,2172 @@
+{
+ "generated": "2026-07-28",
+ "exercised": 117,
+ "total": 376,
+ "untested_by_module": {
+  "ai_assistant": [
+   {
+    "endpoint": "ai_assistant.analyze_photo",
+    "rule": "/ai/analyze-photo",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "ai_assistant.clear",
+    "rule": "/ai/clear",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "ai_assistant.context_visit",
+    "rule": "/ai/context/visit/<int:visit_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "ai_assistant.discharge_instructions",
+    "rule": "/ai/discharge-instructions/<int:visit_id>",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "ai_assistant.draft_message",
+    "rule": "/ai/draft-message",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "ai_assistant.drug_interactions",
+    "rule": "/ai/drug-interactions",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "ai_assistant.history",
+    "rule": "/ai/history",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "ai_assistant.insights",
+    "rule": "/ai/insights",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "ai_assistant.nl_report",
+    "rule": "/ai/nl-report",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "ai_assistant.outbreak_radar",
+    "rule": "/ai/outbreak-radar",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "ai_assistant.pet_summary",
+    "rule": "/ai/pet-summary/<int:pet_id>",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "appointments": [
+   {
+    "endpoint": "appointments.api_pets",
+    "rule": "/appointments/api/pets",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "appointments.api_risk_score",
+    "rule": "/appointments/api/risk-score/<int:owner_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "appointments.api_slots",
+    "rule": "/appointments/api/slots",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "appointments.appt_edit",
+    "rule": "/appointments/<int:appt_id>/edit",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "appointments.reception",
+    "rule": "/appointments/reception",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "attendance": [
+   {
+    "endpoint": "attendance.api_today",
+    "rule": "/attendance/api/today",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "attendance.balance_set",
+    "rule": "/attendance/balances/set",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "attendance.balances",
+    "rule": "/attendance/balances",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "attendance.checkin",
+    "rule": "/attendance/checkin",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "attendance.export_xlsx",
+    "rule": "/attendance/export/xlsx",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "attendance.holiday_delete",
+    "rule": "/attendance/holidays/<int:hid>/delete",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "attendance.holiday_save",
+    "rule": "/attendance/holidays/save",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "attendance.holidays",
+    "rule": "/attendance/holidays",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "attendance.leave_approve",
+    "rule": "/attendance/leaves/<int:req_id>/approve",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "attendance.leave_detail",
+    "rule": "/attendance/leaves/<int:req_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "attendance.leave_new",
+    "rule": "/attendance/leaves/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "attendance.leave_reject",
+    "rule": "/attendance/leaves/<int:req_id>/reject",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "attendance.leave_type_save",
+    "rule": "/attendance/leave-types/save",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "attendance.leave_types",
+    "rule": "/attendance/leave-types",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "attendance.leaves_list",
+    "rule": "/attendance/leaves",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "attendance.record_edit",
+    "rule": "/attendance/records/edit/<int:rec_id>",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "attendance.shift_save",
+    "rule": "/attendance/shifts/save",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "attendance.shifts_list",
+    "rule": "/attendance/shifts",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "boarding": [
+   {
+    "endpoint": "boarding.booking_cancel",
+    "rule": "/boarding/bookings/<int:booking_id>/cancel",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "boarding.booking_edit_form",
+    "rule": "/boarding/bookings/<int:booking_id>/edit",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "boarding.booking_edit_submit",
+    "rule": "/boarding/bookings/<int:booking_id>/edit",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "boarding.booking_invoice",
+    "rule": "/boarding/bookings/<int:booking_id>/invoice",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "boarding.booking_new_form",
+    "rule": "/boarding/bookings/new",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "boarding.booking_new_submit",
+    "rule": "/boarding/bookings/new",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "boarding.checkin",
+    "rule": "/boarding/bookings/<int:booking_id>/checkin",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "boarding.checkout",
+    "rule": "/boarding/bookings/<int:booking_id>/checkout",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "boarding.room_new",
+    "rule": "/boarding/rooms/new",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "catalog": [
+   {
+    "endpoint": "catalog.api_get",
+    "rule": "/catalog/api/get/<int:svc_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "catalog.api_list",
+    "rule": "/catalog/api/list",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "catalog.save",
+    "rule": "/catalog/save",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "catalog.toggle",
+    "rule": "/catalog/<int:svc_id>/toggle",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "clinical": [
+   {
+    "endpoint": "clinical.index",
+    "rule": "/clinical/",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "clinical.lab_new",
+    "rule": "/clinical/lab/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "clinical.lab_results",
+    "rule": "/clinical/lab/<int:lab_id>/results",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "clinical.surgeries",
+    "rule": "/clinical/surgeries",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "clinical.surgery_new",
+    "rule": "/clinical/surgeries/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "clinical.vaccination_certificate",
+    "rule": "/clinical/vaccinations/<int:vacc_id>/certificate",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "clinical.vaccination_new",
+    "rule": "/clinical/vaccinations/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "crm": [
+   {
+    "endpoint": "crm.adjust_points",
+    "rule": "/crm/owners/<int:owner_id>/adjust-points",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "crm.owner_edit",
+    "rule": "/crm/owners/<int:owner_id>/edit",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "crm.owner_pets_json",
+    "rule": "/crm/owners/<int:owner_id>/pets-json",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "crm.pet_edit",
+    "rule": "/crm/pets/<int:pet_id>/edit",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "crm.pet_history_pdf",
+    "rule": "/crm/pets/<int:pet_id>/history.pdf",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "crm.redeem_points",
+    "rule": "/crm/owners/<int:owner_id>/redeem-points",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "doctor": [
+   {
+    "endpoint": "doctor.checkin",
+    "rule": "/doctor/appointment/<int:appt_id>/checkin",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "doctor.quick_visit",
+    "rule": "/doctor/visit/<int:visit_id>/quick",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "finance": [
+   {
+    "endpoint": "finance.expenses_list",
+    "rule": "/finance/expenses",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "finance.invoice_credit_note",
+    "rule": "/finance/invoices/<int:inv_id>/credit-note",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "finance.invoice_whatsapp",
+    "rule": "/finance/invoices/<int:inv_id>/whatsapp",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "finance.reports",
+    "rule": "/finance/reports",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "finance.reports_export_xlsx",
+    "rule": "/finance/reports/export/xlsx",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "grooming": [
+   {
+    "endpoint": "grooming.booking_edit_submit",
+    "rule": "/grooming/bookings/<int:booking_id>/edit",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "grooming.booking_invoice",
+    "rule": "/grooming/bookings/<int:booking_id>/invoice",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "grooming.booking_new_form",
+    "rule": "/grooming/bookings/new",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "grooming.booking_new_submit",
+    "rule": "/grooming/bookings/new",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "grooming.service_new",
+    "rule": "/grooming/services/new",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "grooming.services_list",
+    "rule": "/grooming/services",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "grooming.update_booking_status",
+    "rule": "/grooming/bookings/<int:booking_id>/status",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "hr": [
+   {
+    "endpoint": "hr.acknowledge_warning",
+    "rule": "/hr/staff/<int:user_id>/warnings/<int:warn_id>/acknowledge",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.add_certification",
+    "rule": "/hr/staff/<int:user_id>/certifications/add",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.add_note",
+    "rule": "/hr/staff/<int:user_id>/notes/add",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.add_overtime",
+    "rule": "/hr/staff/<int:user_id>/overtime/add",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.add_warning",
+    "rule": "/hr/staff/<int:user_id>/warnings/add",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.api_headcount",
+    "rule": "/hr/api/headcount",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "hr.approve_overtime",
+    "rule": "/hr/overtime/<int:ot_id>/approve",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.certifications_list",
+    "rule": "/hr/certifications",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "hr.dashboard",
+    "rule": "/hr/dashboard",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "hr.delete_certification",
+    "rule": "/hr/staff/<int:user_id>/certifications/<int:cert_id>/delete",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.delete_note",
+    "rule": "/hr/staff/<int:user_id>/notes/<int:note_id>/delete",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.delete_warning",
+    "rule": "/hr/staff/<int:user_id>/warnings/<int:warn_id>/delete",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.hr_attendance",
+    "rule": "/hr/attendance",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "hr.hr_attendance_add",
+    "rule": "/hr/attendance/add",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.hr_attendance_delete",
+    "rule": "/hr/attendance/<int:rec_id>/delete",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.index",
+    "rule": "/hr/",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "hr.overtime_list",
+    "rule": "/hr/overtime",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "hr.performance_acknowledge",
+    "rule": "/hr/performance/<int:rev_id>/acknowledge",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.performance_detail",
+    "rule": "/hr/performance/<int:rev_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "hr.performance_edit",
+    "rule": "/hr/performance/<int:rev_id>/edit",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.performance_list",
+    "rule": "/hr/performance",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "hr.performance_new",
+    "rule": "/hr/performance/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.reject_overtime",
+    "rule": "/hr/overtime/<int:ot_id>/reject",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.roles_list",
+    "rule": "/hr/roles",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "hr.roster",
+    "rule": "/hr/roster",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "hr.staff_assign_shift",
+    "rule": "/hr/staff/<int:user_id>/assign-shift",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.staff_edit",
+    "rule": "/hr/staff/<int:user_id>/edit",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.staff_new",
+    "rule": "/hr/staff/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "hr.staff_reset_password",
+    "rule": "/hr/staff/<int:user_id>/reset-password",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "imaging": [
+   {
+    "endpoint": "imaging.analyzer_run",
+    "rule": "/imaging/analyzer/analyze",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "imaging.analyzer_save",
+    "rule": "/imaging/analyzer/save",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "imaging.serve_file",
+    "rule": "/imaging/file/<filename>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "imaging.study_detail",
+    "rule": "/imaging/study/<int:study_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "imaging.upload",
+    "rule": "/imaging/upload",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "inpatient": [
+   {
+    "endpoint": "inpatient.add_med",
+    "rule": "/inpatient/<int:stay_id>/med",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "inpatient.add_round",
+    "rule": "/inpatient/<int:stay_id>/round",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "inpatient.admit",
+    "rule": "/inpatient/admit",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "inpatient.api_owner_pets",
+    "rule": "/inpatient/api/owner/<int:owner_id>/pets",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "inpatient.discharge",
+    "rule": "/inpatient/<int:stay_id>/discharge",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "inpatient.stay_detail",
+    "rule": "/inpatient/<int:stay_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "inpatient.update_status",
+    "rule": "/inpatient/<int:stay_id>/status",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "inventory": [
+   {
+    "endpoint": "inventory.batch_new",
+    "rule": "/inventory/batches/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "inventory.item_edit",
+    "rule": "/inventory/items/<int:item_id>/edit",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "inventory.item_new",
+    "rule": "/inventory/items/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "inventory.transfer",
+    "rule": "/inventory/transfer",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "inventory.transfer_batches_json",
+    "rule": "/inventory/transfer/batches-json",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "launcher": [
+   {
+    "endpoint": "launcher.coming_soon",
+    "rule": "/coming-soon",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "launcher.launch_legacy",
+    "rule": "/launcher/legacy/start",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "launcher.legacy_ping",
+    "rule": "/launcher/legacy/ping",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "launcher.open_module",
+    "rule": "/module/<module_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "launcher.stub",
+    "rule": "/module/<module_id>/stub",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "migration": [
+   {
+    "endpoint": "migration.failed_rows",
+    "rule": "/migration/failed-rows.csv",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "notifications": [
+   {
+    "endpoint": "notifications.api_unread",
+    "rule": "/notifications/api/unread",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "notifications.mark_all_read",
+    "rule": "/notifications/mark-all-read",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "notifications.mark_read",
+    "rule": "/notifications/mark-read/<int:notif_id>",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "payroll": [
+   {
+    "endpoint": "payroll.api_attendance_summary",
+    "rule": "/payroll/api/attendance/<int:uid>/<int:year>/<int:month>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "payroll.api_grade",
+    "rule": "/payroll/api/grade/<role>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "payroll.bulk_generate",
+    "rule": "/payroll/bulk-generate",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "payroll.salaries_export_xlsx",
+    "rule": "/payroll/salaries/export/xlsx",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "payroll.salary_approve",
+    "rule": "/payroll/salaries/<int:sid>/approve",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "payroll.salary_edit",
+    "rule": "/payroll/salaries/<int:sid>/edit",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "payroll.salary_grades",
+    "rule": "/payroll/grades",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "payroll.salary_new",
+    "rule": "/payroll/salaries/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "payroll.salary_pay",
+    "rule": "/payroll/salaries/<int:sid>/pay",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "payroll.salary_payslip",
+    "rule": "/payroll/salaries/<int:sid>/payslip",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "petshop": [
+   {
+    "endpoint": "petshop.api_owners",
+    "rule": "/petshop/api/owners/search",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "petshop.api_search",
+    "rule": "/petshop/api/products/search",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "petshop.categories",
+    "rule": "/petshop/categories",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "petshop.order_cancel",
+    "rule": "/petshop/orders/<int:oid>/cancel",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "petshop.order_create",
+    "rule": "/petshop/orders/create",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "petshop.product_edit",
+    "rule": "/petshop/products/<int:pid>/edit",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "petshop.product_new",
+    "rule": "/petshop/products/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "petshop.product_stock",
+    "rule": "/petshop/products/<int:pid>/stock",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "petsy": [
+   {
+    "endpoint": "petsy.embed",
+    "rule": "/petsy/embed",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "petsy.widget_js",
+    "rule": "/petsy/widget.js",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "pharmacy": [
+   {
+    "endpoint": "pharmacy.dispense",
+    "rule": "/pharmacy/dispense/<int:rx_id>",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "pharmacy.history",
+    "rule": "/pharmacy/history",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "pharmacy.narcotics",
+    "rule": "/pharmacy/narcotics",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "procurement": [
+   {
+    "endpoint": "procurement.order_receive",
+    "rule": "/procurement/orders/<int:order_id>/receive",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "procurement.order_update_status",
+    "rule": "/procurement/orders/<int:order_id>/status",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "procurement.orders_list",
+    "rule": "/procurement/orders",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "procurement.supplier_new",
+    "rule": "/procurement/suppliers/new",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "procurement.suppliers_list",
+    "rule": "/procurement/suppliers",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "public_api": [
+   {
+    "endpoint": "public_api.book",
+    "rule": "/api/public/book",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "public_api.contact",
+    "rule": "/api/public/contact",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "public_api.emergency",
+    "rule": "/api/public/emergency",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "public_api.health",
+    "rule": "/api/public/health",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "public_api.options_handler",
+    "rule": "/api/public/<path:p>",
+    "methods": [],
+    "writes": false
+   },
+   {
+    "endpoint": "public_api.services",
+    "rule": "/api/public/services",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "reports": [
+   {
+    "endpoint": "reports.builder",
+    "rule": "/reports/builder",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "reports.builder_delete",
+    "rule": "/reports/builder/saved/<int:rid>/delete",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "reports.builder_run",
+    "rule": "/reports/builder/run",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "reports.builder_save",
+    "rule": "/reports/builder/save",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "reports.builder_saved",
+    "rule": "/reports/builder/saved/<int:rid>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "reports.clinical",
+    "rule": "/reports/clinical",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "reports.doctor_revenue",
+    "rule": "/reports/doctor-revenue",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "reports.export_csv",
+    "rule": "/reports/export/csv",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "reports.financial",
+    "rule": "/reports/financial",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "reports.financial_compare",
+    "rule": "/reports/financial/compare",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "reports.index",
+    "rule": "/reports/",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "reports.inventory_export_xlsx",
+    "rule": "/reports/inventory/export/xlsx",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "reports.inventory_report",
+    "rule": "/reports/inventory",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "settings": [
+   {
+    "endpoint": "settings.set_lang",
+    "rule": "/settings/lang",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "system": [
+   {
+    "endpoint": "system.backup_maintenance_off",
+    "rule": "/system/backup/maintenance/off",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "system.backup_run",
+    "rule": "/system/backup/run",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "system.backup_upload",
+    "rule": "/system/backup/upload",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "system.backup_verify",
+    "rule": "/system/backup/<filename>/verify",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "system.diagnostics",
+    "rule": "/system/diagnostics",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "system.role_assign",
+    "rule": "/system/roles/assign",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "system.role_create",
+    "rule": "/system/roles/create",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "system.role_delete",
+    "rule": "/system/roles/<int:role_id>/delete",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "system.role_edit",
+    "rule": "/system/roles/<int:role_id>/edit",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "system.roles_users_api",
+    "rule": "/system/roles/users",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "system.sync_dashboard",
+    "rule": "/system/sync",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "system.sync_resolve_conflict",
+    "rule": "/system/sync/conflicts/<conflict_id>/resolve",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "telemedicine": [
+   {
+    "endpoint": "telemedicine.api_pets",
+    "rule": "/telemedicine/api/pets/<int:owner_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "telemedicine.cancel_session",
+    "rule": "/telemedicine/<int:sid>/cancel",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "telemedicine.complete_session",
+    "rule": "/telemedicine/<int:sid>/complete",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "telemedicine.share_link",
+    "rule": "/telemedicine/<int:sid>/share",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "telemedicine.start_session",
+    "rule": "/telemedicine/<int:sid>/start",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "uploads": [
+   {
+    "endpoint": "uploads.delete",
+    "rule": "/uploads/delete/<int:att_id>",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "uploads.list_attachments",
+    "rule": "/uploads/list/<entity_type>/<int:entity_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "uploads.serve",
+    "rule": "/uploads/file/<int:att_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "uploads.upload",
+    "rule": "/uploads/upload",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   }
+  ],
+  "visits": [
+   {
+    "endpoint": "visits.add_prescription",
+    "rule": "/visits/<int:visit_id>/prescription",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "visits.save_soap",
+    "rule": "/visits/<int:visit_id>/soap",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "visits.save_treatment",
+    "rule": "/visits/<int:visit_id>/treatment",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "visits.visit_new_form",
+    "rule": "/visits/new",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "visits.visit_print",
+    "rule": "/visits/<int:visit_id>/print",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   }
+  ],
+  "whatsapp": [
+   {
+    "endpoint": "whatsapp.api_campaign_copy",
+    "rule": "/whatsapp/api/campaigns/<cid>/copy",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_campaign_delay",
+    "rule": "/whatsapp/api/campaigns/<cid>/delay",
+    "methods": [
+     "GET",
+     "PATCH"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_campaign_done",
+    "rule": "/whatsapp/api/campaigns/<cid>/done",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_campaign_finish",
+    "rule": "/whatsapp/api/campaigns/<cid>/finish",
+    "methods": [
+     "PATCH"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_campaign_messages",
+    "rule": "/whatsapp/api/campaigns/<cid>/messages",
+    "methods": [
+     "DELETE",
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_campaign_pause",
+    "rule": "/whatsapp/api/campaigns/<cid>/pause",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_campaign_queue",
+    "rule": "/whatsapp/api/campaigns/<cid>/queue",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_campaign_reset_failed",
+    "rule": "/whatsapp/api/campaigns/<cid>/reset-failed",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_campaign_schedule",
+    "rule": "/whatsapp/api/campaigns/<cid>/schedule",
+    "methods": [
+     "DELETE",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_campaign_start",
+    "rule": "/whatsapp/api/campaigns/<cid>/start",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_campaign_stats",
+    "rule": "/whatsapp/api/campaigns/<cid>/stats",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_campaigns",
+    "rule": "/whatsapp/api/campaigns",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_create_campaign",
+    "rule": "/whatsapp/api/campaigns",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_instance_details",
+    "rule": "/whatsapp/api/instance/details",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_instance_status",
+    "rule": "/whatsapp/api/instance/status",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_list_messages",
+    "rule": "/whatsapp/api/messages",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_logout",
+    "rule": "/whatsapp/api/instance/logout",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_lookup_lid",
+    "rule": "/whatsapp/api/lookup/lid/<lid>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_lookup_phone",
+    "rule": "/whatsapp/api/lookup/phone/<phone>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_message_detail",
+    "rule": "/whatsapp/api/messages/<msg_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_qr_code",
+    "rule": "/whatsapp/api/instance/qr",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_queue_settings",
+    "rule": "/whatsapp/api/instance/queue-settings",
+    "methods": [
+     "GET",
+     "PUT"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_restart",
+    "rule": "/whatsapp/api/instance/restart",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_retry_all",
+    "rule": "/whatsapp/api/messages/retry-all",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_retry_message",
+    "rule": "/whatsapp/api/messages/<msg_id>/retry",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_screenshot",
+    "rule": "/whatsapp/api/instance/screenshot",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_send_file",
+    "rule": "/whatsapp/api/send/file",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_send_image",
+    "rule": "/whatsapp/api/send/image",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_send_text",
+    "rule": "/whatsapp/api/send/text",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_send_video",
+    "rule": "/whatsapp/api/send/video",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_start",
+    "rule": "/whatsapp/api/instance/start",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.api_templates",
+    "rule": "/whatsapp/api/templates",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.api_troubleshoot",
+    "rule": "/whatsapp/api/instance/troubleshoot",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.campaign_detail",
+    "rule": "/whatsapp/campaigns/<campaign_id>",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.campaign_new",
+    "rule": "/whatsapp/campaigns/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.campaigns_list",
+    "rule": "/whatsapp/campaigns",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.index",
+    "rule": "/whatsapp/",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.mark_reminder_sent",
+    "rule": "/whatsapp/reminders/<int:rid>/mark-sent",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.message_log",
+    "rule": "/whatsapp/log",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.reminder_admin",
+    "rule": "/whatsapp/reminder-admin",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.reminder_cancel",
+    "rule": "/whatsapp/reminder-admin/reminders/<int:rid>/cancel",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.reminder_create",
+    "rule": "/whatsapp/reminder-admin/reminders/new",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.reminder_send",
+    "rule": "/whatsapp/reminders/<int:rid>/send",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.reminder_send_now",
+    "rule": "/whatsapp/reminder-admin/reminders/<int:rid>/send-now",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.reminder_trigger",
+    "rule": "/whatsapp/reminder-admin/trigger",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.reminders",
+    "rule": "/whatsapp/reminders",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.scheduler",
+    "rule": "/whatsapp/scheduler",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.scheduler_clear_history",
+    "rule": "/whatsapp/scheduler/clear-history",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.scheduler_run",
+    "rule": "/whatsapp/scheduler/run",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.send_center",
+    "rule": "/whatsapp/send-center",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.send_message",
+    "rule": "/whatsapp/send",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.template_delete",
+    "rule": "/whatsapp/templates/<int:tid>/delete",
+    "methods": [
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.template_edit",
+    "rule": "/whatsapp/templates/<int:tid>/edit",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.template_new",
+    "rule": "/whatsapp/templates/new",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   },
+   {
+    "endpoint": "whatsapp.templates_list",
+    "rule": "/whatsapp/templates",
+    "methods": [
+     "GET"
+    ],
+    "writes": false
+   },
+   {
+    "endpoint": "whatsapp.wa_settings",
+    "rule": "/whatsapp/settings",
+    "methods": [
+     "GET",
+     "POST"
+    ],
+    "writes": true
+   }
+  ]
+ }
+}

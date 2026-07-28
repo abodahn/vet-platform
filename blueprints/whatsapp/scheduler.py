@@ -20,10 +20,21 @@ def _already_sent(conn, run_type: str, entity_id: int, entity_type: str) -> bool
 
 
 def _mark_sent(conn, run_type: str, entity_id: int, entity_type: str):
-    conn.execute(
-        "INSERT INTO reminder_runs(run_type, entity_id, entity_type, status, run_at) VALUES(?,?,?,'sent',datetime('now'))",
+    # reminder_runs carries UNIQUE(run_type, entity_id, entity_type), while the
+    # dedup gate above is per *day*. An entity that stays eligible for several
+    # days (an overdue invoice, a vaccine inside its 7-day window) therefore
+    # comes back tomorrow and a plain INSERT would violate the key and abort
+    # the whole run. Refresh the existing row instead, insert only if new.
+    cur = conn.execute(
+        "UPDATE reminder_runs SET status='sent', run_at=datetime('now') "
+        "WHERE run_type=? AND entity_id=? AND entity_type=?",
         (run_type, entity_id, entity_type)
     )
+    if not cur.rowcount:
+        conn.execute(
+            "INSERT INTO reminder_runs(run_type, entity_id, entity_type, status, run_at) VALUES(?,?,?,'sent',datetime('now'))",
+            (run_type, entity_id, entity_type)
+        )
 
 
 def _send_whatsapp(conn, phone: str, message: str, owner_id=None, template_name=""):
@@ -72,7 +83,7 @@ def _appointment_reminders(conn) -> int:
     """Remind owners of appointments scheduled for tomorrow."""
     tomorrow = (date.today() + timedelta(days=1)).isoformat()
     appts = conn.execute("""
-        SELECT a.id, a.appt_date, a.appt_time, a.appointment_type,
+        SELECT a.id, a.appt_date, a.appt_start, a.appointment_type,
                o.id owner_id, o.full_name, o.whatsapp_phone,
                p.pet_name
         FROM appointments a
@@ -89,7 +100,7 @@ def _appointment_reminders(conn) -> int:
         msg = (
             f"Dear {a['full_name']},\n"
             f"Reminder: {a['pet_name']} has a {a['appointment_type']} appointment tomorrow "
-            f"({a['appt_date']} at {a['appt_time'] or 'TBD'}).\n"
+            f"({a['appt_date']} at {a['appt_start'] or 'TBD'}).\n"
             f"Please arrive 10 minutes early. Reply CONFIRM to confirm."
         )
         status = _send_whatsapp(conn, a["whatsapp_phone"], msg,
@@ -105,13 +116,13 @@ def _vaccine_reminders(conn) -> int:
     today = date.today().isoformat()
     week_ago = (date.today() - timedelta(days=7)).isoformat()
     vaccines = conn.execute("""
-        SELECT v.id, v.next_due_date, v.vaccine_name,
+        SELECT v.id, v.next_due_at, v.vaccine_name,
                o.id owner_id, o.full_name, o.whatsapp_phone,
                p.pet_name
         FROM vaccinations v
         JOIN pets p ON p.id = v.pet_id
         JOIN owners o ON o.id = p.owner_id
-        WHERE v.next_due_date BETWEEN ? AND ?
+        WHERE v.next_due_at BETWEEN ? AND ?
           AND o.whatsapp_phone IS NOT NULL AND o.whatsapp_phone != ''
     """, (week_ago, today)).fetchall()
 
@@ -119,11 +130,11 @@ def _vaccine_reminders(conn) -> int:
     for v in vaccines:
         if _already_sent(conn, "vaccine_reminder", v["id"], "vaccination"):
             continue
-        overdue = v["next_due_date"] < today
+        overdue = v["next_due_at"] < today
         msg = (
             f"Dear {v['full_name']},\n"
             f"{'OVERDUE: ' if overdue else ''}{v['pet_name']} is {'overdue for' if overdue else 'due for'} "
-            f"the {v['vaccine_name']} vaccine (due: {v['next_due_date']}).\n"
+            f"the {v['vaccine_name']} vaccine (due: {v['next_due_at']}).\n"
             f"Please book an appointment at your earliest convenience."
         )
         status = _send_whatsapp(conn, v["whatsapp_phone"], msg,
@@ -139,11 +150,11 @@ def _invoice_reminders(conn) -> int:
     today = date.today().isoformat()
     three_days_ago = (date.today() - timedelta(days=3)).isoformat()
     invoices = conn.execute("""
-        SELECT inv.id, inv.invoice_number, inv.total_amount, inv.due_date,
+        SELECT inv.id, inv.invoice_number, inv.total, inv.due_date,
                o.id owner_id, o.full_name, o.whatsapp_phone
         FROM invoices inv
         JOIN owners o ON o.id = inv.owner_id
-        WHERE inv.status IN ('Pending','Partial')
+        WHERE inv.status IN ('Unpaid','Partial')
           AND inv.due_date <= ?
           AND o.whatsapp_phone IS NOT NULL AND o.whatsapp_phone != ''
     """, (three_days_ago,)).fetchall()
@@ -154,7 +165,7 @@ def _invoice_reminders(conn) -> int:
             continue
         msg = (
             f"Dear {inv['full_name']},\n"
-            f"Invoice #{inv['invoice_number']} for {inv['total_amount']:.2f} was due on {inv['due_date']} and remains unpaid.\n"
+            f"Invoice #{inv['invoice_number']} for {inv['total']:.2f} was due on {inv['due_date']} and remains unpaid.\n"
             f"Please contact us to settle your balance. Thank you."
         )
         status = _send_whatsapp(conn, inv["whatsapp_phone"], msg,
