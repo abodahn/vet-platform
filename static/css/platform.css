@@ -1008,7 +1008,9 @@ button { cursor: pointer; }
   .pf-stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 900px) {
+/* Sidebar collapse is 768px, matching v3.css. At 900 a tablet in landscape
+   got the mobile drawer while it had room for the real nav. */
+@media (max-width: 768px) {
   .pf-layout { grid-template-columns: 1fr; }
   .pf-sidebar {
     position: fixed; left: 0; top: 0;
@@ -1018,6 +1020,11 @@ button { cursor: pointer; }
   }
   .pf-sidebar.open { transform: translateX(0); }
   .pf-main         { width: 100%; }
+}
+
+/* Login hero stays at 900 — it is a two-pane marketing split, not the app
+   shell, and it genuinely runs out of room before the nav does. */
+@media (max-width: 900px) {
   .pf-login-root   { grid-template-columns: 1fr; }
   .pf-login-hero   { display: none; }
   .pf-login-panel  { border-left: none; padding: 40px 24px; }

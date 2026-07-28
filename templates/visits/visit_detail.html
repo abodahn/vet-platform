@@ -3,7 +3,10 @@
 {% block title %}{{ t('Visit','زيارة') }} #{{ visit.id }} — {{ visit.pet_name }}{% endblock %}
 
 {% block page_title %}{{ t('Visit','زيارة') }} #{{ visit.id }} — {{ visit.pet_name }}{% endblock %}
-{% block page_sub %}{{ visit.visit_date[:16] if visit.visit_date else '' }} · {{ visit.visit_type }} · {{ t('Dr.','د.') }} {{ visit.doctor_name }}</{% endblock %}
+{# The stray `</` that used to close this line parsed as an HTML bogus
+   comment and swallowed the next `</div>`, so the topbar's centre, actions
+   and right-hand group all ended up nested inside .v3-topbar-left. #}
+{% block page_sub %}{{ visit.visit_date[:16] if visit.visit_date else '' }} · {{ visit.visit_type }} · {{ t('Dr.','د.') }} {{ visit.doctor_name }}{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('visits.visits_list') }}" class="pf-btn">{{ t('← Visits','← الزيارات') }}</a>
@@ -68,12 +71,12 @@
 </div>
 {% endif %}
 
-<div style="display:grid;grid-template-columns:300px 1fr;gap:1.5rem;align-items:start">
+<div class="vd-grid">
 
   <!-- ══════════════════════════════
        LEFT PANEL
   ═══════════════════════════════ -->
-  <div style="display:flex;flex-direction:column;gap:1rem">
+  <div class="vd-rail">
 
     <!-- Patient Card -->
     <div class="pf-card">
@@ -214,7 +217,7 @@
       </div>
 
       {% if visit.soap_subjective or visit.soap_objective or visit.soap_assessment or visit.soap_plan %}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div class="vd-2col" style="gap:12px;margin-bottom:14px">
         {% for label, icon, field in [
           (t('Subjective','البيانات الذاتية'),'👤','soap_subjective'),
           (t('Objective','البيانات الموضوعية'),'🔍','soap_objective'),
@@ -238,8 +241,9 @@
           {% if visit.soap_subjective or visit.soap_objective %}✏️ {{ t('Update SOAP Notes','تحديث ملاحظات SOAP') }}{% else %}＋ {{ t('Record SOAP Notes','تسجيل ملاحظات SOAP') }}{% endif %}
         </summary>
         <form method="post" action="{{ url_for('visits.save_soap', visit_id=visit.id) }}"
+              class="vd-2col"
               style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
-                     padding:1rem;display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+                     padding:1rem">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
           <div>
             <label class="pf-label">👤 {{ t('Subjective','البيانات الذاتية') }} <span style="font-weight:400;color:var(--cl-muted)">{{ t('(owner reports)','(ما يذكره المالك)') }}</span></label>
@@ -321,7 +325,7 @@
             <input type="text" name="diagnosis_text" class="pf-input" required
                    placeholder="{{ t('e.g. Acute gastroenteritis','مثال: التهاب معدي معوي حاد') }}">
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+          <div class="vd-2col">
             <div>
               <label class="pf-label">{{ t('Severity','الشدة') }}</label>
               <select name="severity" class="pf-input">
@@ -385,7 +389,7 @@
             <textarea name="goals" class="pf-input" rows="2"
                       placeholder="{{ t('Expected outcomes…','النتائج المتوقعة…') }}">{{ treatment.goals if treatment else '' }}</textarea>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem">
+          <div class="vd-3col">
             <div>
               <label class="pf-label">{{ t('Duration','المدة') }}</label>
               <input type="text" name="duration" class="pf-input"
@@ -485,9 +489,7 @@
           <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
           <div id="rxLines" style="display:flex;flex-direction:column;gap:.8rem;margin-bottom:.8rem">
             <!-- Line 1 -->
-            <div class="rx-line" style="background:#fff;border:1px solid var(--cl-border);
-                                        border-radius:6px;padding:.8rem;display:grid;
-                                        grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;gap:.5rem">
+            <div class="rx-line">
               <div>
                 <label class="pf-label" style="font-size:.78rem">{{ t('Medication','دواء') }} *</label>
                 <input type="text" name="medication_name_1" class="pf-input" style="font-size:.85rem" required
@@ -603,7 +605,7 @@
               style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
                      padding:1rem;display:grid;gap:.8rem"
               onsubmit="submitLabRequest(event, {{ visit.id }})">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+          <div class="vd-2col">
             <div>
               <label class="pf-label">{{ t('Test Name','اسم الفحص') }} <span style="color:var(--cl-danger)">*</span></label>
               <input type="text" name="test_name" id="labTestName" class="pf-input"
@@ -631,7 +633,7 @@
               </select>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+          <div class="vd-2col">
             <div>
               <label class="pf-label">{{ t('Sample Type','نوع العينة') }}</label>
               <input type="text" name="sample_type" id="labSampleType" class="pf-input"
@@ -663,6 +665,13 @@
   <!-- end right panel -->
 
 </div>
+{% endblock %}
+
+{# Fixed-position UI renders at body level — inside {% block content %} its
+   containing block is .v3-content (animated transform), so the drawer parked
+   off the "screen" edge was really parked off the content edge and the modal
+   backdrop stopped at the sidebar. #}
+{% block overlays %}
 
 <!-- ══════════════════════════════════════════════════════════════════
      AI ASSISTANT — floating button + slide-in panel
@@ -670,10 +679,9 @@
 ═══════════════════════════════════════════════════════════════════ -->
 
 <!-- Floating trigger button -->
-<button id="aiFloatBtn" onclick="toggleAiPanel()"
+<button id="aiFloatBtn" class="vd-ai-fab" onclick="toggleAiPanel()"
   title="{{ t('Ask AI about this patient','اسأل الذكاء الاصطناعي عن هذا المريض') }}"
-  style="position:fixed;bottom:28px;right:28px;z-index:1100;
-         width:56px;height:56px;border-radius:50%;border:none;
+  style="width:56px;height:56px;border-radius:50%;border:none;
          background:var(--cl-primary);color:#fff;font-size:1.5rem;
          box-shadow:0 4px 18px rgba(0,0,0,.25);cursor:pointer;
          display:flex;align-items:center;justify-content:center;
@@ -682,11 +690,10 @@
 </button>
 
 <!-- Slide-in panel -->
-<div id="aiPanel"
-  style="position:fixed;top:0;right:-420px;width:400px;height:100vh;
-         background:var(--cl-surface);border-left:1px solid var(--cl-border);
+<div id="aiPanel" class="vd-ai-panel"
+  style="background:var(--cl-surface);border-inline-start:1px solid var(--cl-border);
          box-shadow:-4px 0 20px rgba(0,0,0,.12);z-index:1200;
-         display:flex;flex-direction:column;transition:right .3s ease;overflow:hidden">
+         display:flex;flex-direction:column;overflow:hidden">
 
   <!-- Panel header -->
   <div style="padding:14px 16px;border-bottom:1px solid var(--cl-border);
@@ -800,7 +807,10 @@ let _ctxLoaded    = false;
 
 async function toggleAiPanel() {
   _aiPanelOpen = !_aiPanelOpen;
-  document.getElementById('aiPanel').style.right   = _aiPanelOpen ? '0' : '-420px';
+  /* Was style.right = '0' / '-420px'. The parked position added 414px of
+     horizontal page overflow and flew in from the wrong edge in Arabic;
+     .open drives a logical transform instead (v3.css §29). */
+  document.getElementById('aiPanel').classList.toggle('open', _aiPanelOpen);
   document.getElementById('aiOverlay').style.display = _aiPanelOpen ? 'block' : 'none';
   document.getElementById('aiFloatBtn').style.transform = _aiPanelOpen ? 'scale(0)' : 'scale(1)';
   if (_aiPanelOpen && !_ctxLoaded) {
@@ -885,8 +895,10 @@ function addRxLine() {
   rxLineCount++;
   var n = rxLineCount;
   var div = document.createElement('div');
+  /* Styling lives in .rx-line (v3.css §29). It used to be duplicated here as
+     a cssText string identical to the one on line 1's markup, so the two
+     could — and did — drift apart. */
   div.className = 'rx-line';
-  div.style.cssText = 'background:#fff;border:1px solid var(--cl-border);border-radius:6px;padding:.8rem;display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;gap:.5rem';
   div.innerHTML = `
     <div>
       <label class="pf-label" style="font-size:.78rem">Medication *</label>

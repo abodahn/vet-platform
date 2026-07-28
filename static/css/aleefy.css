@@ -1220,7 +1220,8 @@ a:hover { color: var(--al-primary-mid); }
   .al-grid-4 { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 900px) {
+/* Sidebar collapse is 768px, matching v3.css — see platform.css. */
+@media (max-width: 768px) {
   .al-sidebar {
     transform: translateX(-100%);
   }
@@ -1240,7 +1241,9 @@ a:hover { color: var(--al-primary-mid); }
   .al-overlay.show {
     display: block;
   }
+}
 
+@media (max-width: 900px) {
   .al-grid-3 { grid-template-columns: repeat(2, 1fr); }
   .al-stat-grid { grid-template-columns: repeat(2, 1fr); }
 
@@ -1276,7 +1279,7 @@ a:hover { color: var(--al-primary-mid); }
 /* BUG: this was `[dir="rtl"] @media (...)` — a selector cannot precede an
    at-rule, so every browser dropped the whole construct and the RTL mobile
    sidebar never slid in from the right. Nested correctly below. */
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   [dir="rtl"] .al-sidebar { transform: translateX(100%); }
   [dir="rtl"] .al-sidebar.open { transform: translateX(0); }
   [dir="rtl"] .al-main { margin-right: 0; }

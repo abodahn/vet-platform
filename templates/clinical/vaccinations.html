@@ -102,11 +102,11 @@
         <tr>
           <th>{{ t('Pet', 'الحيوان') }}</th>
           <th>{{ t('Vaccine', 'اللقاح') }}</th>
-          <th>{{ t('Brand / Batch', 'الماركة / الدفعة') }}</th>
+          <th class="v3-col-2nd">{{ t('Brand / Batch', 'الماركة / الدفعة') }}</th>
           <th>{{ t('Date Given', 'تاريخ الإعطاء') }}</th>
           <th>{{ t('Next Due', 'الجرعة التالية') }}</th>
-          <th>{{ t('Administered By', 'أعطاه') }}</th>
-          <th>{{ t('Site', 'الموضع') }}</th>
+          <th class="v3-col-2nd">{{ t('Administered By', 'أعطاه') }}</th>
+          <th class="v3-col-2nd">{{ t('Site', 'الموضع') }}</th>
           <th>{{ t('Certificate', 'الشهادة') }}</th>
         </tr>
       </thead>
@@ -125,7 +125,7 @@
             <div style="font-size:0.78rem;color:var(--text-muted)">Dose #{{ v.dose_number }}</div>
             {% endif %}
           </td>
-          <td style="font-size:0.83rem;color:var(--text-muted)">
+          <td class="v3-col-2nd" style="font-size:0.83rem;color:var(--text-muted)">
             {{ v.vaccine_brand or '—' }}
             {% if v.batch_number %}<br><span style="font-size:0.75rem">Batch: {{ v.batch_number }}</span>{% endif %}
           </td>
@@ -137,8 +137,8 @@
               </span>
             {% else %}—{% endif %}
           </td>
-          <td style="font-size:0.85rem">{{ v.administered_by or '—' }}</td>
-          <td style="font-size:0.83rem;color:var(--text-muted)">{{ v.site or '—' }}</td>
+          <td class="v3-col-2nd" style="font-size:0.85rem">{{ v.administered_by or '—' }}</td>
+          <td class="v3-col-2nd" style="font-size:0.83rem;color:var(--text-muted)">{{ v.site or '—' }}</td>
           <td>
             <a href="{{ url_for('clinical.vaccination_certificate', vacc_id=v.id) }}"
                class="pf-btn pf-btn-secondary"

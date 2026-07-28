@@ -1850,3 +1850,222 @@ p { margin: 0 0 1em; color: var(--text-3); }
   .v3-content { padding: 0 !important; }
   .v3-card, .v3-stat-card { box-shadow: none; border: 1px solid #ccc; }
 }
+
+/* ──────────────────────────────────────────────────────────────
+   SECTION 28 — TABLET & TOUCH
+   A vet holds an iPad in the exam room; that is the normal case,
+   not an edge case. Everything below is keyed to that.
+────────────────────────────────────────────────────────────── */
+
+/* ── 28.1  The page must never scroll sideways ──────────────
+   ROOT CAUSE, measured: .v3-main and .v3-content are flex items, and a flex
+   item defaults to min-width:auto — it refuses to shrink below its content.
+   So one wide table anywhere stretched the whole shell: 1283px of layout
+   inside a 762px viewport, on every one of the 170 templates. min-width:0
+   lets them shrink back to the viewport; the overflow then belongs to
+   whatever is genuinely too wide, and 28.2 gives that its own scrollbar. */
+.v3-main,
+.v3-content,
+.v3-topbar-left,
+.v3-page-actions { min-width: 0; }
+
+/* Belt and braces. `clip` not `hidden`: hidden creates a scroll container,
+   which breaks the position:sticky topbar. clip does not. */
+html { overflow-x: clip; }
+
+/* ── 28.2  Wide tables scroll; the body never does ──────────
+   Wrapper is applied by v3WrapTables() in base.html — CSS cannot wrap an
+   element, and there are 125 tables across 98 templates. */
+.v3-tbl-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;   /* don't chain to the page/back-gesture */
+}
+
+/* ── 28.3  Touch sizing ─────────────────────────────────────
+   Keyed to coarse pointer OR tablet width, not width alone: a touchscreen
+   laptop at 1440 needs this too, and an iPad at 1024 landscape is not
+   "desktop". Desktop mouse users keep the denser 13px scale. */
+@media (max-width: 1024px), (pointer: coarse) {
+
+  /* 16px exactly: below it, iOS Safari zooms the page on focus and the vet
+     has to pinch back out after every field. !important because ~170
+     templates set font-size inline on .pf-input, and inline beats a
+     stylesheet without it. */
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea { font-size: 16px !important; }
+
+  /* 44px: fingers are not mice. */
+  button,
+  summary,
+  select,
+  input[type="submit"],
+  input[type="button"],
+  [role="button"],
+  .v3-btn, .pf-btn, .al-btn,
+  .v3-nav-item, .v3-nav-group-header,
+  .v3-dropdown-item,
+  .v3-topbar-btn, .v3-icon-btn, .v3-hamburger { min-height: 44px; }
+
+  /* Icon-only controls need the horizontal half of the target too. */
+  .v3-topbar-btn, .v3-icon-btn, .v3-hamburger, .v3-btn-icon, .pf-btn-icon { min-width: 44px; }
+
+  /* Bare <button> is inline-block: min-height alone leaves the label
+     top-aligned in the taller box. */
+  button, input[type="submit"], input[type="button"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Page actions move out of the topbar onto their own row. Eight buttons
+     (visit_detail) never fit beside the search box and user chip. */
+  .v3-topbar {
+    height: auto;
+    min-height: var(--topbar-h);
+    flex-wrap: wrap;
+    padding-block: 8px;
+    row-gap: 8px;
+  }
+  .v3-page-actions {
+    order: 9;
+    flex: 1 0 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 2px;
+  }
+  .v3-page-actions::-webkit-scrollbar { height: 0; }
+  .v3-topbar-right { flex-wrap: wrap; row-gap: 6px; }
+}
+
+/* ── 28.4  Page actions row ─────────────────────────────────
+   Desktop: sits inline in the topbar exactly where the block used to
+   render, between the search box and the status indicators. */
+.v3-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.v3-page-actions:empty { display: none; }
+
+/* ──────────────────────────────────────────────────────────────
+   SECTION 29 — VISIT DETAIL  (templates/visits/visit_detail.html)
+   The busiest clinical screen: a vet has this open during the whole
+   consultation, on a tablet, with an animal on the table. These classes
+   replace inline grid-template-columns so the layout can respond at all.
+────────────────────────────────────────────────────────────── */
+
+/* The rail's desktop stacking lives here, not inline, so the tablet
+   media query below can actually override it. */
+.vd-rail { display: flex; flex-direction: column; gap: 1rem; }
+
+/* Patient rail + clinical work. */
+.vd-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Form grids inside the clinical cards. */
+.vd-2col, .vd-3col { display: grid; gap: .8rem; }
+.vd-2col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.vd-3col { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* One prescription line. Six columns of drug data. */
+.rx-line {
+  background: var(--surface);
+  border: 1px solid var(--cl-border, var(--border));
+  border-radius: 6px;
+  padding: .8rem;
+  display: grid;
+  grid-template-columns: 2fr repeat(5, minmax(0, 1fr));
+  gap: .5rem;
+}
+
+@media (max-width: 1024px) {
+  /* Stack. At 1024 the content column is ~744px; a 300px rail leaves 420px
+     for clinical notes, which is narrower than the phone layout. */
+  .vd-grid { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+
+  /* The rail becomes a compact patient strip ABOVE the clinical work,
+     instead of a tall column the vet has to scroll past to reach the notes. */
+  .vd-rail {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: .8rem;
+    align-items: start;
+  }
+
+  /* Six columns of drug fields at ~120px each is unusable with a finger. */
+  .rx-line { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rx-line > div:first-child { grid-column: 1 / -1; }
+
+  .vd-2col, .vd-3col { grid-template-columns: minmax(0, 1fr); }
+  /* The SOAP save button spans both columns; once stacked, span 1. */
+  .vd-2col > [style*="grid-column"] { grid-column: auto !important; }
+}
+
+
+
+@media (max-width: 600px) {
+  .rx-line { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── AI clinical assistant drawer ──
+   Was `right:-420px` toggled to `right:0`. Two problems: the off-screen
+   parking spot added 414px of horizontal page overflow (its containing
+   block is .v3-content, which has a transform animation), and `right` is
+   physical, so in Arabic the drawer flew in from the wrong edge. Transform
+   + logical inset fixes both, and animating transform beats animating a
+   layout property. */
+.vd-ai-panel {
+  position: fixed;
+  top: 0;
+  inset-inline-end: 0;
+  width: min(400px, 100vw - 40px);
+  height: 100vh;
+  transform: translateX(100%);
+  transition: transform .3s ease;
+  will-change: transform;
+}
+[dir="rtl"] .vd-ai-panel { transform: translateX(-100%); }
+.vd-ai-panel.open, [dir="rtl"] .vd-ai-panel.open { transform: translateX(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vd-ai-panel { transition: none; }
+}
+
+/* Floating AI trigger. Sat exactly on top of the global Petsy FAB
+   (both bottom:28px right:28px) — stack it clear, and use a logical inset
+   so it does not cover the Arabic layout's content edge. */
+.vd-ai-fab {
+  position: fixed;
+  /* Clears the global Petsy FAB, which is 64px tall at bottom:28px
+     (base.html) — 28 + 64 + 12 gap. Measured, not guessed: at bottom:88px
+     the two circles still overlapped by 4px. */
+  bottom: 104px;
+  inset-inline-end: 28px;
+  z-index: 1100;
+}
+
+@media (max-width: 600px) {
+  /* Petsy drops to bottom:20px right:16px below 600. */
+  .vd-ai-fab { bottom: 96px; inset-inline-end: 16px; }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   SECTION 30 — SECONDARY TABLE COLUMNS
+   Applied to the two clinical lists a vet reads on a tablet in portrait
+   (visits queue, vaccination records). Everything still scrolls thanks to
+   §28.2 — this is for the two tables where reaching the status and action
+   columns by scrolling sideways, on every row, is the actual daily task.
+   Nothing is hidden at ≥901px, so tablet landscape and desktop are
+   unchanged and no information is lost from the product.
+────────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .v3-col-2nd { display: none; }
+}

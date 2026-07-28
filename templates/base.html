@@ -37,7 +37,7 @@
     ...then delete the `{% set %}` below. Jinja's `set` would shadow the
     context processor, so it has to go.
   -#}
-  {% set ASSET_V = "32f0ebfc5c" %}
+  {% set ASSET_V = "cb571a99bb" %}
 
   {#- Fonts + icons are SELF-HOSTED (static/fonts/) — no CDN, no third-party
       request, works on a blocked or slow connection. See tokens.css. -#}
@@ -371,9 +371,14 @@
         </div>
       </div>
 
+      <!-- Page actions — own flex child of the topbar, not nested inside
+           .v3-topbar-right, so ≤1024px can drop it onto its own scrollable
+           row (see v3.css 28.3). Renders in the identical inline position
+           on desktop. -->
+      <div class="v3-page-actions">{% block topbar_actions %}{% endblock %}</div>
+
       <!-- Right: indicators + user -->
       <div class="v3-topbar-right">
-        {% block topbar_actions %}{% endblock %}
 
         <!-- Connection + Sync status -->
         <div class="v3-conn-status" id="v3-conn-status" title="{{ t('Connection status', 'حالة الاتصال') }}">
@@ -810,6 +815,15 @@
   </div>
 </div>
 
+{# Body-level slot for drawers, modals and overlays.
+   Anything position:fixed MUST live here, not in {% block content %}:
+   .v3-content carries the fadeIn animation, and an animated transform makes
+   an element the containing block for its fixed descendants. A modal with
+   inset:0 placed inside content therefore covers only the content area —
+   its backdrop stops at the sidebar — and a drawer parked off the "right
+   edge" is parked off the content edge, not the screen edge. #}
+{% block overlays %}{% endblock %}
+
 
 <!-- ═══════════════════════════════════════════════════
      SCRIPTS
@@ -1150,12 +1164,12 @@
 
   })();
 
-  /* ── Mobile: hide hamburger on wide screens ── */
-  function checkWidth(){
-    var hb=document.getElementById('v3-hamburger');
-    if(hb)hb.style.display=window.innerWidth<=900?'flex':'none';
-  }
-  checkWidth();window.addEventListener('resize',checkWidth);
+  /* The hamburger used to be hidden above 900px by JS here. That was the
+     last 900px breakpoint in the codebase and it contradicted both the
+     .v3-hamburger CSS ("always visible — desktop collapses sidebar, mobile
+     opens it") and v3.js, which keys the drawer to ≤768 and the desktop
+     icon-rail collapse to >768. Hiding the only control above 900 made the
+     collapse feature reachable only in the 769–900 window. */
 
   /* ── Search → Command Palette ── */
   window.v3SearchKey=function(e){
@@ -1201,6 +1215,38 @@
       })
       .catch(function(){resp.innerHTML='<span class="v3-cmd-error">⚠️ {{ t("AI service unavailable.","خدمة الذكاء الاصطناعي غير متاحة.") }}</span>';});
   };
+
+  /* ── Table horizontal scroll ──────────────────────────────
+     Give every table its own scroll container so a wide table scrolls
+     itself instead of pushing the whole page sideways. Skipped when the
+     table already sits in something scrollable, so hand-written wrappers
+     keep their styling.
+     ponytail: a shim, because CSS cannot wrap an element and there are 125
+     tables across 98 templates — hand-wrapping them is a 98-file diff that
+     the next new table immediately breaks. Ceiling: runs once, so tables a
+     page injects later are not wrapped. If that starts happening, call
+     window.v3WrapTables() after the injection, or move to a MutationObserver. */
+  function v3WrapTables(root){
+    var tables=(root||document).querySelectorAll('table');
+    for(var i=0;i<tables.length;i++){
+      var t=tables[i];
+      if(t.closest('.v3-tbl-scroll'))continue;
+      var scrollable=false,p=t.parentElement,d=0;
+      while(p&&p!==document.body&&d<6){
+        var ox=getComputedStyle(p).overflowX;
+        if(ox==='auto'||ox==='scroll'){scrollable=true;break;}
+        p=p.parentElement;d++;
+      }
+      if(scrollable)continue;
+      var wrap=document.createElement('div');
+      wrap.className='v3-tbl-scroll';
+      t.parentNode.insertBefore(wrap,t);
+      wrap.appendChild(t);
+    }
+  }
+  window.v3WrapTables=v3WrapTables;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){v3WrapTables();});
+  else v3WrapTables();
 
 })();
 </script>
