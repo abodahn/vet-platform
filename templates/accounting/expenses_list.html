@@ -87,7 +87,11 @@
             <td style="text-align:right;font-weight:700;color:#dc2626;">
               {{ "{:,.0f}".format(exp.amount or 0) }}
             </td>
-            <td style="color:var(--cl-muted);">{{ exp.vendor or '—' }}</td>
+            <td style="color:var(--cl-muted);">
+              {% if exp.vendor and supplier_ids.get(exp.vendor) %}
+              <a href="{{ url_for('procurement.supplier_detail', supplier_id=supplier_ids[exp.vendor]) }}" style="color:var(--cl-primary); text-decoration:none;">{{ exp.vendor }}</a>
+              {% else %}{{ exp.vendor or '—' }}{% endif %}
+            </td>
             <td style="color:var(--cl-muted);font-size:11px;">{{ exp.receipt_ref or '—' }}</td>
             <td style="color:var(--cl-muted);">{{ exp.payment_method or '—' }}</td>
           </tr>

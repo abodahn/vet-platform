@@ -107,13 +107,23 @@ def invoices_list():
     date_from = request.args.get("date_from", "")
     date_to   = request.args.get("date_to", "")
     search    = request.args.get("q", "").strip()
+    owner_id  = request.args.get("owner_id", type=int)
 
     invoices = db.list_invoices(
+        owner_id=owner_id,
         status=status,
         date_from=date_from,
         date_to=date_to,
         limit=200,
     )
+
+    # Name the owner being filtered on, so the chip is readable and links back.
+    owner_name = ""
+    if owner_id:
+        conn = db.get_db()
+        row = conn.execute("SELECT full_name FROM owners WHERE id=?", (owner_id,)).fetchone()
+        conn.close()
+        owner_name = row["full_name"] if row else ""
 
     if search:
         sl = search.lower()
@@ -135,6 +145,8 @@ def invoices_list():
         date_from=date_from,
         date_to=date_to,
         search=search,
+        owner_id=owner_id,
+        owner_name=owner_name,
         total_amount=total_amount,
         total_paid=total_paid,
         total_due=total_due,
@@ -257,11 +269,31 @@ def invoice_detail(inv_id):
     invoice = db.get_invoice(inv_id)
     if not invoice:
         abort(404)
+
+    conn = db.get_db()
+    # get_invoice() returns payments=[] unconditionally; read the real rows.
+    invoice["payments"] = [dict(r) for r in conn.execute(
+        "SELECT * FROM payments WHERE invoice_id=? ORDER BY received_at, id",
+        (inv_id,)
+    ).fetchall()]
+    # Resolve the visit rather than trusting invoices.visit_id: the column has
+    # no enforced FK, so a deleted visit would otherwise render a dead link.
+    visit = None
+    if invoice.get("visit_id"):
+        row = conn.execute(
+            "SELECT id, visit_date, visit_type FROM visits WHERE id=?",
+            (invoice["visit_id"],)
+        ).fetchone()
+        if row:
+            visit = dict(row)
+    conn.close()
+
     return render_template(
         "finance/invoice_detail.html",
         active="finance",
         page_title=f"Invoice {invoice['invoice_number']}",
         invoice=invoice,
+        visit=visit,
         today=date.today().isoformat(),
     )
 
@@ -629,6 +661,10 @@ def expenses_list():
         params.append(date_to)
     q += " ORDER BY expense_date DESC, id DESC LIMIT 200"
     expenses = [dict(r) for r in conn.execute(q, params).fetchall()]
+    # expenses.vendor is free text with no supplier_id — link it only when the
+    # name matches a real supplier row, otherwise render it as plain text.
+    supplier_ids = {r["name"]: r["id"]
+                    for r in conn.execute("SELECT id, name FROM suppliers").fetchall()}
     conn.close()
 
     total_expenses = sum(e.get("amount", 0) or 0 for e in expenses)
@@ -638,6 +674,7 @@ def expenses_list():
         active="finance",
         page_title="Expenses",
         expenses=expenses,
+        supplier_ids=supplier_ids,
         total_expenses=total_expenses,
         today=date.today().isoformat(),
         date_from=date_from,

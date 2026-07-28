@@ -103,7 +103,8 @@ def dashboard():
         recent_invoices = [dict(r) for r in conn.execute(
             """SELECT 'revenue' as tx_type, created_at as tx_date,
                       COALESCE(paid_amount, 0) as amount,
-                      COALESCE(invoice_number, 'Invoice') as description
+                      COALESCE(invoice_number, 'Invoice') as description,
+                      id as invoice_id
                FROM invoices
                WHERE status IN ('Paid','Partial')
                ORDER BY created_at DESC LIMIT 5"""
@@ -172,25 +173,14 @@ def profit_loss():
                FROM invoice_lines il
                JOIN invoices i ON i.id = il.invoice_id
                WHERE i.status IN ('Paid','Partial')
-               AND SUBSTRING(i.issue_date::text, 1, 10) >= ?
-               AND SUBSTRING(i.issue_date::text, 1, 10) <= ?
+               AND i.issue_date >= ?
+               AND i.issue_date <= ?
                GROUP BY il.description, il.line_type
                ORDER BY total DESC""",
             (date_from, date_to)
         ).fetchall()]
     except Exception:
-        try:
-            revenue_rows = [dict(r) for r in conn.execute(
-                """SELECT 'Invoice Payments' as item, 'revenue' as line_type,
-                          COALESCE(SUM(paid_amount), 0) as total, COUNT(*) as count
-                   FROM invoices
-                   WHERE status IN ('Paid','Partial')
-                   AND SUBSTRING(issue_date::text, 1, 10) >= ?
-                   AND SUBSTRING(issue_date::text, 1, 10) <= ?""",
-                (date_from, date_to)
-            ).fetchall()]
-        except Exception:
-            revenue_rows = []
+        revenue_rows = []
 
     # Expenses by category
     try:
@@ -246,23 +236,28 @@ def cash_flow():
 
     movements = []
 
-    # Money in — use invoices (vet payments table belongs to Waslny taxi app, not vet app)
+    # Money in — the payment rows themselves, so every inflow links back to the
+    # invoice it settled instead of being an unattributable "Cash" lump.
     try:
         inv_pay = [dict(r) for r in conn.execute(
-            """SELECT SUBSTRING(issue_date::text, 1, 10) AS tx_date,
-                      paid_amount AS amount,
-                      'Cash' AS payment_method,
-                      COALESCE(invoice_number, 'Invoice') AS description,
+            """SELECT SUBSTR(p.received_at, 1, 10) AS tx_date,
+                      COALESCE(p.amount, 0) AS amount,
+                      COALESCE(p.method, 'Cash') AS payment_method,
+                      COALESCE(i.invoice_number, 'Invoice') AS description,
+                      p.invoice_id AS invoice_id,
+                      o.full_name AS owner_name,
+                      i.owner_id AS owner_id,
                       'in' AS direction
-               FROM invoices
-               WHERE status IN ('Paid','Partial')
-                 AND SUBSTRING(issue_date::text, 1, 10) >= ?
-                 AND SUBSTRING(issue_date::text, 1, 10) <= ?""",
+               FROM payments p
+               LEFT JOIN invoices i ON i.id = p.invoice_id
+               LEFT JOIN owners o ON o.id = p.owner_id
+               WHERE SUBSTR(p.received_at, 1, 10) >= ?
+                 AND SUBSTR(p.received_at, 1, 10) <= ?""",
             (date_from, date_to)
         ).fetchall()]
         movements.extend(inv_pay)
-    except Exception:
-        pass
+    except Exception as e:
+        flash(f"Cash-in could not be read: {e}", "warning")
 
     # Money out — expenses
     try:
@@ -271,6 +266,7 @@ def cash_flow():
                       COALESCE(amount, 0) AS amount,
                       'Cash' AS payment_method,
                       COALESCE(description, category, 'Expense') AS description,
+                      COALESCE(category, 'General') AS category,
                       'out' AS direction
                FROM expenses
                WHERE expense_date >= ? AND expense_date <= ?
@@ -278,8 +274,8 @@ def cash_flow():
             (date_from, date_to)
         ).fetchall()]
         movements.extend(expenses)
-    except Exception:
-        pass
+    except Exception as e:
+        flash(f"Cash-out could not be read: {e}", "warning")
 
     conn.close()
 
@@ -351,6 +347,14 @@ def expenses_list():
     except Exception:
         categories = []
 
+    # expenses.vendor is free text with no supplier_id — link it only when the
+    # name matches a real supplier row, otherwise render it as plain text.
+    try:
+        supplier_ids = {r["name"]: r["id"]
+                        for r in conn.execute("SELECT id, name FROM suppliers").fetchall()}
+    except Exception:
+        supplier_ids = {}
+
     conn.close()
 
     total_expenses = sum(float(e.get("amount") or 0) for e in expenses)
@@ -361,6 +365,7 @@ def expenses_list():
         page_title="Expenses",
         expenses=expenses,
         categories=categories,
+        supplier_ids=supplier_ids,
         total_expenses=total_expenses,
         date_from=date_from,
         date_to=date_to,
@@ -468,20 +473,16 @@ def daily_closing():
                 flash(f"Error saving note: {e}", "danger")
         return redirect(url_for("accounting.daily_closing"))
 
-    # Today's summary — use invoices (vet payments table belongs to Waslny taxi app)
+    # Cash collected today = the payments actually received today. Same basis as
+    # the cash-flow page, so the figure and the rows behind it agree.
     try:
-        today_revenue = float(conn.execute(
-            """SELECT COALESCE(SUM(paid_amount), 0) FROM invoices
-               WHERE status IN ('Paid','Partial')
-                 AND SUBSTRING(issue_date::text, 1, 10) = ?""",
+        row = conn.execute(
+            """SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM payments
+               WHERE SUBSTR(received_at, 1, 10) = ?""",
             (today,)
-        ).fetchone()[0] or 0)
-        tx_count_in = conn.execute(
-            """SELECT COUNT(*) FROM invoices
-               WHERE status IN ('Paid','Partial')
-                 AND SUBSTRING(issue_date::text, 1, 10) = ?""",
-            (today,)
-        ).fetchone()[0]
+        ).fetchone()
+        today_revenue = float(row[0] or 0)
+        tx_count_in = row[1]
     except Exception:
         today_revenue = 0.0
         tx_count_in = 0

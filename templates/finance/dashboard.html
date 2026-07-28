@@ -111,9 +111,19 @@ tr:hover td { background:rgba(0,0,0,.02); }
     <tbody>
       {% for inv in recent_invoices %}
       <tr>
-        <td style="font-weight:700; color:var(--cl-primary);">{{ inv.invoice_number }}</td>
-        <td>{{ inv.owner_name or '—' }}</td>
-        <td style="color:var(--cl-muted);">{{ inv.pet_name or '—' }}</td>
+        <td style="font-weight:700; color:var(--cl-primary);">
+          <a href="{{ url_for('finance.invoice_detail', inv_id=inv.id) }}" style="text-decoration:none; color:inherit;">{{ inv.invoice_number }}</a>
+        </td>
+        <td>
+          {% if inv.owner_id and inv.owner_name %}
+          <a href="{{ url_for('crm.owner_detail', owner_id=inv.owner_id) }}" style="color:var(--cl-primary); text-decoration:none;">{{ inv.owner_name }}</a>
+          {% else %}{{ inv.owner_name or '—' }}{% endif %}
+        </td>
+        <td style="color:var(--cl-muted);">
+          {% if inv.pet_id and inv.pet_name %}
+          <a href="{{ url_for('crm.pet_detail', pet_id=inv.pet_id) }}" style="color:var(--cl-primary); text-decoration:none;">{{ inv.pet_name }}</a>
+          {% else %}{{ inv.pet_name or '—' }}{% endif %}
+        </td>
         <td style="color:var(--cl-muted);">{{ inv.issue_date }}</td>
         <td style="text-align:right; font-weight:600;">{{ "{:,.0f}".format(inv.total or 0) }}</td>
         <td style="text-align:right; color:var(--cl-warning); font-weight:600;">{{ "{:,.0f}".format(inv.due_amount or 0) }}</td>

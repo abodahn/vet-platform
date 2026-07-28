@@ -172,7 +172,11 @@
       {% for tx in recent_transactions %}
       <tr>
         <td style="color:var(--cl-muted);">{{ (tx.tx_date or '')[:10] }}</td>
-        <td>{{ tx.description or '—' }}</td>
+        <td>
+          {% if tx.invoice_id %}
+          <a href="{{ url_for('finance.invoice_detail', inv_id=tx.invoice_id) }}" style="color:var(--cl-primary); text-decoration:none;">{{ tx.description or '—' }}</a>
+          {% else %}{{ tx.description or '—' }}{% endif %}
+        </td>
         <td>
           {% if tx.tx_type == 'revenue' %}
             <span class="pf-badge success">{{ t('Revenue', 'إيرادات') }}</span>

@@ -87,7 +87,14 @@
       {% for m in movements %}
       <tr class="{{ 'row-in' if m.direction == 'in' else 'row-out' }}">
         <td style="color:var(--cl-muted);white-space:nowrap;">{{ (m.tx_date or '')[:10] }}</td>
-        <td>{{ m.description or '—' }}</td>
+        <td>
+          {% if m.invoice_id %}
+          <a href="{{ url_for('finance.invoice_detail', inv_id=m.invoice_id) }}" style="color:var(--cl-primary); text-decoration:none;">{{ m.description or '—' }}</a>
+          {% if m.owner_id and m.owner_name %}
+          <span style="color:var(--cl-muted);"> · </span><a href="{{ url_for('crm.owner_detail', owner_id=m.owner_id) }}" style="color:var(--cl-muted); text-decoration:none;">{{ m.owner_name }}</a>
+          {% endif %}
+          {% else %}{{ m.description or '—' }}{% endif %}
+        </td>
         <td style="color:var(--cl-muted);">{{ m.payment_method or t('Cash', 'نقداً') }}</td>
         <td>
           <span class="dir-badge {{ 'dir-in' if m.direction == 'in' else 'dir-out' }}">

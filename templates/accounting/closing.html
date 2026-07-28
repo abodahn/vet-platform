@@ -47,13 +47,23 @@
       <div class="cl-stats">
         <div class="cl-stat" style="background:#f0fdf4;">
           <div class="cl-stat-label">💵 {{ t('Cash Collected', 'النقد المحصّل') }}</div>
-          <div class="cl-stat-val" style="color:#15803d;">{{ "{:,.0f}".format(today_revenue) }}</div>
-          <div style="font-size:11px;color:var(--cl-muted);margin-top:4px;">{{ t('EGP', 'جنيه') }}</div>
+          <div class="cl-stat-val">
+            <a href="{{ url_for('accounting.cash_flow', date_from=today, date_to=today) }}"
+               style="color:#15803d; text-decoration:none;">{{ "{:,.0f}".format(today_revenue) }}</a>
+          </div>
+          <div style="font-size:11px;margin-top:4px;">
+            <a href="{{ url_for('accounting.cash_flow', date_from=today, date_to=today) }}" style="color:var(--cl-muted); text-decoration:none;">{{ t('EGP', 'جنيه') }} · {{ t('View payments', 'عرض المدفوعات') }} {{ t('→', '←') }}</a>
+          </div>
         </div>
         <div class="cl-stat" style="background:#fef2f2;">
           <div class="cl-stat-label">🧾 {{ t('Expenses Paid', 'المصروفات المدفوعة') }}</div>
-          <div class="cl-stat-val" style="color:#dc2626;">{{ "{:,.0f}".format(today_expenses) }}</div>
-          <div style="font-size:11px;color:var(--cl-muted);margin-top:4px;">{{ t('EGP', 'جنيه') }}</div>
+          <div class="cl-stat-val">
+            <a href="{{ url_for('accounting.expenses_list', date_from=today, date_to=today) }}"
+               style="color:#dc2626; text-decoration:none;">{{ "{:,.0f}".format(today_expenses) }}</a>
+          </div>
+          <div style="font-size:11px;margin-top:4px;">
+            <a href="{{ url_for('accounting.expenses_list', date_from=today, date_to=today) }}" style="color:var(--cl-muted); text-decoration:none;">{{ t('EGP', 'جنيه') }} · {{ t('View expenses', 'عرض المصروفات') }} {{ t('→', '←') }}</a>
+          </div>
         </div>
         <div class="cl-stat" style="background:{{ '#f0fdf4' if net_cash >= 0 else '#fef2f2' }};">
           <div class="cl-stat-label">📊 {{ t('Net Cash', 'صافي النقد') }}</div>

@@ -29,6 +29,7 @@ tr:hover td { background:rgba(0,0,0,.02); }
 <!-- Filters -->
 <div class="filter-bar">
   <form method="get" style="display:contents">
+    {% if owner_id %}<input type="hidden" name="owner_id" value="{{ owner_id }}">{% endif %}
     <div class="filter-group">
       <label class="filter-label">{{ t('Search', 'بحث') }}</label>
       <input class="filter-control" name="q" type="text" value="{{ search }}" placeholder="{{ t('Owner / Invoice #', 'المالك / رقم الفاتورة') }}" style="width:180px">
@@ -55,6 +56,18 @@ tr:hover td { background:rgba(0,0,0,.02); }
   </form>
 </div>
 
+{% if owner_id %}
+<div class="filter-bar" style="align-items:center;">
+  <span class="filter-label">{{ t('Filtered to client', 'مصفّاة على عميل') }}</span>
+  {% if owner_name %}
+  <a href="{{ url_for('crm.owner_detail', owner_id=owner_id) }}" style="color:var(--cl-primary); font-weight:700; text-decoration:none;">{{ owner_name }} {{ t('→', '←') }}</a>
+  {% else %}
+  <span style="color:var(--cl-muted);">{{ t('Client not found', 'العميل غير موجود') }}</span>
+  {% endif %}
+  <a href="{{ url_for('finance.invoices_list') }}" style="margin-inline-start:auto; padding:6px 14px; border:1.5px solid var(--cl-border); border-radius:8px; text-decoration:none; color:var(--cl-text); font-weight:600; font-size:12px;">{{ t('Clear', 'إلغاء التصفية') }}</a>
+</div>
+{% endif %}
+
 <div class="table-wrap">
   <table>
     <thead>
@@ -77,8 +90,16 @@ tr:hover td { background:rgba(0,0,0,.02); }
         <td style="font-weight:700; color:var(--cl-primary);">
           <a href="{{ url_for('finance.invoice_detail', inv_id=inv.id) }}" style="text-decoration:none; color:inherit;">{{ inv.invoice_number }}</a>
         </td>
-        <td>{{ inv.owner_name or '—' }}</td>
-        <td style="color:var(--cl-muted);">{{ inv.pet_name or '—' }}</td>
+        <td>
+          {% if inv.owner_id and inv.owner_name %}
+          <a href="{{ url_for('crm.owner_detail', owner_id=inv.owner_id) }}" style="color:var(--cl-primary); text-decoration:none;">{{ inv.owner_name }}</a>
+          {% else %}{{ inv.owner_name or '—' }}{% endif %}
+        </td>
+        <td style="color:var(--cl-muted);">
+          {% if inv.pet_id and inv.pet_name %}
+          <a href="{{ url_for('crm.pet_detail', pet_id=inv.pet_id) }}" style="color:var(--cl-primary); text-decoration:none;">{{ inv.pet_name }}</a>
+          {% else %}{{ inv.pet_name or '—' }}{% endif %}
+        </td>
         <td style="color:var(--cl-muted); white-space:nowrap;">{{ inv.issue_date }}</td>
         <td style="color:var(--cl-muted);">{{ inv.doctor_name or '—' }}</td>
         <td style="text-align:right; font-weight:600;">{{ "{:,.2f}".format(inv.total or 0) }}</td>

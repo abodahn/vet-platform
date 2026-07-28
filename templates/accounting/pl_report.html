@@ -58,11 +58,19 @@
   <div class="pl-sum-row">
     <div class="pl-sum-item" style="background:#f0fdf4;">
       <div class="pl-sum-label">{{ t('Total Revenue', 'إجمالي الإيرادات') }}</div>
-      <div class="pl-sum-val" style="color:#15803d;">{{ "{:,.0f}".format(total_revenue) }} EGP</div>
+      <div class="pl-sum-val">
+        <a href="{{ url_for('finance.invoices_list', date_from=date_from, date_to=date_to) }}"
+           style="color:#15803d; text-decoration:none;">{{ "{:,.0f}".format(total_revenue) }} EGP</a>
+      </div>
+      <div style="font-size:11px;margin-top:4px;"><a href="{{ url_for('finance.invoices_list', date_from=date_from, date_to=date_to) }}" style="color:var(--cl-muted); text-decoration:none;">{{ t('View invoices', 'عرض الفواتير') }} {{ t('→', '←') }}</a></div>
     </div>
     <div class="pl-sum-item" style="background:#fef2f2;">
       <div class="pl-sum-label">{{ t('Total Expenses', 'إجمالي المصروفات') }}</div>
-      <div class="pl-sum-val" style="color:#dc2626;">{{ "{:,.0f}".format(total_expenses) }} EGP</div>
+      <div class="pl-sum-val">
+        <a href="{{ url_for('accounting.expenses_list', date_from=date_from, date_to=date_to) }}"
+           style="color:#dc2626; text-decoration:none;">{{ "{:,.0f}".format(total_expenses) }} EGP</a>
+      </div>
+      <div style="font-size:11px;margin-top:4px;"><a href="{{ url_for('accounting.expenses_list', date_from=date_from, date_to=date_to) }}" style="color:var(--cl-muted); text-decoration:none;">{{ t('View expenses', 'عرض المصروفات') }} {{ t('→', '←') }}</a></div>
     </div>
     <div class="pl-sum-item" style="background:{{ '#f0fdf4' if net_profit >= 0 else '#fef2f2' }};">
       <div class="pl-sum-label">{{ t('Net Profit', 'صافي الربح') }}</div>
@@ -135,7 +143,10 @@
       <tbody>
         {% for row in expense_rows %}
         <tr>
-          <td>{{ row.category or t('General', 'عام') }}</td>
+          <td>
+            <a href="{{ url_for('accounting.expenses_list', category=row.category, date_from=date_from, date_to=date_to) }}"
+               style="color:var(--cl-primary); text-decoration:none;">{{ row.category or t('General', 'عام') }}</a>
+          </td>
           <td style="text-align:right;color:var(--cl-muted);">{{ row.count }}</td>
           <td style="text-align:right;font-weight:700;color:#dc2626;">{{ "{:,.0f}".format(row.total or 0) }}</td>
         </tr>

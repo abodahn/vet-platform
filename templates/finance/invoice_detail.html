@@ -85,13 +85,37 @@
         <div class="inv-parties">
           <div>
             <div class="party-label">{{ t('Bill To', 'فاتورة إلى') }}</div>
-            <div class="party-name">{{ invoice.owner_name or '—' }}</div>
+            <div class="party-name">
+              {% if invoice.owner_id and invoice.owner_name %}
+              <a href="{{ url_for('crm.owner_detail', owner_id=invoice.owner_id) }}"
+                 style="color:var(--cl-primary); text-decoration:none;">{{ invoice.owner_name }}</a>
+              {% else %}{{ invoice.owner_name or '—' }}{% endif %}
+            </div>
             {% if invoice.owner_phone %}<div class="party-info">{{ invoice.owner_phone }}</div>{% endif %}
+            {% if invoice.owner_id %}
+            <div class="party-info no-print">
+              <a href="{{ url_for('finance.invoices_list', owner_id=invoice.owner_id) }}"
+                 style="color:var(--cl-primary); text-decoration:none;">{{ t('All invoices for this client', 'كل فواتير هذا العميل') }} {{ t('→', '←') }}</a>
+            </div>
+            {% endif %}
           </div>
           <div>
             <div class="party-label">{{ t('Patient', 'المريض') }}</div>
-            <div class="party-name">{{ invoice.pet_name or '—' }}</div>
+            <div class="party-name">
+              {% if invoice.pet_id and invoice.pet_name %}
+              <a href="{{ url_for('crm.pet_detail', pet_id=invoice.pet_id) }}"
+                 style="color:var(--cl-primary); text-decoration:none;">{{ invoice.pet_name }}</a>
+              {% else %}{{ invoice.pet_name or '—' }}{% endif %}
+            </div>
             {% if invoice.doctor_name %}<div class="party-info">Dr. {{ invoice.doctor_name }}</div>{% endif %}
+            {% if visit %}
+            <div class="party-info no-print">
+              <a href="{{ url_for('visits.visit_detail', visit_id=visit.id) }}"
+                 style="color:var(--cl-primary); text-decoration:none;">
+                {{ t('Visit', 'الزيارة') }} {{ (visit.visit_date or '')[:10] }}{% if visit.visit_type %} · {{ visit.visit_type }}{% endif %} {{ t('→', '←') }}
+              </a>
+            </div>
+            {% endif %}
           </div>
         </div>
 
@@ -157,8 +181,10 @@
         {% for pay in invoice.payments %}
         <div class="pay-row">
           <div>
-            <div style="font-weight:600;">{{ "{:,.2f}".format(pay.amount) }} EGP</div>
-            <div style="font-size:11px; color:var(--cl-muted);">{{ pay.method }} · {{ pay.received_at[:10] if pay.received_at else '' }}</div>
+            <div style="font-weight:600;">{{ "{:,.2f}".format(pay.amount or 0) }} EGP</div>
+            <div style="font-size:11px; color:var(--cl-muted);">
+              {{ pay.method or t('Cash', 'نقداً') }} · {{ (pay.received_at or '')[:10] }}{% if pay.reference %} · {{ pay.reference }}{% endif %}
+            </div>
           </div>
           <div style="font-size:12px; color:var(--cl-muted);">{{ pay.received_by or '' }}</div>
         </div>
