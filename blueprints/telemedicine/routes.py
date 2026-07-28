@@ -21,20 +21,27 @@ TELEMEDICINE_FALLBACK_PRICE = 0.0
 # ── Table init ────────────────────────────────────────────────────────────────
 
 def _ensure_tables():
-    """Create telemedicine_sessions table if it doesn't exist.
-    Uses PostgreSQL-compatible syntax (SERIAL, NOW()); also works with SQLite
-    because the fallback path never uses SERIAL.
+    """Create telemedicine_sessions if it does not exist.
+
+    ONE portable definition, written SQLite-flavoured. `_fix_sql` translates
+    it for PostgreSQL (INTEGER PRIMARY KEY AUTOINCREMENT -> SERIAL,
+    datetime('now') -> NOW()), so both engines get correct DDL from the same
+    source.
+
+    It previously carried two full copies — a PostgreSQL one that raised on
+    SQLite, caught by a bare except, and a SQLite one in the handler. Two
+    definitions of the same table drift, and the swallowed exception meant a
+    genuine DDL failure looked identical to the normal path.
     """
     conn = get_db()
     try:
-        # Try PostgreSQL syntax first
         conn.execute("""
             CREATE TABLE IF NOT EXISTS telemedicine_sessions (
-                id              SERIAL PRIMARY KEY,
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 owner_id        INTEGER NOT NULL,
                 pet_id          INTEGER,
                 doctor_name     TEXT,
-                scheduled_at    TIMESTAMP NOT NULL,
+                scheduled_at    TEXT NOT NULL,
                 duration_min    INTEGER DEFAULT 30,
                 room_token      TEXT NOT NULL UNIQUE,
                 room_url        TEXT NOT NULL,
@@ -44,39 +51,20 @@ def _ensure_tables():
                 prescription_id INTEGER,
                 invoice_id      INTEGER,
                 created_by      TEXT,
-                created_at      TIMESTAMP DEFAULT NOW(),
-                started_at      TIMESTAMP,
-                ended_at        TIMESTAMP
+                created_at      TEXT DEFAULT (datetime('now')),
+                started_at      TEXT,
+                ended_at        TEXT
             )
         """)
         conn.commit()
     except Exception:
-        # SQLite fallback
-        try:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS telemedicine_sessions (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                    owner_id        INTEGER NOT NULL,
-                    pet_id          INTEGER,
-                    doctor_name     TEXT,
-                    scheduled_at    TEXT NOT NULL,
-                    duration_min    INTEGER DEFAULT 30,
-                    room_token      TEXT NOT NULL UNIQUE,
-                    room_url        TEXT NOT NULL,
-                    status          TEXT DEFAULT 'Scheduled',
-                    chief_complaint TEXT,
-                    notes           TEXT,
-                    prescription_id INTEGER,
-                    invoice_id      INTEGER,
-                    created_by      TEXT,
-                    created_at      TEXT DEFAULT (datetime('now')),
-                    started_at      TEXT,
-                    ended_at        TEXT
-                )
-            """)
-            conn.commit()
-        except Exception:
-            pass
+        # A real DDL failure now surfaces instead of being swallowed by a
+        # second attempt. The route still renders — a broken telemedicine
+        # table must not take down the app — but the reason is in the log
+        # rather than invisible.
+        logger.exception(
+            "Could not create telemedicine_sessions — the telemedicine module "
+            "will not work until this is resolved")
     finally:
         conn.close()
 

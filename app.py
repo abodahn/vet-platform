@@ -422,6 +422,21 @@ def _start_scheduler(app, backup_dir: str) -> None:
         scheduler.add_job(_backup_health, CronTrigger(hour=9, minute=5),
                           id="backup_health")
 
+        # LOG_FILE_RETENTION_DAYS between restarts. init_logging() sweeps at
+        # startup, which is enough for a clinic PC that reboots — but a VPS
+        # instance can stay up for months and would keep expired logs forever.
+        def _log_retention():
+            with app.app_context():
+                try:
+                    from models.logging_db import cleanup_old_logs
+                    n = cleanup_old_logs()
+                    if n:
+                        logger.info("Log retention: deleted %d expired log file(s)", n)
+                except Exception:
+                    logger.exception("Log retention sweep failed")
+        scheduler.add_job(_log_retention, CronTrigger(hour=3, minute=30),
+                          id="log_retention")
+
         scheduler.start()
         # Exposed so /healthz can tell "scheduler dead" from "another worker
         # owns it" — without the handle those two look identical.

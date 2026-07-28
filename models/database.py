@@ -2200,13 +2200,41 @@ def get_clinic() -> dict:
     return result
 
 def update_clinic(data: dict, updated_by: str = "system") -> None:
-    """Update clinic settings and invalidate the cache."""
+    """Update clinic settings and invalidate the cache.
+
+    Had zero callers and was broken for both engines when found: it built
+    `%s` placeholders by hand and used `NOW()`, neither of which survives the
+    SQLite path, while `_fix_sql` only translates in the other direction. The
+    settings blueprint writes its own portable UPDATE instead. Repaired rather
+    than deleted so the next person who reaches for the obvious function name
+    gets working code instead of a landmine.
+    """
+    if not data:
+        return
+    # ? is the portable placeholder — _fix_sql rewrites it to %s for PostgreSQL.
+    # Column names are interpolated, so they must never come from user input;
+    # restrict them to the real columns of the table.
+    allowed = {
+        "name", "name_ar", "phone", "email", "address", "address_ar", "website",
+        "tax_number", "license_number", "doctor_name", "tagline", "logo_data",
+        "currency", "timezone",
+    }
+    fields = {k: v for k, v in data.items() if k in allowed}
+    if not fields:
+        logger.warning("update_clinic called with no recognised columns: %s",
+                       sorted(data))
+        return
+    sets = ", ".join(f"{k}=?" for k in fields)
+    vals = list(fields.values())
     conn = get_db()
-    sets = ", ".join(f"{k}=%s" for k in data)
-    vals = list(data.values())
-    with conn:
-        conn.execute(f"UPDATE clinic SET {sets}, updated_at=NOW() WHERE id=1", vals)
-    conn.close()
+    try:
+        with conn:
+            conn.execute(
+                f"UPDATE clinic SET {sets}, updated_at=datetime('now') WHERE id=1",
+                vals,
+            )
+    finally:
+        conn.close()
     cache_invalidate("clinic_row")
 
 # ── SETTINGS ───────────────────────────────────────────────────
