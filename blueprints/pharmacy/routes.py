@@ -21,15 +21,15 @@ def index():
     """Dispensing queue — all prescriptions pending full dispensing."""
     conn = get_db()
     prescriptions = conn.execute("""
-        SELECT pr.*, v.visit_date, v.doctor_name,
-               p.pet_name, p.species,
-               o.full_name owner_name, o.phone owner_phone,
+        SELECT pr.*, v.id linked_visit_id, v.visit_date, v.doctor_name,
+               p.id linked_pet_id, p.pet_name, p.species,
+               o.id linked_owner_id, o.full_name owner_name, o.phone owner_phone,
                (SELECT COUNT(*) FROM prescription_items pi WHERE pi.prescription_id=pr.id) item_count,
                (SELECT COUNT(*) FROM prescription_items pi WHERE pi.prescription_id=pr.id AND pi.dispensed=1) dispensed_count
         FROM prescriptions pr
-        JOIN visits v ON v.id=pr.visit_id
-        JOIN pets p ON p.id=pr.pet_id
-        JOIN owners o ON o.id=pr.owner_id
+        LEFT JOIN visits v ON v.id=pr.visit_id
+        LEFT JOIN pets p ON p.id=pr.pet_id
+        LEFT JOIN owners o ON o.id=pr.owner_id
         WHERE pr.status != 'Dispensed'
         ORDER BY pr.created_at DESC
         LIMIT 100
@@ -73,14 +73,18 @@ def history():
 @login_required
 def rx_detail(rx_id):
     conn = get_db()
+    # LEFT JOINs: a prescription whose visit/pet/owner row is gone must still open
+    # — a pharmacist has to be able to see what is being dispensed. The
+    # linked_*_id columns are NULL exactly when the row is missing, so the
+    # template links only what actually exists.
     rx = conn.execute("""
-        SELECT pr.*, v.visit_date, v.doctor_name, v.chief_complaint,
-               p.pet_name, p.species, p.weight_kg,
-               o.full_name owner_name, o.phone
+        SELECT pr.*, v.id linked_visit_id, v.visit_date, v.doctor_name, v.chief_complaint,
+               p.id linked_pet_id, p.pet_name, p.species, p.breed, p.weight_kg,
+               o.id linked_owner_id, o.full_name owner_name, o.phone
         FROM prescriptions pr
-        JOIN visits v ON v.id=pr.visit_id
-        JOIN pets p ON p.id=pr.pet_id
-        JOIN owners o ON o.id=pr.owner_id
+        LEFT JOIN visits v ON v.id=pr.visit_id
+        LEFT JOIN pets p ON p.id=pr.pet_id
+        LEFT JOIN owners o ON o.id=pr.owner_id
         WHERE pr.id=?
     """, (rx_id,)).fetchone()
     if not rx:

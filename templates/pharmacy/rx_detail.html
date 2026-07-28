@@ -12,18 +12,44 @@
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px">
   <div class="pf-card" style="padding:16px">
     <div class="pf-label">{{ t('Patient', 'المريض') }}</div>
-    <div style="font-weight:700;font-size:16px">{{ rx.pet_name }}</div>
+    <div style="font-weight:700;font-size:16px">
+      {% if rx.linked_pet_id %}
+      <a href="{{ url_for('crm.pet_detail', pet_id=rx.linked_pet_id) }}">{{ rx.pet_name }}</a>
+      {% else %}{{ rx.pet_name or '—' }}{% endif %}
+    </div>
     <div style="font-size:13px;color:var(--cl-text-light)">{{ rx.species }} · {{ rx.weight_kg or '?' }} kg</div>
+    {% if rx.linked_pet_id %}
+    <div style="font-size:12px;margin-top:6px">
+      <a href="{{ url_for('imaging.pet_studies', pet_id=rx.linked_pet_id) }}">{{ t('Imaging →', 'الأشعة ←') }}</a>
+      ·
+      <a href="{{ url_for('clinical.vaccinations', pet_id=rx.linked_pet_id) }}">{{ t('Vaccinations →', 'التطعيمات ←') }}</a>
+    </div>
+    {% endif %}
   </div>
   <div class="pf-card" style="padding:16px">
     <div class="pf-label">{{ t('Owner', 'المالك') }}</div>
-    <div style="font-weight:700">{{ rx.owner_name }}</div>
+    <div style="font-weight:700">
+      {% if rx.linked_owner_id %}
+      <a href="{{ url_for('crm.owner_detail', owner_id=rx.linked_owner_id) }}">{{ rx.owner_name }}</a>
+      {% else %}{{ rx.owner_name or '—' }}{% endif %}
+    </div>
     <div style="font-size:13px;color:var(--cl-text-light)">{{ rx.phone or '—' }}</div>
   </div>
   <div class="pf-card" style="padding:16px">
     <div class="pf-label">{{ t('Doctor / Visit', 'الطبيب / الزيارة') }}</div>
     <div style="font-weight:700">{{ rx.doctor_name or '—' }}</div>
     <div style="font-size:13px;color:var(--cl-text-light)">{{ rx.visit_date or '—' }}</div>
+    {% if rx.linked_visit_id %}
+    <div style="font-size:12px;margin-top:6px">
+      <a href="{{ url_for('visits.visit_detail', visit_id=rx.linked_visit_id) }}">
+        {{ t('Open the visit that prescribed this →', 'فتح الزيارة التي وصفت هذا ←') }}
+      </a>
+    </div>
+    {% else %}
+    <div style="font-size:12px;margin-top:6px;color:var(--cl-text-light)">
+      {{ t('No visit record is linked to this prescription.', 'لا توجد زيارة مرتبطة بهذه الوصفة.') }}
+    </div>
+    {% endif %}
   </div>
   <div class="pf-card" style="padding:16px">
     <div class="pf-label">{{ t('Status', 'الحالة') }}</div>
@@ -145,4 +171,38 @@
 {% if can_dispense and rx.status != 'Dispensed' %}
 </form>
 {% endif %}
+
+{#
+  Clinical decision support entry point.
+
+  Deliberately fail-closed and opt-in, matching the "Not checked" banner in
+  visits/visit_detail.html: nothing is screened until a human asks for it, and
+  opening the reference is never presented as clearing the prescription. The
+  underlying drug data is DRAFT and unreviewed, so this is a reference tool,
+  not a control.
+#}
+<div class="pf-card" style="margin-top:16px;padding:14px 16px;background:#f1f5f9;border:1.5px solid #94a3b8;color:#334155">
+  <div style="font-weight:700;margin-bottom:4px">
+    {{ t('❔ Not screened', '❔ لم يتم الفحص') }}
+  </div>
+  <div style="font-size:13px;line-height:1.6">
+    {{ t('This prescription has not been checked against species contraindications, drug interactions or dosing. That is not a statement that it is safe — verify manually.',
+         'لم تُفحص هذه الوصفة للبحث عن موانع الاستعمال حسب النوع أو التداخلات الدوائية أو الجرعات. هذا ليس تأكيداً على سلامتها — تحقق يدوياً.') }}
+  </div>
+  <form method="post" action="{{ url_for('cds.index') }}" style="margin-top:10px">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <textarea name="drugs" hidden>{% for item in items %}{{ item.medication_name or item.item_name or '' }}
+{% endfor %}</textarea>
+    <input type="hidden" name="species" value="{{ rx.species or '' }}">
+    <input type="hidden" name="breed" value="{{ rx.breed or '' }}">
+    <input type="hidden" name="weight_kg" value="{{ rx.weight_kg or '' }}">
+    <button type="submit" class="pf-btn pf-btn-secondary">
+      {{ t('Open drug reference for this patient →', 'فتح المرجع الدوائي لهذا المريض ←') }}
+    </button>
+  </form>
+  <div style="font-size:11.5px;margin-top:8px;line-height:1.5">
+    {{ t('Reference data is a DRAFT that has not been reviewed by a licensed veterinarian. Opening it does not check, clear or approve this prescription.',
+         'بيانات المرجع مسودة لم يراجعها طبيب بيطري مرخّص. فتحه لا يفحص هذه الوصفة ولا يجيزها ولا يعتمدها.') }}
+  </div>
+</div>
 {% endblock %}

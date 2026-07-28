@@ -46,11 +46,12 @@ ANESTHESIA_TYPES = ["General", "Local", "Sedation"]
 def _get_lab_requests(status_filter: str = "") -> list:
     conn = db.get_db()
     q = """
-        SELECT lr.*, p.pet_name, p.species, o.full_name owner_name,
-               v.visit_date, v.doctor_name
+        SELECT lr.*, p.id linked_pet_id, p.pet_name, p.species,
+               o.id linked_owner_id, o.full_name owner_name,
+               v.id linked_visit_id, v.visit_date, v.doctor_name
         FROM lab_requests lr
-        JOIN pets p ON p.id = lr.pet_id
-        JOIN owners o ON o.id = p.owner_id
+        LEFT JOIN pets p ON p.id = lr.pet_id
+        LEFT JOIN owners o ON o.id = p.owner_id
         LEFT JOIN visits v ON v.id = lr.visit_id
         WHERE 1=1
     """
@@ -158,11 +159,12 @@ def lab_new():
 def lab_detail(lab_id: int):
     conn = db.get_db()
     row = conn.execute(
-        """SELECT lr.*, p.pet_name, p.species, o.full_name owner_name,
-                  v.visit_date, v.doctor_name
+        """SELECT lr.*, p.id linked_pet_id, p.pet_name, p.species,
+                  o.id linked_owner_id, o.full_name owner_name,
+                  v.id linked_visit_id, v.visit_date, v.doctor_name
            FROM lab_requests lr
-           JOIN pets p ON p.id = lr.pet_id
-           JOIN owners o ON o.id = p.owner_id
+           LEFT JOIN pets p ON p.id = lr.pet_id
+           LEFT JOIN owners o ON o.id = p.owner_id
            LEFT JOIN visits v ON v.id = lr.visit_id
            WHERE lr.id = ?""",
         (lab_id,),
@@ -226,14 +228,22 @@ def lab_results(lab_id: int):
 @clinical_bp.route("/vaccinations")
 @login_required
 def vaccinations():
+    # ?pet_id= narrows the page to one animal, so a vaccination record can lead
+    # back to the rest of that pet's schedule.
+    pet_id   = request.args.get("pet_id", type=int)
+    pet      = db.get_pet(pet_id) if pet_id else None
     upcoming = db.get_upcoming_vaccines(days=30)
-    all_vacs = db.list_vaccinations(limit=200)
+    if pet_id:
+        upcoming = [v for v in upcoming if v.get("pet_id") == pet_id]
+    all_vacs = db.list_vaccinations(pet_id=pet_id, limit=200)
     return render_template(
         "clinical/vaccinations.html",
         active="clinical",
         page_title="Vaccinations",
         upcoming=upcoming,
         all_vacs=all_vacs,
+        pet=pet,
+        pet_id=pet_id,
         today=date.today().isoformat(),
     )
 

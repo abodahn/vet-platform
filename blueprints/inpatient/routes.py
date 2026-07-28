@@ -102,13 +102,17 @@ def _get_stay(stay_id: int):
     conn = db.get_db()
     row = conn.execute("""
         SELECT s.*,
+               p.id AS linked_pet_id,
                p.pet_name, p.species, p.breed, p.sex, p.dob, p.weight_kg,
                p.allergies, p.chronic_conditions,
+               o.id AS linked_owner_id,
                o.full_name  AS owner_name, o.phone AS owner_phone,
+               v.id AS linked_visit_id, v.visit_date,
                u.full_name  AS admitted_by_name
         FROM inpatient_stays s
         JOIN pets   p ON p.id = s.pet_id
         JOIN owners o ON o.id = s.owner_id
+        LEFT JOIN visits v ON v.id = s.visit_id
         JOIN users  u ON u.id = s.admitted_by
         WHERE s.id = ?
     """, (stay_id,)).fetchone()
@@ -252,6 +256,17 @@ def stay_detail(stay_id: int):
         ORDER BY m.given_at DESC
     """, (stay_id,)).fetchall()
 
+    # A stay accrues charges, so the person paying has to be reachable from it.
+    # There is no stays→invoices FK; the billing link runs through the
+    # originating visit, and is simply absent when the stay has no visit.
+    invoice = None
+    if stay.get("visit_id"):
+        invoice = conn.execute(
+            "SELECT id, invoice_number, status, total, due_amount "
+            "FROM invoices WHERE visit_id=? ORDER BY id DESC LIMIT 1",
+            (stay["visit_id"],)).fetchone()
+        invoice = dict(invoice) if invoice else None
+
     conn.close()
 
     nights = _nights(stay["admitted_at"], stay.get("discharged_at"))
@@ -264,6 +279,7 @@ def stay_detail(stay_id: int):
         meds=[dict(m) for m in meds],
         nights=nights,
         estimated_cost=estimated_cost,
+        invoice=invoice,
         routes_list=ROUTES,
         statuses=STATUSES,
         status_colors=STATUS_COLORS,

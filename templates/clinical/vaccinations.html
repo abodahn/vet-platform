@@ -60,6 +60,18 @@
 
 {% block content %}
 
+{% if pet_id %}
+<div class="pf-card" style="margin-bottom:1rem;padding:0.75rem 1.25rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
+  <span style="font-weight:700">
+    {{ t('Showing vaccinations for', 'عرض تطعيمات') }}
+    <a href="{{ url_for('crm.pet_detail', pet_id=pet_id) }}">{{ pet.pet_name if pet else ('#' ~ pet_id) }}</a>
+  </span>
+  <a href="{{ url_for('clinical.vaccinations') }}" class="pf-btn pf-btn-secondary" style="font-size:0.78rem;padding:0.2rem 0.6rem">
+    {{ t('Show all pets', 'عرض كل الحيوانات') }}
+  </a>
+</div>
+{% endif %}
+
 <!-- Due soon section -->
 {% if upcoming %}
 <div class="due-soon-banner">
@@ -67,14 +79,18 @@
   {% for v in upcoming %}
   <div class="due-card">
     <div style="flex:1">
-      <div style="font-weight:700">{{ v.pet_name }}</div>
+      <div style="font-weight:700">
+        {% if v.pet_id %}
+        <a href="{{ url_for('crm.pet_detail', pet_id=v.pet_id) }}">{{ v.pet_name }}</a>
+        {% else %}{{ v.pet_name or '—' }}{% endif %}
+      </div>
       <div style="font-size:0.82rem;color:#92400e">{{ v.vaccine_name }}</div>
       <div style="font-size:0.78rem;color:#b45309">Owner: {{ v.owner_name }}
         {% if v.whatsapp_phone %} · {{ v.whatsapp_phone }}{% endif %}
       </div>
     </div>
     <span class="due-date-badge">Due {{ v.next_due_at }}</span>
-    <a href="{{ url_for('clinical.vaccination_new') }}?pet_id={{ v.pet_id }}"
+    <a href="{{ url_for('clinical.vaccination_new', pet_id=v.pet_id) }}"
        class="pf-btn pf-btn-secondary" style="font-size:0.78rem;padding:0.25rem 0.65rem">
       {{ t('Record', 'تسجيل') }}
     </a>
@@ -114,9 +130,18 @@
         {% for v in all_vacs %}
         <tr>
           <td>
-            <div style="font-weight:600">{{ v.pet_name }}</div>
+            <div style="font-weight:600">
+              {% if v.pet_id %}
+              <a href="{{ url_for('crm.pet_detail', pet_id=v.pet_id) }}">{{ v.pet_name }}</a>
+              {% else %}{{ v.pet_name or '—' }}{% endif %}
+            </div>
             {% if v.owner_name %}
             <div style="font-size:0.78rem;color:var(--text-muted)">{{ v.owner_name }}</div>
+            {% endif %}
+            {% if v.pet_id and not pet_id %}
+            <div style="font-size:0.72rem">
+              <a href="{{ url_for('clinical.vaccinations', pet_id=v.pet_id) }}">{{ t('All vaccinations for this pet →', 'كل تطعيمات هذا الحيوان ←') }}</a>
+            </div>
             {% endif %}
           </td>
           <td>

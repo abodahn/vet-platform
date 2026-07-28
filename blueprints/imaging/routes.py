@@ -298,11 +298,17 @@ def upload():
 def study_detail(study_id):
     conn = _get_db()
     try:
+        # linked_*_id is NULL when the row is missing, so the template can tell
+        # "no visit recorded" apart from "visit recorded but deleted" and link
+        # only what actually resolves.
         row = conn.execute("""
-            SELECT s.*, p.pet_name, p.species, o.full_name AS owner_name
+            SELECT s.*, p.id linked_pet_id, p.pet_name, p.species,
+                   o.id linked_owner_id, o.full_name AS owner_name,
+                   v.id linked_visit_id, v.visit_date
             FROM imaging_studies s
             LEFT JOIN pets   p ON p.id = s.pet_id
             LEFT JOIN owners o ON o.id = s.owner_id
+            LEFT JOIN visits v ON v.id = s.visit_id
             WHERE s.id=?
         """, (study_id,)).fetchone()
         study = dict(row) if row else None

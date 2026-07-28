@@ -9,6 +9,9 @@ from blueprints.auth.routes import login_required
 from models.database import get_db
 from datetime import date, datetime, timedelta
 import sqlite3
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _doctor_name():
@@ -35,8 +38,8 @@ def workspace():
                    FROM appointments a
                    JOIN owners o ON o.id = a.owner_id
                    JOIN pets p ON p.id = a.pet_id
-                   WHERE DATE(a.appointment_date) = ?
-                   ORDER BY a.appointment_date""", (today,)
+                   WHERE a.appt_date = ?
+                   ORDER BY a.appt_date, a.appt_start""", (today,)
             ).fetchall()
         else:
             todays_appointments = conn.execute(
@@ -45,12 +48,16 @@ def workspace():
                    FROM appointments a
                    JOIN owners o ON o.id = a.owner_id
                    JOIN pets p ON p.id = a.pet_id
-                   WHERE DATE(a.appointment_date) = ?
+                   WHERE a.appt_date = ?
                      AND LOWER(a.doctor_name) LIKE ?
-                   ORDER BY a.appointment_date""",
+                   ORDER BY a.appt_date, a.appt_start""",
                 (today, f"%{doctor.lower()}%")
             ).fetchall()
     except Exception:
+        # This swallow is why the queue was empty for the module's entire
+        # life: it queried a.appointment_date, a column that does not exist
+        # (it is appt_date), and the OperationalError vanished here.
+        logger.exception("Doctor queue query failed — showing an empty queue")
         todays_appointments = []
 
     try:
@@ -77,6 +84,7 @@ def workspace():
                 (f"%{doctor.lower()}%",)
             ).fetchall()
     except Exception:
+        logger.exception("Open-visits query failed — showing none")
         open_visits = []
 
     try:
@@ -136,8 +144,8 @@ def queue():
                    FROM appointments a
                    JOIN owners o ON o.id = a.owner_id
                    JOIN pets p ON p.id = a.pet_id
-                   WHERE DATE(a.appointment_date) = ?
-                   ORDER BY a.appointment_date""", (today,)
+                   WHERE a.appt_date = ?
+                   ORDER BY a.appt_date, a.appt_start""", (today,)
             ).fetchall()
         else:
             appointments = conn.execute(
@@ -146,9 +154,9 @@ def queue():
                    FROM appointments a
                    JOIN owners o ON o.id = a.owner_id
                    JOIN pets p ON p.id = a.pet_id
-                   WHERE DATE(a.appointment_date) = ?
+                   WHERE a.appt_date = ?
                      AND LOWER(a.doctor_name) LIKE ?
-                   ORDER BY a.appointment_date""",
+                   ORDER BY a.appt_date, a.appt_start""",
                 (today, f"%{doctor.lower()}%")
             ).fetchall()
     except Exception:
@@ -227,8 +235,8 @@ def my_schedule():
                    FROM appointments a
                    JOIN owners o ON o.id = a.owner_id
                    JOIN pets p ON p.id = a.pet_id
-                   WHERE DATE(a.appointment_date) BETWEEN ? AND ?
-                   ORDER BY a.appointment_date""",
+                   WHERE a.appt_date BETWEEN ? AND ?
+                   ORDER BY a.appt_date, a.appt_start""",
                 (date_from, date_to)
             ).fetchall()
         else:
@@ -237,9 +245,9 @@ def my_schedule():
                    FROM appointments a
                    JOIN owners o ON o.id = a.owner_id
                    JOIN pets p ON p.id = a.pet_id
-                   WHERE DATE(a.appointment_date) BETWEEN ? AND ?
+                   WHERE a.appt_date BETWEEN ? AND ?
                      AND LOWER(a.doctor_name) LIKE ?
-                   ORDER BY a.appointment_date""",
+                   ORDER BY a.appt_date, a.appt_start""",
                 (date_from, date_to, f"%{doctor.lower()}%")
             ).fetchall()
     except Exception:
@@ -250,7 +258,7 @@ def my_schedule():
     for d in week_days:
         schedule[d.isoformat()] = []
     for a in appointments:
-        day_key = (a["appointment_date"] or "")[:10]
+        day_key = (a["appt_date"] or "")[:10]
         if day_key in schedule:
             schedule[day_key].append(a)
 

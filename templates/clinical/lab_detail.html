@@ -97,12 +97,32 @@
       {% endif %}
       <div class="lab-info-item">
         <label>{{ t('Patient', 'المريض') }}</label>
-        <div class="val">{{ lab.pet_name }}</div>
+        <div class="val">
+          {% if lab.linked_pet_id %}
+          <a href="{{ url_for('crm.pet_detail', pet_id=lab.linked_pet_id) }}">{{ lab.pet_name }}</a>
+          {% else %}{{ lab.pet_name or '—' }}{% endif %}
+        </div>
         <div style="font-size:0.8rem;color:var(--text-muted)">{{ lab.species }}</div>
       </div>
       <div class="lab-info-item">
         <label>{{ t('Owner', 'المالك') }}</label>
-        <div class="val">{{ lab.owner_name }}</div>
+        <div class="val">
+          {% if lab.linked_owner_id %}
+          <a href="{{ url_for('crm.owner_detail', owner_id=lab.linked_owner_id) }}">{{ lab.owner_name }}</a>
+          {% else %}{{ lab.owner_name or '—' }}{% endif %}
+        </div>
+      </div>
+      <div class="lab-info-item">
+        <label>{{ t('Visit', 'الزيارة') }}</label>
+        {% if lab.linked_visit_id %}
+        <div class="val">
+          <a href="{{ url_for('visits.visit_detail', visit_id=lab.linked_visit_id) }}">{{ lab.visit_date or t('Open visit', 'فتح الزيارة') }}</a>
+        </div>
+        {% else %}
+        <div class="val" style="font-weight:400;color:var(--text-muted)">
+          {{ t('Not linked to a visit', 'غير مرتبط بزيارة') }}
+        </div>
+        {% endif %}
       </div>
       {% if lab.doctor_name %}
       <div class="lab-info-item">

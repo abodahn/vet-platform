@@ -57,13 +57,20 @@
         <tr>
           <td style="white-space:nowrap;font-weight:600">{{ (a.appointment_date or '')[-8:-3] }}</td>
           <td>
-            <strong>{{ a.pet_name }}</strong><br>
+            <strong>
+              {% if a.pet_id %}<a href="{{ url_for('crm.pet_detail', pet_id=a.pet_id) }}">{{ a.pet_name }}</a>
+              {% else %}{{ a.pet_name or '—' }}{% endif %}
+            </strong><br>
             <small style="color:var(--pf-muted)">
               {% if a.species == 'Dog' %}🐶{% elif a.species == 'Cat' %}🐱{% elif a.species == 'Bird' %}🦜{% else %}🐾{% endif %}
               {{ a.species }}
             </small>
           </td>
-          <td>{{ a.owner_name }}<br><small style="color:var(--pf-muted)">{{ a.owner_phone }}</small></td>
+          <td>
+            {% if a.owner_id %}<a href="{{ url_for('crm.owner_detail', owner_id=a.owner_id) }}">{{ a.owner_name }}</a>
+            {% else %}{{ a.owner_name or '—' }}{% endif %}
+            <br><small style="color:var(--pf-muted)">{{ a.owner_phone }}</small>
+          </td>
           <td style="font-size:.85rem;color:var(--pf-muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.reason or '—' }}</td>
           <td>
             {% if a.status == 'Scheduled' %}<span class="pf-badge warning">{{ t('Scheduled', 'مجدول') }}</span>

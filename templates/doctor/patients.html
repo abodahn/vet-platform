@@ -36,8 +36,9 @@
       <div style="font-size:.78rem;color:var(--pf-muted)">Last visit: {{ (p.last_visit or '')[:10] }}</div>
       {% endif %}
       <div style="margin-top:1rem;display:flex;gap:.5rem">
-        <a href="{{ url_for('visits.visits_list') }}" class="pf-btn pf-btn-primary" style="flex:1;text-align:center;font-size:.8rem;padding:5px 8px">{{ t('📋 Visits', '📋 الزيارات') }}</a>
-        <a href="{{ url_for('crm.owner_detail', owner_id=p.id) }}" class="pf-btn pf-btn-ghost" style="font-size:.8rem;padding:5px 8px">{{ t('Profile', 'الملف') }}</a>
+        {# p.id is the PET id (SELECT DISTINCT p.id … FROM pets p), so this must be pet_detail. #}
+        <a href="{{ url_for('crm.pet_detail', pet_id=p.id) }}" class="pf-btn pf-btn-primary" style="flex:1;text-align:center;font-size:.8rem;padding:5px 8px">{{ t('🐾 Pet record', '🐾 ملف الحيوان') }}</a>
+        <a href="{{ url_for('imaging.pet_studies', pet_id=p.id) }}" class="pf-btn pf-btn-ghost" style="font-size:.8rem;padding:5px 8px">{{ t('Imaging', 'الأشعة') }}</a>
       </div>
     </div>
   </div>

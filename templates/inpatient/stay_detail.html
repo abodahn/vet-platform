@@ -30,7 +30,7 @@
   </div>
   {% if stay.status != 'Discharged' %}
   <form method="post" action="{{ url_for('inpatient.update_status', stay_id=stay.id) }}" style="display:flex;gap:.4rem;align-items:center">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
     <select name="status" class="pf-input" style="font-size:.8rem;padding:4px 8px">
       {% for s in statuses %}{% if s != 'Discharged' %}
       <option value="{{ s }}" {% if stay.status==s %}selected{% endif %}>{{ s }}</option>
@@ -50,10 +50,33 @@
       <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">{{ t('Chronic', 'مزمن') }}</td>
           <td>{{ stay.chronic_conditions or '—' }}</td></tr>
       <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">{{ t('Owner', 'المالك') }}</td>
-          <td>{{ stay.owner_name }} · {{ stay.owner_phone }}</td></tr>
+          <td>
+            {% if stay.linked_owner_id %}
+            <a href="{{ url_for('crm.owner_detail', owner_id=stay.linked_owner_id) }}">{{ stay.owner_name }}</a>
+            {% else %}{{ stay.owner_name }}{% endif %} · {{ stay.owner_phone }}
+          </td></tr>
       <tr><td style="color:var(--cl-muted);padding:.25rem .5rem .25rem 0">{{ t('Admitted by', 'نوّمه') }}</td>
           <td>{{ stay.admitted_by_name }}</td></tr>
     </table>
+    <div style="margin-top:.75rem;display:flex;gap:.5rem;flex-wrap:wrap">
+      {% if stay.linked_pet_id %}
+      <a href="{{ url_for('crm.pet_detail', pet_id=stay.linked_pet_id) }}" class="pf-btn pf-btn-secondary" style="font-size:.78rem;padding:4px 10px">{{ t('🐾 Pet record', '🐾 ملف الحيوان') }}</a>
+      <a href="{{ url_for('imaging.pet_studies', pet_id=stay.linked_pet_id) }}" class="pf-btn pf-btn-secondary" style="font-size:.78rem;padding:4px 10px">{{ t('🩻 Imaging', '🩻 الأشعة') }}</a>
+      {% endif %}
+      {% if stay.linked_visit_id %}
+      <a href="{{ url_for('visits.visit_detail', visit_id=stay.linked_visit_id) }}" class="pf-btn pf-btn-secondary" style="font-size:.78rem;padding:4px 10px">{{ t('📋 Admitting visit', '📋 زيارة التنويم') }}</a>
+      {% endif %}
+      {% if invoice %}
+      <a href="{{ url_for('finance.invoice_detail', inv_id=invoice.id) }}" class="pf-btn pf-btn-secondary" style="font-size:.78rem;padding:4px 10px">
+        {{ t('💳 Invoice', '💳 الفاتورة') }} {{ invoice.invoice_number }} · {{ invoice.status }}
+      </a>
+      {% endif %}
+    </div>
+    {% if not invoice %}
+    <div style="margin-top:.5rem;font-size:.78rem;color:var(--cl-muted)">
+      {{ t('No invoice has been raised for this stay yet.', 'لم تُصدر فاتورة لهذه الإقامة بعد.') }}
+    </div>
+    {% endif %}
   </div>
   <div class="pf-card">
     <h3 style="font-size:.95rem;font-weight:700;margin-bottom:.75rem;color:var(--cl-primary)">{{ t('📋 Clinical', '📋 سريري') }}</h3>
@@ -131,7 +154,7 @@
   <div class="pf-card" style="width:620px;max-width:95vw;max-height:90vh;overflow-y:auto">
     <h3 style="margin-bottom:1rem">{{ t('📊 Record Clinical Round', '📊 تسجيل جولة سريرية') }}</h3>
     <form method="post" action="{{ url_for('inpatient.add_round', stay_id=stay.id) }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <div class="pf-form-grid">
         <div class="pf-form-group"><label class="pf-label">{{ t('Temp (°C)', 'الحرارة (°م)') }}</label>
           <input type="number" step="0.1" name="temp_c" class="pf-input" placeholder="38.5"></div>
@@ -167,7 +190,7 @@
   <div class="pf-card" style="width:480px;max-width:95vw">
     <h3 style="margin-bottom:1rem">{{ t('💊 Record Medication', '💊 تسجيل دواء') }}</h3>
     <form method="post" action="{{ url_for('inpatient.add_med', stay_id=stay.id) }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <div class="pf-form-grid">
         <div class="pf-form-group" style="grid-column:1/-1"><label class="pf-label">{{ t('Medication *', 'الدواء *') }}</label>
           <input type="text" name="medication" class="pf-input" required></div>
@@ -196,7 +219,7 @@
       {{ t('This will mark the stay as Discharged. Billing can then be generated from Finance.', 'سيتم تعليم الإقامة كمنتهية. يمكن بعدها إصدار الفاتورة من وحدة المالية.') }}
     </p>
     <form method="post" action="{{ url_for('inpatient.discharge', stay_id=stay.id) }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <label class="pf-label">{{ t('Discharge Notes / Owner Instructions', 'ملاحظات الخروج / تعليمات المالك') }}</label>
       <textarea name="discharge_notes" class="pf-input" rows="4" placeholder="{{ t('Follow-up date, medications to continue, diet, activity restrictions…', 'تاريخ المتابعة، الأدوية المستمرة، النظام الغذائي، قيود النشاط…') }}"></textarea>
       <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">

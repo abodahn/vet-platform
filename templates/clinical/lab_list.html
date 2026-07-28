@@ -105,7 +105,11 @@
           <tr>
             <td style="white-space:nowrap;color:var(--text-muted);font-size:0.83rem">{{ lab.created_at[:10] }}</td>
             <td>
-              <div style="font-weight:600">{{ lab.pet_name }}</div>
+              <div style="font-weight:600">
+                {% if lab.linked_pet_id %}
+                <a href="{{ url_for('crm.pet_detail', pet_id=lab.linked_pet_id) }}">{{ lab.pet_name }}</a>
+                {% else %}{{ lab.pet_name or '—' }}{% endif %}
+              </div>
               <div style="font-size:0.78rem;color:var(--text-muted)">{{ lab.species }} · {{ lab.owner_name }}</div>
             </td>
             <td>
@@ -152,7 +156,11 @@
           <tr>
             <td style="white-space:nowrap;color:var(--text-muted);font-size:0.83rem">{{ lab.created_at[:10] }}</td>
             <td>
-              <div style="font-weight:600">{{ lab.pet_name }}</div>
+              <div style="font-weight:600">
+                {% if lab.linked_pet_id %}
+                <a href="{{ url_for('crm.pet_detail', pet_id=lab.linked_pet_id) }}">{{ lab.pet_name }}</a>
+                {% else %}{{ lab.pet_name or '—' }}{% endif %}
+              </div>
               <div style="font-size:0.78rem;color:var(--text-muted)">{{ lab.species }} · {{ lab.owner_name }}</div>
             </td>
             <td><span style="font-weight:500">{{ lab.test_name }}</span></td>
@@ -195,7 +203,11 @@
           <tr>
             <td style="white-space:nowrap;color:var(--text-muted);font-size:0.83rem">{{ lab.created_at[:10] }}</td>
             <td>
-              <div style="font-weight:600">{{ lab.pet_name }}</div>
+              <div style="font-weight:600">
+                {% if lab.linked_pet_id %}
+                <a href="{{ url_for('crm.pet_detail', pet_id=lab.linked_pet_id) }}">{{ lab.pet_name }}</a>
+                {% else %}{{ lab.pet_name or '—' }}{% endif %}
+              </div>
               <div style="font-size:0.78rem;color:var(--text-muted)">{{ lab.species }} · {{ lab.owner_name }}</div>
             </td>
             <td><span style="font-weight:500">{{ lab.test_name }}</span></td>

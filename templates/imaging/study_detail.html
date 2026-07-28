@@ -4,7 +4,11 @@
 {% block page_sub %}{{ study.pet_name }} · {{ study.body_region or 'No region specified' }}{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('imaging.pet_studies', pet_id=study.pet_id) }}" class="pf-btn">{{ t('← Pet Studies', '← دراسات الحيوان') }}</a>
+  {% if study.linked_pet_id %}
+  <a href="{{ url_for('imaging.pet_studies', pet_id=study.linked_pet_id) }}" class="pf-btn">{{ t('← Pet Studies', '← دراسات الحيوان') }}</a>
+  {% else %}
+  <a href="{{ url_for('imaging.index') }}" class="pf-btn">{{ t('← Imaging', '← الأشعة') }}</a>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -32,9 +36,38 @@
   <div>
     <div class="v3-card" style="padding:20px;margin-bottom:18px;">
       <div style="font-weight:700;font-size:1rem;margin-bottom:14px;color:var(--cl-text);">{{ t('Study Details', 'تفاصيل الدراسة') }}</div>
+      {% set row_style = 'display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--cl-border);' %}
+      {% set key_style = 'color:var(--cl-muted);font-size:.87rem;font-weight:600;' %}
+      {% set val_style = 'color:var(--cl-text);font-size:.9rem;font-weight:500;' %}
+
+      <div style="{{ row_style }}">
+        <span style="{{ key_style }}">{{ t('Pet', 'الحيوان') }}</span>
+        <span style="{{ val_style }}">
+          {% if study.linked_pet_id %}
+          <a href="{{ url_for('crm.pet_detail', pet_id=study.linked_pet_id) }}">{{ study.pet_name }}</a>
+          {% else %}{{ study.pet_name or '—' }}{% endif %}
+        </span>
+      </div>
+      <div style="{{ row_style }}">
+        <span style="{{ key_style }}">{{ t('Owner', 'المالك') }}</span>
+        <span style="{{ val_style }}">
+          {% if study.linked_owner_id %}
+          <a href="{{ url_for('crm.owner_detail', owner_id=study.linked_owner_id) }}">{{ study.owner_name }}</a>
+          {% else %}{{ study.owner_name or '—' }}{% endif %}
+        </span>
+      </div>
+      <div style="{{ row_style }}">
+        <span style="{{ key_style }}">{{ t('Visit', 'الزيارة') }}</span>
+        <span style="{{ val_style }}">
+          {% if study.linked_visit_id %}
+          <a href="{{ url_for('visits.visit_detail', visit_id=study.linked_visit_id) }}">{{ study.visit_date or t('Open visit', 'فتح الزيارة') }}</a>
+          {% else %}
+          <span style="color:var(--cl-muted);font-weight:400">{{ t('Not linked to a visit', 'غير مرتبطة بزيارة') }}</span>
+          {% endif %}
+        </span>
+      </div>
+
       {% for label, val in [
-        ('Pet', study.pet_name),
-        ('Owner', study.owner_name),
         ('Study Type', study.study_type),
         ('Body Region', study.body_region or '—'),
         ('Recorded by', study.created_by or '—'),

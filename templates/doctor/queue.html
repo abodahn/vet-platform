@@ -44,13 +44,19 @@
         <td style="color:var(--pf-muted)">{{ loop.index }}</td>
         <td style="font-weight:700;white-space:nowrap">{{ (a.appointment_date or '')[-8:-3] }}</td>
         <td>
-          <strong>{{ a.pet_name }}</strong><br>
+          <strong>
+            {% if a.pet_id %}<a href="{{ url_for('crm.pet_detail', pet_id=a.pet_id) }}">{{ a.pet_name }}</a>
+            {% else %}{{ a.pet_name or '—' }}{% endif %}
+          </strong><br>
           <small style="color:var(--pf-muted)">
             {% if a.species == 'Dog' %}🐶{% elif a.species == 'Cat' %}🐱{% elif a.species == 'Bird' %}🦜{% else %}🐾{% endif %}
             {{ a.species }}{% if a.breed %} · {{ a.breed }}{% endif %}
           </small>
         </td>
-        <td>{{ a.owner_name }}</td>
+        <td>
+          {% if a.owner_id %}<a href="{{ url_for('crm.owner_detail', owner_id=a.owner_id) }}">{{ a.owner_name }}</a>
+          {% else %}{{ a.owner_name or '—' }}{% endif %}
+        </td>
         <td><a href="tel:{{ a.owner_phone }}" style="color:var(--pf-primary)">{{ a.owner_phone }}</a></td>
         <td style="font-size:.85rem;color:var(--pf-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.reason or '—' }}</td>
         <td>
