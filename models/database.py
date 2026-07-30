@@ -367,7 +367,50 @@ def _fix_sql_sqlite(sql: str) -> str:
     s = _sqlite_extract(s, lits)
     s = _sqlite_interval(s, lits)
     s = _sqlite_casts(s)
-    s = s.replace("NOW()", f"datetime({_tok(lits, chr(39) + 'now' + chr(39))})")
+    # SQLite's datetime('now') is UTC; PostgreSQL's NOW() is the SERVER's local
+    # time. That divergence is a real bug, not a cosmetic one, because the whole
+    # application reads back against local dates — 147 datetime('now') writes
+    # against 164 date.today() comparisons. Wherever local and UTC differ (Cairo
+    # between midnight and 03:00, and permanently for clinics far enough east),
+    # a row written "today" carries yesterday's date and vanishes from today's
+    # view. It hid a dispensing from the pharmacy history and re-sent every
+    # WhatsApp reminder on every run.
+    #
+    # Appending 'localtime' makes SQLite agree with PostgreSQL rather than
+    # introducing a third behaviour. Applied here, at the one choke point every
+    # statement passes through, instead of at 147 call sites.
+    #
+    # ponytail: the honest fix is storing UTC and converting on display; that is
+    # a schema-wide migration. This makes the two engines consistent today.
+    s = re.sub(r"\bdatetime\(\x00(\d+)\x00\)",
+               lambda m: (f"datetime({_tok(lits, chr(39) + 'now' + chr(39))},"
+                          f"{_tok(lits, chr(39) + 'localtime' + chr(39))})")
+               if lits[int(m.group(1))].strip("'\"") == "now"
+               else m.group(0), s)
+    s = s.replace("NOW()",
+                  f"datetime({_tok(lits, chr(39) + 'now' + chr(39))},"
+                  f"{_tok(lits, chr(39) + 'localtime' + chr(39))})")
+
+    # CURRENT_DATE / CURRENT_TIMESTAMP / CURRENT_TIME are UTC in SQLite and
+    # LOCAL in PostgreSQL — the same divergence as datetime('now') above, and
+    # fixing only that one left this half broken: a row stamped with local time
+    # then compared against CURRENT_DATE missed by a day. Caught by
+    # test_cast_end_to_end rather than by reading, which is the point of it.
+    _now = _tok(lits, chr(39) + "now" + chr(39))
+    _loc = _tok(lits, chr(39) + "localtime" + chr(39))
+    for kw, fn in (("CURRENT_TIMESTAMP", "datetime"),
+                   ("CURRENT_DATE", "date"),
+                   ("CURRENT_TIME", "time")):
+        call = f"{fn}({_now},{_loc})"
+        # A column DEFAULT must be a constant OR a parenthesised expression.
+        # `DEFAULT CURRENT_DATE` is legal because the keyword is special-cased
+        # by the parser; `DEFAULT date(...)` without parentheses is a syntax
+        # error — which is why the schema already writes DEFAULT (datetime(..)).
+        # Handle that form first, then any remaining bare keyword.
+        s = re.sub(rf"\bDEFAULT\s+{kw}\b", f"DEFAULT ({call})", s,
+                   flags=re.IGNORECASE)
+        s = re.sub(rf"\b{kw}\b", call, s)
+
     out = re.sub(r"\x00(\d+)\x00", lambda m: lits[int(m.group(1))], s)
     if len(_SQLITE_FIX_CACHE) >= _SQLITE_FIX_CACHE_MAX:
         _SQLITE_FIX_CACHE.clear()

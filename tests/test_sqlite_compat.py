@@ -102,7 +102,10 @@ def test_ilike_inside_literal_untouched():
 
 # ── 4. NOW() ──────────────────────────────────────────────────────
 def test_now(conn):
-    assert fix("UPDATE t SET a=NOW()") == "UPDATE t SET a=datetime('now')"
+    # 'localtime' is deliberate: SQLite's datetime('now') is UTC while
+    # PostgreSQL's NOW() is server-local, and the whole app reads back against
+    # local dates. Without it a row written "today" carried yesterday's date.
+    assert fix("UPDATE t SET a=NOW()") == "UPDATE t SET a=datetime('now','localtime')"
     conn.execute("CREATE TABLE t (a TEXT)")
     conn.execute("INSERT INTO t VALUES (NOW())")
     assert conn.execute("SELECT a FROM t").fetchone()["a"]
@@ -152,10 +155,14 @@ def test_bare_age_left_alone():
 # ── 6. INTERVAL ───────────────────────────────────────────────────
 def test_interval_on_current_date_stays_a_date(conn):
     assert fix("SELECT CURRENT_DATE - INTERVAL '90 days'") == \
-        "SELECT date(CURRENT_DATE, '-90 days')"
+        "SELECT date(date('now','localtime'), '-90 days')"
     conn.execute("CREATE TABLE u (hire_date TEXT)")
-    conn.execute("INSERT INTO u VALUES (date('now','-90 days'))")   # boundary
-    conn.execute("INSERT INTO u VALUES (date('now','-91 days'))")
+    # 'localtime' on the seed rows too: CURRENT_DATE is now rewritten to the
+    # local clock, and a bare date('now') here is UTC. Mixing the two is the
+    # exact bug this translation exists to remove, and it would put the
+    # boundary row one day the wrong side.
+    conn.execute("INSERT INTO u VALUES (date('now','localtime','-90 days'))")  # boundary
+    conn.execute("INSERT INTO u VALUES (date('now','localtime','-91 days'))")
     row = conn.execute(
         "SELECT COUNT(*) n FROM u WHERE hire_date >= (CURRENT_DATE - INTERVAL '90 days')"
     ).fetchone()
@@ -175,10 +182,12 @@ def test_interval_addition(conn):
 
 def test_interval_on_now_is_a_timestamp(conn):
     assert fix("DELETE FROM r WHERE run_at < NOW() - INTERVAL '30 days'") == \
-        "DELETE FROM r WHERE run_at < datetime(datetime('now'), '-30 days')"
+        "DELETE FROM r WHERE run_at < datetime(datetime('now','localtime'), '-30 days')"
 
 
 def test_compound_interval_left_alone():
+    # compound intervals stay untranslated so they fail loudly rather than
+    # returning a subtly wrong date
     assert "INTERVAL" in fix("SELECT CURRENT_DATE - INTERVAL '1 year 2 months'")
 
 

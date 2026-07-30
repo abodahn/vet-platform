@@ -4,17 +4,44 @@ Sends appointment reminders (next-day), vaccine due reminders, and overdue invoi
 Deduplication via reminder_runs table to prevent double-sending.
 """
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from models.database import get_db, log_audit
 
 logger = logging.getLogger(__name__)
 
 
+def _run_stamp() -> str:
+    """Timestamp written to reminder_runs — the CLINIC's local time.
+
+    Both sides of the dedup gate must agree on one clock, and they did not:
+    _mark_sent stored SQLite's datetime('now'), which is UTC, while the gate
+    compared DATE(run_at) against Python's date.today(), which is local. Where
+    those differ — anywhere far enough east at 09:00, and Cairo between
+    midnight and 03:00 — the gate could never match its own marker, so EVERY
+    client was re-reminded on EVERY run.
+
+    Local, not UTC, because the rest of this module already reasons in local
+    dates: _appointment_reminders selects tomorrow with date.today() + 1 and
+    _vaccine_reminders uses date.today(). "Already reminded today" means the
+    clinic's today, and the stored timestamp should read back the way the
+    clinic's own screens show it.
+
+    Binding it from Python also makes the two engines agree: _fix_sql rewrites
+    datetime('now') to NOW(), which PostgreSQL evaluates in the server's
+    timezone rather than the clinic's.
+    """
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _run_date() -> str:
+    """Local date, matching the stamp above."""
+    return date.today().isoformat()
+
+
 def _already_sent(conn, run_type: str, entity_id: int, entity_type: str) -> bool:
-    today = date.today().isoformat()
     row = conn.execute(
         "SELECT id FROM reminder_runs WHERE run_type=? AND entity_id=? AND entity_type=? AND DATE(run_at)=?",
-        (run_type, entity_id, entity_type, today)
+        (run_type, entity_id, entity_type, _run_date())
     ).fetchone()
     return row is not None
 
@@ -26,14 +53,14 @@ def _mark_sent(conn, run_type: str, entity_id: int, entity_type: str):
     # comes back tomorrow and a plain INSERT would violate the key and abort
     # the whole run. Refresh the existing row instead, insert only if new.
     cur = conn.execute(
-        "UPDATE reminder_runs SET status='sent', run_at=datetime('now') "
+        "UPDATE reminder_runs SET status='sent', run_at=? "
         "WHERE run_type=? AND entity_id=? AND entity_type=?",
-        (run_type, entity_id, entity_type)
+        (_run_stamp(), run_type, entity_id, entity_type)
     )
     if not cur.rowcount:
         conn.execute(
-            "INSERT INTO reminder_runs(run_type, entity_id, entity_type, status, run_at) VALUES(?,?,?,'sent',datetime('now'))",
-            (run_type, entity_id, entity_type)
+            "INSERT INTO reminder_runs(run_type, entity_id, entity_type, status, run_at) VALUES(?,?,?,'sent',?)",
+            (run_type, entity_id, entity_type, _run_stamp())
         )
 
 

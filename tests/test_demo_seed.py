@@ -215,8 +215,11 @@ def test_history_spans_several_months(seeded):
 
 def test_today_has_a_populated_schedule(seeded):
     path, _ = seeded
-    assert _count(path, "appointments", "appt_date = date('now')") >= 5
-    assert _count(path, "appointments", "appt_date > date('now')") >= 10
+    # _count opens sqlite3 directly, bypassing the app's translation layer, so
+    # a bare date('now') here is UTC while the seeder wrote the clinic's local
+    # dates. Between midnight and 03:00 in Cairo they differ by a day.
+    assert _count(path, "appointments", "appt_date = date('now','localtime')") >= 5
+    assert _count(path, "appointments", "appt_date > date('now','localtime')") >= 10
 
 
 def test_prices_are_egyptian_not_placeholder(seeded):
