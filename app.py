@@ -234,6 +234,59 @@ def create_app(cfg=None) -> Flask:
                  f"separately — and import them one after another."),
         ), 413
 
+    # ── PWA: installable on a phone, tablet or desktop ───────────────────────
+    # Both routes sit at the ROOT deliberately. A service worker's scope is the
+    # directory it is served from, so /static/sw.js could only ever control
+    # /static/* — it would never see a page navigation. Served from /sw.js it
+    # controls the whole app.
+    @app.route("/manifest.webmanifest")
+    def _manifest():
+        from flask import jsonify
+        # Generated rather than a static file so the installed icon carries the
+        # CLINIC's name, not the vendor's. A clinic that has set its own
+        # branding should not find "Aleefy" on its staff's home screens.
+        clinic = db.get_clinic()
+        name = (clinic.get("name") or "").strip() or app.config.get("APP_TITLE", "Aleefy")
+        resp = jsonify({
+            "name": name,
+            "short_name": name[:12],
+            "description": clinic.get("tagline") or "Veterinary clinic management",
+            "start_url": "/",
+            "scope": "/",
+            "display": "standalone",
+            "orientation": "any",
+            "background_color": "#F7F5F1",   # --bg
+            "theme_color": "#0B7A6B",        # --c-primary
+            "dir": "auto",                   # the UI ships in Arabic and English
+            "icons": [
+                {"src": "/static/images/icon-192.png", "sizes": "192x192",
+                 "type": "image/png", "purpose": "any"},
+                {"src": "/static/images/icon-512.png", "sizes": "512x512",
+                 "type": "image/png", "purpose": "any"},
+                {"src": "/static/images/icon-maskable-512.png", "sizes": "512x512",
+                 "type": "image/png", "purpose": "maskable"},
+            ],
+            "shortcuts": [
+                {"name": "Today's appointments", "url": "/appointments/"},
+                {"name": "New visit", "url": "/visits/new"},
+                {"name": "Reception queue", "url": "/clinical/waiting-room"},
+            ],
+        })
+        resp.headers["Content-Type"] = "application/manifest+json"
+        # The clinic row is cached 5 minutes; let the manifest go stale no longer.
+        resp.headers["Cache-Control"] = "public, max-age=300"
+        return resp
+
+    @app.route("/sw.js")
+    def _service_worker():
+        from flask import send_from_directory
+        resp = send_from_directory(app.static_folder, "sw.js",
+                                   mimetype="application/javascript")
+        # A cached service worker cannot ship its own replacement. Browsers
+        # already bypass the HTTP cache for the SW script, but proxies do not.
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
     # ── Health ───────────────────────────────────────────────────────────────
     # The public body is a status word and the version — nothing an
     # unauthenticated caller cannot already read from the X-App-Version header

@@ -1,0 +1,26 @@
+{#- PWA install tags. Included by base.html AND by every standalone page that
+    does not extend it — login, two-factor and the waiting-room kiosk.
+
+    The login page matters most: it is the first thing anyone sees and the page
+    they will actually install from. A browser only offers "Install" on a page
+    that links a manifest, so leaving it off login meant the app was installable
+    in theory and never in practice.
+
+    Deliberately NOT included by the print, label and petsy-embed templates —
+    those render inside a print dialog or somebody else's website, where an
+    install prompt would be nonsense. -#}
+<link rel="manifest" href="{{ url_for('_manifest') }}">
+<meta name="theme-color" content="#0B7A6B">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}">
+<script>
+/* Registering the worker is what makes the browser offer "Install". Served
+   from / rather than /static/ so its scope covers the whole app. Silent on
+   failure: an unavailable worker must never break a page, and it is absent by
+   design on http:// because browsers require a secure origin. */
+if ("serviceWorker" in navigator) {
+  addEventListener("load", function () {
+    navigator.serviceWorker.register("/sw.js").catch(function () {});
+  });
+}
+</script>

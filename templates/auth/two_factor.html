@@ -6,6 +6,7 @@
       dir="{% if current_lang == 'ar' %}rtl{% else %}ltr{% endif %}"
       data-theme="light">
 <head>
+  {% include "_pwa_head.html" %}
   <script>(function(){var t=localStorage.getItem('al-theme')||'light';document.documentElement.setAttribute('data-theme',t);if(t==='dark')document.documentElement.style.background='#0D1B2A'})();</script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">

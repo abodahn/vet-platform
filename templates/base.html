@@ -18,6 +18,8 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/aleefy-logo.png') }}">
   {% endif %}
 
+  {% include "_pwa_head.html" %}
+
   {#-
     ASSET_V — cache-busting content hash, STAMPED AUTOMATICALLY by
     `python static/css/build.py`. Do not edit the value by hand; edit the CSS
@@ -1270,6 +1272,7 @@
 
 {% block scripts %}{% endblock %}
 {% block extra_js %}{% endblock %}
+
 
 </body>
 </html>
