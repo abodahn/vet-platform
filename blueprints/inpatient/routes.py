@@ -29,7 +29,10 @@ STATUS_COLORS = {
 
 # Set only after the DDL has actually succeeded, so a failed run retries.
 # Per-process (each gunicorn worker ensures once) — harmless, DDL is IF NOT EXISTS.
-_inpatient_ready = False
+# Keyed by DATABASE, not a bare bool: this process serves many clinics and a
+# latch recording only "already ran" would build these tables in whichever
+# tenant loaded first and leave every clinic provisioned later without them.
+_inpatient_ready = {}
 
 
 def _ensure_tables(conn):
@@ -87,13 +90,12 @@ def _ensure_tables(conn):
 
 @inpatient_bp.before_request
 def _init():
-    global _inpatient_ready
-    if _inpatient_ready:
+    if not db._ensure_schema_once(_inpatient_ready, 'inpatient'):
         return
     conn = db.get_db()
     _ensure_tables(conn)
     conn.close()
-    _inpatient_ready = True
+    db._schema_done(_inpatient_ready, 'inpatient')
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────

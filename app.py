@@ -49,10 +49,36 @@ def create_app(cfg=None) -> Flask:
             "Set POSTGRES_DSN environment variable for production."
         )
     db.set_path(app.config["DATABASE_PATH"])
+
+    # Multi-tenancy. The registry is a separate file next to the default
+    # database; until a clinic is actually provisioned into it, every request
+    # resolves to no tenant and the app behaves exactly as a single-clinic
+    # install — which is why this needed no change to any of the 376 routes.
+    from models import tenancy
+    tenancy.configure(os.path.join(
+        os.path.dirname(app.config["DATABASE_PATH"]) or ".", "tenants.db"))
+
     db.init_db(
         admin_user=app.config.get("SEED_ADMIN_USER", "admin"),
         admin_pass=app.config.get("SEED_ADMIN_PASS", "1234"),
     )
+
+    @app.errorhandler(tenancy.UnknownTenant)
+    def _unknown_tenant(exc):
+        # Explicitly NOT a fall-through to the default database: serving one
+        # clinic's records under another clinic's subdomain is the single worst
+        # thing a multi-tenant medical system can do.
+        logger.warning("request for unregistered tenant %s", exc)
+        return render_template(
+            "error.html", code=404,
+            msg="No clinic is registered at this address."), 404
+
+    @app.errorhandler(tenancy.TenantSuspended)
+    def _suspended_tenant(exc):
+        return render_template(
+            "error.html", code=403,
+            msg=("This clinic's account is not active. "
+                 "Please contact support.")), 403
 
     # Return every checked-out DB connection at the end of each request.
     # 247 route functions call get_db() with no try/finally; without this a

@@ -11,6 +11,9 @@ import os
 import re
 import secrets
 import threading
+
+# Safe at module level: database.py imports nothing from here.
+import models.database as _db
 import time
 from datetime import datetime, timedelta
 from functools import wraps
@@ -36,7 +39,10 @@ RATE_LIMIT_MAX     = 5      # failed attempts before lockout
 RATE_LIMIT_WINDOW  = 900    # 15 minutes lockout (seconds)
 SESSION_TIMEOUT    = 3600   # 1 hour session idle timeout (seconds)
 
-_tables_ready = False
+# Keyed by DATABASE, not a bare bool: this process serves many clinics and a
+# latch recording only "already ran" would build these tables in whichever
+# tenant loaded first and leave every clinic provisioned later without them.
+_tables_ready = {}
 
 # DOUBLE PRECISION is deliberate and portable: PostgreSQL REAL is a 4-byte
 # float (~7 significant digits) which would round a unix epoch timestamp to the
@@ -51,12 +57,11 @@ _DDL = """CREATE TABLE IF NOT EXISTS login_attempts (
 
 def _ensure_tables() -> None:
     """Create the login_attempts table on first use (idempotent)."""
-    global _tables_ready
-    if _tables_ready:
+    if not _db._ensure_schema_once(_tables_ready, 'login_attempts'):
         return
     from models.database import get_db
     with _lock:
-        if _tables_ready:
+        if not _db._ensure_schema_once(_tables_ready, 'login_attempts'):
             return
         conn = get_db()
         try:
@@ -68,7 +73,7 @@ def _ensure_tables() -> None:
             conn.commit()
         finally:
             conn.close()
-        _tables_ready = True
+        _db._schema_done(_tables_ready, 'login_attempts')
 
 
 def _norm_user(username) -> str:
@@ -379,7 +384,7 @@ def _decrypt_secret(stored):
 
 # ── Schema (lazy, portable across SQLite and PostgreSQL) ─────────────────────
 
-_totp_ready = False
+_totp_ready = {}
 
 _TOTP_DDL = """CREATE TABLE IF NOT EXISTS totp_backup_codes (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -404,12 +409,11 @@ def _ensure_totp_schema() -> None:
     `INTEGER PRIMARY KEY AUTOINCREMENT` -> `SERIAL PRIMARY KEY`, so this one
     body of SQLite-flavoured DDL is correct on PostgreSQL too.
     """
-    global _totp_ready
-    if _totp_ready:
+    if not _db._ensure_schema_once(_totp_ready, 'totp'):
         return
     from models.database import get_db, _try_stmt
     with _lock:
-        if _totp_ready:
+        if not _db._ensure_schema_once(_totp_ready, 'totp'):
             return
         conn = get_db()
         try:
@@ -425,7 +429,7 @@ def _ensure_totp_schema() -> None:
             conn.commit()
         finally:
             conn.close()
-        _totp_ready = True
+        _db._schema_done(_totp_ready, 'totp')
 
 
 def _user_totp_row(user_id):

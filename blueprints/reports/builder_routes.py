@@ -150,13 +150,15 @@ SOURCES = {
 }
 
 
-_saved_reports_ready = False
+# Keyed by DATABASE, not a bare bool: this process serves many clinics and a
+# latch that just records "already ran" would build these tables in whichever
+# tenant loaded first and leave every later clinic without them.
+_saved_reports_ready = {}
 
 
 def _ensure_saved_reports():
-    """Create the saved_reports table once per process, not once per request."""
-    global _saved_reports_ready
-    if _saved_reports_ready:
+    """Create the saved_reports table once per database, not once per request."""
+    if not db._ensure_schema_once(_saved_reports_ready, 'saved_reports'):
         return
     conn = db.get_db()
     conn.execute("""
@@ -171,7 +173,7 @@ def _ensure_saved_reports():
     """)
     conn.commit()
     conn.close()
-    _saved_reports_ready = True
+    db._schema_done(_saved_reports_ready, 'saved_reports')
 
 
 # ── Builder landing ───────────────────────────────────────────────────────────

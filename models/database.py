@@ -49,7 +49,26 @@ _POOL_LOCK = threading.Lock()
 _CACHE: dict = {}
 _CACHE_LOCK = threading.Lock()
 
+def _ckey(key: str) -> str:
+    """Namespace every cache key by tenant.
+
+    This process serves many clinics, and the cache is one dict shared by all
+    of them. Without this prefix the first clinic to load a page would put its
+    row under 'clinic_row' and the next clinic would read it back — showing one
+    clinic another clinic's name, logo and tagline. Applied here rather than at
+    the call sites so no caller can forget, and so the one existing caller
+    (get_clinic) needed no change at all.
+    """
+    slug = ""
+    try:
+        from models import tenancy
+        slug = tenancy.current()
+    except Exception:
+        pass
+    return f"{slug}\x00{key}" if slug else key
+
 def _cache_get(key: str):
+    key = _ckey(key)
     with _CACHE_LOCK:
         entry = _CACHE.get(key)
         if entry and time.monotonic() < entry[1]:
@@ -58,12 +77,12 @@ def _cache_get(key: str):
 
 def _cache_set(key: str, value, ttl: int = 300):
     with _CACHE_LOCK:
-        _CACHE[key] = (value, time.monotonic() + ttl)
+        _CACHE[_ckey(key)] = (value, time.monotonic() + ttl)
 
 def cache_invalidate(key: str):
     """Call after mutating a cached table so next read is fresh."""
     with _CACHE_LOCK:
-        _CACHE.pop(key, None)
+        _CACHE.pop(_ckey(key), None)
 
 
 def configure_postgres(host="localhost", port=5432, dbname="vetclinic",
@@ -692,7 +711,59 @@ def close_context_connections(exc=None):
             logger.warning("teardown: failed to release DB connection", exc_info=True)
 
 
+def current_target() -> dict:
+    """Which database get_db() will hand back for the CURRENT request.
+
+    Empty dict = the configured default (legacy single-clinic mode). Callers
+    that cache per-database state must key it on this, not on a bare bool —
+    see the comment on _ensure_schema_once().
+    """
+    try:
+        from models import tenancy
+        return tenancy.target()
+    except ImportError:
+        return {}
+
+
+def _schema_target() -> str:
+    """Identity of the database a lazy schema check applies to."""
+    return repr((_db_path, _PG_CONFIG, current_target()))
+
+
+def _ensure_schema_once(flag_holder: dict, key: str) -> bool:
+    """Does this module still need to build its tables in THIS database?
+
+    A plain `if _ready: return` boolean is correct for exactly one database and
+    wrong the moment the process serves a second clinic: the flag latches on
+    whichever tenant happened to load first, and every clinic provisioned after
+    it is left without those tables — surfacing much later as "no such table"
+    from a route that works perfectly for the first clinic.
+
+    Checks only. The caller records success with _schema_done() AFTER its DDL,
+    which is what the boolean flags this replaces did — recording up front
+    would mark a failed CREATE as done and never retry it.
+    """
+    return flag_holder.get(key) != _schema_target()
+
+
+def _schema_done(flag_holder: dict, key: str) -> None:
+    """Record that the DDL succeeded against the current database."""
+    flag_holder[key] = _schema_target()
+
+
 def _connect():
+    # Multi-tenant: route to the clinic that owns this request. An empty dict
+    # means no tenant was resolved, so everything below behaves exactly as it
+    # did before tenancy existed.
+    tgt = current_target()
+    dsn = tgt.get("pg_dsn")
+    if dsn:
+        return _PGConn(_tenant_pool(dsn).getconn(), pool=_tenant_pool(dsn))
+
+    path = tgt.get("db_path")
+    if path:
+        return _sqlite_connect(path)
+
     if _POOL is not None:
         # Fast path: get from pool (no TCP handshake)
         raw = _POOL.getconn()
@@ -704,8 +775,33 @@ def _connect():
         raw = psycopg2.connect(**_PG_CONFIG)
         return _PGConn(raw, pool=None)
 
-    # Fallback: SQLite (dev / test mode)
-    conn = sqlite3.connect(_db_path, check_same_thread=False, factory=_SQLiteConn)
+    return _sqlite_connect(_db_path)
+
+
+# One pool per tenant database. Pools are expensive to build and cheap to keep,
+# and a dict keyed by DSN means a clinic's pool is created on its first request
+# and reused forever after.
+_TENANT_POOLS: dict = {}
+
+
+def _tenant_pool(dsn: str):
+    with _POOL_LOCK:
+        pool = _TENANT_POOLS.get(dsn)
+        if pool is None:
+            from psycopg2.pool import ThreadedConnectionPool
+            # Smaller than the single-tenant pool on purpose: N clinics each
+            # holding 20 connections would exhaust PostgreSQL's max_connections
+            # long before any one of them was busy.
+            # ponytail: fixed 2/8 per tenant. Make it configurable when a
+            # clinic's traffic actually justifies its own sizing.
+            pool = ThreadedConnectionPool(1, 8, dsn=dsn)
+            _TENANT_POOLS[dsn] = pool
+            logger.info("PostgreSQL pool ready for tenant database")
+        return pool
+
+
+def _sqlite_connect(path: str):
+    conn = sqlite3.connect(path, check_same_thread=False, factory=_SQLiteConn)
     conn.row_factory = sqlite3.Row
     # Performance PRAGMAs — applied once per connection
     conn.execute("PRAGMA foreign_keys  = ON")

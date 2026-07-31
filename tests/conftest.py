@@ -161,10 +161,10 @@ def _restore_db_globals():
     saved = (db._db_path, db._PG_CONFIG, db._POOL)
     yield
     db._db_path, db._PG_CONFIG, db._POOL = saved
-    # sec._ensure_tables() latches on a process global, so a test that pointed
-    # the DB elsewhere leaves login_attempts "already created" for a database
-    # that never got it. Clear the latch with the path it was created against.
-    sec._tables_ready = False
+    # The latch is now keyed by database, so it corrects itself when a test
+    # points the DB elsewhere — this clear is belt and braces, kept because it
+    # costs nothing and documents the hazard.
+    sec._tables_ready.clear()
 
 
 @pytest.fixture

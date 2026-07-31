@@ -9,6 +9,7 @@ from flask import (
 )
 from datetime import date, timedelta
 from . import accounting_bp
+import models.database as db
 from models.database import get_db
 from blueprints.auth.routes import login_required
 
@@ -433,13 +434,15 @@ def add_expense():
 # DAILY CLOSING
 # ─────────────────────────────────────────────
 
-_closing_notes_ready = False
+# Keyed by DATABASE, not a bare bool: this process serves many clinics and a
+# latch that just records "already ran" would build these tables in whichever
+# tenant loaded first and leave every later clinic without them.
+_closing_notes_ready = {}
 
 
 def _ensure_closing_notes(conn):
-    """Create closing_notes once per process, not once per request."""
-    global _closing_notes_ready
-    if _closing_notes_ready:
+    """Create closing_notes once per database, not once per request."""
+    if not db._ensure_schema_once(_closing_notes_ready, 'closing_notes'):
         return
     conn.execute(
         """CREATE TABLE IF NOT EXISTS closing_notes
@@ -449,7 +452,7 @@ def _ensure_closing_notes(conn):
             created_by TEXT,
             created_at TEXT DEFAULT (datetime('now')))"""
     )
-    _closing_notes_ready = True
+    db._schema_done(_closing_notes_ready, 'closing_notes')
 
 
 @accounting_bp.route("/closing", methods=["GET", "POST"])

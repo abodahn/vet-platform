@@ -126,7 +126,7 @@ def test_rate_limit_survives_a_process_restart():
     sec.clear_rate_limit(ip, user)
     for _ in range(sec.RATE_LIMIT_MAX):
         sec.record_failed_login(ip, user)
-    sec._tables_ready = False          # simulate a fresh worker process
+    sec._tables_ready.clear()          # simulate a fresh worker process
     assert sec.is_rate_limited(ip, user)[0] is True
     sec.clear_rate_limit(ip, user)
 
