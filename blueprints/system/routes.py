@@ -331,6 +331,18 @@ def settings():
                 up = request.files.get("logo")
                 if up and up.filename:
                     logo_set, logo_val = ", logo_data=?", (encode_logo(up.read()),)
+
+            # Instapay QR. Same all-or-nothing handling as the logo: a bad
+            # upload must not half-write the text fields around it.
+            from blueprints.settings.routes import QR_MAX_PX
+            if f.get("remove_instapay_qr"):
+                logo_set += ", instapay_qr=?"
+                logo_val += (None,)
+            else:
+                qr = request.files.get("instapay_qr")
+                if qr and qr.filename:
+                    logo_set += ", instapay_qr=?"
+                    logo_val += (encode_logo(qr.read(), max_px=QR_MAX_PX),)
         except LogoError as e:
             flash(str(e), "danger")
             return redirect(url_for("system.settings"))
@@ -340,13 +352,15 @@ def settings():
             conn.execute(
                 "UPDATE clinic SET name=?, name_ar=?, tagline=?, doctor_name=?, phone=?, "
                 "email=?, address=?, address_ar=?, website=?, license_number=?, tax_number=?, "
-                "currency=?, timezone=?, updated_at=datetime('now')" + logo_set + " WHERE id=1",
+                "currency=?, timezone=?, instapay_handle=?, "
+                "updated_at=datetime('now')" + logo_set + " WHERE id=1",
                 (f.get("name",""), f.get("name_ar",""), f.get("tagline",""),
                  f.get("doctor_name",""),
                  f.get("phone",""), f.get("email",""), f.get("address",""),
                  f.get("address_ar",""),
                  f.get("website",""), f.get("license_number",""), f.get("tax_number",""),
-                 f.get("currency","EGP"), f.get("timezone","Africa/Cairo")) + logo_val
+                 f.get("currency","EGP"), f.get("timezone","Africa/Cairo"),
+                 f.get("instapay_handle","").strip()) + logo_val
             )
             conn.commit()
             # Appearance settings

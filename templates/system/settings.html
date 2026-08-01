@@ -134,6 +134,54 @@
     </div>
   </div>
 
+  <!-- Instapay -->
+  <div class="form-card">
+    <div class="form-card-title">{{ t('💳 Instapay', '💳 إنستاباي') }}</div>
+    <div class="logo-row">
+      <div class="logo-frame">
+        {% if clinic.get('instapay_qr') %}
+          <img src="{{ clinic.get('instapay_qr') }}" alt="{{ t('Instapay QR', 'كود إنستاباي') }}">
+        {% else %}
+          <span class="logo-empty">{{ t('No QR yet', 'لا يوجد كود بعد') }}</span>
+        {% endif %}
+      </div>
+      <div class="logo-fields">
+        <div class="form-group">
+          <label>{{ t('Instapay address', 'عنوان إنستاباي') }}</label>
+          <input type="text" name="instapay_handle"
+                 value="{{ clinic.get('instapay_handle','') or '' }}"
+                 placeholder="{{ t('e.g. clinicname@instapay or a mobile number',
+                                   'مثال: اسم العيادة@instapay أو رقم موبايل') }}">
+          <div class="hint">
+            {{ t('Shown to the client at payment so they can send without typing it from a screen.',
+                 'يظهر للعميل عند الدفع حتى يرسل دون كتابته من الشاشة.') }}
+          </div>
+        </div>
+        <div class="form-group">
+          <label>{{ t('Upload your Instapay QR', 'رفع كود إنستاباي') }}</label>
+          <input type="file" name="instapay_qr"
+                 accept="image/png,image/jpeg,image/gif,image/webp">
+          <div class="hint">
+            {{ t('Up to 2 MB · kept at 800 px so it still scans · stored inside the database, so it survives every backup and restore.',
+                 'بحد أقصى ٢ ميجابايت · يُحفظ بدقة ٨٠٠ بكسل ليظل قابلاً للمسح · ويُخزَّن داخل قاعدة البيانات فيبقى مع كل نسخة احتياطية.') }}
+          </div>
+          <div class="hint">
+            {{ t('The staff member still confirms the transfer arrived before recording the payment — the app records it, it does not receive it.',
+                 'يؤكد الموظف وصول التحويل قبل تسجيل الدفع — البرنامج يسجّل الدفع ولا يستقبله.') }}
+          </div>
+        </div>
+        {% if clinic.get('instapay_qr') %}
+        <div class="form-group">
+          <label style="text-transform:none;">
+            <input type="checkbox" name="remove_instapay_qr" value="1">
+            {{ t('Remove the current QR when saving', 'حذف الكود الحالي عند الحفظ') }}
+          </label>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
   <!-- Preferences -->
   <div class="form-card">
     <div class="form-card-title">{{ t('🌍 Preferences', '🌍 التفضيلات') }}</div>

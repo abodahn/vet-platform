@@ -400,3 +400,46 @@ def test_payments_work_without_a_flask_app(app, invoice):
     finally:
         p._REGISTRY.clear()
         p._REGISTRY.update(saved)
+
+
+def test_a_staff_entered_reference_survives_to_the_ledger(app, invoice):
+    """The reconciliation key, and the same bug twice.
+
+    add_payment originally accepted `reference` and discarded it. The rewrite
+    reintroduced exactly that: create_intent never took it, so a receptionist
+    typing an Instapay or transfer number watched it vanish — while the screen
+    told them to enter it "so it can be reconciled later".
+
+    For a counter method the staff reference must also survive capture: the
+    gateway returns a synthetic stub like CASH-12, which must not overwrite the
+    number that will be matched against a bank statement.
+    """
+    with app.app_context():
+        db.add_payment(invoice["invoice_id"], invoice["owner_id"], 250.00,
+                       method="Instapay", reference="IPY-99231144",
+                       received_by="reception1")
+    rows = _ledger(app, invoice["invoice_id"])
+    assert len(rows) == 1
+    assert rows[0]["reference"] == "IPY-99231144", \
+        f"the reference was lost or overwritten: {rows[0]['reference']!r}"
+    assert rows[0]["method"] == "InstaPay"
+
+
+def test_an_online_gateway_reference_still_wins(app, invoice):
+    """The inverse: a real provider reference must take precedence, because
+    that is the one the provider will be queried by in a dispute."""
+    class Online(payments.Gateway):
+        name, label, offline = "onlinetest", "Online Test", False
+        def configured(self): return True
+        def charge(self, intent):
+            return {"status": payments.SUCCEEDED, "gateway_ref": "PROVIDER-777"}
+
+    payments.register(Online())
+    with app.app_context():
+        intent = payments.create_intent(
+            invoice["invoice_id"], invoice["owner_id"], "250.00",
+            gateway="onlinetest", idempotency_key="k-online-ref",
+            reference="staff-typed")
+        payments.capture(intent["id"])
+    rows = _ledger(app, invoice["invoice_id"])
+    assert rows[0]["reference"] == "PROVIDER-777"

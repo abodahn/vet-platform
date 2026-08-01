@@ -325,6 +325,23 @@
     background: var(--c-warning-bg);
   }
 
+  /* ── Instapay at the counter ────────────────────────────────────────── */
+  .pay-instapay {
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    margin-top: 13px; padding: 13px; border: 1px solid var(--border);
+    border-radius: var(--r-md); background: var(--surface-sunk);
+  }
+  /* Big enough to scan from across a counter without the client leaning in. */
+  .pay-instapay img {
+    width: 148px; height: 148px; object-fit: contain; flex-shrink: 0;
+    background: #fff; border-radius: var(--r-sm); padding: 6px;
+    border: 1px solid var(--border);
+  }
+  .ip-handle {
+    font-weight: 700; font-size: 1rem; letter-spacing: .01em;
+    word-break: break-all; margin-bottom: 4px;
+  }
+
   /* ── Vaccination ────────────────────────────────────────────────────── */
   .vax-box {
     margin-top: 14px; padding: 13px; border: 1px solid var(--border);
@@ -1048,6 +1065,7 @@
         {% endfor %}
         "</select></div>" +
         "<div><label>{{ t('Reference', 'مرجع') }}</label><input id=\"pay_reference\"></div></div>" +
+        '<div id="payExtra"></div>' +
         '<div class="wf-actions">' +
         '<button type="button" class="btn btn-primary" id="btnPay">{{ t("Take payment", "تحصيل الدفع") }}</button>' +
         '<a class="btn btn-ghost" href="/finance/invoices/' + inv.id + '">{{ t("Open invoice", "فتح الفاتورة") }}</a>' +
@@ -1059,6 +1077,40 @@
         '<a class="btn btn-primary" href="/workflow/">{{ t("Start another visit", "بدء زيارة أخرى") }}</a></div>';
     }
     $("invoiceBox").innerHTML = html;
+
+    // Instapay: show the clinic's own QR and address so the client can scan
+    // rather than copy a handle off a monitor. The app RECORDS the payment; the
+    // money still arrives in the clinic's Instapay account, and staff confirm it
+    // before pressing the button — which is why this is a counter method and not
+    // an online gateway.
+    const INSTAPAY = {
+      handle: {{ (clinic.get('instapay_handle') or '')|tojson }},
+      qr: {{ (clinic.get('instapay_qr') or '')|tojson }},
+    };
+    function payExtra() {
+      const box = $("payExtra");
+      const sel = $("pay_method");
+      if (!box || !sel) return;
+      if (sel.value !== "instapay") { box.innerHTML = ""; return; }
+      if (!INSTAPAY.handle && !INSTAPAY.qr) {
+        box.innerHTML = '<div class="wf-alert info">' +
+          "{{ t('No Instapay details are set up yet. Add them under Settings so clients can scan instead of typing.', 'لم يتم ضبط بيانات إنستاباي بعد. أضفها من الإعدادات ليتمكن العملاء من المسح بدل الكتابة.') }}" +
+          "</div>";
+        return;
+      }
+      box.innerHTML =
+        '<div class="pay-instapay">' +
+        (INSTAPAY.qr ? '<img src="' + INSTAPAY.qr + '" alt="Instapay QR">' : "") +
+        "<div>" +
+        (INSTAPAY.handle
+          ? "<div class=\"ip-handle\">" + esc(INSTAPAY.handle) + "</div>" : "") +
+        '<p class="ai-foot">' +
+        "{{ t('Client scans and sends. Confirm the transfer has arrived before recording it, and put the Instapay reference in the field above so it can be reconciled later.', 'يمسح العميل ويرسل. تأكد من وصول التحويل قبل التسجيل، واكتب رقم عملية إنستاباي في الحقل بالأعلى ليسهل مطابقتها لاحقاً.') }}" +
+        "</p></div></div>";
+    }
+
+    const methodSel = $("pay_method");
+    if (methodSel) { methodSel.addEventListener("change", payExtra); payExtra(); }
 
     const payBtn = $("btnPay");
     if (payBtn) payBtn.addEventListener("click", async (ev) => {

@@ -129,7 +129,7 @@ def available() -> list:
 
 def create_intent(invoice_id: int, owner_id: int, amount, gateway: str = "cash",
                   *, idempotency_key: str = "", created_by: str = "",
-                  currency: str = "EGP") -> dict:
+                  currency: str = "EGP", reference: str = "") -> dict:
     """Register an attempt to collect `amount`. Idempotent.
 
     Re-submitting the same idempotency_key returns the EXISTING intent instead
@@ -176,10 +176,10 @@ def create_intent(invoice_id: int, owner_id: int, amount, gateway: str = "cash",
             cur = conn.execute(
                 "INSERT INTO payment_intents"
                 "(invoice_id, owner_id, gateway, amount, currency, status,"
-                " idempotency_key, created_by)"
-                " VALUES(?,?,?,?,?,?,?,?)",
+                " idempotency_key, created_by, gateway_ref)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
                 (invoice_id, owner_id, gateway, str(amt), currency, PENDING,
-                 key, created_by))
+                 key, created_by, (reference or "").strip() or None))
             intent_id = cur.lastrowid
             _event(conn, intent_id, "created",
                    {"amount": str(amt), "gateway": gateway}, created_by)
@@ -381,6 +381,13 @@ def _update(intent_id: int, **fields) -> None:
 
 def _succeed(intent_id: int, gateway_ref: str, actor: str) -> dict:
     intent = _load(intent_id)
+    # A reference typed by staff is the reconciliation key — the Instapay or
+    # transfer number they will later match against a bank statement. A counter
+    # gateway returns a synthetic stub like CASH-12, which must never overwrite
+    # it. An online gateway's real reference does take precedence, because that
+    # is the one the provider will be queried by.
+    if intent.get("gateway_ref") and get(intent["gateway"]).offline:
+        gateway_ref = intent["gateway_ref"]
     conn = db.get_db()
     try:
         with conn:

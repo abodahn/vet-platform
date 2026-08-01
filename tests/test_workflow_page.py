@@ -503,3 +503,89 @@ def test_the_page_offers_a_vaccination_section_on_the_treatment_step(client, vet
     body = body[:body.index("$(\"btnSaveRx\")")]
     assert body.index("saveVaccination") < body.index("completeVisit"), \
         "the vaccination is saved after the invoice is raised"
+
+
+# ── Instapay at the counter ──────────────────────────────────────────────────
+
+def _set_instapay(app, handle, qr):
+    with app.app_context():
+        conn = db.get_db()
+        with conn:
+            conn.execute("UPDATE clinic SET instapay_handle=?, instapay_qr=?",
+                         (handle, qr))
+        conn.close()
+        db.cache_invalidate("clinic_row")
+
+
+def test_the_instapay_qr_reaches_the_payment_step(client, vet, app):
+    """The client scans instead of copying a handle off a monitor.
+
+    The app RECORDS this payment; the money arrives in the clinic's own Instapay
+    account and staff confirm it before pressing the button — which is why
+    Instapay is a counter method and not an online gateway.
+    """
+    qr = "data:image/png;base64,iVBORw0KGgo="
+    _set_instapay(app, "nilevet@instapay", qr)
+    html = client.get("/workflow/").get_data(as_text=True)
+    assert "nilevet@instapay" in html
+    assert qr in html
+    assert 'sel.value !== "instapay"' in html, \
+        "the QR is not gated on the Instapay method being selected"
+
+
+def test_a_clinic_with_no_instapay_details_is_told_where_to_set_them(client, vet, app):
+    """An empty panel would read as "Instapay is broken" to whoever is at the
+    counter. It says where to fix it instead."""
+    _set_instapay(app, "", "")
+    html = client.get("/workflow/").get_data(as_text=True)
+    assert "No Instapay details are set up yet" in html
+
+
+def test_instapay_is_still_recorded_through_the_ledger(app, invoice_for_instapay):
+    """The QR changes what the client sees, not how the money is recorded — it
+    goes through the same intent, capture and ledger row as cash."""
+    from models import payments
+    inv = invoice_for_instapay
+    with app.app_context():
+        intent = payments.create_intent(
+            inv["invoice_id"], inv["owner_id"], "250.00",
+            gateway="instapay", idempotency_key="k-ipay", created_by="reception")
+        payments.capture(intent["id"], actor="reception")
+        conn = db.get_db()
+        rows = conn.execute(
+            "SELECT amount, method, received_by FROM payments WHERE invoice_id=?",
+            (inv["invoice_id"],)).fetchall()
+        conn.close()
+    assert len(rows) == 1
+    assert rows[0]["method"] == "InstaPay", f"recorded as {rows[0]['method']}"
+    assert rows[0]["received_by"] == "reception"
+
+
+@pytest.fixture()
+def invoice_for_instapay(app):
+    with app.app_context():
+        conn = db.get_db()
+        with conn:
+            cur = conn.execute("INSERT INTO owners(full_name, phone) VALUES(?,?)",
+                               ("Instapay Owner", "01011112222"))
+            owner_id = cur.lastrowid
+            cur = conn.execute(
+                "INSERT INTO invoices(owner_id, invoice_number, issue_date, subtotal,"
+                " total, paid_amount, due_amount, status)"
+                " VALUES(?,?,date('now','localtime'),?,?,0,?,'Unpaid')",
+                (owner_id, f"IPAY-{owner_id}", 250.00, 250.00, 250.00))
+            invoice_id = cur.lastrowid
+        conn.close()
+    return {"invoice_id": invoice_id, "owner_id": owner_id}
+
+
+def test_the_instapay_qr_survives_a_backup_and_restore(app):
+    """Stored in the clinic ROW, not on disk. models/backup.py copies the
+    database and nothing else, so a QR under uploads/ would survive a backup and
+    vanish on restore — losing it on the one day the clinic is already having a
+    bad time."""
+    with app.app_context():
+        conn = db.get_db()
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(clinic)").fetchall()]
+        conn.close()
+    assert "instapay_qr" in cols and "instapay_handle" in cols

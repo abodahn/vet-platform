@@ -891,6 +891,12 @@ CREATE TABLE IF NOT EXISTS clinic (
     doctor_name TEXT DEFAULT 'Lead Veterinarian',
     tagline     TEXT DEFAULT 'Happy Pets, Healthy Lives',
     logo_data   TEXT,
+    -- Instapay: the clinic's own payment handle and QR. Stored in the clinic
+    -- ROW, not on disk, for the same reason as the logo -- models/backup.py
+    -- copies the database and nothing else, so anything under uploads/ survives
+    -- a backup and vanishes on restore.
+    instapay_handle TEXT,
+    instapay_qr     TEXT,
     currency    TEXT DEFAULT 'EGP',
     timezone    TEXT DEFAULT 'Africa/Cairo',
     created_at  TEXT DEFAULT (datetime('now')),
@@ -2207,6 +2213,10 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
             _try_stmt(conn, f"ALTER TABLE visits ADD COLUMN {_col} {_type}")
         # Loyalty balance column on owners
         _try_stmt(conn, "ALTER TABLE owners ADD COLUMN loyalty_balance INTEGER DEFAULT 0")
+        # Instapay handle and QR — added after clinics were already running, so
+        # existing databases need them backfilled here, not only in _SCHEMA.
+        for _col in ("instapay_handle", "instapay_qr"):
+            _try_stmt(conn, f"ALTER TABLE clinic ADD COLUMN {_col} TEXT")
         # Pet insurance columns
         for _col, _type in [
             ("insurance_provider", "TEXT"),
@@ -3165,7 +3175,8 @@ def add_payment(invoice_id: int, owner_id: int, amount: float,
         invoice_id, owner_id, amount,
         gateway=payments.gateway_for_method(method),
         idempotency_key=idempotency_key or "",
-        created_by=received_by)
+        created_by=received_by,
+        reference=reference)
     payments.capture(intent["id"], actor=received_by)
 
 def get_finance_summary(date_from: str = "", date_to: str = "") -> dict:

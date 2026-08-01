@@ -64,16 +64,21 @@ def sniff_image(head: bytes) -> str | None:
     return None
 
 
-def encode_logo(raw: bytes) -> str:
-    """Validate, downscale and encode an uploaded logo as a `data:` URI.
+def encode_logo(raw: bytes, max_px: int = LOGO_MAX_PX) -> str:
+    """Validate, downscale and encode an uploaded image as a `data:` URI.
 
     Raises LogoError with a user-facing reason for anything not accepted.
+
+    `max_px` is a parameter because the Instapay QR needs more room than a logo:
+    a payment QR downscaled to 400px loses modules and stops scanning, and a QR
+    that will not scan at the counter is worse than none — the client is already
+    holding their phone out.
     """
     if not raw:
         raise LogoError("No file received.")
     if len(raw) > LOGO_MAX_UPLOAD:
         raise LogoError(
-            f"Logo is too large. Maximum {LOGO_MAX_UPLOAD // (1024 * 1024)} MB."
+            f"Image is too large. Maximum {LOGO_MAX_UPLOAD // (1024 * 1024)} MB."
         )
     if not sniff_image(raw[:16]):
         raise LogoError("That file is not a PNG, JPEG, GIF or WebP image.")
@@ -86,10 +91,16 @@ def encode_logo(raw: bytes) -> str:
     except Exception as exc:
         raise LogoError("That image could not be read. Try re-saving it as a PNG.") from exc
 
-    img.thumbnail((LOGO_MAX_PX, LOGO_MAX_PX))
+    img.thumbnail((max_px, max_px))
     out = io.BytesIO()
     img.convert("RGBA").save(out, format="PNG", optimize=True)
     return "data:image/png;base64," + base64.b64encode(out.getvalue()).decode("ascii")
+
+
+# A payment QR carries fine detail that a 400px logo box destroys. 800 keeps it
+# scannable from a phone held at arm's length while staying well inside the
+# 2 MB upload ceiling once re-encoded.
+QR_MAX_PX = 800
 
 
 @settings_bp.route("/")
