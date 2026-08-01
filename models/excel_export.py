@@ -6,6 +6,31 @@ Requires: pip install openpyxl
 from io import BytesIO
 from datetime import datetime
 
+# PostgreSQL returns money as Decimal, SQLite as float. A Decimal is neither an
+# int nor a float, so a check written against those two treats every amount as
+# text: right-alignment is lost and — the part that matters — the TOTAL row
+# silently skips every money column. The tests run on SQLite and would never
+# have shown it.
+from decimal import Decimal
+
+_NUMERIC = (int, float, Decimal)
+
+
+def _sum(values):
+    """Total a column that may hold both Decimal and float.
+
+    `sum()` raises TypeError on that mix, which turns a report into a 500 rather
+    than a spreadsheet. It happens for real during the NUMERIC cutover, when a
+    query joins a migrated table to one not migrated yet.
+
+    Only normalises when the mix is actually present, so a column of plain
+    integer counts still totals to an integer instead of 5.00.
+    """
+    has_dec = any(isinstance(v, Decimal) for v in values)
+    if has_dec and any(isinstance(v, float) for v in values):
+        return sum(Decimal(str(v)) for v in values)
+    return sum(values)
+
 try:
     import openpyxl
     from openpyxl.styles import (
@@ -80,7 +105,7 @@ def make_workbook(title: str, headers: list, rows: list,
             cell.fill   = fill
             cell.alignment = Alignment(vertical="center")
             # Right-align numbers
-            if isinstance(value, (int, float)):
+            if isinstance(value, _NUMERIC):
                 cell.alignment = Alignment(horizontal="right", vertical="center")
 
     # ── Auto column widths ───────────────────────────────────
@@ -92,17 +117,18 @@ def make_workbook(title: str, headers: list, rows: list,
         ws.column_dimensions[col_letter].width = min(max_len + 4, 40)
 
     # ── Summary total row (for numeric last-column) ──────────
-    if rows and isinstance(rows[0][-1], (int, float)):
+    if rows and isinstance(rows[0][-1], _NUMERIC):
         total_row = ws.max_row + 1
         ws.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True)
         for col_idx in range(1, len(headers) + 1):
             cell_data = []
             for r in range(4, total_row):
                 v = ws.cell(r, col_idx).value
-                if isinstance(v, (int, float)):
+                if isinstance(v, _NUMERIC):
                     cell_data.append(v)
             if cell_data:
-                sum_cell = ws.cell(row=total_row, column=col_idx, value=sum(cell_data))
+                sum_cell = ws.cell(row=total_row, column=col_idx,
+                                   value=_sum(cell_data))
                 sum_cell.font   = Font(bold=True, color="15803D")
                 sum_cell.fill   = PatternFill("solid", fgColor="DCFCE7")
                 sum_cell.border = _border()

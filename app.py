@@ -86,6 +86,19 @@ def create_app(cfg=None) -> Flask:
     # ~20 of them exhausted the pool until restart.
     app.teardown_appcontext(db.close_context_connections)
 
+    # `|money` filter + Decimal-safe JSON. PostgreSQL returns money columns as
+    # Decimal and SQLite as float; without these a page renders 120.5 on one
+    # engine and 120.50 on the other, and any endpoint returning an amount
+    # becomes a 500 on the day PostgreSQL is switched on.
+    from models import money
+    money.init_app(app)
+
+    # Payment gateways. Cash is always available and needs no configuration;
+    # online gateways appear only once their keys are set, so a clinic with no
+    # merchant account still takes money exactly as before.
+    from models import payments
+    payments.init()
+
     # Configure backup system
     backup_dir = os.path.join(os.path.dirname(app.config["DATABASE_PATH"]), "backups")
     bk.configure(db_path=app.config["DATABASE_PATH"], backup_dir=backup_dir)
@@ -201,6 +214,15 @@ def create_app(cfg=None) -> Flask:
                 logger.warning(f"CSRF validation failed: {request.path} from {sec.get_real_ip(request)}")
                 return render_template("error.html", code=403, msg="Invalid or missing security token. Please go back and try again."), 403
 
+    def _payment_methods():
+        """Never let a template-render failure take down a page."""
+        try:
+            from models import payments
+            return payments.available()
+        except Exception:
+            logger.exception("could not list payment gateways")
+            return []
+
     # ── Context processor ────────────────────────────────────────────────────
     @app.context_processor
     def _inject_globals():
@@ -234,6 +256,12 @@ def create_app(cfg=None) -> Flask:
             clinic        = clinic,
             csrf_token    = csrf_token,
             unread_count  = unread_count,
+            # Payment methods, from the registry rather than hardcoded in each
+            # template. This is what makes "add a gateway without
+            # redevelopment" true: register it and it appears in the UI. An
+            # online gateway stays absent until its keys are configured, so a
+            # clinic is never offered a method that cannot complete.
+            payment_methods = _payment_methods(),
             t             = t,
         )
 

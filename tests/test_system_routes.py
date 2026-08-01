@@ -582,18 +582,16 @@ def test_role_assign_without_a_role_changes_nothing(app, admin):
             _exec("DELETE FROM users WHERE id=?", (uid,))
 
 
-def test_permissions_json_is_written_by_the_admin_screen_but_gates_no_route(
+def test_a_grant_alone_does_not_unlock_a_privileged_route(
         app, admin, client, temp_role):
-    """KNOWN GAP, pinned deliberately — this is the whole point of the test.
+    """Was a pinned KNOWN GAP; now pins the boundary between the two gates.
 
-    The roles screen writes `roles.permissions_json`, and `has_permission()`
-    reads it. But NO route and NO template calls has_permission() or
-    @permission_required: every route still gates on @role_required's hardcoded
-    role-name list. So granting "system" and "backup" to a custom role changes
-    the database and changes nothing about access.
-
-    If a route is ever migrated to @permission_required this test fails and
-    should be replaced with a real authorisation assertion.
+    It used to read: "NO route and NO template calls has_permission()... So
+    granting system and backup to a custom role changes the database and
+    changes nothing about access." Routes honour grants now — but a grant says
+    which MODULE you may enter, not what you may do inside it. /system/monitor
+    still requires the role, so a custom role holding every system permission
+    is still refused, and a built-in role stripped of grants keeps working.
     """
     from blueprints.auth.routes import has_permission, clear_permission_cache
 

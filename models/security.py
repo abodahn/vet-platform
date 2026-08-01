@@ -81,6 +81,93 @@ def _norm_user(username) -> str:
     return (username or "").strip().lower()
 
 
+# ── General-purpose throttle ─────────────────────────────────────────────────
+#
+# Separate from login_attempts on purpose. The public API used to call
+# is_rate_limited(ip), which counts rows that ONLY record_failed_login writes —
+# so a bot hammering /api/public/book incremented nothing and the check it was
+# guarded by could never fire. A limiter has to count the traffic it limits.
+#
+# Its own table rather than a bucket column on login_attempts because login is
+# the single most important path in the system and must not be disturbed by an
+# ALTER done for a public endpoint.
+
+_THROTTLE_DDL = """CREATE TABLE IF NOT EXISTS rate_hits (
+    bucket TEXT NOT NULL,
+    key    TEXT NOT NULL,
+    ts     DOUBLE PRECISION NOT NULL
+)"""
+
+_throttle_ready = {}
+
+
+def _ensure_throttle() -> None:
+    if not _db._ensure_schema_once(_throttle_ready, "rate_hits"):
+        return
+    from models.database import get_db
+    with _lock:
+        if not _db._ensure_schema_once(_throttle_ready, "rate_hits"):
+            return
+        conn = get_db()
+        try:
+            conn.execute(_THROTTLE_DDL)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_rate_hits "
+                         "ON rate_hits(bucket, key, ts)")
+            conn.commit()
+        finally:
+            conn.close()
+        _db._schema_done(_throttle_ready, "rate_hits")
+
+
+def throttle(bucket: str, key: str, max_hits: int, window: int) -> tuple:
+    """Record one hit and report (over_limit, seconds_until_clear).
+
+    Records BEFORE checking — that ordering is the entire fix. Callers use it
+    as a gate:
+
+        over, wait = sec.throttle("public_book", ip, 20, 3600)
+        if over: return 429
+
+    Fails OPEN on a database error: a public booking form that rejects real
+    clients because the throttle table is unavailable is worse than one that
+    briefly lets an abuser through, and the error is logged either way.
+    """
+    from models.database import get_db
+    now = time.time()
+    cutoff = now - window
+    conn = None
+    # The WHOLE thing, not just the queries: creating the table and checking out
+    # the connection can both fail, and a fail-open guard that still raises from
+    # its first two lines is not fail-open at all.
+    try:
+        _ensure_throttle()
+        conn = get_db()
+        with _lock:
+            conn.execute("INSERT INTO rate_hits (bucket, key, ts) VALUES (?,?,?)",
+                         (bucket, key or "unknown", now))
+            # Opportunistic cleanup: without it this table grows forever, and
+            # nothing else ever visits it.
+            conn.execute("DELETE FROM rate_hits WHERE ts < ?", (now - max(window, 3600) * 24,))
+            conn.commit()
+            row = conn.execute(
+                "SELECT ts FROM rate_hits WHERE bucket=? AND key=? AND ts>? "
+                "ORDER BY ts DESC LIMIT 1 OFFSET ?",
+                (bucket, key or "unknown", cutoff, max_hits - 1)).fetchone()
+    except Exception:
+        logger.exception("throttle unavailable for %s/%s — allowing the request",
+                         bucket, key)
+        return False, 0
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    if row:
+        return True, int(row[0] + window - now) + 1
+    return False, 0
+
+
 def record_failed_login(ip: str, username: str = None) -> bool:
     """Record a failed login attempt. Returns True if now locked out.
 

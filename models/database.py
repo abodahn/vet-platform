@@ -1345,6 +1345,55 @@ CREATE TABLE IF NOT EXISTS payments (
     FOREIGN KEY (owner_id)   REFERENCES owners(id)
 );
 
+-- An attempt to collect money, whatever the method. One row per attempt,
+-- including the ones that fail: an invoice that shows "paid" with no record of
+-- who took the money, when, or by what means cannot be reconciled or disputed,
+-- and a failed card attempt that leaves no trace is indistinguishable from one
+-- that never happened.
+--
+-- Separate from `payments` on purpose. `payments` is the LEDGER — money that
+-- actually arrived. This is the ATTEMPT log, which includes failures,
+-- cancellations and duplicates. Collapsing them would mean either recording
+-- money that never arrived, or losing the evidence of what went wrong.
+CREATE TABLE IF NOT EXISTS payment_intents (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id      INTEGER NOT NULL,
+    owner_id        INTEGER NOT NULL,
+    gateway         TEXT NOT NULL DEFAULT 'cash',
+    amount          NUMERIC(12,2) NOT NULL,
+    currency        TEXT NOT NULL DEFAULT 'EGP',
+    -- pending -> succeeded | failed | cancelled ; succeeded -> refunded
+    status          TEXT NOT NULL DEFAULT 'pending',
+    -- The client's own key for this attempt. UNIQUE, so a double-submitted
+    -- form or a retried request returns the FIRST attempt instead of charging
+    -- twice. This constraint is the duplicate protection; nothing else is.
+    idempotency_key TEXT NOT NULL UNIQUE,
+    gateway_ref     TEXT,
+    failure_reason  TEXT,
+    refunded_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    created_by      TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    updated_at      TEXT,
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+    FOREIGN KEY (owner_id)   REFERENCES owners(id)
+);
+CREATE INDEX IF NOT EXISTS idx_pay_intent_invoice ON payment_intents(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_pay_intent_status  ON payment_intents(status);
+
+-- Append-only history of everything that happened to an intent. Never updated,
+-- never deleted: this is what a dispute, a chargeback or an audit is answered
+-- with, and a row that can be edited answers nothing.
+CREATE TABLE IF NOT EXISTS payment_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    intent_id   INTEGER NOT NULL,
+    event       TEXT NOT NULL,
+    detail      TEXT,
+    actor       TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (intent_id) REFERENCES payment_intents(id)
+);
+CREATE INDEX IF NOT EXISTS idx_pay_event_intent ON payment_events(intent_id);
+
 CREATE TABLE IF NOT EXISTS expenses (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     branch_id    INTEGER DEFAULT 1,
@@ -2158,6 +2207,12 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
             conn.execute(
                 "INSERT OR IGNORE INTO roles (name,display_name,display_name_ar,color) VALUES (?,?,?,?)",
                 (rn, rd, rda, rc))
+        # Roles shipped with no grants at all, which the access check reads as
+        # "fall open" — so every role reached every module. Fill only the empty
+        # ones, so an administrator's own choices are never overwritten.
+        _seeded = seed_default_permissions(conn)
+        if _seeded:
+            logger.info("seeded default permissions for %d role(s)", _seeded)
         # admin user
         if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
             conn.execute(
@@ -3006,33 +3061,32 @@ def list_invoices(owner_id: Optional[int] = None, status: str = "",
     return [dict(r) for r in rows]
 
 def add_payment(invoice_id: int, owner_id: int, amount: float,
-                method: str = "Cash", reference: str = "", received_by: str = "") -> None:
-    """Record a payment by updating the invoice's paid_amount directly.
-    The shared DB's payments table belongs to Waslny (taxi) and cannot be used."""
-    conn = get_db()
-    with conn:
-        row = conn.execute(
-            "SELECT total, paid_amount FROM invoices WHERE id=?", (invoice_id,)
-        ).fetchone()
-        if not row:
-            conn.close()
-            return
-        total = round(float(row["total"] or 0), 2)
-        # Round at every write. Money is stored as REAL (binary float), so
-        # accumulating instalments leaves residues like 4.5e-13: a simulation
-        # over 200k invoices showed ~14% of instalment-paid invoices ending up
-        # permanently "Partial" while the screen displayed 0.00 due. The min()
-        # clamp below does NOT prevent this — measured with and without.
-        new_paid = round(min(round(float(row["paid_amount"] or 0) + float(amount), 2), total), 2)
-        due = round(max(0.0, total - new_paid), 2)
-        # Compare against half a piastre, never against exact zero.
-        # ponytail: real fix is NUMERIC(12,2) end to end — see docs/MONEY_PRECISION.md
-        status = "Paid" if due < 0.005 else "Partial"
-        conn.execute(
-            "UPDATE invoices SET paid_amount=?,due_amount=?,status=?,updated_at=datetime('now') WHERE id=?",
-            (new_paid, due, status, invoice_id)
-        )
-    conn.close()
+                method: str = "Cash", reference: str = "", received_by: str = "",
+                idempotency_key: str = "") -> None:
+    """Record a payment against an invoice.
+
+    Now a thin wrapper over models.payments, which is the only path that writes
+    money. It used to be the whole implementation, and it:
+
+      - accepted `method`, `reference` and `received_by` and DISCARDED all three,
+        so an invoice could be "Paid" with no record of who took the money, when
+        or how, and nothing to reconcile the till against;
+      - never wrote to the `payments` table at all — the docstring blamed a
+        table belonging to another product, which had long since stopped being
+        true — so there was no ledger, no refund and no reversal;
+      - INCREMENTED paid_amount, which drifts away from reality the first time
+        anything is refunded or replayed. It is now derived by summing the
+        ledger, so it cannot.
+
+    Keeping the signature means the two existing call sites did not change.
+    """
+    from models import payments
+    intent = payments.create_intent(
+        invoice_id, owner_id, amount,
+        gateway=payments.gateway_for_method(method),
+        idempotency_key=idempotency_key or "",
+        created_by=received_by)
+    payments.capture(intent["id"], actor=received_by)
 
 def get_finance_summary(date_from: str = "", date_to: str = "") -> dict:
     conn = get_db()
@@ -3370,7 +3424,81 @@ ALL_PERMISSIONS = [
     ("backup",       "Backup & Restore"),
     ("audit",        "Audit Log"),
     ("settings",     "Platform Settings"),
+    # Modules that existed with no grantable key, so the Roles screen could not
+    # govern them at all — an administrator revoking everything still left them
+    # open, with nothing in the UI to say so.
+    ("payroll",      "Payroll & Salaries"),
+    ("inpatient",    "Inpatient & Hospitalisation"),
+    ("telemedicine", "Telemedicine"),
+    ("imaging",      "Imaging & Radiology"),
+    ("petshop",      "Pet Shop & Retail"),
 ]
+
+# What each role may reach out of the box.
+#
+# Every role previously shipped with permissions_json='[]', which the access
+# check reads as "no data — fall open". Combined with 271 routes carrying only
+# @login_required, that meant a groomer could open the clinic's accounts, its
+# purchase orders and its entire client list. Verified, not assumed.
+#
+# These are a STARTING POINT an administrator edits on the Roles screen, not a
+# fixed policy. Each role gets what its job needs and nothing else: the test of
+# a line below is "would this person be asked to do this in a real clinic".
+#
+# super_admin is absent deliberately — it bypasses the check entirely, so
+# giving it a list would imply the list could restrict it.
+DEFAULT_ROLE_PERMISSIONS = {
+    "clinic_owner":   [k for k, _ in ALL_PERMISSIONS],
+    "branch_manager": ["patients", "appointments", "visits", "pharmacy",
+                       "invoicing", "inventory", "procurement", "reports",
+                       "whatsapp", "catalog", "grooming", "boarding",
+                       "attendance", "accounting", "inpatient", "telemedicine",
+                       "imaging", "petshop"],
+    # "attendance" is on every staff role deliberately. It is not an admin
+    # module — it is where an employee clocks in and requests leave, and the
+    # routes behind it are already scoped to the requesting user. Leaving it off
+    # locked a nurse out of her own timesheet, which a test caught.
+    #
+    # Clinicians: the medical record and what they prescribe from it. No money.
+    "doctor":         ["patients", "appointments", "visits", "pharmacy",
+                       "reports", "catalog", "inpatient", "telemedicine",
+                       "imaging", "ai", "attendance"],
+    "nurse":          ["patients", "appointments", "visits", "pharmacy",
+                       "inpatient", "imaging", "attendance"],
+    # Front desk: books, bills and talks to clients. Not the clinic's accounts.
+    "reception":      ["patients", "appointments", "invoicing", "catalog",
+                       "whatsapp", "grooming", "boarding", "petshop",
+                       "attendance"],
+    "pharmacist":     ["pharmacy", "inventory", "patients", "visits", "attendance"],
+    "inventory_mgr":  ["inventory", "procurement", "petshop", "reports", "attendance"],
+    # Money roles: the books, but not the medical record.
+    "finance":        ["invoicing", "accounting", "reports", "payroll"],
+    "hr":             ["hr", "attendance", "payroll"],
+    # Service staff: their own diary and the animals in front of them.
+    "groomer":        ["grooming", "appointments", "patients", "attendance"],
+    "boarding_staff": ["boarding", "appointments", "patients", "attendance"],
+    "support_admin":  ["system", "backup", "audit", "settings"],
+    # Read-only by role; these keys decide only WHICH screens open.
+    "auditor":        ["reports", "audit", "accounting"],
+}
+
+
+def seed_default_permissions(conn) -> int:
+    """Give every role with no grants its default set. Returns rows changed.
+
+    Only touches roles whose permissions_json is empty, so an administrator's
+    own configuration is never overwritten — including a deliberate empty one
+    they set after this ran once.
+    """
+    import json as _json
+    changed = 0
+    for role, perms in DEFAULT_ROLE_PERMISSIONS.items():
+        cur = conn.execute(
+            "UPDATE roles SET permissions_json=? "
+            "WHERE name=? AND (permissions_json IS NULL OR permissions_json IN ('', '[]'))",
+            (_json.dumps(perms), role))
+        changed += cur.rowcount or 0
+    return changed
 
 
 def list_roles() -> list:

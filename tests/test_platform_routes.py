@@ -342,10 +342,18 @@ def visit(app, patient):
 
 
 def test_context_visit_refuses_a_non_clinical_role(client, visit):
+    """Refused, whichever gate gets there first.
+
+    Reception has no "ai" grant, so the module gate in login_required now
+    redirects before the route's own 403 is reached. Asserting the exact shape
+    of the refusal made this test fail on a change that made access control
+    STRICTER, so it asserts the refusal itself.
+    """
     _become(client, "reception")
-    r = client.get(f"/ai/context/visit/{visit}")
-    assert r.status_code == 403
-    assert r.get_json()["error"] == "Access denied"
+    r = client.get(f"/ai/context/visit/{visit}", follow_redirects=False)
+    assert r.status_code in (302, 403), "a receptionist reached the AI context"
+    if r.status_code == 403:
+        assert r.get_json()["error"] == "Access denied"
 
 
 def test_context_visit_returns_the_patient_to_a_doctor(client, visit, patient):
@@ -664,50 +672,53 @@ def test_public_endpoints_cannot_read_or_modify_existing_clinic_data(app, client
         assert client.get(path).status_code in (404, 405)
 
 
-def test_public_book_is_blocked_for_a_rate_limited_ip_and_writes_nothing(app, client):
-    """`_check_rate_limit()` reads models.security.is_rate_limited, whose counters
-    live in `login_attempts`. Seed a lockout for the test client's IP and the
-    booking must be refused before it touches the database."""
-    from models.security import RATE_LIMIT_MAX, _ensure_tables
-    with app.app_context():
-        _ensure_tables()
-        now = time.time()
-        for _ in range(RATE_LIMIT_MAX):
-            _exec("INSERT INTO login_attempts (ip, username, ts) VALUES (?,?,?)",
-                  ("127.0.0.1", "", now))
-        before = _scalar("SELECT COUNT(*) FROM appointments")
-    try:
-        r = client.post("/api/public/book", json={
-            "ownerName": "Flooder", "mobile": "01099999999",
-            "petName": "Bot", "date": date.today().isoformat()})
-        assert r.status_code == 429
-        assert r.get_json()["ok"] is False
-        with app.app_context():
-            assert _scalar("SELECT COUNT(*) FROM appointments") == before
-    finally:
-        with app.app_context():
-            _exec("DELETE FROM login_attempts WHERE ip='127.0.0.1'")
+def test_a_throttled_booking_writes_nothing(app, client):
+    """A refused booking must not leave an owner, a pet or an appointment behind.
 
-
-def test_public_traffic_does_not_feed_its_own_rate_limiter(app, client):
-    """KNOWN GAP, pinned deliberately.
-
-    `login_attempts` is written only by `record_failed_login`. A flood of public
-    bookings therefore never increments the counter the public endpoints check,
-    so /api/public/* is effectively unthrottled. This test asserts the behaviour
-    as it is; if real throttling is added it will fail and must be updated.
+    The valuable half of this test is unchanged. What changed is HOW the IP gets
+    throttled: it used to seed a failed-LOGIN lockout, because the public
+    endpoints read that counter. They no longer do, and they should not — five
+    fat-fingered password attempts should never close the public booking form
+    for a client with a sick animal.
     """
-    from models.security import _ensure_tables
+    payload = {"ownerName": "Flooder", "mobile": "01099999999",
+               "petName": "Bot", "date": date.today().isoformat()}
+    refused = None
+    for _ in range(30):
+        r = client.post("/api/public/book", json=payload)
+        if r.status_code == 429:
+            refused = r
+            break
+    assert refused is not None, "flooding /api/public/book was never refused"
+    assert refused.get_json()["ok"] is False
+
     with app.app_context():
-        _ensure_tables()
-        before = _scalar("SELECT COUNT(*) FROM login_attempts WHERE ip='127.0.0.1'")
-    for i in range(12):
+        before = _scalar("SELECT COUNT(*) FROM appointments")
+    r = client.post("/api/public/book", json=payload)
+    assert r.status_code == 429
+    with app.app_context():
+        assert _scalar("SELECT COUNT(*) FROM appointments") == before,             "a throttled booking still reached the database"
+
+
+def test_public_traffic_now_feeds_its_own_rate_limiter(app, client):
+    """This used to pin the gap; the gap is closed, so it now pins the fix.
+
+    It previously read: "login_attempts is written only by record_failed_login.
+    A flood of public bookings therefore never increments the counter the public
+    endpoints check, so /api/public/* is effectively unthrottled... if real
+    throttling is added it will fail and must be updated."
+
+    It failed, saying "call 7 was throttled". That is the fix arriving.
+    """
+    throttled_at = None
+    for i in range(15):
         r = client.post("/api/public/contact", json={
             "name": "flood", "mobile": "01000000000", "message": f"m{i}"})
-        assert r.status_code == 200, f"call {i} was throttled — update this test"
-    with app.app_context():
-        assert _scalar(
-            "SELECT COUNT(*) FROM login_attempts WHERE ip='127.0.0.1'") == before
+        if r.status_code == 429:
+            throttled_at = i
+            break
+    assert throttled_at is not None, "15 contact submissions from one IP, none throttled"
+    assert throttled_at >= 5, "throttling a real client this early would block genuine use"
 
 
 # ═════════════════════════════════════════════════════════════════════════════

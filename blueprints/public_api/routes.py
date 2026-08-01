@@ -46,12 +46,35 @@ def options_handler(p):
 
 # ── Rate limit helper for public endpoints ───────────────────────────────────
 
-def _check_rate_limit():
-    """Returns a 429 response if rate limited, else None."""
+# These three endpoints are unauthenticated, write to the database, and send
+# WhatsApp messages — the whole reason they need a limit. Generous enough that
+# no real client hits it: a household booking for several pets stays well under.
+_LIMITS = {
+    "book":      (20, 3600),    # 20 bookings/hour from one address
+    "contact":   (10, 3600),
+    "emergency": (10, 600),     # a real emergency justifies retrying quickly
+    # Generous: a provider legitimately retries a callback it thinks was
+    # missed, and throttling those would strand real payments as pending.
+    "callback":  (300, 3600),
+}
+
+
+def _check_rate_limit(bucket: str = "public"):
+    """Returns a 429 response if over the limit, else None.
+
+    This used to call sec.is_rate_limited(ip), which counts rows only
+    record_failed_login ever writes. Nothing here wrote to that table, so the
+    counter this guard read stayed empty for public traffic and the limit could
+    never fire, at any volume. sec.throttle() records the hit it is checking.
+    """
+    max_hits, window = _LIMITS.get(bucket, (30, 3600))
     ip = sec.get_real_ip(request)
-    limited, wait = sec.is_rate_limited(ip)
-    if limited:
-        return jsonify({"ok": False, "error": "Too many requests. Please try again later."}), 429
+    over, wait = sec.throttle(f"public_{bucket}", ip, max_hits, window)
+    if over:
+        resp = jsonify({"ok": False,
+                        "error": "Too many requests. Please try again later."})
+        resp.headers["Retry-After"] = str(max(wait, 1))
+        return _cors(resp), 429
     return None
 
 
@@ -93,7 +116,7 @@ def services():
 
 @public_api_bp.route("/book", methods=["POST"])
 def book():
-    rl = _check_rate_limit()
+    rl = _check_rate_limit("book")
     if rl:
         return rl
     data = request.get_json(silent=True) or {}
@@ -217,7 +240,7 @@ def book():
 
 @public_api_bp.route("/contact", methods=["POST"])
 def contact():
-    rl = _check_rate_limit()
+    rl = _check_rate_limit("contact")
     if rl:
         return rl
     data = request.get_json(silent=True) or {}
@@ -277,7 +300,7 @@ def contact():
 
 @public_api_bp.route("/emergency", methods=["POST"])
 def emergency():
-    rl = _check_rate_limit()
+    rl = _check_rate_limit("emergency")
     if rl:
         return rl
     data = request.get_json(silent=True) or {}
@@ -365,3 +388,41 @@ def emergency():
         return jsonify({"ok": False, "error": "Emergency registration failed. Please call us directly."}), 500
     finally:
         conn.close()
+
+
+# ── POST /api/public/payments/callback/<gateway> ─────────────────────────────
+#
+# Lives on the PUBLIC blueprint because the payment provider posts here, not a
+# logged-in member of staff — behind @login_required it would redirect to the
+# login page and every online payment would hang as "pending" forever.
+#
+# Unauthenticated does NOT mean untrusted: nothing is believed until
+# gateway.verify_callback() has checked the signature. An unverified callback
+# marking invoices paid is free treatment for anyone who finds this URL.
+
+@public_api_bp.route("/payments/callback/<gateway>", methods=["POST", "GET"])
+def payment_callback(gateway):
+    from models import payments
+
+    # Rate limited like everything else public. A provider retrying is normal;
+    # someone hammering the endpoint hunting for a signature is not.
+    rl = _check_rate_limit("callback")
+    if rl:
+        return rl
+
+    payload = request.get_json(silent=True) or request.form.to_dict() or \
+        request.args.to_dict()
+    try:
+        intent = payments.handle_callback(gateway, payload, dict(request.headers))
+    except payments.PaymentError as exc:
+        # 400, never 500: a 500 makes providers retry a callback that will never
+        # be accepted. Details stay in the log, not in the response — telling a
+        # caller WHY their signature failed helps them forge a better one.
+        logger.warning("payment callback refused (%s): %s", gateway, exc)
+        return jsonify({"ok": False, "error": "Callback rejected."}), 400
+    except Exception:
+        logger.exception("payment callback blew up (%s)", gateway)
+        return jsonify({"ok": False, "error": "Callback could not be processed."}), 500
+
+    logger.info("payment callback: intent=%s now %s", intent["id"], intent["status"])
+    return jsonify({"ok": True, "status": intent["status"]})

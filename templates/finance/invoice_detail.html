@@ -208,12 +208,16 @@
           </div>
           <div class="form-group">
             <label class="form-label">{{ t('Method', 'طريقة الدفع') }}</label>
+            {#- Driven by the gateway registry, not a hardcoded list. Cash is
+                first because that is how most clinics are actually paid, and an
+                online gateway only appears once its keys are configured — so
+                staff are never offered a method that cannot complete. -#}
             <select name="method" class="form-control">
-              <option value="Cash">{{ t('Cash', 'نقداً') }}</option>
-              <option value="Card">{{ t('Card / Visa', 'بطاقة / فيزا') }}</option>
-              <option value="Transfer">{{ t('Bank Transfer', 'تحويل بنكي') }}</option>
-              <option value="Instapay">{{ t('Instapay', 'إنستاباي') }}</option>
-              <option value="Insurance">{{ t('Insurance', 'تأمين') }}</option>
+              {% for gw in payment_methods %}
+              <option value="{{ gw.name }}">{{ t(gw.label, gw.label_ar) }}</option>
+              {% else %}
+              <option value="cash">{{ t('Cash', 'نقداً') }}</option>
+              {% endfor %}
             </select>
           </div>
           <div class="form-group">

@@ -6,7 +6,7 @@ from flask import render_template, request, redirect, url_for, session, flash, j
 from datetime import date
 from . import payroll_bp
 import models.database as db
-from blueprints.auth.routes import login_required, role_required
+from blueprints.auth.routes import login_required, self_service, role_required
 from blueprints.hr.routes import can_view_staff, _ensure_hr_tables, _db_target
 from models.excel_export import make_workbook
 
@@ -255,6 +255,7 @@ def dashboard():
 
 @payroll_bp.route("/salaries")
 @login_required
+@self_service
 def salaries_list():
     conn = db.get_db()
     today = date.today()
@@ -297,6 +298,7 @@ def salaries_list():
 
 @payroll_bp.route("/salaries/export/xlsx")
 @login_required
+@self_service
 def salaries_export_xlsx():
     today = date.today()
     year  = int(request.args.get("year",  today.year))
@@ -415,6 +417,7 @@ def salary_new():
 
 @payroll_bp.route("/salaries/<int:sid>")
 @login_required
+@self_service
 def salary_detail(sid):
     conn = db.get_db()
     # LEFT JOIN: a payslip for a since-deleted employee must still open, with
@@ -632,6 +635,7 @@ def salary_grades():
 
 @payroll_bp.route("/salaries/<int:sid>/payslip")
 @login_required
+@self_service
 def salary_payslip(sid):
     from flask import Response, abort
     from models.pdf_generator import generate_payslip_pdf
@@ -664,6 +668,7 @@ def salary_payslip(sid):
 
 @payroll_bp.route("/api/attendance/<int:uid>/<int:year>/<int:month>")
 @login_required
+@self_service
 def api_attendance_summary(uid, year, month):
     if not _may_see_salary({"user_id": uid}):
         return jsonify({"error": "forbidden"}), 403

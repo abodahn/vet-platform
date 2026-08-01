@@ -1,6 +1,6 @@
 from flask import (
     render_template, request, redirect, url_for,
-    session, flash, current_app,
+    session, flash, current_app, jsonify,
 )
 from functools import wraps
 from urllib.parse import urlparse
@@ -62,18 +62,114 @@ def login_required(f):
         if not session.get("user"):
             flash("Please log in to continue.", "warning")
             return redirect(url_for("auth.login", next=request.path))
+        denied = _permission_denied()
+        if denied is not None:
+            return denied
         return f(*args, **kwargs)
     return decorated
 
 
+def self_service(f):
+    """This route serves the logged-in user their OWN record.
+
+    Exempt from the module grant, because the grant is the wrong question here.
+    "payroll" means may-administer-payroll; a nurse reading her own payslip is
+    not administering anything, and locking her out of it made five tests fail
+    with names that say so exactly — "an employee may download their own
+    payslip", "may read their own attendance summary".
+
+    This does NOT relax anything else: login is still required, and each of
+    these routes already scopes its query to the requesting user, which is what
+    stops it becoming an IDOR.
+    """
+    f._self_service = True
+    return f
+
+
+def _permission_denied():
+    """None if the current user may enter this blueprint, else a redirect.
+
+    Enforced HERE because 271 of the 376 routes carry only @login_required with
+    no role gate at all — so a groomer, a nurse and a receptionist could each
+    open /finance/, /accounting/, /inventory/, /procurement/ and the full client
+    list. Fixing that by hand-adding a role list to 271 routes would have missed
+    some and locked people out of others; this is the one gate they all pass.
+
+    Falls open, never closed, on anything ungovernable:
+      - a role with no grant data      -> unchanged (an upgrade cannot lock a
+                                          live clinic out of its own system)
+      - a blueprint with no grant key  -> unchanged (launcher, auth, uploads,
+                                          notifications: nothing to grant)
+    """
+    role = (session.get("user") or {}).get("role", "")
+    if not role or role == "super_admin":
+        return None
+    view = current_app.view_functions.get(request.endpoint or "")
+    if getattr(view, "_self_service", False):
+        return None
+    key = _permission_for(getattr(request, "blueprint", "") or "")
+    if not key:
+        return None
+    granted = _role_permissions(role)
+    if granted is None:
+        return None
+    if has_permission(key, role):
+        return None
+    flash("You don't have permission to access this page.", "danger")
+    if request.path.startswith("/api/") or request.accept_mimetypes.best == "application/json":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    return redirect(url_for("launcher.index"))
+
+
+# Blueprint name -> permission key. Most match; these do not, and guessing
+# would silently deny access to a module an administrator believed they had
+# granted.
+_BP_PERMISSION = {
+    "crm":          "patients",
+    "finance":      "invoicing",
+    "ai_assistant": "ai",
+    "clinical":     "visits",
+    "doctor":       "visits",
+    "petsy":        "petshop",
+}
+
+
+def _permission_for(blueprint: str) -> str:
+    """The grant key governing a blueprint, or "" if none can govern it.
+
+    Returning "" matters: a module with no key cannot be granted on the Roles
+    screen, so enforcing against it would lock users out of a permission no
+    administrator is able to give them.
+    """
+    if not blueprint:
+        return ""
+    key = _BP_PERMISSION.get(blueprint, blueprint)
+    return key if key in {k for k, _ in db.ALL_PERMISSIONS} else ""
+
+
 def role_required(*roles):
-    """Allow access only to users whose role is in `roles`."""
+    """Allow access only to users whose role is in `roles`.
+
+    Both gates apply, and BOTH must pass. The module grant (checked in
+    login_required) says which modules a role may enter at all; this role list
+    says who may do this particular thing inside one.
+
+    They are not interchangeable, and treating them as such was a real bug. The
+    grant keys are per MODULE, while routes inside a module differ enormously
+    in blast radius: deleting a WhatsApp template and viewing the message log
+    both live under "whatsapp". Letting the grant REPLACE the role list handed
+    every receptionist the destructive routes too — caught by
+    test_template_delete_is_role_gated, which put it plainly: "a receptionist
+    deleted a template".
+
+    So a grant can only ever narrow. It never widens.
+    """
     def decorator(f):
         @wraps(f)
-        @login_required
+        @login_required            # module-level grant is enforced in there
         def decorated(*args, **kwargs):
             user_role = session.get("user", {}).get("role", "")
-            if user_role not in roles and user_role != "super_admin":
+            if user_role != "super_admin" and user_role not in roles:
                 flash("You don't have permission to access this page.", "danger")
                 return redirect(url_for("launcher.index"))
             return f(*args, **kwargs)
