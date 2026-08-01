@@ -7,7 +7,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Aleefy — Secure Clinic Login</title>
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/aleefy-logo.png') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/aleefy-mark.png') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -121,23 +121,39 @@ body {
   max-width: 520px;
 }
 
-/* Logo row */
+/* Logo row
+   Uses aleefy-mark.png — the SYMBOL only. The full aleefy-logo.png is a
+   lockup: it already contains the word "Aleefy" and the tagline, so pairing it
+   with the wordmark below printed the name twice. It is also 747x1012
+   portrait, and object-fit:contain in a square box rendered it ~44px wide with
+   dead space either side, which is what made it look misaligned rather than
+   merely small. */
 .hero-logo-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
   margin-bottom: 36px;
 }
 
 .hero-logo-img {
-  width: 60px;
-  height: 60px;
-  object-fit: contain;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-  padding: 4px;
+  width: 66px;
+  height: 66px;
+  /* cover, not contain: the mark is square now, so it fills the tile edge to
+     edge instead of floating inside it. */
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.38);
+  /* No padding and no translucent backplate — the mark carries its own cream,
+     and layering the two produced a pale rectangle inside a faintly lighter
+     square. One deliberate light tile on the dark hero reads better than two. */
+  flex-shrink: 0;
+}
+
+.hero-logo-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .hero-logo-name {
@@ -152,8 +168,9 @@ body {
   font-size: 1rem;
   font-family: 'Cairo', sans-serif;
   color: #D4AC2C;
-  margin-top: 3px;
+  margin-top: 6px;
   letter-spacing: 0.01em;
+  line-height: 1;
 }
 
 /* Tagline */
@@ -589,8 +606,9 @@ body {
 
     <!-- Logo -->
     <div class="hero-logo-row">
-      <img src="/static/images/aleefy-logo.png" alt="Aleefy Logo" class="hero-logo-img">
-      <div>
+      <img src="/static/images/aleefy-mark.png" alt="" aria-hidden="true"
+           class="hero-logo-img">
+      <div class="hero-logo-text">
         <div class="hero-logo-name">Aleefy</div>
         <div class="hero-logo-ar">اليفي</div>
       </div>

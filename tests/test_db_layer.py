@@ -234,22 +234,43 @@ def test_every_legal_dsn_shape_is_accepted(monkeypatch, dsn, want_host, want_por
     assert unquote(p.password or "") == want_pass
 
 
-def test_a_valid_dsn_actually_configures_postgres(monkeypatch):
-    """End to end through create_app's own branch, not just urlparse."""
+def test_a_valid_dsn_actually_configures_postgres(monkeypatch, tmp_path):
+    """End to end through create_app's own branch, not just urlparse.
+
+    Everything here is monkeypatched or redirected on purpose. The first
+    version of this test called the real create_app(): DATABASE_PATH was the
+    real platform.db, so it ran init_db against the developer's own database
+    AND left models.backup pointed there, which broke 19 unrelated tests that
+    happened to run afterwards. A test that reaches outside its temp directory
+    is the same mistake this suite was just fixed for.
+    """
     import app as app_module
+    import config as config_module
+    import models.backup as backup
+
     seen = {}
     monkeypatch.setattr(app_module.db, "configure_postgres",
                         lambda **kw: seen.update(kw))
     # POSTGRES_DSN is read into Config at import time, so setting the
     # environment variable here would never reach create_app.
-    import config as config_module
     monkeypatch.setattr(config_module.Config, "POSTGRES_DSN",
                         "postgresql://postgres:@127.0.0.1:62386/vetclinic_test",
                         raising=False)
+    # Nothing may touch the real database or the real backup directory.
+    monkeypatch.setattr(config_module.Config, "DATABASE_PATH",
+                        str(tmp_path / "dsn_probe.db"), raising=False)
+    monkeypatch.setattr(app_module.db, "init_db", lambda **kw: None)
+    monkeypatch.setattr(backup, "configure", lambda *a, **k: None)
+
+    saved = (db._db_path, dict(db._PG_CONFIG), db._POOL)
     try:
-        app_module.create_app()
-    except Exception:
-        pass                      # only the DSN branch matters here
+        try:
+            app_module.create_app()
+        except Exception:
+            pass                  # only the DSN branch matters here
+    finally:
+        db._db_path, db._PG_CONFIG, db._POOL = saved
+
     assert seen.get("host") == "127.0.0.1", \
         f"an empty-password DSN did not reach configure_postgres: {seen}"
     assert seen.get("port") == 62386
