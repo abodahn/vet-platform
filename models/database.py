@@ -145,10 +145,27 @@ _SQ_STRING_RE = re.compile(r"('(?:[^']|'')*')")
 # INSERT target table, used to decide whether "RETURNING id" can be appended.
 _INSERT_TABLE_RE = re.compile(r'\s*INSERT\s+INTO\s+"?(\w+)"?', re.IGNORECASE)
 
-# Tables in _SCHEMA that have no `id` column, so INSERT ... RETURNING id would
-# raise UndefinedColumn. Verified by scanning _SCHEMA; tests/test_db_layer.py
-# re-scans and fails if a new id-less table appears.
-_TABLES_WITHOUT_ID = frozenset({"settings"})
+# Tables with no `id` column, so INSERT ... RETURNING id would raise
+# UndefinedColumn on PostgreSQL. tests/test_db_layer.py re-scans and fails if a
+# new id-less table appears.
+#
+# rate_hits is created lazily in models/security.py rather than in _SCHEMA, and
+# the guard test used to scan _SCHEMA alone — so it was invisible, and every
+# throttled request would have failed on PostgreSQL while passing on SQLite,
+# which ignores the appended RETURNING. The test now scans the whole codebase.
+_TABLES_WITHOUT_ID = frozenset({
+    "settings",
+    # All three below were invisible to the old guard and are PRE-EXISTING, not
+    # new. login_attempts is the serious one: it is written on every failed
+    # login, so on PostgreSQL a wrong password raised UndefinedColumn instead of
+    # being reported as a wrong password, and the lockout could never engage.
+    "login_attempts",
+    "petsy_usage",
+    "rate_hits",
+    # Always opened as plain sqlite3, never through get_db(), so it cannot hit
+    # this path today. Listed so it stays safe if that ever changes.
+    "tenants",
+})
 
 
 def _fix_sql(sql: str) -> str:
@@ -162,12 +179,34 @@ def _fix_sql(sql: str) -> str:
     # split() keeps the captured literals at odd indices; only touch the rest.
     s = "".join(p if i % 2 else p.replace("?", "%s") for i, p in enumerate(parts))
     # SQLite datetime function -> PostgreSQL NOW()
-    s = s.replace("datetime('now')", "NOW()")
+    #
+    # Both spellings, and the two-argument form is not optional. Newer code
+    # writes datetime('now','localtime') — the reverse translator adds
+    # 'localtime' precisely so SQLite stops disagreeing with PostgreSQL about
+    # what day it is. Only the one-argument form was handled here, so the
+    # two-argument form reached PostgreSQL verbatim as a call to a function it
+    # does not have: every CREATE TABLE carrying such a DEFAULT failed, and so
+    # did every UPDATE using it. The whole payments schema was unusable on the
+    # production engine while passing on SQLite.
+    #
+    # NOW() is the correct target for both. PostgreSQL evaluates it in the
+    # server's own timezone, which is what 'localtime' asks for.
+    s = re.sub(r"datetime\(\s*'now'\s*(?:,\s*'localtime'\s*)?\)", "NOW()", s)
     # SQLite AUTOINCREMENT primary key -> PostgreSQL SERIAL
     s = re.sub(r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b', 'SERIAL PRIMARY KEY', s, flags=re.IGNORECASE)
-    # TEXT DEFAULT (NOW()) -> TEXT DEFAULT (NOW()::TEXT)  keeps column as TEXT
-    # while providing a valid PostgreSQL default expression
-    s = re.sub(r'\bTEXT(\s+DEFAULT\s+\(NOW\(\)\))', r"TEXT\1::TEXT", s, flags=re.IGNORECASE)
+    # TEXT DEFAULT (NOW()) -> TEXT DEFAULT (NOW()::TEXT), keeping the column TEXT
+    # while giving PostgreSQL a default of the right type. Without the cast it
+    # refuses the table outright: "column is of type text but default
+    # expression is of type timestamp with time zone".
+    #
+    # The optional group in the middle is load-bearing. The original pattern
+    # required TEXT and DEFAULT to be adjacent, so a perfectly ordinary
+    # `created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))` slipped
+    # past it and failed at CREATE TABLE on PostgreSQL only. Column constraints
+    # are legal between the type and its default, and this codebase writes them.
+    s = re.sub(r'\bTEXT((?:\s+(?:NOT\s+NULL|NULL|UNIQUE|COLLATE\s+\w+))*'
+               r'\s+DEFAULT\s+\(NOW\(\)\))',
+               r"TEXT\1::TEXT", s, flags=re.IGNORECASE)
     # INSERT OR IGNORE -> INSERT ... ON CONFLICT DO NOTHING
     has_ignore = bool(re.search(r'\bINSERT\s+OR\s+IGNORE\b', s, re.IGNORECASE))
     if has_ignore:

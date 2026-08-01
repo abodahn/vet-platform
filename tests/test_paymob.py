@@ -184,3 +184,41 @@ def test_amounts_are_converted_to_piastres(gw, monkeypatch):
     assert result["status"] == payments.PENDING, \
         "returning SUCCEEDED here marks invoices paid for anyone who merely opens checkout"
     assert "clientSecret=cs_test" in result["checkout_url"]
+
+
+# ── the authorization scheme, which is config not code ───────────────────────
+
+def test_auth_scheme_defaults_to_Token_and_is_overridable(monkeypatch):
+    """Paymob's docs say `Token <secret>`; some SDKs send `Bearer`. It cannot
+    be settled without a real key — probing the live endpoint with a fake one
+    returns the same generic 401 for Token, Bearer, Api-Key and no header at
+    all — so it is an environment variable rather than a code edit made under
+    pressure on the day a clinic's payments are down."""
+    from models.payments.paymob import _auth_scheme
+    monkeypatch.delenv("PAYMOB_AUTH_SCHEME", raising=False)
+    assert _auth_scheme() == "Token"
+    monkeypatch.setenv("PAYMOB_AUTH_SCHEME", "Bearer")
+    assert _auth_scheme() == "Bearer"
+    monkeypatch.setenv("PAYMOB_AUTH_SCHEME", "")
+    assert _auth_scheme() == "Token", "an empty value must not send a bare secret"
+
+
+def test_the_auth_scheme_reaches_the_request_header(gw, monkeypatch):
+    seen = {}
+
+    class _Resp:
+        status = 200
+        def read(self): return b'{"client_secret":"cs","id":1}'
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_urlopen(req, timeout=None):
+        seen["auth"] = req.headers.get("Authorization")
+        return _Resp()
+
+    monkeypatch.setenv("PAYMOB_AUTH_SCHEME", "Bearer")
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("models.payments.paymob._billing", lambda intent: {})
+    gw.charge({"id": 1, "invoice_id": 1, "owner_id": 1, "amount": "1.00",
+               "currency": "EGP", "idempotency_key": "k"})
+    assert seen["auth"] == "Bearer sk_test_x", seen["auth"]

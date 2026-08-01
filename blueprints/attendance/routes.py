@@ -789,9 +789,15 @@ def holidays():
         return redirect(url_for("attendance.dashboard"))
     conn = get_db()
     year = int(request.args.get("year", date.today().year))
+    # EXTRACT, not strftime: PostgreSQL has no strftime, so this page was the
+    # one query in the codebase that would have raised there. EXTRACT is the
+    # portable spelling — _fix_sql_sqlite rewrites it back to strftime for
+    # SQLite, which is exactly what the bidirectional translator is for.
+    # It yields a number, so the parameter is an int rather than a string.
     holidays_list = conn.execute(
-        "SELECT * FROM public_holidays WHERE strftime('%Y',holiday_date)=? ORDER BY holiday_date",
-        (str(year),)).fetchall()
+        "SELECT * FROM public_holidays WHERE EXTRACT(YEAR FROM holiday_date)=? "
+        "ORDER BY holiday_date",
+        (year,)).fetchall()
     conn.close()
     return render_template("attendance/holidays.html", active="attendance",
                            holidays=holidays_list, year=year)

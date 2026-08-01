@@ -39,6 +39,54 @@ def test_fix_sql_datetime_now():
     assert "NOW()" in db._fix_sql("INSERT INTO t(a) VALUES(datetime('now'))")
 
 
+def test_fix_sql_translates_the_TWO_ARGUMENT_datetime_form():
+    """datetime('now','localtime') must reach PostgreSQL as NOW().
+
+    Only the one-argument form was handled. The reverse translator adds
+    'localtime' deliberately — it is what stops SQLite disagreeing with
+    PostgreSQL about what day it is — so newer code writes the two-argument
+    form, and it went to PostgreSQL verbatim as a call to a function that does
+    not exist there. Every CREATE TABLE carrying such a DEFAULT failed and so
+    did every UPDATE using it, which left the whole payments schema unusable on
+    the production engine while passing perfectly on SQLite.
+
+    NOW() is right for both: PostgreSQL evaluates it in the server's own
+    timezone, which is what 'localtime' asks for.
+    """
+    out = db._fix_sql("UPDATE t SET updated_at=datetime('now','localtime') WHERE id=?")
+    assert out == "UPDATE t SET updated_at=NOW() WHERE id=%s"
+    assert "datetime(" not in db._fix_sql(
+        "CREATE TABLE t (a TEXT DEFAULT (datetime('now', 'localtime')))")
+
+
+def test_fix_sql_casts_NOW_for_a_TEXT_column_WITH_constraints():
+    """PostgreSQL refuses `a TEXT DEFAULT NOW()` outright — "column is of type
+    text but default expression is of type timestamp with time zone" — so the
+    default is cast. The rule required TEXT and DEFAULT to be adjacent, and a
+    perfectly ordinary `created_at TEXT NOT NULL DEFAULT (...)` slipped past it
+    and failed at CREATE TABLE on PostgreSQL only."""
+    for ddl in ("CREATE TABLE t (a TEXT NOT NULL DEFAULT (datetime('now','localtime')))",
+                "CREATE TABLE t (a TEXT UNIQUE NOT NULL DEFAULT (datetime('now')))",
+                "CREATE TABLE t (a TEXT DEFAULT (datetime('now')))"):
+        out = db._fix_sql(ddl)
+        assert "::TEXT" in out, f"uncast NOW() default: {out}"
+
+
+def test_the_WHOLE_schema_survives_translation_to_postgresql():
+    """A sweep, not a sample. Every table the app creates has to be valid on
+    the production engine, and these three shapes are silently fatal there
+    while passing on SQLite — which is the only engine the suite runs on."""
+    import re
+    pg = db._fix_sql(db._SCHEMA)
+    assert not re.search(r"datetime\(\s*'now'", pg), \
+        "a datetime('now') reached PostgreSQL untranslated"
+    assert not re.search(r"\bAUTOINCREMENT\b", pg, re.I), \
+        "AUTOINCREMENT is not PostgreSQL syntax"
+    assert not re.search(
+        r"\bTEXT(?:\s+(?:NOT\s+NULL|NULL|UNIQUE))*\s+DEFAULT\s+\(NOW\(\)\)(?!::TEXT)",
+        pg, re.I), "a TEXT column defaults to an uncast NOW()"
+
+
 def test_returning_id_skips_tables_without_id():
     assert db._PGCursor._returning_id_target("INSERT INTO visits (pet_id) VALUES (%s)") == "visits"
     assert db._PGCursor._returning_id_target("INSERT INTO settings(key) VALUES (%s)") is None
@@ -47,15 +95,38 @@ def test_returning_id_skips_tables_without_id():
     assert db._PGCursor._returning_id_target("SELECT 1") is None
 
 
-def test_no_id_table_list_matches_schema():
-    """Guards _TABLES_WITHOUT_ID against schema drift."""
-    found = {
-        m.group(1).lower()
-        for m in re.finditer(r'CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\n\);', db._SCHEMA, re.S)
-        if not re.search(r'^\s*id\s', m.group(2), re.M)
-    }
-    assert found == set(db._TABLES_WITHOUT_ID), (
-        f"_TABLES_WITHOUT_ID is stale: schema says {found}")
+def test_no_id_table_list_matches_EVERY_table_the_app_creates():
+    """Guards _TABLES_WITHOUT_ID against drift, across the whole codebase.
+
+    This used to scan db._SCHEMA alone. Eleven modules create tables lazily at
+    runtime instead — and one of them, rate_hits, has no `id` column. It was
+    therefore invisible here, so INSERT ... RETURNING id would have been
+    appended to it and every throttled request would have failed on PostgreSQL
+    with UndefinedColumn, while passing on SQLite, which ignores the extra
+    clause. Scanning only the tables that happen to live in one string was the
+    blind spot, not the missing entry.
+    """
+    import pathlib
+
+    ddl_sources = [db._SCHEMA]
+    root = pathlib.Path(__file__).resolve().parent.parent
+    for path in list((root / "models").rglob("*.py")) + \
+                list((root / "blueprints").rglob("*.py")):
+        ddl_sources.append(path.read_text(encoding="utf-8", errors="ignore"))
+
+    found = set()
+    for src in ddl_sources:
+        for m in re.finditer(
+                r'CREATE TABLE (?:IF NOT EXISTS )?(\w+)\s*\((.*?)\n\s*\)',
+                src, re.S | re.I):
+            name, body = m.group(1).lower(), m.group(2)
+            if not re.search(r'^\s*id\s', body, re.M):
+                found.add(name)
+
+    missing = found - set(db._TABLES_WITHOUT_ID)
+    assert not missing, (
+        f"these tables have no `id` column but are not in _TABLES_WITHOUT_ID, "
+        f"so INSERT ... RETURNING id will fail on PostgreSQL: {sorted(missing)}")
 
 
 def test_get_db_returns_working_sqlite_connection():

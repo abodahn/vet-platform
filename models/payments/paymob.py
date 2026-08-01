@@ -13,11 +13,17 @@ WHAT IS NOT VERIFIED
 
 There is no Paymob account yet, so this has NOT been run against the sandbox.
 The flow below follows the documented Intention API, and everything testable
-without a network is tested. Two things must be confirmed with one real sandbox
-transaction before going live, and both are marked TODO(sandbox) in place:
+without a network is tested. Run scripts/verify_paymob.py once with sandbox
+keys to settle the two remaining unknowns:
 
-  1. the exact field set and ordering the HMAC is computed over
-  2. the Authorization scheme on the intention call
+  1. the exact field set and ordering the HMAC is computed over — still
+     TODO(sandbox) below, and the script prints a field-by-field comparison
+     against a real callback when it does not match
+  2. the Authorization scheme on the intention call — no longer a code TODO.
+     Probing the live endpoint with a fake key is useless: Token, Bearer,
+     Api-Key and no header at all all return the same generic 401, so the
+     error cannot distinguish them. It is now PAYMOB_AUTH_SCHEME, and the
+     script tries both and tells you which to set.
 
 Getting HMAC wrong fails CLOSED here — an unverified callback is refused and
 no invoice is marked paid — so the failure mode is "payments do not complete",
@@ -29,6 +35,7 @@ CONFIGURATION (environment)
     PAYMOB_PUBLIC_KEY     public key used in the checkout URL
     PAYMOB_HMAC_SECRET    secret the callback signature is verified with
     PAYMOB_BASE           optional; defaults to https://accept.paymob.com
+    PAYMOB_AUTH_SCHEME    optional; "Token" (default) or "Bearer"
 
 Unset means the gateway simply does not appear in the payment options. Cash
 keeps working regardless — see models/payments/cash.py.
@@ -220,9 +227,14 @@ class PaymobGateway(Gateway):
         req = urllib.request.Request(
             url, data=body, method="POST",
             headers={
-                # TODO(sandbox): Paymob's docs show `Token <secret>` for the
-                # Intention API; some SDKs send Bearer. Confirm on first call.
-                "Authorization": f"Token {self._secret}",
+                # Paymob's docs show `Token <secret>` for the Intention API;
+                # some SDKs send `Bearer`. Made configurable rather than left as
+                # a code TODO because it cannot be settled without a real key:
+                # probing the live endpoint with a fake one returns the same
+                # generic 401 for Token, Bearer, Api-Key AND no header at all,
+                # so the error does not distinguish them.
+                # scripts/verify_paymob.py tries both and reports which works.
+                "Authorization": f"{_auth_scheme()} {self._secret}",
                 "Content-Type": "application/json",
             })
         try:
@@ -239,6 +251,15 @@ class PaymobGateway(Gateway):
             raise PaymentError(
                 "Could not reach the payment provider. Nothing was charged. "
                 "You can take this payment in cash instead.") from exc
+
+
+def _auth_scheme() -> str:
+    """Authorization scheme for the Intention API — "Token" or "Bearer".
+
+    Overridable with PAYMOB_AUTH_SCHEME so switching it is a config change, not
+    a code change made under pressure on the day a clinic's payments are down.
+    """
+    return os.environ.get("PAYMOB_AUTH_SCHEME", "Token").strip() or "Token"
 
 
 def _integration_ids() -> list:
