@@ -206,17 +206,32 @@ def test_partial_payment_leaves_the_exact_remainder_due(auth_client):
     assert inv["status"] == "Partial"
 
 
-def test_overpayment_is_clamped_to_the_invoice_total(auth_client):
+def test_overpayment_is_REFUSED_not_silently_clamped(auth_client):
+    """Clamping was the wrong behaviour and this test used to require it.
+
+    If a client hands over 1000 for a 250 invoice, silently recording 250 and
+    discarding the other 750 means the clinic has taken money it never wrote
+    down: a cash discrepancy at the end of the shift, and no receipt for the
+    difference. Refusing tells the receptionist exactly what is wrong — "that
+    is more than the 250.00 still owed" — so they can enter the right amount
+    and handle change as change.
+    """
     owner_id = _owner("Overpay Owner", "01099000022")
     inv_id = _make_invoice(auth_client, owner_id)
 
-    _post(auth_client, f"/finance/invoices/{inv_id}/pay",
-          {"amount": "1000.00", "method": "Cash"})
+    r = _post(auth_client, f"/finance/invoices/{inv_id}/pay",
+              {"amount": "1000.00", "method": "Cash"})
+    assert "still owed" in r.get_data(as_text=True),         "the refusal did not explain what was wrong"
 
     inv = dict(_row("SELECT * FROM invoices WHERE id=?", (inv_id,)))
-    assert round(inv["paid_amount"], 2) == _EXPECTED_TOTAL, \
-        "paid_amount exceeded the invoice total"
-    assert round(inv["due_amount"], 2) == 0.0
+    assert round(inv["paid_amount"], 2) == 0.0, "a refused payment was recorded anyway"
+    assert inv["status"] == "Unpaid"
+
+    # …and the correct amount still works.
+    _post(auth_client, f"/finance/invoices/{inv_id}/pay",
+          {"amount": f"{_EXPECTED_TOTAL:.2f}", "method": "Cash"})
+    inv = dict(_row("SELECT * FROM invoices WHERE id=?", (inv_id,)))
+    assert round(inv["paid_amount"], 2) == _EXPECTED_TOTAL
     assert inv["status"] == "Paid"
 
 

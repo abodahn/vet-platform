@@ -8,7 +8,12 @@ from flask import (
 )
 from datetime import date, timedelta
 from . import finance_bp
+import logging
+
 import models.database as db
+from models import payments
+
+logger = logging.getLogger(__name__)
 from blueprints.auth.routes import login_required, role_required
 from models.excel_export import make_workbook
 
@@ -337,8 +342,15 @@ def invoice_pay(inv_id):
             flash(f"Payment of {amount:.2f} recorded. +{pts} loyalty points awarded.", "success")
         except Exception:
             flash(f"Payment of {amount:.2f} recorded successfully.", "success")
-    except Exception as e:
-        flash(f"Error recording payment: {e}", "danger")
+    except payments.PaymentError as e:
+        # Written for the person at the counter and already says what to do
+        # ("that is more than the 120.00 still owed"), so it is shown as-is
+        # rather than wrapped in "Error recording payment:".
+        flash(str(e), "warning")
+    except Exception:
+        logger.exception("recording payment on invoice %s failed", inv_id)
+        flash("The payment could not be recorded. Nothing was charged — "
+              "please try again, or record it in cash.", "danger")
 
     return redirect(url_for("finance.invoice_detail", inv_id=inv_id))
 

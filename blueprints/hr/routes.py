@@ -11,7 +11,7 @@ from flask import (
     session, flash, jsonify,
 )
 from . import hr_bp
-from blueprints.auth.routes import login_required, role_required
+from blueprints.auth.routes import login_required, self_service, role_required
 import models.database as db
 
 logger = logging.getLogger(__name__)
@@ -969,6 +969,7 @@ def performance_edit(rev_id):
 
 @hr_bp.route("/performance/<int:rev_id>/acknowledge", methods=["POST"])
 @login_required
+@self_service
 def performance_acknowledge(rev_id):
     conn = db.get_db()
     # Only the employee the review is about (or HR) may acknowledge it.
@@ -1021,6 +1022,7 @@ def add_warning(user_id):
 
 @hr_bp.route("/staff/<int:user_id>/warnings/<int:warn_id>/acknowledge", methods=["POST"])
 @login_required
+@self_service
 def acknowledge_warning(user_id, warn_id):
     conn = db.get_db()
     # The subject comes from the stored warning, not from the URL.
