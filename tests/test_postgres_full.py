@@ -1,17 +1,40 @@
 """
 Comprehensive PostgreSQL test suite for the Premium Animal Hospital platform.
-Runs against the PRODUCTION vetclinic database (not vetclinic_test).
 
 Usage:
-    cd C:\\vet\\platform
+    set TEST_POSTGRES_DSN=postgresql://user:pass@localhost:5432/vetclinic_test
     python -X utf8 -m pytest tests/test_postgres_full.py -v --tb=short
-    # OR standalone:
-    python -X utf8 tests/test_postgres_full.py
+
+Skipped entirely when TEST_POSTGRES_DSN is unset.
+
+WHAT THIS FILE USED TO DO, AND WHY IT DOES NOT ANY MORE
+-------------------------------------------------------
+Its own docstring said: "Runs against the PRODUCTION vetclinic database (not
+vetclinic_test)." It meant it — connection details were hardcoded here, at
+import time, as localhost:5432/vetclinic with user postgres and password 1234.
+
+Two things wrong with that, either of which is enough.
+
+It ran 16 DELETE statements against a live clinic's records. Cleanup is
+best-effort by construction: an assertion that fires early leaves rows behind,
+and a crash mid-test leaves them behind for good. A test suite that writes to
+production is a data-loss incident that has not happened yet.
+
+And conftest.py already has the mechanism to prevent exactly this — it builds
+and drops a throwaway database from TEST_POSTGRES_DSN — which this file quietly
+bypassed by connecting before any of it ran.
+
+It also put a database password in a repository that is being prepared for sale.
+
+Now: connection comes from TEST_POSTGRES_DSN, and a database whose name looks
+like production is refused outright rather than trusted to a careful reader.
 """
 
-import sys
 import os
+import sys
 import time
+from urllib.parse import unquote, urlparse
+
 import pytest
 import psycopg2
 
@@ -19,11 +42,35 @@ import psycopg2
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import models.database as db
 
-# Connect to production DB once for the whole session
-db.configure_postgres(
-    host="localhost", port=5432, dbname="vetclinic",
-    user="postgres", password="1234"
-)
+_DSN = os.environ.get("TEST_POSTGRES_DSN", "").strip()
+if not _DSN:
+    pytest.skip("needs PostgreSQL — set TEST_POSTGRES_DSN",
+                allow_module_level=True)
+
+
+def _pg_kwargs(dsn: str) -> dict:
+    u = urlparse(dsn)
+    name = (u.path or "").lstrip("/")
+    if not u.hostname or not name:
+        raise ValueError(
+            "TEST_POSTGRES_DSN must look like "
+            f"postgresql://user:pass@host:port/dbname — got {dsn!r}")
+    # A refusal, not a warning. This suite deletes rows, and the name is the
+    # only thing standing between it and somebody's real clinic.
+    lowered = name.lower()
+    if not (lowered.endswith("_test") or lowered.startswith("test_")
+            or "test" in lowered):
+        raise RuntimeError(
+            f"refusing to run a destructive suite against {name!r}. "
+            "Name the database with a _test suffix — this suite issues DELETEs "
+            "and its cleanup is best-effort, so a failure part-way through "
+            "leaves rows behind.")
+    return dict(host=u.hostname, port=u.port or 5432, dbname=name,
+                user=unquote(u.username or ""), password=unquote(u.password or ""))
+
+
+_PG = _pg_kwargs(_DSN)
+db.configure_postgres(**_PG)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 _CREATED_OWNER_IDS: list = []
@@ -33,11 +80,12 @@ _CREATED_INV_IDS:   list = []
 
 
 def _raw_conn():
-    """Direct psycopg2 connection for low-level tests."""
-    return psycopg2.connect(
-        host="localhost", port=5432, dbname="vetclinic",
-        user="postgres", password="1234"
-    )
+    """Direct psycopg2 connection for low-level tests.
+
+    Same throwaway database as everything else — this used to open its own
+    hardcoded connection to production, bypassing even the module-level setting.
+    """
+    return psycopg2.connect(**_PG)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -605,13 +653,21 @@ _http_skip = pytest.mark.skipif(
 )
 
 
+# The seeded admin password, from the environment. It was hardcoded as "1234"
+# in two places — a working credential for the app, committed to a repository
+# being prepared for sale, and one that silently stops matching the moment
+# PLATFORM_ADMIN_PASS is set to anything sensible.
+_ADMIN_USER = os.environ.get("PLATFORM_ADMIN_USER", "admin")
+_ADMIN_PASS = os.environ.get("PLATFORM_ADMIN_PASS", "")
+
+
 def _make_session() -> "_requests.Session":
     """Return a requests.Session that is logged in as admin."""
     s = _requests.Session()
     # POST to login — expect a redirect (302) on success
     resp = s.post(
         f"{BASE_URL}/auth/login",
-        data={"username": "admin", "password": "1234"},
+        data={"username": _ADMIN_USER, "password": _ADMIN_PASS},
         allow_redirects=False,
         timeout=10,
     )
@@ -636,7 +692,7 @@ class TestHTTPRoutes:
         try:
             resp = _requests.post(
                 f"{BASE_URL}/auth/login",
-                data={"username": "admin", "password": "1234"},
+                data={"username": _ADMIN_USER, "password": _ADMIN_PASS},
                 allow_redirects=False,
                 timeout=10,
             )
