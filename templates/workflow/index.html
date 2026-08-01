@@ -23,7 +23,81 @@
   /* ── Layout ─────────────────────────────────────────────────────────────
      Product register: this screen is opened to finish something, never to be
      admired. Density and legibility over decoration. */
-  .wf-wrap { max-width: 1060px; margin: 0 auto; }
+  .wf-wrap { max-width: 1320px; margin: 0 auto; }
+
+  /* Two columns once there is room. At 1440 the old single 1060px column threw
+     away 380px while the patient — the thing being glanced at constantly — was
+     a 40px strip of text that scrolled off. The aside is the better use of that
+     space, and it stays put. */
+  .wf-layout {
+    display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 18px; align-items: start;
+  }
+  .wf-main { min-width: 0; }
+  .wf-aside { position: sticky; top: 16px; }
+  .wf-aside[hidden] { display: none; }
+  @media (max-width: 1080px) {
+    /* Below two columns the patient goes ABOVE the step, not below it: the
+       allergy line is the reason this panel exists. */
+    .wf-layout { grid-template-columns: 1fr; }
+    .wf-aside { position: static; order: -1; }
+  }
+
+  /* ── Patient panel ──────────────────────────────────────────────────── */
+  .pt-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 16px; font-size: .84rem;
+  }
+  .pt-head { display: flex; align-items: center; gap: 11px; margin-bottom: 13px; }
+  .pt-avatar {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-weight: 700; font-size: .92rem;
+    background: var(--c-primary); color: #fff;
+  }
+  .pt-name { font-weight: 700; font-size: 1rem; line-height: 1.25; }
+  .pt-owner { color: var(--text-3); font-size: .8rem; }
+  .pt-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 12px; }
+  .pt-facts dt { font-size: .7rem; color: var(--text-muted); font-weight: 600; }
+  .pt-facts dd {
+    margin: 1px 0 0; font-weight: 650; font-variant-numeric: tabular-nums;
+  }
+  /* Allergies get the strongest treatment on the page and sit above the facts,
+     because they are the one thing that must be read before a drug is typed.
+
+     The colour is #991B1B, not the shared --c-danger. Measured: --c-danger on
+     --c-danger-bg is 4.41:1, which fails the 4.5 minimum — and failing it on
+     the most safety-critical element on the screen is the wrong place to be
+     within rounding distance of a standard. This darker red is 7.60:1. */
+  .pt-allergy {
+    background: var(--c-danger-bg); border: 1px solid var(--c-danger-bd);
+    color: #991B1B; border-radius: var(--r-sm);
+    padding: 9px 11px; margin-bottom: 13px; line-height: 1.45;
+  }
+  [data-theme="dark"] .pt-allergy { color: #FCA5A5; }
+  .pt-allergy b { display: block; font-size: .72rem; margin-bottom: 1px; }
+  .pt-none {
+    color: var(--text-muted); font-size: .78rem;
+    padding: 7px 0 11px; border-bottom: 1px solid var(--border); margin-bottom: 11px;
+  }
+  .pt-section {
+    margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--border);
+  }
+  .pt-section h4 {
+    font-size: .7rem; color: var(--text-muted); font-weight: 700;
+    margin: 0 0 7px;
+  }
+  .pt-visit { font-size: .79rem; line-height: 1.5; margin-bottom: 5px; }
+  .pt-visit time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+  /* Vitals read as a set, not as four more form fields in a wall of eight. */
+  .vitals-box {
+    margin-top: 13px; padding: 13px; border: 1px solid var(--border);
+    border-radius: var(--r-md); background: var(--surface-sunk);
+  }
+  .vitals-box > h4 {
+    font-size: .7rem; color: var(--text-muted); font-weight: 700; margin: 0 0 10px;
+  }
+  .vitals-box .wf-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
 
   /* ── Stepper ────────────────────────────────────────────────────────────
      Progress stays on screen because "how much is left" gets asked with an
@@ -206,6 +280,51 @@
   /* Stops an AI panel ever being mistaken for a completed clinical check. */
   .ai-foot { font-size: .74rem; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
 
+  /* ── Today's queue ──────────────────────────────────────────────────────
+     The default view of step one. Search is the fallback for a walk-in, which
+     is the minority case. */
+  .wf-sub {
+    font-size: .74rem; font-weight: 700; color: var(--text-muted);
+    margin: 0 0 2px; letter-spacing: .01em;
+  }
+  .wf-or {
+    margin: 18px 0 6px; display: flex; align-items: center; gap: 10px;
+    font-weight: 600; color: var(--text-muted);
+  }
+  .wf-or::before, .wf-or::after {
+    content: ""; flex: 1; height: 1px; background: var(--border);
+  }
+  .queue-row { gap: 11px; }
+  .q-time {
+    font-variant-numeric: tabular-nums; font-weight: 700; font-size: .82rem;
+    color: var(--text-2); min-width: 46px; flex-shrink: 0;
+  }
+  .q-main { flex: 1; min-width: 0; }
+  .q-main b, .q-main small {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;
+  }
+  /* Same darker red as the patient panel. --c-danger measures 4.57:1 on the
+     hover tint, which passes 4.5 by three hundredths at 12px — too little
+     margin for the one word in the row that changes what gets prescribed. */
+  .q-allergy { color: #991B1B; font-weight: 600; }
+  [data-theme="dark"] .q-allergy { color: #FCA5A5; }
+  .q-status {
+    font-size: .7rem; font-weight: 700; padding: 3px 9px;
+    border-radius: var(--r-full); flex-shrink: 0;
+    background: var(--surface-sunk); color: var(--text-3);
+  }
+  /* Already in the building. The one status worth colouring, because it is the
+     one that changes who reception calls next. */
+  .q-status.here { background: var(--c-success-bg); color: var(--c-success); }
+
+  /* A vital outside its reference range is marked on the field itself, not only
+     in a message that scrolls away. Never blocked — a stressed cat in a carrier
+     is legitimately tachycardic. */
+  .wf-grid input.out-of-range {
+    border-color: var(--c-warning);
+    background: var(--c-warning-bg);
+  }
+
   /* ── Prescription rows ──────────────────────────────────────────────── */
   .rx-row {
     display: grid; grid-template-columns: 2fr 1fr 1fr 1fr .7fr auto;
@@ -252,11 +371,20 @@
   <div class="wf-summary" id="wfSummary" hidden></div>
   <div id="wfError"></div>
 
+  <div class="wf-layout">
+  <div class="wf-main">
+
   <!-- ── 1. CLIENT ──────────────────────────────────────────────────────── -->
   <div class="wf-panel" id="p1">
     <h3>{{ t('Who is the client?', 'من هو العميل؟') }}</h3>
     <p class="wf-hint">{{ t('Search by name or phone. If they are new, add them here.',
                             'ابحث بالاسم أو رقم الهاتف. لو عميل جديد، أضفه هنا.') }}</p>
+
+    <div id="todayQueueWrap">
+      <p class="wf-sub">{{ t("Today's bookings", 'حجوزات اليوم') }}</p>
+      <div class="wf-list" id="todayQueue"></div>
+      <p class="wf-sub wf-or">{{ t('or find someone else', 'أو ابحث عن شخص آخر') }}</p>
+    </div>
 
     <input id="ownerSearch" type="search" autocomplete="off"
            placeholder="{{ t('Name or phone…', 'الاسم أو رقم الهاتف…') }}"
@@ -365,15 +493,22 @@
         </select></div>
       <div><label>{{ t('Doctor', 'الطبيب') }}</label>
            <input id="v_doctor_name" value="{{ doctor_name }}"></div>
-      <div><label>{{ t('Weight (kg)', 'الوزن') }}</label>
-           <input id="v_weight_kg" type="number" step="0.1"></div>
-      <div><label>{{ t('Temperature (°C)', 'الحرارة') }}</label>
-           <input id="v_temp_c" type="number" step="0.1"></div>
-      <div><label>{{ t('Heart rate', 'النبض') }}</label>
-           <input id="v_heart_rate" type="number"></div>
-      <div><label>{{ t('Respiratory rate', 'التنفس') }}</label>
-           <input id="v_respiratory_rate" type="number"></div>
     </div>
+
+    <div class="vitals-box">
+      <h4>{{ t('Vital signs', 'العلامات الحيوية') }}</h4>
+      <div class="wf-grid">
+        <div><label>{{ t('Weight (kg)', 'الوزن') }}</label>
+             <input id="v_weight_kg" type="number" step="0.1" inputmode="decimal"></div>
+        <div><label>{{ t('Temperature (°C)', 'الحرارة') }}</label>
+             <input id="v_temp_c" type="number" step="0.1" inputmode="decimal"></div>
+        <div><label>{{ t('Heart rate', 'النبض') }}</label>
+             <input id="v_heart_rate" type="number" inputmode="numeric"></div>
+        <div><label>{{ t('Respiratory rate', 'التنفس') }}</label>
+             <input id="v_respiratory_rate" type="number" inputmode="numeric"></div>
+      </div>
+    </div>
+    <div id="vitalsNote"></div>
     <div class="wf-actions">
       <button type="button" class="btn btn-primary" id="btnSaveVisit">
         {{ t('Start visit & continue', 'بدء الزيارة والمتابعة') }}
@@ -462,6 +597,17 @@
     <div id="invoiceBox"></div>
   </div>
 
+  </div><!-- /.wf-main -->
+
+  {#- The patient stays on screen for the whole visit. It used to be one line of
+      text above the panel that scrolled away, which is the wrong treatment for
+      the thing a vet needs to keep glancing at — species, weight and above all
+      allergies, which have to be visible at the moment a drug is typed, not
+      three steps earlier. -#}
+  <aside class="wf-aside" id="wfAside" hidden aria-label="{{ t('Patient', 'الحيوان') }}"></aside>
+
+  </div><!-- /.wf-layout -->
+
 </div>
 
 <script>
@@ -516,6 +662,7 @@
       state.visitId + "</b>");
     $("wfSummary").innerHTML = bits.join("");
     $("wfSummary").hidden = bits.length === 0;
+    renderAside();
   }
 
   /* POST to an EXISTING route, exactly as the browser form would. The route
@@ -667,12 +814,15 @@
     $("petHistory").innerHTML = html;
     // Kept for the differential prompt: "seen 3 weeks ago for the same
     // complaint" changes what is likely, and the model should know it.
+    state.allergies = hist.allergies || "";
+    state.visits = hist.visits || [];
     state.historyText = (hist.visits || [])
       .map((v) => v.visit_date + " " + (v.diagnosis || v.chief_complaint || ""))
       .join("; ");
     $("rxAllergyHint").innerHTML = hist.allergies
       ? '⚠ {{ t("Allergic to", "حساسية من") }}: <b style="color:var(--c-danger)">' +
         esc(hist.allergies) + "</b>" : "";
+    checkVitals();
     goto(3);
   }
 
@@ -1010,10 +1160,192 @@
     } finally { setBusy(btnAiRx, false); }
   });
 
+
+  /* ── Today's queue ────────────────────────────────────────────────────────
+     Step one opens on who is booked, not on an empty search box. Most visits
+     are not walk-ins, and making reception type a name already on the screen is
+     the friction that gets a system worked around instead of used.
+
+     Picking someone from the queue jumps straight to the examination: the
+     client and the animal are both already known, so asking again would be
+     asking a question the system can answer itself. */
+  async function loadQueue() {
+    const box = $("todayQueue");
+    if (!box) return;
+    box.innerHTML = '<div class="wf-skel"><i></i><i></i></div>';
+    try {
+      const rows = await getJSON("/workflow/api/today");
+      if (!rows.length) {
+        box.innerHTML = '<div class="wf-empty">' +
+          "{{ t('Nobody is booked for today. Search above for a walk-in.', 'لا يوجد حجوزات اليوم. ابحث بالأعلى عن حالة طارئة.') }}" +
+          "</div>";
+        return;
+      }
+      box.innerHTML = rows.map((a) => {
+        const here = a.status === "Checked-in";
+        return '<button type="button" class="wf-card queue-row" data-appt=\'' +
+          esc(JSON.stringify(a)) + "'>" +
+          '<span class="q-time">' + esc(a.appt_start || "—") + "</span>" +
+          '<span class="wf-avatar">' +
+          esc((a.pet_name || "?").slice(0, 2).toUpperCase()) + "</span>" +
+          "<span class=\"q-main\"><b>" + esc(a.pet_name) + " · " + esc(a.full_name) + "</b>" +
+          "<small>" + esc(a.species || "") +
+          (a.appointment_type ? " · " + esc(a.appointment_type) : "") +
+          (a.allergies ? ' · <span class="q-allergy">⚠ ' + esc(a.allergies) + "</span>" : "") +
+          "</small></span>" +
+          '<span class="q-status' + (here ? " here" : "") + '">' +
+          (here ? "{{ t('In the waiting room', 'في الانتظار') }}"
+                : esc(a.status)) + "</span></button>";
+      }).join("");
+    } catch (err) {
+      box.innerHTML = '<div class="wf-empty">' +
+        "{{ t('Bookings could not be loaded. Search above instead.', 'تعذر تحميل الحجوزات. ابحث بالأعلى بدلاً من ذلك.') }}" +
+        "</div>";
+    }
+  }
+
+  const queueBox = $("todayQueue");
+  if (queueBox) queueBox.addEventListener("click", (e) => {
+    const row = e.target.closest("[data-appt]");
+    if (!row) return;
+    const a = JSON.parse(row.dataset.appt);
+    state.owner = { id: a.owner_id, full_name: a.full_name, phone: a.phone };
+    state.fromAppointment = a.id;
+    // Straight to the examination — both questions before it are answered.
+    selectPet({
+      id: a.pet_id, pet_name: a.pet_name, species: a.species,
+      breed: a.breed, weight_kg: a.weight_kg, allergies: a.allergies,
+    });
+    if (a.reason && !$("v_chief_complaint").value) {
+      $("v_chief_complaint").value = a.reason;
+    }
+  });
+
+  /* ── Vitals against reference ranges ──────────────────────────────────────
+     A temperature of 39.4 in a dog means something. The page used to accept it
+     silently, which puts the whole burden of recall on whoever is typing while
+     holding an animal.
+
+     GENERAL ADULT ranges, shown as a prompt to look — never a diagnosis. A
+     puppy, a stressed cat in a carrier and a post-operative patient all sit
+     outside these legitimately, so the wording is "outside the usual range",
+     and nothing is ever blocked. */
+  const VITALS = {
+    Dog:    { temp_c: [37.8, 39.2], heart_rate: [70, 160],  respiratory_rate: [10, 30] },
+    Cat:    { temp_c: [38.1, 39.2], heart_rate: [140, 220], respiratory_rate: [20, 30] },
+    Rabbit: { temp_c: [38.3, 39.4], heart_rate: [180, 250], respiratory_rate: [30, 60] },
+  };
+
+  function checkVitals() {
+    const species = (state.pet || {}).species || "";
+    const ranges = VITALS[species];
+    const out = $("vitalsNote");
+    if (!out) return;
+    if (!ranges) { out.innerHTML = ""; return; }
+
+    const LABELS = {
+      temp_c: "{{ t('Temperature', 'الحرارة') }}",
+      heart_rate: "{{ t('Heart rate', 'النبض') }}",
+      respiratory_rate: "{{ t('Respiratory rate', 'التنفس') }}",
+    };
+    const flags = [];
+    Object.keys(ranges).forEach((k) => {
+      const el = $("v_" + k);
+      if (!el || !el.value.trim()) { if (el) el.classList.remove("out-of-range"); return; }
+      const v = parseFloat(el.value);
+      const [lo, hi] = ranges[k];
+      const bad = !isNaN(v) && (v < lo || v > hi);
+      el.classList.toggle("out-of-range", bad);
+      if (bad) {
+        flags.push(LABELS[k] + " " + v + " (" +
+          "{{ t('usual', 'المعتاد') }} " + lo + "–" + hi + ")");
+      }
+    });
+
+    out.innerHTML = flags.length
+      ? '<div class="wf-alert warn">' +
+        "{{ t('Outside the usual range for a', 'خارج المعدل المعتاد لـ') }} " +
+        esc(species.toLowerCase()) + ": <b>" + flags.join(", ") + "</b><br>" +
+        "<span style=\"font-weight:400\">" +
+        "{{ t('General adult reference only — age, stress and recent activity all move these.', 'مرجع عام للبالغين فقط — العمر والتوتر والنشاط الحديث تؤثر جميعها.') }}" +
+        "</span></div>"
+      : "";
+  }
+
+  ["v_temp_c", "v_heart_rate", "v_respiratory_rate"].forEach((id) => {
+    const el = $(id);
+    if (el) el.addEventListener("input", checkVitals);
+  });
+
+  /* Enter picks the first search result — reception works this by keyboard. */
+  const searchBox = $("ownerSearch");
+  if (searchBox) searchBox.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const first = document.querySelector("#ownerResults [data-owner]");
+    if (first) first.click();
+  });
+
+
+  /* ── The patient panel ────────────────────────────────────────────────────
+     Replaces the one-line summary strip. Allergies sit at the TOP, above the
+     facts, because they are the thing that must be read before a drug is typed
+     — and the panel is sticky so they are still on screen at the treatment step,
+     not three scrolls up. */
+  function renderAside() {
+    const el = $("wfAside");
+    if (!el) return;
+    if (!state.pet) { el.hidden = true; return; }
+    el.hidden = false;
+
+    const p = state.pet, o = state.owner || {};
+    const allergies = (state.allergies || p.allergies || "").trim();
+
+    let html = '<div class="pt-card"><div class="pt-head">' +
+      '<span class="pt-avatar">' +
+      esc((p.pet_name || "?").slice(0, 2).toUpperCase()) + "</span><span>" +
+      '<span class="pt-name">' + esc(p.pet_name || "") + "</span>" +
+      '<span class="pt-owner">' + esc(o.full_name || "") + "</span></span></div>";
+
+    html += allergies
+      ? '<div class="pt-allergy"><b>{{ t("Allergies", "حساسية") }}</b>' +
+        esc(allergies) + "</div>"
+      : '<div class="pt-none">{{ t("No allergies recorded", "لا توجد حساسية مسجلة") }}</div>';
+
+    const facts = [
+      ["{{ t('Species', 'النوع') }}", p.species],
+      ["{{ t('Breed', 'السلالة') }}", p.breed],
+      ["{{ t('Sex', 'الجنس') }}", p.sex],
+      ["{{ t('Weight', 'الوزن') }}", p.weight_kg ? p.weight_kg + " kg" : ""],
+    ].filter((f) => f[1]);
+    if (facts.length) {
+      html += '<dl class="pt-facts">' + facts.map((f) =>
+        "<div><dt>" + f[0] + "</dt><dd>" + esc(f[1]) + "</dd></div>").join("") + "</dl>";
+    }
+
+    if ((state.visits || []).length) {
+      html += '<div class="pt-section"><h4>' +
+        "{{ t('Recent visits', 'زيارات سابقة') }}</h4>" +
+        state.visits.slice(0, 4).map((v) =>
+          '<div class="pt-visit"><time>' + esc(v.visit_date || "") + "</time> — " +
+          esc(v.diagnosis || v.chief_complaint || "—") + "</div>").join("") +
+        "</div>";
+    }
+
+    if (state.visitId) {
+      html += '<div class="pt-section"><h4>' +
+        "{{ t('This visit', 'هذه الزيارة') }}</h4>" +
+        '<div class="pt-visit">#' + state.visitId + "</div></div>";
+    }
+    html += "</div>";
+    el.innerHTML = html;
+  }
+
   // Back links
   document.querySelectorAll("[data-back]").forEach((b) =>
     b.addEventListener("click", () => goto(Number(b.dataset.back))));
 
+  loadQueue();
   $("ownerSearch").focus();
 })();
 </script>

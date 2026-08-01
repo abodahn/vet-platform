@@ -338,3 +338,79 @@ def test_a_medication_name_with_an_apostrophe_does_not_break_the_page(
     raw = html[start:end].replace(",]", "]")          # trailing comma is legal JS, not JSON
     names = json.loads(raw)
     assert "Dexter's Drops" in names,         f"the apostrophe broke the medication out of the list: {names}"
+
+
+# ── today's queue ────────────────────────────────────────────────────────────
+
+def test_todays_queue_lists_bookings_and_puts_checked_in_first(client, vet, app):
+    """Step one opens on who is booked, not on an empty search box.
+
+    Most visits are not walk-ins. Making reception type a name already on the
+    screen is the friction that gets a system worked around rather than used.
+    Checked-in first because those people are physically in the building.
+    """
+    import datetime
+    _post(client, "/crm/owners/new", {"full_name": "Queue Owner",
+                                      "phone": "01088776655"})
+    owner = client.get("/workflow/api/owners?q=01088776655").get_json()[0]
+    _post(client, "/crm/pets/new", {"owner_id": owner["id"], "pet_name": "Waiting",
+                                    "species": "Dog", "allergies": "Sulfa"})
+    pet = client.get(f"/workflow/api/owner/{owner['id']}/pets").get_json()["pets"][0]
+
+    today = datetime.date.today().isoformat()
+    with app.app_context():
+        conn = db.get_db()
+        with conn:
+            for start, status in (("11:00", "Confirmed"), ("09:00", "Checked-in")):
+                conn.execute(
+                    "INSERT INTO appointments(owner_id, pet_id, appt_date, appt_start,"
+                    " appointment_type, status) VALUES(?,?,?,?,?,?)",
+                    (owner["id"], pet["id"], today, start, "Consultation", status))
+            # Must NOT appear: already done, and cancelled.
+            conn.execute(
+                "INSERT INTO appointments(owner_id, pet_id, appt_date, appt_start,"
+                " appointment_type, status) VALUES(?,?,?,?,?,?)",
+                (owner["id"], pet["id"], today, "08:00", "Consultation", "Completed"))
+        conn.close()
+
+    rows = client.get("/workflow/api/today").get_json()
+    mine = [r for r in rows if r["owner_id"] == owner["id"]]
+    assert len(mine) == 2, f"expected 2 open bookings, got {len(mine)}"
+    assert mine[0]["status"] == "Checked-in", \
+        "somebody already in the waiting room is not at the top of the queue"
+    assert all(r["status"] != "Completed" for r in rows), \
+        "a finished appointment is still in the queue"
+
+
+def test_the_queue_carries_what_is_needed_to_skip_two_steps(client, vet):
+    """Picking from the queue jumps straight to the examination, so the row has
+    to carry the owner, the pet AND the allergies — asking again would be asking
+    a question the system can already answer."""
+    rows = client.get("/workflow/api/today").get_json()
+    row = next((r for r in rows if r.get("allergies")), None)
+    assert row is not None, "no queued patient with allergies to check against"
+    for key in ("owner_id", "pet_id", "full_name", "pet_name", "species", "allergies"):
+        assert key in row, f"the queue row is missing {key}"
+
+
+def test_the_queue_requires_login(client):
+    r = client.get("/workflow/api/today", follow_redirects=False)
+    assert r.status_code == 302
+
+
+def test_the_patient_panel_puts_allergies_above_the_facts(client, vet):
+    """Ordering is the point: the allergy line has to be read before a drug is
+    typed, so it sits at the top of the panel and the panel is sticky."""
+    html = client.get("/workflow/").get_data(as_text=True)
+    assert 'class="pt-allergy"' in html
+
+    # The panel is built by renderAside() at runtime, so DOM order is decided by
+    # the order the markup is CONCATENATED — not by where the rules sit in the
+    # stylesheet, which is what a naive position check would compare.
+    fn = html[html.index("function renderAside"):]
+    fn = fn[:fn.index("\n  }")]
+    assert fn.index("pt-allergy") < fn.index("pt-facts"), \
+        "the allergy block is appended after the facts"
+
+    assert ".wf-aside { position: sticky" in html, \
+        "the patient panel scrolls away from the treatment step"

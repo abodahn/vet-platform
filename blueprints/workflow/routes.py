@@ -21,6 +21,7 @@ That is also what makes the page safe: every write still passes through
 1,469 tests cover.
 """
 import logging
+from datetime import date
 
 from flask import jsonify, render_template, request, session
 
@@ -92,6 +93,39 @@ def api_owners():
             conn.close()
         out.append(d)
     return jsonify(out)
+
+
+@workflow_bp.route("/api/today")
+@login_required
+def api_today():
+    """Who is booked today, and who is already in the waiting room.
+
+    Most visits are not walk-ins. Making reception type a name they already have
+    on the screen is the kind of friction that gets a system worked around
+    rather than used — so the default view of step one is the queue, and search
+    is the fallback for the walk-in.
+
+    Checked-in first: those people are physically in the building.
+    """
+    conn = db.get_db()
+    try:
+        rows = conn.execute(
+            "SELECT a.id, a.appt_start, a.appointment_type, a.status, a.reason,"
+            "       a.doctor_name,"
+            "       o.id AS owner_id, o.full_name, o.phone,"
+            "       p.id AS pet_id, p.pet_name, p.species, p.breed,"
+            "       p.weight_kg, p.allergies "
+            "FROM appointments a "
+            "JOIN owners o ON o.id = a.owner_id "
+            "JOIN pets   p ON p.id = a.pet_id "
+            "WHERE a.appt_date = ? "
+            "  AND a.status NOT IN ('Completed','Cancelled','No-Show') "
+            "ORDER BY CASE a.status WHEN 'Checked-in' THEN 0 ELSE 1 END, "
+            "         a.appt_start",
+            (date.today().isoformat(),)).fetchall()
+    finally:
+        conn.close()
+    return jsonify([dict(r) for r in rows])
 
 
 @workflow_bp.route("/api/owner/<int:owner_id>/pets")
