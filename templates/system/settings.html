@@ -158,6 +158,16 @@
           </div>
         </div>
         <div class="form-group">
+          <label>{{ t('Instapay payment link', 'رابط الدفع') }}</label>
+          <input type="url" name="instapay_link"
+                 value="{{ clinic.get('instapay_link','') or '' }}"
+                 placeholder="https://ipn.eg/S/yourname/instapay/xxxxxx">
+          <div class="hint">
+            {{ t('A client reading the invoice on their own phone cannot scan their own screen — a link they can tap works where the QR cannot, and it can be sent by WhatsApp.',
+                 'العميل الذي يفتح الفاتورة على هاتفه لا يستطيع مسح شاشته — الرابط يعمل حيث لا يعمل الكود، ويمكن إرساله عبر واتساب.') }}
+          </div>
+        </div>
+        <div class="form-group">
           <label>{{ t('Upload your Instapay QR', 'رفع كود إنستاباي') }}</label>
           <input type="file" name="instapay_qr"
                  accept="image/png,image/jpeg,image/gif,image/webp">

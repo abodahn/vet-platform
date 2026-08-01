@@ -897,6 +897,10 @@ CREATE TABLE IF NOT EXISTS clinic (
     -- a backup and vanishes on restore.
     instapay_handle TEXT,
     instapay_qr     TEXT,
+    -- The ipn.eg payment link. Not a duplicate of the QR: a client reading the
+    -- invoice on their OWN phone cannot scan their own screen, and a link sent
+    -- by WhatsApp is tappable where an image is not.
+    instapay_link   TEXT,
     currency    TEXT DEFAULT 'EGP',
     timezone    TEXT DEFAULT 'Africa/Cairo',
     created_at  TEXT DEFAULT (datetime('now')),
@@ -2215,7 +2219,7 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
         _try_stmt(conn, "ALTER TABLE owners ADD COLUMN loyalty_balance INTEGER DEFAULT 0")
         # Instapay handle and QR — added after clinics were already running, so
         # existing databases need them backfilled here, not only in _SCHEMA.
-        for _col in ("instapay_handle", "instapay_qr"):
+        for _col in ("instapay_handle", "instapay_qr", "instapay_link"):
             _try_stmt(conn, f"ALTER TABLE clinic ADD COLUMN {_col} TEXT")
         # Pet insurance columns
         for _col, _type in [

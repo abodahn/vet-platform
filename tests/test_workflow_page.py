@@ -589,3 +589,88 @@ def test_the_instapay_qr_survives_a_backup_and_restore(app):
         cols = [r[1] for r in conn.execute("PRAGMA table_info(clinic)").fetchall()]
         conn.close()
     assert "instapay_qr" in cols and "instapay_handle" in cols
+
+
+def test_the_payment_link_is_offered_alongside_the_qr(client, vet, app):
+    """They are not interchangeable, which is why both exist.
+
+    The QR is for a client standing at the counter pointing their own phone at
+    the screen. The LINK is for the same client reading the invoice ON that
+    phone — where scanning their own screen is impossible — and it is what gets
+    pasted into a WhatsApp message.
+    """
+    with app.app_context():
+        conn = db.get_db()
+        with conn:
+            conn.execute("UPDATE clinic SET instapay_handle=?, instapay_link=?, "
+                         "instapay_qr=?",
+                         ("goharyfab@instapay",
+                          "https://ipn.eg/S/goharyfab/instapay/3c8FZv",
+                          "data:image/png;base64,iVBORw0KGgo="))
+        conn.close()
+        db.cache_invalidate("clinic_row")
+
+    html = client.get("/workflow/").get_data(as_text=True)
+    assert "https://ipn.eg/S/goharyfab/instapay/3c8FZv" in html
+    assert 'rel="noopener"' in html, "an external payment link opened without noopener"
+    assert "data-copy=" in html, "no way to copy the link for WhatsApp"
+
+
+def test_a_link_with_no_qr_is_still_offered(client, vet, app):
+    """A clinic may have the link and not have got round to the image. Requiring
+    both would leave them with nothing."""
+    with app.app_context():
+        conn = db.get_db()
+        with conn:
+            conn.execute("UPDATE clinic SET instapay_qr=NULL, instapay_handle='', "
+                         "instapay_link=?",
+                         ("https://ipn.eg/S/someone/instapay/abc",)) 
+        conn.close()
+        db.cache_invalidate("clinic_row")
+    html = client.get("/workflow/").get_data(as_text=True)
+    assert "https://ipn.eg/S/someone/instapay/abc" in html
+    assert "No Instapay details are set up yet" not in html.split("payExtra")[-1][:400]
+
+
+def test_the_qr_shown_to_the_client_is_a_separate_full_screen_view(client, vet, app):
+    """The QR on the staff form is a control, not something to be scanned.
+
+    It is small, surrounded by payment inputs, and on a monitor facing the wrong
+    way across a counter. Asking a client to lean over the desk and aim a camera
+    at a thumbnail next to an amount field is the kind of small indignity that
+    gets a payment method quietly abandoned. The client gets their own view: the
+    amount large, the code sized to scan, nothing else.
+    """
+    with app.app_context():
+        conn = db.get_db()
+        with conn:
+            conn.execute("UPDATE clinic SET instapay_handle=?, instapay_link=?, "
+                         "instapay_qr=?",
+                         ("goharyfab@instapay",
+                          "https://ipn.eg/S/goharyfab/instapay/3c8FZv",
+                          "data:image/png;base64,iVBORw0KGgo="))
+        conn.close()
+        db.cache_invalidate("clinic_row")
+
+    html = client.get("/workflow/").get_data(as_text=True)
+    assert 'id="btnShowQr"' in html, "no way to show the code to the client"
+    assert "function showQrToClient" in html
+    assert 'class="ip-thumb"' in html, \
+        "the staff-side image should be a thumbnail, not a scan target"
+    # The amount is the largest thing on the client's screen: the first question
+    # anyone asks is how much.
+    assert ".qr-amount" in html and "2.9rem" in html
+    # Dismissible without a mouse, and announced as a dialog.
+    assert 'aria-modal' in html and '"Escape"' in html
+
+
+def test_instapay_config_is_readable_by_both_panels(client, vet, app):
+    """INSTAPAY was declared inside renderInvoice() while showQrToClient is a
+    sibling function, so the client view failed at runtime with "INSTAPAY is not
+    defined" — invisible to every server-side test because it only breaks in a
+    browser. It is page-level now; this pins that."""
+    html = client.get("/workflow/").get_data(as_text=True)
+    decl = html.index("const INSTAPAY")
+    render = html.index("function renderInvoice")
+    assert decl < render, \
+        "INSTAPAY is scoped inside renderInvoice again — showQrToClient cannot see it"

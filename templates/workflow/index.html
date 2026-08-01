@@ -331,12 +331,50 @@
     margin-top: 13px; padding: 13px; border: 1px solid var(--border);
     border-radius: var(--r-md); background: var(--surface-sunk);
   }
-  /* Big enough to scan from across a counter without the client leaning in. */
-  .pay-instapay img {
-    width: 148px; height: 148px; object-fit: contain; flex-shrink: 0;
-    background: #fff; border-radius: var(--r-sm); padding: 6px;
+  /* A thumbnail on the staff form — confirmation that a QR is configured, not
+     something anyone is expected to scan from here. The scannable one is the
+     full-screen view the client is shown. */
+  .ip-thumb {
+    width: 64px; height: 64px; object-fit: contain; flex-shrink: 0;
+    background: #fff; border-radius: var(--r-sm); padding: 4px;
     border: 1px solid var(--border);
   }
+
+  /* ── The client's side ──────────────────────────────────────────────────
+     Turn the screen round. The amount is the largest thing on it, because the
+     first question a client asks is "how much", and the code is sized to be
+     scanned at arm's length across a counter. */
+  .qr-stage {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(10, 31, 23, .92);
+    display: grid; place-items: center; padding: 20px;
+    animation: qrIn .16s ease-out;
+  }
+  @keyframes qrIn { from { opacity: 0 } to { opacity: 1 } }
+  .qr-card {
+    background: #fff; border-radius: var(--r-2xl); padding: 28px 32px;
+    text-align: center; max-width: 460px; width: 100%;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .45);
+  }
+  .qr-amount {
+    font-size: 2.9rem; font-weight: 800; color: #1C1A17; line-height: 1;
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+  }
+  .qr-amount span { font-size: 1.15rem; font-weight: 700; color: #5A5246; }
+  .qr-for { font-size: .88rem; color: #5A5246; margin-top: 6px; }
+  .qr-big {
+    width: min(320px, 72vw); height: auto; display: block; margin: 20px auto 14px;
+    image-rendering: pixelated;          /* keeps the modules crisp when scaled */
+  }
+  .qr-handle {
+    font-size: 1.05rem; font-weight: 700; color: #1C1A17;
+    word-break: break-all; margin-bottom: 6px;
+  }
+  .qr-hint { font-size: .86rem; color: #5A5246; line-height: 1.5; margin-bottom: 18px; }
+  .qr-close { min-width: 120px; }
+  @media (prefers-reduced-motion: reduce) { .qr-stage { animation: none; } }
+  .ip-link { margin-inline-end: 8px; }
+  .ip-copy { margin-inline-start: 0; }
   .ip-handle {
     font-weight: 700; font-size: 1rem; letter-spacing: .01em;
     word-break: break-all; margin-bottom: 4px;
@@ -705,6 +743,19 @@
 
   const state = { owner: null, pet: null, visitId: null, invoice: null, step: 1 };
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // The clinic's own Instapay details. Page-level because both the staff panel
+  // and the client-facing display need them; scoped inside renderInvoice they
+  // were unreachable from showQrToClient.
+  //
+  // The app RECORDS this payment. The money arrives in the clinic's own
+  // Instapay account and staff confirm the transfer before pressing the button,
+  // which is why Instapay is a counter method and not an online gateway.
+  const INSTAPAY = {
+    handle: {{ (clinic.get('instapay_handle') or '')|tojson }},
+    qr: {{ (clinic.get('instapay_qr') or '')|tojson }},
+    link: {{ (clinic.get('instapay_link') or '')|tojson }},
+  };
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
@@ -1078,21 +1129,12 @@
     }
     $("invoiceBox").innerHTML = html;
 
-    // Instapay: show the clinic's own QR and address so the client can scan
-    // rather than copy a handle off a monitor. The app RECORDS the payment; the
-    // money still arrives in the clinic's Instapay account, and staff confirm it
-    // before pressing the button — which is why this is a counter method and not
-    // an online gateway.
-    const INSTAPAY = {
-      handle: {{ (clinic.get('instapay_handle') or '')|tojson }},
-      qr: {{ (clinic.get('instapay_qr') or '')|tojson }},
-    };
     function payExtra() {
       const box = $("payExtra");
       const sel = $("pay_method");
       if (!box || !sel) return;
       if (sel.value !== "instapay") { box.innerHTML = ""; return; }
-      if (!INSTAPAY.handle && !INSTAPAY.qr) {
+      if (!INSTAPAY.handle && !INSTAPAY.qr && !INSTAPAY.link) {
         box.innerHTML = '<div class="wf-alert info">' +
           "{{ t('No Instapay details are set up yet. Add them under Settings so clients can scan instead of typing.', 'لم يتم ضبط بيانات إنستاباي بعد. أضفها من الإعدادات ليتمكن العملاء من المسح بدل الكتابة.') }}" +
           "</div>";
@@ -1100,17 +1142,56 @@
       }
       box.innerHTML =
         '<div class="pay-instapay">' +
-        (INSTAPAY.qr ? '<img src="' + INSTAPAY.qr + '" alt="Instapay QR">' : "") +
+        (INSTAPAY.qr
+          ? '<img class="ip-thumb" src="' + INSTAPAY.qr + '" alt="" aria-hidden="true">'
+          : "") +
         "<div>" +
         (INSTAPAY.handle
           ? "<div class=\"ip-handle\">" + esc(INSTAPAY.handle) + "</div>" : "") +
+        // Two ways in, because they are not interchangeable: the QR is for the
+        // client standing at the counter with their own phone, the link is for
+        // an invoice they are reading ON that phone — where scanning their own
+        // screen is impossible.
+        '<button type="button" class="btn btn-primary ip-show" id="btnShowQr">' +
+        "{{ t('Show QR to client', 'اعرض الكود للعميل') }}</button>" +
+        (INSTAPAY.link
+          ? '<a class="btn btn-secondary ip-link" target="_blank" rel="noopener" href="' +
+            esc(INSTAPAY.link) + '">' +
+            "{{ t('Open payment link', 'فتح رابط الدفع') }}</a>" +
+            '<button type="button" class="ai-use ip-copy" data-copy="' +
+            esc(INSTAPAY.link) + '">{{ t("Copy link", "نسخ الرابط") }}</button>'
+          : "") +
         '<p class="ai-foot">' +
         "{{ t('Client scans and sends. Confirm the transfer has arrived before recording it, and put the Instapay reference in the field above so it can be reconciled later.', 'يمسح العميل ويرسل. تأكد من وصول التحويل قبل التسجيل، واكتب رقم عملية إنستاباي في الحقل بالأعلى ليسهل مطابقتها لاحقاً.') }}" +
         "</p></div></div>";
     }
 
+    // Copy rather than retype: the commonest thing staff do with this link is
+    // paste it into a WhatsApp message to the owner.
+    const extraBox = $("payExtra");
+    if (extraBox) extraBox.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-copy]");
+      if (!b) return;
+      try {
+        await navigator.clipboard.writeText(b.dataset.copy);
+        const was = b.textContent;
+        b.textContent = "{{ t('Copied', 'تم النسخ') }}";
+        setTimeout(() => { b.textContent = was; }, 1600);
+      } catch (err) {
+        showError("{{ t('Could not copy. Select the link and copy it manually.', 'تعذر النسخ. حدد الرابط وانسخه يدوياً.') }}", "warn");
+      }
+    });
+
     const methodSel = $("pay_method");
-    if (methodSel) { methodSel.addEventListener("change", payExtra); payExtra(); }
+    if (methodSel) {
+      methodSel.addEventListener("change", () => { payExtra(); wireShowQr(inv); });
+      payExtra(); wireShowQr(inv);
+    }
+
+    function wireShowQr(invoice) {
+      const b = $("btnShowQr");
+      if (b) b.addEventListener("click", () => showQrToClient(invoice));
+    }
 
     const payBtn = $("btnPay");
     if (payBtn) payBtn.addEventListener("click", async (ev) => {
@@ -1562,6 +1643,60 @@
       throw new Error(
         "{{ t('The vaccination was not saved.', 'لم يتم حفظ التطعيم.') }}");
     }
+  }
+
+
+  /* ── Show the QR to the client ────────────────────────────────────────────
+     The QR on the staff form is a control, not a thing to be scanned: it is
+     small, surrounded by the payment inputs, and sits on a monitor facing the
+     wrong way across a counter. Asking a client to lean over the desk and aim a
+     camera at a 148px square next to an amount field is the kind of small
+     indignity that gets a payment method quietly abandoned.
+
+     This is the client's side of the transaction: the amount, large, and
+     nothing else but the code. Turn the screen round. */
+  function showQrToClient(inv) {
+    if (!INSTAPAY.qr && !INSTAPAY.link) return;
+    const wrap = document.createElement("div");
+    wrap.className = "qr-stage";
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.setAttribute("aria-label", "{{ t('Scan to pay', 'امسح للدفع') }}");
+    wrap.innerHTML =
+      '<div class="qr-card">' +
+      '<div class="qr-amount">' + Number(inv.due_amount || 0).toFixed(2) +
+      " <span>{{ t('EGP', 'ج.م') }}</span></div>" +
+      '<div class="qr-for">' + esc((state.pet || {}).pet_name || "") +
+      " · " + esc(inv.invoice_number || "") + "</div>" +
+      (INSTAPAY.qr ? '<img class="qr-big" src="' + INSTAPAY.qr +
+                     '" alt="{{ t("Instapay QR", "كود إنستاباي") }}">' : "") +
+      (INSTAPAY.handle ? '<div class="qr-handle">' + esc(INSTAPAY.handle) + "</div>" : "") +
+      '<div class="qr-hint">{{ t("Scan with your phone camera to pay by InstaPay", "امسح الكود بكاميرا هاتفك للدفع عبر إنستاباي") }}</div>' +
+      '<button type="button" class="btn btn-secondary qr-close">' +
+      "{{ t('Done', 'تم') }}</button>" +
+      "</div>";
+    document.body.appendChild(wrap);
+
+    // Focus moves into the dialog so Escape and Enter reach it, and returns to
+    // the button afterwards — the receptionist is mid-transaction and should
+    // not have to hunt for where they were.
+    const closeBtn = wrap.querySelector(".qr-close");
+    const returnTo = document.activeElement;
+    closeBtn.focus();
+
+    function close() {
+      wrap.remove();
+      document.removeEventListener("keydown", onKey);
+      if (returnTo && returnTo.focus) returnTo.focus();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") close();
+      // Trap Tab inside: behind this overlay is a form the client can see.
+      if (e.key === "Tab") { e.preventDefault(); closeBtn.focus(); }
+    }
+    document.addEventListener("keydown", onKey);
+    closeBtn.addEventListener("click", close);
+    wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
   }
 
   // Back links

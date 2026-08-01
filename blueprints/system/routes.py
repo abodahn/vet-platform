@@ -352,7 +352,7 @@ def settings():
             conn.execute(
                 "UPDATE clinic SET name=?, name_ar=?, tagline=?, doctor_name=?, phone=?, "
                 "email=?, address=?, address_ar=?, website=?, license_number=?, tax_number=?, "
-                "currency=?, timezone=?, instapay_handle=?, "
+                "currency=?, timezone=?, instapay_handle=?, instapay_link=?, "
                 "updated_at=datetime('now')" + logo_set + " WHERE id=1",
                 (f.get("name",""), f.get("name_ar",""), f.get("tagline",""),
                  f.get("doctor_name",""),
@@ -360,7 +360,8 @@ def settings():
                  f.get("address_ar",""),
                  f.get("website",""), f.get("license_number",""), f.get("tax_number",""),
                  f.get("currency","EGP"), f.get("timezone","Africa/Cairo"),
-                 f.get("instapay_handle","").strip()) + logo_val
+                 f.get("instapay_handle","").strip(),
+                 f.get("instapay_link","").strip()) + logo_val
             )
             conn.commit()
             # Appearance settings
