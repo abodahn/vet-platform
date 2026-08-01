@@ -27,6 +27,7 @@ the thing that eats a developer's working data.
 from __future__ import annotations
 
 import argparse
+from urllib.parse import unquote, urlparse
 import os
 import sys
 import unicodedata
@@ -62,6 +63,12 @@ def ar(text: str) -> str:
 # ── Tables this script owns, child-before-parent ──────────────────────────────
 # Wiped on every run. Anything not listed is left alone.
 WIPE_ORDER = [
+    # payment_events -> payment_intents -> invoices. Children first, because
+    # PostgreSQL enforces the foreign key and refuses to delete a parent that is
+    # still referenced. SQLite let this pass only because a fresh file had no
+    # rows to violate it — re-seeding a database that had ever taken a payment
+    # failed with ForeignKeyViolation on the real engine.
+    "payment_events", "payment_intents",
     "payments", "invoice_lines", "invoices",
     "prescription_items", "prescriptions",
     "lab_results", "lab_requests",
@@ -1323,14 +1330,52 @@ def resolve_guard(target: str, force: bool) -> str:
     return abs_target
 
 
-def run(target: str, force: bool = False, wipe_only: bool = False, quiet: bool = False) -> dict:
-    """Seed `target`. Returns a dict of row counts. Idempotent: wipes first."""
-    path = resolve_guard(target, force)
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
+def resolve_pg_guard(dsn: str, force: bool) -> str:
+    """Refuse to seed a PostgreSQL database that looks like production.
 
-    db.set_path(path)
+    The SQLite path has had a guard since it was written; this one did not
+    exist because PostgreSQL was not seedable at all. Same principle: the
+    seeder WIPES before it writes, so the name is the only thing between it and
+    a live clinic.
+    """
+    name = (urlparse(dsn).path or "").lstrip("/").lower()
+    if not name:
+        raise SystemExit(f"--postgres needs a database name: {dsn!r}")
+    if not force and not ("test" in name or "demo" in name or "staging" in name):
+        raise SystemExit(
+            f"REFUSING to seed the PostgreSQL database {name!r}.\n"
+            "This script WIPES before it seeds. Name the database with test/demo/"
+            "staging in it, or pass --force if you really mean this one.")
+    return dsn
+
+
+def run(target: str, force: bool = False, wipe_only: bool = False,
+        quiet: bool = False, postgres: str = "") -> dict:
+    """Seed `target`. Returns a dict of row counts. Idempotent: wipes first.
+
+    `postgres` seeds a PostgreSQL DSN instead of a SQLite file. It was
+    SQLite-only, which meant the production engine could not be demonstrated or
+    load-tested with realistic data — and, less obviously, that the PostgreSQL
+    test suite's data-integrity checks could never pass against a throwaway
+    database. Everything below is unchanged: it all goes through get_db(), and
+    the dialect translator handles the difference.
+    """
+    if postgres:
+        dsn = resolve_pg_guard(postgres, force)
+        u = urlparse(dsn)
+        db.configure_postgres(host=u.hostname, port=u.port or 5432,
+                              dbname=u.path.lstrip("/"),
+                              user=unquote(u.username or "postgres"),
+                              password=unquote(u.password or ""))
+        if not db._PG_CONFIG:
+            raise SystemExit(f"could not reach PostgreSQL at {u.hostname}:{u.port}")
+    else:
+        path = resolve_guard(target, force)
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        db.set_path(path)
+
     db.init_db(admin_user="admin", admin_pass=os.environ.get("DEMO_ADMIN_PASS", DEMO_PASSWORD))
     ensure_module_tables()
 
@@ -1371,7 +1416,9 @@ def run(target: str, force: bool = False, wipe_only: bool = False, quiet: bool =
         conn.close()
 
     if not quiet:
-        print(f"\nDemo dataset written to {path}\n")
+        where = (f"PostgreSQL {urlparse(postgres).path.lstrip('/')}"
+                 f" on {urlparse(postgres).hostname}" if postgres else path)
+        print(f"\nDemo dataset written to {where}\n")
         for k in sorted(counts):
             print(f"  {k:<16} {counts[k]}")
         print(f"\n  login: admin / {os.environ.get('DEMO_ADMIN_PASS', DEMO_PASSWORD)}")
@@ -1389,8 +1436,11 @@ def main(argv=None) -> int:
     p.add_argument("--wipe", action="store_true",
                    help="clear the demo scope and stop, without re-seeding")
     p.add_argument("--quiet", action="store_true")
+    p.add_argument("--postgres", default="", metavar="DSN",
+                   help="seed a PostgreSQL database instead of a SQLite file, "
+                        "e.g. postgresql://user:pass@host:5432/vetclinic_demo")
     a = p.parse_args(argv)
-    run(a.db, force=a.force, wipe_only=a.wipe, quiet=a.quiet)
+    run(a.db, force=a.force, wipe_only=a.wipe, quiet=a.quiet, postgres=a.postgres)
     return 0
 
 

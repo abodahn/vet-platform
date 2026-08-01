@@ -97,6 +97,13 @@ def register(gateway: Gateway) -> None:
 
 
 def get(name: str) -> Gateway:
+    # Register on first use if create_app() has not run. Seeders, cron jobs,
+    # migrations and tests all take payments without a Flask app, and requiring
+    # them to know about init() meant `add_payment(..., method="Cash")` raised
+    # "Unknown payment method: 'cash'" outside the web process — caught by the
+    # PostgreSQL suite, which does exactly that.
+    if not _REGISTRY:
+        init()
     gw = _REGISTRY.get((name or "").strip().lower())
     if gw is None:
         raise PaymentError(f"Unknown payment method: {name!r}")
@@ -109,6 +116,8 @@ def available() -> list:
     Cash leads because it is how most Egyptian clinics are actually paid, and
     because it keeps working when the internet does not.
     """
+    if not _REGISTRY:
+        init()
     out = [g for g in _REGISTRY.values() if g.offline or g.configured()]
     # Cash first by name, not by luck: sorting the counter methods by label put
     # "Bank transfer" at the top. Then the rest of the counter methods, then
@@ -155,6 +164,14 @@ def create_intent(invoice_id: int, owner_id: int, amount, gateway: str = "cash",
             raise PaymentError(
                 f"That is more than the {due:.2f} still owed on this invoice.")
 
+        # Everything that touches `conn` must happen INSIDE this block.
+        # `with conn:` commits AND closes — on PostgreSQL close() hands the
+        # connection back to the pool, so a query issued after the block opens a
+        # fresh transaction on a connection somebody else is about to borrow.
+        # The next caller then gets it mid-transaction and psycopg2 raises
+        # "set_session cannot be used inside a transaction" from an unrelated
+        # place. Invisible on SQLite, where close() really closes and every
+        # get_db() opens a new handle.
         with conn:
             cur = conn.execute(
                 "INSERT INTO payment_intents"
@@ -166,8 +183,8 @@ def create_intent(invoice_id: int, owner_id: int, amount, gateway: str = "cash",
             intent_id = cur.lastrowid
             _event(conn, intent_id, "created",
                    {"amount": str(amt), "gateway": gateway}, created_by)
-        row = conn.execute("SELECT * FROM payment_intents WHERE id=?",
-                           (intent_id,)).fetchone()
+            row = conn.execute("SELECT * FROM payment_intents WHERE id=?",
+                               (intent_id,)).fetchone()
         return dict(row)
     finally:
         conn.close()

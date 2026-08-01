@@ -199,3 +199,58 @@ def test_close_context_connections_releases_tracked_connections():
                 raise AssertionError("connection should be closed")
             except Exception as exc:
                 assert "closed" in str(exc).lower()
+
+
+# ── POSTGRES_DSN parsing ─────────────────────────────────────────────────────
+
+import pytest
+
+
+@pytest.mark.parametrize("dsn,want_host,want_port,want_db,want_user,want_pass", [
+    ("postgresql://u:p@h:5432/d",          "h", 5432, "d", "u", "p"),
+    ("postgres://u:p@h:5432/d",            "h", 5432, "d", "u", "p"),   # scheme alias
+    ("postgresql://u:@h:5432/d",           "h", 5432, "d", "u", ""),    # empty password
+    ("postgresql://u@h:5432/d",            "h", 5432, "d", "u", ""),    # no password
+    ("postgresql://u:p@h/d",               "h", 5432, "d", "u", "p"),   # default port
+    ("postgresql://u:p%40ss@h:5432/d",     "h", 5432, "d", "u", "p@ss"),# encoded @
+])
+def test_every_legal_dsn_shape_is_accepted(monkeypatch, dsn, want_host, want_port,
+                                           want_db, want_user, want_pass):
+    """A DSN PostgreSQL accepts must not silently land the clinic on SQLite.
+
+    The hand-rolled regex this replaced required user:password@host:port/db with
+    every part present and non-empty. Everything above is legal and was
+    rejected — and rejection means a quiet fallback to a SQLite file, so a
+    clinic can believe it is on PostgreSQL while its records sit somewhere a
+    redeploy erases. The failure looked like success.
+    """
+    from urllib.parse import unquote, urlparse
+    p = urlparse(dsn)
+    assert p.scheme in ("postgresql", "postgres")
+    assert p.hostname == want_host
+    assert (p.port or 5432) == want_port
+    assert p.path.lstrip("/") == want_db
+    assert unquote(p.username or "postgres") == want_user
+    assert unquote(p.password or "") == want_pass
+
+
+def test_a_valid_dsn_actually_configures_postgres(monkeypatch):
+    """End to end through create_app's own branch, not just urlparse."""
+    import app as app_module
+    seen = {}
+    monkeypatch.setattr(app_module.db, "configure_postgres",
+                        lambda **kw: seen.update(kw))
+    # POSTGRES_DSN is read into Config at import time, so setting the
+    # environment variable here would never reach create_app.
+    import config as config_module
+    monkeypatch.setattr(config_module.Config, "POSTGRES_DSN",
+                        "postgresql://postgres:@127.0.0.1:62386/vetclinic_test",
+                        raising=False)
+    try:
+        app_module.create_app()
+    except Exception:
+        pass                      # only the DSN branch matters here
+    assert seen.get("host") == "127.0.0.1", \
+        f"an empty-password DSN did not reach configure_postgres: {seen}"
+    assert seen.get("port") == 62386
+    assert seen.get("dbname") == "vetclinic_test"

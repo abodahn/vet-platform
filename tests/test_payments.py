@@ -379,3 +379,24 @@ def test_insurance_settlements_are_not_recorded_as_cash(app, invoice):
         payments.capture(intent["id"], actor="reception")
     rows = _ledger(app, invoice["invoice_id"])
     assert rows[0]["method"] == "Insurance", f"recorded as {rows[0]['method']}"
+
+
+def test_payments_work_without_a_flask_app(app, invoice):
+    """Seeders, cron jobs and migrations take payments outside create_app().
+
+    Gateways were registered only by create_app(), so `add_payment(...,
+    method="Cash")` from a script raised "Unknown payment method: 'cash'".
+    Caught by the PostgreSQL suite, which calls db.add_payment directly.
+    """
+    import models.payments as p
+    saved = dict(p._REGISTRY)
+    p._REGISTRY.clear()                     # simulate a bare process
+    try:
+        with app.app_context():
+            db.add_payment(invoice["invoice_id"], invoice["owner_id"], 250.00,
+                           method="Cash", received_by="seeder")
+        rows = _ledger(app, invoice["invoice_id"])
+        assert len(rows) == 1 and rows[0]["method"] == "Cash"
+    finally:
+        p._REGISTRY.clear()
+        p._REGISTRY.update(saved)

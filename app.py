@@ -34,18 +34,44 @@ def create_app(cfg=None) -> Flask:
     app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
     app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
 
-    # Wire database — PostgreSQL via DSN (no hardcoded credentials)
-    import re as _re
-    pg_dsn = app.config.get("POSTGRES_DSN", "")
-    m = _re.match(r'postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)', pg_dsn)
-    if m:
+    # Wire database — PostgreSQL via DSN (no hardcoded credentials).
+    #
+    # urlparse, not a hand-rolled regex. The regex this replaces demanded
+    # user:password@host:port/db with every part present and non-empty, so it
+    # silently rejected DSNs PostgreSQL itself accepts:
+    #
+    #   postgresql://postgres:@host:5432/db   empty password  (a trust/local setup)
+    #   postgresql://postgres@host:5432/db    no password at all
+    #   postgresql://u:p@host/db              no port
+    #   postgres://u:p@host:5432/db           the common scheme alias
+    #   postgresql://u:p%40ss@host:5432/db    a percent-encoded @ in the password
+    #
+    # And rejection is not loud: the app falls back to SQLite with a warning in
+    # a log nobody reads, so a clinic can believe it is running on PostgreSQL
+    # while its records sit in a file that a redeploy erases. That is the whole
+    # danger — the failure looks like success.
+    from urllib.parse import unquote, urlparse
+    pg_dsn = (app.config.get("POSTGRES_DSN", "") or "").strip()
+    parsed = urlparse(pg_dsn) if pg_dsn else None
+    if parsed and parsed.scheme in ("postgresql", "postgres") \
+            and parsed.hostname and (parsed.path or "").strip("/"):
         db.configure_postgres(
-            user=m.group(1), password=m.group(2),
-            host=m.group(3), port=int(m.group(4)), dbname=m.group(5)
+            user=unquote(parsed.username or "postgres"),
+            password=unquote(parsed.password or ""),
+            host=parsed.hostname,
+            port=parsed.port or 5432,
+            dbname=parsed.path.lstrip("/"),
         )
+    elif pg_dsn:
+        # Set but unusable is a configuration error, not an absent setting, and
+        # the two deserve different words.
+        logger.error(
+            "POSTGRES_DSN is set but could not be parsed (%r) — falling back to "
+            "SQLite. Expected postgresql://user:password@host:port/dbname",
+            pg_dsn[:60])
     else:
         logger.warning(
-            "POSTGRES_DSN not set or invalid — falling back to SQLite. "
+            "POSTGRES_DSN not set — falling back to SQLite. "
             "Set POSTGRES_DSN environment variable for production."
         )
     db.set_path(app.config["DATABASE_PATH"])

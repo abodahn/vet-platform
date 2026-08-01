@@ -619,6 +619,14 @@ class _PGCursor:
             pass
 
 
+# psycopg2's "no transaction open" status. Imported lazily below rather than at
+# module scope, because this module must import cleanly with no psycopg2 at all.
+try:                                            # pragma: no cover
+    from psycopg2.extensions import TRANSACTION_STATUS_IDLE as _PG_TXN_IDLE
+except Exception:                               # pragma: no cover
+    _PG_TXN_IDLE = 0
+
+
 class _PGConn:
     """Wraps a psycopg2 connection to behave like sqlite3.Connection.
 
@@ -631,6 +639,21 @@ class _PGConn:
         import psycopg2.extras
         self._conn = raw_conn
         self._pool = pool
+        # A connection can come back from the pool mid-transaction if its
+        # previous holder used it after `with conn:` (which commits AND closes).
+        # Assigning autocommit then raises "set_session cannot be used inside a
+        # transaction" HERE — in the next, innocent caller — which sends anyone
+        # debugging it to entirely the wrong place. Roll back first so one
+        # misbehaving call site cannot poison the connection for everyone after
+        # it. The caller's own bug still needs fixing; this stops it spreading.
+        if raw_conn.get_transaction_status() != _PG_TXN_IDLE:
+            logger.warning("pooled connection came back mid-transaction — "
+                           "rolling back before reuse")
+            try:
+                raw_conn.rollback()
+            except Exception:
+                logger.warning("rollback of a dirty pooled connection failed",
+                               exc_info=True)
         self._conn.autocommit = False
         self._dict_factory = psycopg2.extras.DictCursor
         self._closed = False
@@ -2305,6 +2328,24 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
         if conn.execute("SELECT COUNT(*) FROM service_catalog").fetchone()[0] == 0:
             _seed_services(conn)
     conn.close()
+
+    # Retail tables live in the petshop blueprint and are created lazily by its
+    # routes, so a freshly provisioned database had no ps_orders until somebody
+    # opened a petshop page. Every petshop route calls ensure_petshop_tables()
+    # first, so the module itself was fine — but anything CROSS-module reached
+    # them without that guarantee, and a report joining retail sales to the
+    # accounts would fail on a new deployment until a specific page was visited.
+    # A fresh install should have a complete schema.
+    #
+    # Imported here rather than at module scope: blueprints import this module,
+    # so a top-level import is circular. Guarded because a blueprint problem
+    # must never stop the core schema being built.
+    try:
+        from blueprints.petshop.routes import ensure_petshop_tables
+        ensure_petshop_tables()
+    except Exception:
+        logger.warning("could not create the retail tables during init_db",
+                       exc_info=True)
 
 
 def _seed_services(conn) -> None:

@@ -333,34 +333,74 @@ class TestSQLWrapper:
         conn.close()
         assert isinstance(rid, int) and rid > 0, f"lastrowid={rid!r} is not a positive int"
 
-    def test_savepoint_isolation_on_failure(self):
-        """
-        A failed statement inside a transaction must not abort the whole
-        transaction — the SAVEPOINT mechanism must roll back only the bad stmt.
+    def test_a_bare_failed_statement_aborts_the_transaction(self):
+        """PostgreSQL semantics, and the reason _protect exists.
+
+        This test used to assert the opposite — that a swallowed failure left
+        earlier writes intact — which is SQLite's behaviour, not PostgreSQL's.
+        On PostgreSQL any error aborts the transaction until it is rolled back,
+        so work done before the failure is lost too.
+
+        models/database.py chooses this deliberately: ordinary queries run bare
+        for one round-trip instead of three, and callers that genuinely expect a
+        statement to fail opt in with _protect=True (see the test below). The
+        divergence only bites code that CATCHES a database error mid-transaction
+        and carries on, which is exactly what _protect is for.
         """
         conn = db.get_db()
-        # Insert a good row first
-        cur = conn.execute(
-            "INSERT INTO owners (full_name, phone) VALUES (?, ?)",
-            ("__sp_test_good__", "01111111111")
-        )
-        good_id = cur.lastrowid
-
-        # Attempt a bad insert (violates NOT NULL on name for items)
+        conn.execute("INSERT INTO owners (full_name, phone) VALUES (?, ?)",
+                     ("__bare_fail_test__", "01111111111"))
         try:
-            conn.execute(
-                "INSERT INTO items (name) VALUES (?)", (None,)
-            )
+            conn.execute("INSERT INTO items (name) VALUES (?)", (None,))
         except Exception:
-            pass  # expected to fail; SAVEPOINT should have rolled this back
+            pass                      # swallowed, as the old test did
+        try:
+            conn.commit()
+        except Exception:
+            pass                      # the transaction is already aborted
+        conn.close()
 
-        # The good insert must still be visible and committable
-        conn.commit()
-        row = conn.execute("SELECT id FROM owners WHERE id = ?", (good_id,)).fetchone()
-        conn.execute("DELETE FROM owners WHERE id = ?", (good_id,))
+        conn2 = db.get_db()
+        row = conn2.execute(
+            "SELECT id FROM owners WHERE full_name = ?",
+            ("__bare_fail_test__",)).fetchone()
+        conn2.execute("DELETE FROM owners WHERE full_name = ?",
+                      ("__bare_fail_test__",))
+        conn2.commit()
+        conn2.close()
+        assert row is None, (
+            "an unprotected failure left earlier writes committed — either "
+            "_protect became the default, which costs 2 extra round-trips on "
+            "every query, or this is not PostgreSQL")
+
+    def test_protect_TRUE_isolates_a_failure_and_earlier_writes_survive(self):
+        """The other half of the contract, which had no coverage at all.
+
+        _try_stmt() and the idempotent ALTER TABLEs in init_db depend on this:
+        a statement expected to fail must not take the surrounding transaction
+        down with it.
+        """
+        conn = db.get_db()
+        conn.execute("INSERT INTO owners (full_name, phone) VALUES (?, ?)",
+                     ("__protected_test__", "01222222222"))
+        try:
+            conn.execute("INSERT INTO items (name) VALUES (?)", (None,),
+                         _protect=True)
+        except Exception:
+            pass                      # expected; the SAVEPOINT contains it
         conn.commit()
         conn.close()
-        assert row is not None, "SAVEPOINT rollback killed the outer transaction"
+
+        conn2 = db.get_db()
+        row = conn2.execute(
+            "SELECT id FROM owners WHERE full_name = ?",
+            ("__protected_test__",)).fetchone()
+        conn2.execute("DELETE FROM owners WHERE full_name = ?",
+                      ("__protected_test__",))
+        conn2.commit()
+        conn2.close()
+        assert row is not None, \
+            "_protect=True did not isolate the failure — _try_stmt is broken"
 
     def test_fix_sql_cache(self):
         """_fix_sql must be deterministic and cache results."""
@@ -605,37 +645,8 @@ class TestTransactionSafety:
         assert count1 == count2, \
             f"Inconsistent reads: conn1={count1}, conn2={count2}"
 
-    def test_partial_failure_does_not_corrupt_transaction(self):
-        """
-        After a savepoint-rolled-back bad statement, valid data still commits.
-        """
-        conn = db.get_db()
-        cur = conn.execute(
-            "INSERT INTO owners (full_name, phone) VALUES (?, ?)",
-            ("__partial_fail_test__", "07777777777")
-        )
-        good_id = cur.lastrowid
-
-        # This should fail silently (NULL name violates NOT NULL)
-        try:
-            conn.execute("INSERT INTO items (name) VALUES (?)", (None,))
-        except Exception:
-            pass
-
-        conn.commit()
-
-        conn2 = db.get_db()
-        row = conn2.execute(
-            "SELECT id FROM owners WHERE id = ?", (good_id,)
-        ).fetchone()
-        conn2.execute("DELETE FROM owners WHERE id = ?", (good_id,))
-        conn2.commit()
-        conn2.close()
-        conn.close()
-
-        assert row is not None, "Partial failure corrupted good data"
-
-
+    # The partial-failure scenario is covered in TestSQLWrapper above, in
+    # both directions: bare (aborts) and _protect=True (isolates).
 # ══════════════════════════════════════════════════════════════════════════════
 # 6. HTTP ROUTE SMOKE TESTS
 # ══════════════════════════════════════════════════════════════════════════════

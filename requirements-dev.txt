@@ -6,3 +6,16 @@
 # browser suite lives in ../tests and is not part of CI.
 
 pytest>=8.0.0
+
+# An embedded PostgreSQL server, so tests/test_postgres_full.py can run against
+# the real production engine on a machine with no PostgreSQL installed. Ships
+# its own binaries inside the virtualenv: no admin rights, no Windows service,
+# nothing outside .venv, and `pip uninstall pgembed` removes it entirely.
+#
+# Worth the dependency because the suite it enables cannot be replaced by the
+# SQLite run. It found four bugs that exist ONLY on PostgreSQL, including one
+# where a wrong password raised UndefinedColumn instead of being reported as a
+# wrong password, leaving account lockout permanently disengaged.
+#
+# See scripts/run_postgres_tests.py for the one-command version.
+pgembed>=0.2.0
