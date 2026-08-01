@@ -20,21 +20,32 @@
 
 {% block content %}
 <style>
-  .wf-wrap { max-width: 1080px; margin: 0 auto; }
+  /* ── Layout ─────────────────────────────────────────────────────────────
+     Product register: this screen is opened to finish something, never to be
+     admired. Density and legibility over decoration. */
+  .wf-wrap { max-width: 1060px; margin: 0 auto; }
 
-  /* Stepper */
-  .wf-steps { display: flex; gap: 6px; margin-bottom: 22px; flex-wrap: wrap; }
+  /* ── Stepper ────────────────────────────────────────────────────────────
+     Progress stays on screen because "how much is left" gets asked with an
+     owner waiting at the counter. */
+  .wf-steps {
+    display: flex; gap: 4px; margin-bottom: 20px;
+    overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
+  }
+  .wf-steps::-webkit-scrollbar { display: none; }
   .wf-step {
-    flex: 1 1 140px; display: flex; align-items: center; gap: 10px;
-    padding: 11px 14px; border-radius: var(--r-md);
+    flex: 1 0 auto; display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-radius: var(--r-md);
     background: var(--surface); border: 1px solid var(--border);
-    font-size: .82rem; font-weight: 600; color: var(--text-muted);
-    transition: all var(--tx);
+    font-size: .8rem; font-weight: 600; color: var(--text-3);
+    white-space: nowrap;
+    transition: background .18s ease, border-color .18s ease, color .18s ease;
   }
   .wf-step .n {
-    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
-    display: grid; place-items: center; font-size: .75rem; font-weight: 700;
-    background: var(--surface-sunk); color: var(--text-muted);
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-size: .72rem; font-weight: 700;
+    background: var(--surface-sunk); color: var(--text-3);
+    transition: background .18s ease, color .18s ease;
   }
   .wf-step.active {
     border-color: var(--c-primary); background: var(--c-primary-50);
@@ -44,68 +55,181 @@
   .wf-step.done { color: var(--c-success); border-color: var(--c-success-bd); }
   .wf-step.done .n { background: var(--c-success); color: #fff; }
 
-  /* Panels */
+  /* ── Panels ─────────────────────────────────────────────────────────── */
   .wf-panel {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--r-lg); padding: 22px; margin-bottom: 16px;
+    border-radius: var(--r-lg); padding: 22px;
   }
   .wf-panel[hidden] { display: none; }
-  .wf-panel h3 { font-size: 1.05rem; margin: 0 0 4px; }
-  .wf-hint { font-size: .82rem; color: var(--text-3); margin-bottom: 16px; }
+  .wf-panel h3 { font-size: 1.05rem; margin: 0 0 4px; font-weight: 700; }
+  .wf-hint { font-size: .82rem; color: var(--text-3); margin: 0 0 16px; line-height: 1.5; }
 
-  .wf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-  .wf-grid label { display: block; font-size: .76rem; font-weight: 600;
-                   color: var(--text-3); margin-bottom: 4px; }
-  .wf-grid input, .wf-grid select, .wf-grid textarea {
+  /* ── Fields ─────────────────────────────────────────────────────────── */
+  .wf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 13px; }
+  .wf-full { grid-column: 1 / -1; }
+  .wf-grid label, .wf-lbl {
+    display: block; font-size: .75rem; font-weight: 600;
+    color: var(--text-3); margin-bottom: 5px;
+  }
+  .wf-grid input, .wf-grid select, .wf-grid textarea, .wf-search, .rx-row input {
     width: 100%; padding: 9px 11px; border: 1px solid var(--border);
     border-radius: var(--r-sm); background: var(--surface); color: var(--text);
     font: inherit; font-size: .88rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
   }
-  .wf-full { grid-column: 1 / -1; }
+  .wf-grid input:hover, .wf-search:hover, .rx-row input:hover { border-color: var(--border-md); }
+  /* One focus treatment for every control. Keyboard users are real: reception
+     works this screen at speed and rarely reaches for the mouse. */
+  .wf-grid input:focus-visible, .wf-grid select:focus-visible,
+  .wf-grid textarea:focus-visible, .wf-search:focus-visible,
+  .rx-row input:focus-visible, .wf-card:focus-visible,
+  .ai-use:focus-visible, .btn:focus-visible {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 2px;
+    border-color: var(--c-primary);
+  }
+  .wf-grid input:disabled, .wf-search:disabled {
+    background: var(--surface-sunk); cursor: not-allowed;
+  }
+  .wf-search { font-size: .95rem; padding: 11px 13px; }
+  .wf-req { color: var(--c-danger); }
 
-  /* Search results / cards */
-  .wf-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  /* ── Selectable rows ────────────────────────────────────────────────── */
+  .wf-list { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
   .wf-card {
     display: flex; align-items: center; gap: 12px; width: 100%; text-align: start;
-    padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-md);
-    background: var(--surface); cursor: pointer; transition: all var(--tx);
+    padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--r-md);
+    background: var(--surface); cursor: pointer; color: inherit; font: inherit;
+    transition: border-color .15s ease, background .15s ease, transform .15s ease;
   }
   .wf-card:hover { border-color: var(--c-primary); background: var(--c-primary-50); }
-  .wf-card.sel { border-color: var(--c-primary); background: var(--c-primary-50); }
+  .wf-card:active { transform: translateY(1px); }
   .wf-avatar {
-    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
-    display: grid; place-items: center; font-weight: 700; font-size: .8rem;
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-weight: 700; font-size: .78rem;
     background: var(--c-primary); color: #fff;
   }
-  .wf-card b { display: block; font-size: .92rem; }
-  .wf-card small { color: var(--text-3); font-size: .78rem; }
+  .wf-card b { display: block; font-size: .9rem; font-weight: 650; }
+  .wf-card small { color: var(--text-3); font-size: .77rem; }
 
-  .wf-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
-  .wf-empty { padding: 16px; text-align: center; color: var(--text-3); font-size: .86rem; }
+  /* Skeletons while searching, not a spinner thrown over content. */
+  .wf-skel { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
+  .wf-skel i {
+    height: 60px; border-radius: var(--r-md); display: block;
+    background: linear-gradient(90deg, var(--surface-sunk) 25%,
+                var(--surface-hover) 50%, var(--surface-sunk) 75%);
+    background-size: 200% 100%; animation: wfShimmer 1.1s linear infinite;
+  }
+  @keyframes wfShimmer { to { background-position: -200% 0; } }
 
-  /* Selected-so-far summary rail */
+  /* Empty states teach the next move rather than announcing emptiness. */
+  .wf-empty {
+    padding: 18px; text-align: center; color: var(--text-3); font-size: .85rem;
+    border: 1px dashed var(--border-md); border-radius: var(--r-md);
+    margin-top: 12px; line-height: 1.6;
+  }
+
+  .wf-actions { display: flex; gap: 9px; margin-top: 18px; flex-wrap: wrap; align-items: center; }
+  .wf-divider { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  /* ── Context rail ───────────────────────────────────────────────────── */
   .wf-summary {
-    display: flex; gap: 18px; flex-wrap: wrap; padding: 12px 16px;
+    display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 14px;
     background: var(--surface-sunk); border-radius: var(--r-md);
-    margin-bottom: 16px; font-size: .84rem;
+    margin-bottom: 14px; font-size: .83rem; align-items: center;
   }
   .wf-summary span { color: var(--text-3); }
-  .wf-summary b { color: var(--text); }
+  .wf-summary b { color: var(--text); font-weight: 650; }
 
+  /* ── Messages ───────────────────────────────────────────────────────── */
   .wf-alert {
     padding: 11px 14px; border-radius: var(--r-sm); font-size: .85rem;
-    margin-bottom: 14px;
+    margin-bottom: 13px; line-height: 1.55;
   }
-  .wf-alert.err { background: var(--c-danger-bg); color: var(--c-danger);
-                  border: 1px solid var(--c-danger-bd); }
+  .wf-alert.err  { background: var(--c-danger-bg);  color: var(--c-danger);
+                   border: 1px solid var(--c-danger-bd); }
   .wf-alert.warn { background: var(--c-warning-bg); color: var(--c-warning);
                    border: 1px solid var(--c-warning-bd); }
-  .wf-alert.ok { background: var(--c-success-bg); color: var(--c-success);
-                 border: 1px solid var(--c-success-bd); }
+  .wf-alert.ok   { background: var(--c-success-bg); color: var(--c-success);
+                   border: 1px solid var(--c-success-bd); }
+  .wf-alert.info { background: var(--c-info-bg);    color: var(--c-info);
+                   border: 1px solid var(--c-info-bd); }
 
-  .rx-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr .8fr auto;
-            gap: 8px; margin-bottom: 8px; align-items: end; }
-  @media (max-width: 760px) { .rx-row { grid-template-columns: 1fr 1fr; } }
+  /* ── Busy state ─────────────────────────────────────────────────────────
+     A merely-disabled button reads as broken mid-shift. It has to say it is
+     working, and hold its width so the layout does not jump. */
+  .btn[data-busy] { position: relative; color: transparent !important; pointer-events: none; }
+  .btn[data-busy]::after {
+    content: ""; position: absolute; inset: 0; margin: auto;
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 2px solid #fff; border-top-color: transparent;
+    animation: wfSpin .6s linear infinite;
+  }
+  .btn-secondary[data-busy]::after, .btn-ghost[data-busy]::after,
+  .ai-use[data-busy]::after { border-color: var(--c-primary); border-top-color: transparent; }
+  @keyframes wfSpin { to { transform: rotate(360deg); } }
+
+  /* ── AI assist ──────────────────────────────────────────────────────────
+     Deliberately quieter than the clinician's own controls. It offers a second
+     opinion; it never takes the primary-button treatment, and everything it
+     produces is labelled a suggestion. */
+  .ai-strip {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-top: 14px; padding: 11px 13px;
+    background: var(--surface-sunk); border: 1px solid var(--border);
+    border-radius: var(--r-md);
+  }
+  .ai-strip .ai-label { font-size: .78rem; color: var(--text-3); flex: 1;
+                        min-width: 180px; line-height: 1.5; }
+  .ai-panel { margin-top: 12px; }
+  .ai-item {
+    padding: 11px 13px; border: 1px solid var(--border);
+    border-radius: var(--r-md); margin-bottom: 7px; background: var(--surface);
+  }
+  .ai-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .ai-item b { font-size: .89rem; font-weight: 650; }
+  .ai-item p { margin: 3px 0 0; font-size: .81rem; color: var(--text-3); line-height: 1.55; }
+  .ai-pill {
+    font-size: .68rem; font-weight: 700; padding: 2px 8px;
+    border-radius: var(--r-full); letter-spacing: .01em;
+  }
+  .ai-pill.high     { background: var(--c-danger-bg);  color: var(--c-danger); }
+  .ai-pill.moderate { background: var(--c-warning-bg); color: var(--c-warning); }
+  .ai-pill.low      { background: var(--c-info-bg);    color: var(--c-info); }
+  .ai-use {
+    margin-inline-start: auto; font-size: .76rem; font-weight: 600;
+    background: none; border: 1px solid var(--border-md); color: var(--c-primary);
+    border-radius: var(--r-sm); padding: 4px 10px; cursor: pointer;
+    position: relative; transition: background .15s ease, border-color .15s ease;
+  }
+  .ai-use:hover { background: var(--c-primary-50); border-color: var(--c-primary); }
+  /* Stops an AI panel ever being mistaken for a completed clinical check. */
+  .ai-foot { font-size: .74rem; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
+
+  /* ── Prescription rows ──────────────────────────────────────────────── */
+  .rx-row {
+    display: grid; grid-template-columns: 2fr 1fr 1fr 1fr .7fr auto;
+    gap: 7px; margin-bottom: 7px; align-items: end;
+  }
+  .rx-row .wf-lbl { margin-bottom: 4px; }
+  @media (max-width: 780px) {
+    .rx-row { grid-template-columns: 1fr 1fr; padding-bottom: 10px;
+              border-bottom: 1px solid var(--border); }
+  }
+
+  @media (max-width: 620px) {
+    .wf-panel { padding: 16px; }
+    /* The strip scrolls rather than dropping the labels, and goto() scrolls the
+       active step into view. "Diagnosis" tells a receptionist more than "4",
+       and the step they are on is the one they need to see. */
+    .wf-step { padding: 9px 12px; font-size: .78rem; }
+  }
+
+  /* Motion here conveys state and nothing else, so removing it costs nothing. */
+  @media (prefers-reduced-motion: reduce) {
+    .wf-step, .wf-card, .wf-grid input, .ai-use, .btn { transition: none; }
+    .wf-skel i, .btn[data-busy]::after { animation: none; }
+  }
 </style>
 
 <div class="wf-wrap">
@@ -279,6 +403,17 @@
       <div class="wf-full"><label>{{ t('Notes', 'ملاحظات') }}</label>
            <textarea id="d_diagnosis_notes" rows="2"></textarea></div>
     </div>
+    <div class="ai-strip" id="aiDxStrip">
+      <span class="ai-label">
+        {{ t('Get differentials to consider from this presentation.',
+              'اعرض تشخيصات محتملة بناءً على الحالة.') }}
+      </span>
+      <button type="button" class="btn btn-ghost" id="btnAiDx">
+        {{ t('Suggest differentials', 'اقترح تشخيصات') }}
+      </button>
+    </div>
+    <div class="ai-panel" id="aiDxPanel"></div>
+
     <div class="wf-actions">
       <button type="button" class="btn btn-primary" id="btnSaveDiagnosis">
         {{ t('Save diagnosis & continue', 'حفظ التشخيص والمتابعة') }}
@@ -296,6 +431,17 @@
         + {{ t('Add medication', 'إضافة دواء') }}
       </button>
     </div>
+    <div class="ai-strip" id="aiRxStrip">
+      <span class="ai-label">
+        {{ t('Check the new medication against what this animal already takes.',
+              'راجع الدواء الجديد مع أدوية الحيوان الحالية.') }}
+      </span>
+      <button type="button" class="btn btn-ghost" id="btnAiRx">
+        {{ t('Check interactions', 'فحص التداخلات') }}
+      </button>
+    </div>
+    <div class="ai-panel" id="aiRxPanel"></div>
+
     <div class="wf-grid" style="margin-top:12px">
       <div class="wf-full"><label>{{ t('Instructions', 'تعليمات') }}</label>
            <textarea id="rx_notes" rows="2"></textarea></div>
@@ -325,9 +471,11 @@
   // CSRF: the app validates `_csrf_token`, not `csrf_token`. Getting this wrong
   // makes every POST fail as a silent 403, which has happened three times in
   // this codebase's history.
+  const AI_ON = {{ "true" if ai_available else "false" }};
   const CSRF = document.querySelector('meta[name="csrf-token"]').content;
 
   const state = { owner: null, pet: null, visitId: null, invoice: null, step: 1 };
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
@@ -346,6 +494,13 @@
       const n = Number(el.dataset.step);
       el.classList.toggle("active", n === step);
       el.classList.toggle("done", n < step);
+      el.setAttribute("aria-current", n === step ? "step" : "false");
+      // On a phone the strip scrolls; the step you are on must not be the one
+      // off the edge of it.
+      if (n === step && el.scrollIntoView) {
+        el.scrollIntoView({ inline: "center", block: "nearest",
+                            behavior: reduceMotion ? "auto" : "smooth" });
+      }
     });
     renderSummary();
     showError("");
@@ -386,6 +541,7 @@
     const q = e.target.value.trim();
     if (q.length < 2) { $("ownerResults").innerHTML = ""; return; }
     // Debounced: one request per pause, not one per keystroke.
+    $("ownerResults").innerHTML = '<div class="wf-skel"><i></i><i></i></div>';
     searchTimer = setTimeout(async () => {
       const rows = await getJSON("/workflow/api/owners?q=" + encodeURIComponent(q));
       if (!rows.length) {
@@ -424,7 +580,7 @@
     const name = $("o_full_name").value.trim();
     const phone = $("o_phone").value.trim();
     if (!name || !phone) { showError("{{ t('A name and a phone number are required.', 'الاسم ورقم الهاتف مطلوبان.') }}"); return; }
-    ev.target.disabled = true;
+    setBusy(ev.target, true);
     try {
       const res = await postForm("/crm/owners/new", {
         full_name: name, full_name_ar: $("o_full_name_ar").value.trim(),
@@ -440,7 +596,7 @@
       selectOwner(created);
     } catch (err) {
       showError("{{ t('Could not save the client.', 'تعذر حفظ العميل.') }} " + err.message);
-    } finally { ev.target.disabled = false; }
+    } finally { setBusy(ev.target, false); }
   });
 
   async function selectOwner(owner) {
@@ -475,7 +631,7 @@
   $("btnSavePet").addEventListener("click", async (ev) => {
     const nm = $("pt_pet_name").value.trim();
     if (!nm) { showError("{{ t('The animal needs a name.', 'الحيوان يحتاج اسماً.') }}"); return; }
-    ev.target.disabled = true;
+    setBusy(ev.target, true);
     try {
       const res = await postForm("/crm/pets/new", {
         owner_id: state.owner.id, pet_name: nm,
@@ -490,7 +646,7 @@
       selectPet(created);
     } catch (err) {
       showError("{{ t('Could not save the patient.', 'تعذر حفظ الحيوان.') }} " + err.message);
-    } finally { ev.target.disabled = false; }
+    } finally { setBusy(ev.target, false); }
   });
 
   async function selectPet(pet) {
@@ -509,6 +665,11 @@
           esc(v.diagnosis || v.chief_complaint || "—")).join(" · ") + "</div>";
     }
     $("petHistory").innerHTML = html;
+    // Kept for the differential prompt: "seen 3 weeks ago for the same
+    // complaint" changes what is likely, and the model should know it.
+    state.historyText = (hist.visits || [])
+      .map((v) => v.visit_date + " " + (v.diagnosis || v.chief_complaint || ""))
+      .join("; ");
     $("rxAllergyHint").innerHTML = hist.allergies
       ? '⚠ {{ t("Allergic to", "حساسية من") }}: <b style="color:var(--c-danger)">' +
         esc(hist.allergies) + "</b>" : "";
@@ -519,7 +680,7 @@
   $("btnSaveVisit").addEventListener("click", async (ev) => {
     const cc = $("v_chief_complaint").value.trim();
     if (!cc) { showError("{{ t('What is the animal here for?', 'ما سبب الزيارة؟') }}"); return; }
-    ev.target.disabled = true;
+    setBusy(ev.target, true);
     try {
       const res = await postForm("/visits/new", {
         owner_id: state.owner.id, pet_id: state.pet.id,
@@ -539,14 +700,14 @@
       goto(4);
     } catch (err) {
       showError("{{ t('Could not start the visit.', 'تعذر بدء الزيارة.') }} " + err.message);
-    } finally { ev.target.disabled = false; }
+    } finally { setBusy(ev.target, false); }
   });
 
   // ── 4. diagnosis ─────────────────────────────────────────────────────────
   $("btnSaveDiagnosis").addEventListener("click", async (ev) => {
     const dx = $("d_diagnosis_text").value.trim();
     if (!dx) { showError("{{ t('A diagnosis is required.', 'التشخيص مطلوب.') }}"); return; }
-    ev.target.disabled = true;
+    setBusy(ev.target, true);
     try {
       const res = await postForm("/visits/" + state.visitId + "/diagnosis", {
         diagnosis_text: dx, severity: $("d_severity").value,
@@ -562,7 +723,7 @@
       goto(5);
     } catch (err) {
       showError("{{ t('Could not save the diagnosis.', 'تعذر حفظ التشخيص.') }} " + err.message);
-    } finally { ev.target.disabled = false; }
+    } finally { setBusy(ev.target, false); }
   });
 
   // ── 5. treatment ─────────────────────────────────────────────────────────
@@ -613,16 +774,16 @@
   }
 
   $("btnSaveRx").addEventListener("click", async (ev) => {
-    ev.target.disabled = true;
+    setBusy(ev.target, true);
     try { await saveRx(false); }
     catch (err) { showError("{{ t('Could not save the prescription.', 'تعذر حفظ الروشتة.') }} " + err.message); }
-    finally { ev.target.disabled = false; }
+    finally { setBusy(ev.target, false); }
   });
   $("btnSkipRx").addEventListener("click", async (ev) => {
-    ev.target.disabled = true;
+    setBusy(ev.target, true);
     try { await saveRx(true); }
     catch (err) { showError(err.message); }
-    finally { ev.target.disabled = false; }
+    finally { setBusy(ev.target, false); }
   });
 
   // ── 6. invoice & payment ─────────────────────────────────────────────────
@@ -676,7 +837,7 @@
 
     const payBtn = $("btnPay");
     if (payBtn) payBtn.addEventListener("click", async (ev) => {
-      ev.target.disabled = true;
+      setBusy(ev.target, true);
       try {
         const res = await postForm("/finance/invoices/" + inv.id + "/pay", {
           amount: $("pay_amount").value,
@@ -693,9 +854,161 @@
         }
       } catch (err) {
         showError("{{ t('Could not record the payment.', 'تعذر تسجيل الدفع.') }} " + err.message);
-      } finally { if (payBtn) payBtn.disabled = false; }
+      } finally { setBusy(payBtn, false); }
     });
   }
+
+
+  /* ── AI assist ───────────────────────────────────────────────────────────
+     Two rules govern everything below.
+
+     It never fills the clinician's field on its own. Every suggestion has an
+     explicit "Use this" — the recorded diagnosis has to be a decision someone
+     made, not a default they failed to notice.
+
+     It never implies a check ran that did not. An unreachable model produces a
+     visible "could not be checked", never silence and never an empty panel that
+     reads as an all-clear. */
+
+  function setBusy(btn, on) {
+    if (!btn) return;
+    if (on) { btn.dataset.busy = "1"; btn.setAttribute("aria-busy", "true"); }
+    else { delete btn.dataset.busy; btn.removeAttribute("aria-busy"); }
+  }
+
+  async function postJSON(url, payload) {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }
+
+  // Hide the assists entirely when the clinic has no AI configured.
+  if (!AI_ON) {
+    ["aiDxStrip", "aiRxStrip"].forEach((id) => { const e = $(id); if (e) e.hidden = true; });
+  }
+
+  // ── differentials, on the diagnosis step ─────────────────────────────────
+  const btnAiDx = $("btnAiDx");
+  if (btnAiDx) btnAiDx.addEventListener("click", async () => {
+    const panel = $("aiDxPanel");
+    setBusy(btnAiDx, true);
+    panel.innerHTML = '<div class="wf-skel"><i></i><i></i></div>';
+    try {
+      const res = await postJSON("/ai/suggest-diagnosis", {
+        complaint: $("v_chief_complaint").value.trim(),
+        symptoms: $("v_symptoms").value.trim(),
+        species: (state.pet || {}).species || "",
+        weight_kg: $("v_weight_kg").value,
+        temp_c: $("v_temp_c").value,
+        heart_rate: $("v_heart_rate").value,
+        respiratory_rate: $("v_respiratory_rate").value,
+        history: state.historyText || "",
+      });
+
+      if (!res.ran) {
+        panel.innerHTML = '<div class="wf-alert info">' + esc(res.note ||
+          "{{ t('Nothing was checked.', 'لم يتم الفحص.') }}") + "</div>";
+        return;
+      }
+      if (!res.suggestions.length) {
+        panel.innerHTML = '<div class="wf-empty">' +
+          "{{ t('Not enough in the presentation to suggest anything useful. Add symptoms or vitals and try again.', 'المعلومات غير كافية لاقتراح تشخيص. أضف أعراضاً أو علامات حيوية وحاول مرة أخرى.') }}" +
+          "</div>";
+        return;
+      }
+
+      let html = "";
+      (res.red_flags || []).forEach((f) => {
+        html += '<div class="wf-alert warn">' +
+          "{{ t('Worth ruling out urgently', 'يستحق الاستبعاد بشكل عاجل') }}: " +
+          esc(f) + "</div>";
+      });
+      res.suggestions.forEach((s, i) => {
+        const lk = (s.likelihood || "low").toLowerCase();
+        html +=
+          '<div class="ai-item"><div class="ai-item-head">' +
+          "<b>" + esc(s.diagnosis) + "</b>" +
+          '<span class="ai-pill ' + esc(lk) + '">' + esc(lk) + "</span>" +
+          '<button type="button" class="ai-use" data-dx="' + esc(s.diagnosis) + '">' +
+          "{{ t('Use this', 'استخدم هذا') }}</button></div>" +
+          (s.why ? "<p>" + esc(s.why) + "</p>" : "") +
+          (s.rule_out ? "<p><b>{{ t('To confirm or exclude', 'للتأكيد أو الاستبعاد') }}:</b> " +
+            esc(s.rule_out) + "</p>" : "") +
+          "</div>";
+      });
+      html += '<p class="ai-foot">' + esc(res.note || "") + "</p>";
+      panel.innerHTML = html;
+
+      panel.querySelectorAll("[data-dx]").forEach((b) =>
+        b.addEventListener("click", () => {
+          $("d_diagnosis_text").value = b.dataset.dx;
+          $("d_diagnosis_text").focus();
+        }));
+    } catch (err) {
+      panel.innerHTML = '<div class="wf-alert err">' +
+        "{{ t('The suggestion service could not be reached. Nothing was checked.', 'تعذر الوصول لخدمة الاقتراحات. لم يتم فحص أي شيء.') }}" +
+        "</div>";
+    } finally { setBusy(btnAiDx, false); }
+  });
+
+  // ── interactions, on the treatment step ──────────────────────────────────
+  const btnAiRx = $("btnAiRx");
+  if (btnAiRx) btnAiRx.addEventListener("click", async () => {
+    const panel = $("aiRxPanel");
+    const typed = [...document.querySelectorAll('#rxRows [data-rx="medication_name"]')]
+      .map((i) => i.value.trim()).filter(Boolean);
+    if (!typed.length) {
+      panel.innerHTML = '<div class="wf-empty">' +
+        "{{ t('Enter a medication first.', 'أدخل اسم الدواء أولاً.') }}</div>";
+      return;
+    }
+
+    setBusy(btnAiRx, true);
+    panel.innerHTML = '<div class="wf-skel"><i></i></div>';
+    try {
+      // What the animal is already on comes from the SERVER, not from this
+      // page's memory — that list is the entire point of the check.
+      const v = await getJSON("/workflow/api/visit/" + state.visitId);
+      const onFile = (v.prescription || []).map((r) => r.medication_name);
+      const current = onFile.concat(typed.slice(1));
+
+      const res = await postJSON("/ai/drug-interactions", {
+        new_drug: typed[0],
+        current_medications: current,
+        species: (state.pet || {}).species || "",
+      });
+
+      const sev = (res.severity || "unchecked").toLowerCase();
+      let cls = "info", head;
+      if (sev === "severe") { cls = "err"; head = "{{ t('Severe interaction', 'تداخل شديد') }}"; }
+      else if (sev === "moderate") { cls = "warn"; head = "{{ t('Moderate interaction', 'تداخل متوسط') }}"; }
+      else if (sev === "mild") { cls = "warn"; head = "{{ t('Mild interaction', 'تداخل خفيف') }}"; }
+      else if (sev === "none") { cls = "ok"; head = "{{ t('No interaction found', 'لا يوجد تداخل') }}"; }
+      else { cls = "info"; head = "{{ t('Not checked', 'لم يتم الفحص') }}"; }
+
+      let html = '<div class="wf-alert ' + cls + '"><b>' + head + "</b>";
+      if (res.recommendation) html += "<br>" + esc(res.recommendation);
+      html += "</div>";
+      (res.interactions || []).forEach((it) => {
+        html += '<div class="ai-item"><b>' + esc(it.drugs || "") + "</b>" +
+                (it.effect ? "<p>" + esc(it.effect) + "</p>" : "") + "</div>";
+      });
+      if (!onFile.length) {
+        html += '<p class="ai-foot">' +
+          "{{ t('This animal has nothing else on file, so there was no co-medication to check against.', 'لا توجد أدوية أخرى مسجلة لهذا الحيوان، لذا لا يوجد تداخل للفحص.') }}" +
+          "</p>";
+      }
+      panel.innerHTML = html;
+    } catch (err) {
+      panel.innerHTML = '<div class="wf-alert err">' +
+        "{{ t('The interaction check could not run. This is NOT a statement that the combination is safe.', 'تعذر إجراء فحص التداخلات. هذا لا يعني أن التركيبة آمنة.') }}" +
+        "</div>";
+    } finally { setBusy(btnAiRx, false); }
+  });
 
   // Back links
   document.querySelectorAll("[data-back]").forEach((b) =>

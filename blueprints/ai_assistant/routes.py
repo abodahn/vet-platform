@@ -75,6 +75,25 @@ def get_system_prompt(role: str) -> str:
     )
 
 
+def ai_configured() -> bool:
+    """Is AI actually usable, as opposed to merely importable?
+
+    The chat screen reported "configured" from _OPENAI_AVAILABLE alone, which
+    only says the `openai` package installed. With no API key set, the UI
+    promised a working assistant and every request failed at the network. Same
+    shape as a half-configured payment gateway: the dangerous state is not
+    "off", it is "looks on".
+
+    A local proxy on localhost legitimately needs no key, so that is allowed.
+    """
+    if not _OPENAI_AVAILABLE:
+        return False
+    if FREELLM_API_KEY:
+        return True
+    host = (FREELLM_BASE_URL or "").lower()
+    return "localhost" in host or "127.0.0.1" in host
+
+
 def _client() -> "_OpenAI":
     return _OpenAI(base_url=FREELLM_BASE_URL, api_key=FREELLM_API_KEY)
 
@@ -274,7 +293,7 @@ def index():
     user = session["user"]
     history = _get_history_raw(user["id"], limit=50)
     history.reverse()  # chronological for display
-    api_configured = _OPENAI_AVAILABLE
+    api_configured = ai_configured()
     return render_template(
         "ai_assistant/chat.html",
         active="ai",
@@ -953,3 +972,88 @@ def drug_interactions():
         result["safe"] = False
 
     return jsonify(result)
+
+
+@ai_bp.route("/suggest-diagnosis", methods=["POST"])
+@login_required
+def suggest_diagnosis():
+    """Differential diagnoses from the presentation, for the workflow page.
+
+    A SUGGESTION, and the wording throughout says so. The clinician types their
+    own diagnosis; this offers candidates to consider and to rule out. Anything
+    that reads like a verdict would be both clinically wrong and, in a system a
+    clinic is liable for, indefensible.
+
+    Fails LOUDLY and empty. An unreachable model returns no suggestions and says
+    the check did not run — never a short list that looks like a considered
+    answer, which is the same failure mode drug_interactions was fixed for.
+    """
+    data = request.get_json(silent=True) or {}
+    complaint = (data.get("complaint") or "").strip()
+    if not complaint:
+        return jsonify({"ok": False, "ran": False, "suggestions": [],
+                        "note": "No presenting complaint given."})
+
+    if not ai_configured():
+        return jsonify({"ok": False, "ran": False, "suggestions": [],
+                        "note": "AI is not configured for this clinic."})
+
+    species = (data.get("species") or "Unknown").strip()
+    symptoms = (data.get("symptoms") or "").strip()
+    signalment = ", ".join(
+        f"{k} {v}" for k, v in (
+            ("weight", data.get("weight_kg")), ("temperature", data.get("temp_c")),
+            ("heart rate", data.get("heart_rate")),
+            ("respiratory rate", data.get("respiratory_rate")),
+        ) if v)
+    history = (data.get("history") or "").strip()
+
+    prompt = (
+        "You are assisting a licensed veterinarian who is about to record a "
+        "diagnosis. Offer DIFFERENTIALS to consider — not a verdict.\n"
+        f"Species: {species}\n"
+        f"Presenting complaint: {complaint}\n"
+        f"Reported signs: {symptoms or 'none recorded'}\n"
+        f"Vitals: {signalment or 'none recorded'}\n"
+        f"Previous visits: {history or 'none on file'}\n\n"
+        "Reply with a JSON object ONLY, no markdown:\n"
+        '{"suggestions":[{"diagnosis":"name","likelihood":"high|moderate|low",'
+        '"why":"one clause of supporting evidence from the presentation",'
+        '"rule_out":"the single test or check that would confirm or exclude it"}],'
+        '"red_flags":["anything in this presentation that warrants urgent attention"]}\n'
+        "At most 4 suggestions, most likely first. If the presentation is too "
+        "thin to reason from, return an empty suggestions list."
+    )
+
+    reply, _, _ = call_ai([{"role": "user", "content": prompt}], "doctor")
+    try:
+        m = re.search(r"\{.*\}", reply, re.DOTALL)
+        if not m:
+            # No JSON at all means the model was unreachable or refused — its
+            # error text arrives here as a plain string. Falling through to an
+            # empty list would report ran=True with nothing in it, which reads
+            # to a busy vet as "nothing worth considering" rather than "this
+            # never ran". Absence of a finding is not a finding.
+            raise ValueError("no JSON object in the reply")
+        result = json.loads(m.group())
+        if "suggestions" not in result:
+            raise ValueError("reply had no suggestions key")
+        suggestions = result.get("suggestions") or []
+        if not isinstance(suggestions, list):
+            raise ValueError("suggestions was not a list")
+    except Exception:
+        _logger.warning("suggest_diagnosis: unparseable AI reply for %r", complaint)
+        return jsonify({
+            "ok": False, "ran": False, "suggestions": [],
+            "note": ("The suggestion service could not be reached. Nothing was "
+                     "checked — this is not a statement that the presentation is "
+                     "straightforward."),
+        })
+
+    return jsonify({
+        "ok": True, "ran": True,
+        "suggestions": suggestions[:4],
+        "red_flags": result.get("red_flags") or [],
+        "note": ("Suggestions only. Confirm against your own examination — the "
+                 "recorded diagnosis is yours."),
+    })

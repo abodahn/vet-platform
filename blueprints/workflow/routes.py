@@ -36,12 +36,18 @@ logger = logging.getLogger(__name__)
 @login_required
 def index():
     """The workflow page itself."""
+    from blueprints.ai_assistant.routes import ai_configured
+
     user = session.get("user") or {}
     return render_template(
         "workflow/index.html",
         active="workflow",
         page_title="New Visit",
         doctor_name=user.get("full_name") or "",
+        # Decided server-side so an unconfigured clinic never sees a button that
+        # cannot work. A control that fails when pressed is worse than one that
+        # was never offered — the staff member has already committed to the step.
+        ai_available=ai_configured(),
     )
 
 
