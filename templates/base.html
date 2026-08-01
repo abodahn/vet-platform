@@ -107,6 +107,14 @@
             <span class="v3-nav-icon"><i class="bi bi-grid-1x2"></i></span>
             <span>{{ t('Dashboard', 'لوحة التحكم') }}</span>
           </a>
+          {#- The whole visit on one screen. Placed second, right under the
+              dashboard, because for reception it is the most-used entry point
+              in the system: a walk-in starts here and does not leave. -#}
+          <a href="{{ url_for('workflow.index') }}" class="v3-nav-item"
+             {% if active == 'workflow' %}aria-current="page"{% endif %}>
+            <span class="v3-nav-icon"><i class="bi bi-lightning-charge"></i></span>
+            <span>{{ t('New Visit', 'زيارة جديدة') }}</span>
+          </a>
           <a href="{{ url_for('appointments.schedule') }}" class="v3-nav-item">
             <span class="v3-nav-icon"><i class="bi bi-calendar-check"></i></span>
             <span>{{ t('Appointments', 'المواعيد') }}</span>

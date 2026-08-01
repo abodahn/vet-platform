@@ -1068,8 +1068,26 @@ function checkDrugInteractions() {
   });
   if (!meds.length) { alert('Enter at least one medication name first.'); return; }
 
-  // Existing active prescriptions
-  var existing = [{% for rx in prescriptions %}{% for item in rx.items if rx.items is defined %}'{{ item.medication_name }}',{% endfor %}{% endfor %}];
+  // What this animal is ALREADY taking — the whole point of the check.
+  //
+  // This read `rx.items`, which was never right: the route builds a separate
+  // `rx_items` dict keyed by prescription id and passes it in. `items` is also
+  // a dict METHOD, so on PostgreSQL — where rows are dict-like — it resolved to
+  // the bound method and crashed the page with "'method' object is not
+  // iterable". On SQLite rows have no such attribute, so Jinja returned
+  // Undefined, `is defined` skipped the loop, and this list was silently ALWAYS
+  // EMPTY: the interaction checker compared the new drugs only against each
+  // other and never against existing medication.
+  //
+  // tojson per name, not bare quotes: a medication written with an apostrophe
+  // would otherwise break out of the string and take the script with it.
+  var existing = [
+    {%- for rx in prescriptions -%}
+      {%- for item in rx_items.get(rx.id, []) -%}
+        {{ item.medication_name | tojson }},
+      {%- endfor -%}
+    {%- endfor -%}
+  ];
   var newDrug  = meds[0];
   var current  = existing.concat(meds.slice(1));
 

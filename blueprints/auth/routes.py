@@ -131,6 +131,10 @@ _BP_PERMISSION = {
     "clinical":     "visits",
     "doctor":       "visits",
     "petsy":        "petshop",
+    # The one-page visit flow is the visits module with a different front door.
+    # Mapping it explicitly means it is governed by an existing grant rather
+    # than arriving ungoverned — a new blueprint with no key falls open.
+    "workflow":     "visits",
 }
 
 

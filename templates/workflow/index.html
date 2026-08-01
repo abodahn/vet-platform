@@ -1,0 +1,707 @@
+{% extends "base.html" %}
+{% block title %}{{ t('New Visit', 'زيارة جديدة') }}{% endblock %}
+
+{#
+  ONE PAGE, THE WHOLE VISIT.
+
+  Client -> patient -> examination -> diagnosis -> treatment -> invoice ->
+  payment, without navigating away once.
+
+  Every write POSTs to the EXISTING route for that step — the same chain
+  tests/test_full_cycle.py drives. Nothing here re-implements clinic logic:
+  complete_visit alone is 125 lines that price the consultation from the service
+  catalogue and turn prescription lines into invoice lines, and a second copy of
+  that would drift.
+
+  After each step the page RE-READS the visit from the server instead of
+  trusting what it just sent. If a POST half-succeeds, the next step sees the
+  real state.
+#}
+
+{% block content %}
+<style>
+  .wf-wrap { max-width: 1080px; margin: 0 auto; }
+
+  /* Stepper */
+  .wf-steps { display: flex; gap: 6px; margin-bottom: 22px; flex-wrap: wrap; }
+  .wf-step {
+    flex: 1 1 140px; display: flex; align-items: center; gap: 10px;
+    padding: 11px 14px; border-radius: var(--r-md);
+    background: var(--surface); border: 1px solid var(--border);
+    font-size: .82rem; font-weight: 600; color: var(--text-muted);
+    transition: all var(--tx);
+  }
+  .wf-step .n {
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-size: .75rem; font-weight: 700;
+    background: var(--surface-sunk); color: var(--text-muted);
+  }
+  .wf-step.active {
+    border-color: var(--c-primary); background: var(--c-primary-50);
+    color: var(--c-primary-d);
+  }
+  .wf-step.active .n { background: var(--c-primary); color: #fff; }
+  .wf-step.done { color: var(--c-success); border-color: var(--c-success-bd); }
+  .wf-step.done .n { background: var(--c-success); color: #fff; }
+
+  /* Panels */
+  .wf-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 22px; margin-bottom: 16px;
+  }
+  .wf-panel[hidden] { display: none; }
+  .wf-panel h3 { font-size: 1.05rem; margin: 0 0 4px; }
+  .wf-hint { font-size: .82rem; color: var(--text-3); margin-bottom: 16px; }
+
+  .wf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .wf-grid label { display: block; font-size: .76rem; font-weight: 600;
+                   color: var(--text-3); margin-bottom: 4px; }
+  .wf-grid input, .wf-grid select, .wf-grid textarea {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--border);
+    border-radius: var(--r-sm); background: var(--surface); color: var(--text);
+    font: inherit; font-size: .88rem;
+  }
+  .wf-full { grid-column: 1 / -1; }
+
+  /* Search results / cards */
+  .wf-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .wf-card {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: start;
+    padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-md);
+    background: var(--surface); cursor: pointer; transition: all var(--tx);
+  }
+  .wf-card:hover { border-color: var(--c-primary); background: var(--c-primary-50); }
+  .wf-card.sel { border-color: var(--c-primary); background: var(--c-primary-50); }
+  .wf-avatar {
+    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-weight: 700; font-size: .8rem;
+    background: var(--c-primary); color: #fff;
+  }
+  .wf-card b { display: block; font-size: .92rem; }
+  .wf-card small { color: var(--text-3); font-size: .78rem; }
+
+  .wf-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .wf-empty { padding: 16px; text-align: center; color: var(--text-3); font-size: .86rem; }
+
+  /* Selected-so-far summary rail */
+  .wf-summary {
+    display: flex; gap: 18px; flex-wrap: wrap; padding: 12px 16px;
+    background: var(--surface-sunk); border-radius: var(--r-md);
+    margin-bottom: 16px; font-size: .84rem;
+  }
+  .wf-summary span { color: var(--text-3); }
+  .wf-summary b { color: var(--text); }
+
+  .wf-alert {
+    padding: 11px 14px; border-radius: var(--r-sm); font-size: .85rem;
+    margin-bottom: 14px;
+  }
+  .wf-alert.err { background: var(--c-danger-bg); color: var(--c-danger);
+                  border: 1px solid var(--c-danger-bd); }
+  .wf-alert.warn { background: var(--c-warning-bg); color: var(--c-warning);
+                   border: 1px solid var(--c-warning-bd); }
+  .wf-alert.ok { background: var(--c-success-bg); color: var(--c-success);
+                 border: 1px solid var(--c-success-bd); }
+
+  .rx-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr .8fr auto;
+            gap: 8px; margin-bottom: 8px; align-items: end; }
+  @media (max-width: 760px) { .rx-row { grid-template-columns: 1fr 1fr; } }
+</style>
+
+<div class="wf-wrap">
+
+  <h2 style="margin-bottom:4px">{{ t('New Visit', 'زيارة جديدة') }}</h2>
+  <p class="wf-hint">
+    {{ t('Everything from finding the client to taking payment, in order, on this page.',
+          'كل شيء من البحث عن العميل حتى تحصيل الدفع، بالترتيب، في هذه الصفحة.') }}
+  </p>
+
+  <div class="wf-steps" id="wfSteps">
+    <div class="wf-step active" data-step="1"><span class="n">1</span>{{ t('Client', 'العميل') }}</div>
+    <div class="wf-step" data-step="2"><span class="n">2</span>{{ t('Patient', 'الحيوان') }}</div>
+    <div class="wf-step" data-step="3"><span class="n">3</span>{{ t('Examination', 'الفحص') }}</div>
+    <div class="wf-step" data-step="4"><span class="n">4</span>{{ t('Diagnosis', 'التشخيص') }}</div>
+    <div class="wf-step" data-step="5"><span class="n">5</span>{{ t('Treatment', 'العلاج') }}</div>
+    <div class="wf-step" data-step="6"><span class="n">6</span>{{ t('Invoice & Payment', 'الفاتورة والدفع') }}</div>
+  </div>
+
+  <div class="wf-summary" id="wfSummary" hidden></div>
+  <div id="wfError"></div>
+
+  <!-- ── 1. CLIENT ──────────────────────────────────────────────────────── -->
+  <div class="wf-panel" id="p1">
+    <h3>{{ t('Who is the client?', 'من هو العميل؟') }}</h3>
+    <p class="wf-hint">{{ t('Search by name or phone. If they are new, add them here.',
+                            'ابحث بالاسم أو رقم الهاتف. لو عميل جديد، أضفه هنا.') }}</p>
+
+    <input id="ownerSearch" type="search" autocomplete="off"
+           placeholder="{{ t('Name or phone…', 'الاسم أو رقم الهاتف…') }}"
+           style="width:100%;padding:11px 13px;border:1px solid var(--border);
+                  border-radius:var(--r-sm);background:var(--surface);
+                  color:var(--text);font:inherit">
+
+    <div class="wf-list" id="ownerResults"></div>
+
+    <div class="wf-actions">
+      <button type="button" class="btn btn-secondary" id="btnNewOwner">
+        + {{ t('New client', 'عميل جديد') }}
+      </button>
+    </div>
+
+    <div id="newOwnerForm" hidden style="margin-top:16px;padding-top:16px;
+         border-top:1px solid var(--border)">
+      <div class="wf-grid">
+        <div><label>{{ t('Full name', 'الاسم بالكامل') }} *</label>
+             <input id="o_full_name" required></div>
+        <div><label>{{ t('Name (Arabic)', 'الاسم بالعربية') }}</label>
+             <input id="o_full_name_ar" dir="rtl"></div>
+        <div><label>{{ t('Phone', 'الهاتف') }} *</label>
+             <input id="o_phone" inputmode="tel" required></div>
+        <div><label>{{ t('WhatsApp', 'واتساب') }}</label>
+             <input id="o_whatsapp_phone" inputmode="tel"></div>
+        <div><label>{{ t('Email', 'البريد') }}</label>
+             <input id="o_email" type="email"></div>
+        <div class="wf-full"><label>{{ t('Address', 'العنوان') }}</label>
+             <input id="o_address"></div>
+      </div>
+      <div class="wf-actions">
+        <button type="button" class="btn btn-primary" id="btnSaveOwner">
+          {{ t('Save client & continue', 'حفظ العميل والمتابعة') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. PATIENT ─────────────────────────────────────────────────────── -->
+  <div class="wf-panel" id="p2" hidden>
+    <h3>{{ t('Which animal?', 'أي حيوان؟') }}</h3>
+    <p class="wf-hint" id="petHint"></p>
+    <div class="wf-list" id="petResults"></div>
+
+    <div class="wf-actions">
+      <button type="button" class="btn btn-secondary" id="btnNewPet">
+        + {{ t('New patient', 'حيوان جديد') }}
+      </button>
+      <button type="button" class="btn btn-ghost" data-back="1">
+        ← {{ t('Change client', 'تغيير العميل') }}
+      </button>
+    </div>
+
+    <div id="newPetForm" hidden style="margin-top:16px;padding-top:16px;
+         border-top:1px solid var(--border)">
+      <div class="wf-grid">
+        <div><label>{{ t('Name', 'الاسم') }} *</label><input id="pt_pet_name" required></div>
+        <div><label>{{ t('Species', 'النوع') }} *</label>
+          <select id="pt_species">
+            <option value="Cat">{{ t('Cat', 'قطة') }}</option>
+            <option value="Dog">{{ t('Dog', 'كلب') }}</option>
+            <option value="Bird">{{ t('Bird', 'طائر') }}</option>
+            <option value="Rabbit">{{ t('Rabbit', 'أرنب') }}</option>
+            <option value="Other">{{ t('Other', 'أخرى') }}</option>
+          </select></div>
+        <div><label>{{ t('Breed', 'السلالة') }}</label><input id="pt_breed"></div>
+        <div><label>{{ t('Sex', 'الجنس') }}</label>
+          <select id="pt_sex">
+            <option value="Male">{{ t('Male', 'ذكر') }}</option>
+            <option value="Female">{{ t('Female', 'أنثى') }}</option>
+          </select></div>
+        <div><label>{{ t('Weight (kg)', 'الوزن (كجم)') }}</label>
+             <input id="pt_weight_kg" type="number" step="0.1"></div>
+        <div><label>{{ t('Date of birth', 'تاريخ الميلاد') }}</label>
+             <input id="pt_dob" type="date"></div>
+        <div class="wf-full"><label>{{ t('Allergies', 'الحساسية') }}</label>
+             <input id="pt_allergies"
+                    placeholder="{{ t('Anything that must never be prescribed',
+                                      'أي شيء يجب ألا يوصف أبداً') }}"></div>
+      </div>
+      <div class="wf-actions">
+        <button type="button" class="btn btn-primary" id="btnSavePet">
+          {{ t('Save patient & continue', 'حفظ الحيوان والمتابعة') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3. EXAMINATION ─────────────────────────────────────────────────── -->
+  <div class="wf-panel" id="p3" hidden>
+    <h3>{{ t('Examination', 'الفحص') }}</h3>
+    <div id="petHistory"></div>
+    <div class="wf-grid">
+      <div class="wf-full"><label>{{ t('Chief complaint', 'الشكوى الرئيسية') }} *</label>
+           <input id="v_chief_complaint" required></div>
+      <div class="wf-full"><label>{{ t('Symptoms', 'الأعراض') }}</label>
+           <textarea id="v_symptoms" rows="2"></textarea></div>
+      <div><label>{{ t('Visit type', 'نوع الزيارة') }}</label>
+        <select id="v_visit_type">
+          <option value="Consultation">{{ t('Consultation', 'كشف') }}</option>
+          <option value="Follow-up">{{ t('Follow-up', 'متابعة') }}</option>
+          <option value="Vaccination">{{ t('Vaccination', 'تطعيم') }}</option>
+          <option value="Emergency">{{ t('Emergency', 'طوارئ') }}</option>
+          <option value="Surgery">{{ t('Surgery', 'جراحة') }}</option>
+        </select></div>
+      <div><label>{{ t('Doctor', 'الطبيب') }}</label>
+           <input id="v_doctor_name" value="{{ doctor_name }}"></div>
+      <div><label>{{ t('Weight (kg)', 'الوزن') }}</label>
+           <input id="v_weight_kg" type="number" step="0.1"></div>
+      <div><label>{{ t('Temperature (°C)', 'الحرارة') }}</label>
+           <input id="v_temp_c" type="number" step="0.1"></div>
+      <div><label>{{ t('Heart rate', 'النبض') }}</label>
+           <input id="v_heart_rate" type="number"></div>
+      <div><label>{{ t('Respiratory rate', 'التنفس') }}</label>
+           <input id="v_respiratory_rate" type="number"></div>
+    </div>
+    <div class="wf-actions">
+      <button type="button" class="btn btn-primary" id="btnSaveVisit">
+        {{ t('Start visit & continue', 'بدء الزيارة والمتابعة') }}
+      </button>
+      <button type="button" class="btn btn-ghost" data-back="2">
+        ← {{ t('Change patient', 'تغيير الحيوان') }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ── 4. DIAGNOSIS ───────────────────────────────────────────────────── -->
+  <div class="wf-panel" id="p4" hidden>
+    <h3>{{ t('Diagnosis', 'التشخيص') }}</h3>
+    <p class="wf-hint">
+      {{ t('At least one diagnosis is required before the visit can be completed.',
+            'مطلوب تشخيص واحد على الأقل قبل إنهاء الزيارة.') }}
+    </p>
+    <div class="wf-grid">
+      <div class="wf-full"><label>{{ t('Diagnosis', 'التشخيص') }} *</label>
+           <input id="d_diagnosis_text" required></div>
+      <div><label>{{ t('Severity', 'الشدة') }}</label>
+        <select id="d_severity">
+          <option value="Mild">{{ t('Mild', 'خفيف') }}</option>
+          <option value="Moderate" selected>{{ t('Moderate', 'متوسط') }}</option>
+          <option value="Severe">{{ t('Severe', 'شديد') }}</option>
+        </select></div>
+      <div class="wf-full"><label>{{ t('Notes', 'ملاحظات') }}</label>
+           <textarea id="d_diagnosis_notes" rows="2"></textarea></div>
+    </div>
+    <div class="wf-actions">
+      <button type="button" class="btn btn-primary" id="btnSaveDiagnosis">
+        {{ t('Save diagnosis & continue', 'حفظ التشخيص والمتابعة') }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ── 5. TREATMENT ───────────────────────────────────────────────────── -->
+  <div class="wf-panel" id="p5" hidden>
+    <h3>{{ t('Treatment', 'العلاج') }}</h3>
+    <p class="wf-hint" id="rxAllergyHint"></p>
+    <div id="rxRows"></div>
+    <div class="wf-actions">
+      <button type="button" class="btn btn-ghost" id="btnAddRxRow">
+        + {{ t('Add medication', 'إضافة دواء') }}
+      </button>
+    </div>
+    <div class="wf-grid" style="margin-top:12px">
+      <div class="wf-full"><label>{{ t('Instructions', 'تعليمات') }}</label>
+           <textarea id="rx_notes" rows="2"></textarea></div>
+    </div>
+    <div class="wf-actions">
+      <button type="button" class="btn btn-primary" id="btnSaveRx">
+        {{ t('Save prescription & continue', 'حفظ الروشتة والمتابعة') }}
+      </button>
+      <button type="button" class="btn btn-secondary" id="btnSkipRx">
+        {{ t('No medication — continue', 'بدون دواء — متابعة') }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ── 6. INVOICE & PAYMENT ───────────────────────────────────────────── -->
+  <div class="wf-panel" id="p6" hidden>
+    <h3>{{ t('Invoice & Payment', 'الفاتورة والدفع') }}</h3>
+    <div id="invoiceBox"></div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // CSRF: the app validates `_csrf_token`, not `csrf_token`. Getting this wrong
+  // makes every POST fail as a silent 403, which has happened three times in
+  // this codebase's history.
+  const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+
+  const state = { owner: null, pet: null, visitId: null, invoice: null, step: 1 };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function showError(msg, kind) {
+    $("wfError").innerHTML = msg
+      ? '<div class="wf-alert ' + (kind || "err") + '">' + esc(msg) + "</div>" : "";
+    if (msg) window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function goto(step) {
+    state.step = step;
+    for (let i = 1; i <= 6; i++) $("p" + i).hidden = (i !== step);
+    document.querySelectorAll(".wf-step").forEach((el) => {
+      const n = Number(el.dataset.step);
+      el.classList.toggle("active", n === step);
+      el.classList.toggle("done", n < step);
+    });
+    renderSummary();
+    showError("");
+  }
+
+  function renderSummary() {
+    const bits = [];
+    if (state.owner) bits.push("<span>{{ t('Client', 'العميل') }}:</span> <b>" +
+      esc(state.owner.full_name) + "</b>");
+    if (state.pet) bits.push("<span>{{ t('Patient', 'الحيوان') }}:</span> <b>" +
+      esc(state.pet.pet_name) + " (" + esc(state.pet.species) + ")</b>");
+    if (state.visitId) bits.push("<span>{{ t('Visit', 'الزيارة') }}:</span> <b>#" +
+      state.visitId + "</b>");
+    $("wfSummary").innerHTML = bits.join("");
+    $("wfSummary").hidden = bits.length === 0;
+  }
+
+  /* POST to an EXISTING route, exactly as the browser form would. The route
+     redirects on success; fetch follows it, so a 200 back means the chain
+     worked. Server state is then re-read rather than assumed. */
+  async function postForm(url, fields) {
+    const body = new URLSearchParams(fields);
+    body.set("_csrf_token", CSRF);
+    const r = await fetch(url, {
+      method: "POST", body, redirect: "follow",
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+    return { ok: r.ok, status: r.status, url: r.url, text: await r.text() };
+  }
+
+  const getJSON = (u) => fetch(u, { headers: { "Accept": "application/json" } })
+    .then((r) => r.json());
+
+  // ── 1. client ────────────────────────────────────────────────────────────
+  let searchTimer = null;
+  $("ownerSearch").addEventListener("input", (e) => {
+    clearTimeout(searchTimer);
+    const q = e.target.value.trim();
+    if (q.length < 2) { $("ownerResults").innerHTML = ""; return; }
+    // Debounced: one request per pause, not one per keystroke.
+    searchTimer = setTimeout(async () => {
+      const rows = await getJSON("/workflow/api/owners?q=" + encodeURIComponent(q));
+      if (!rows.length) {
+        $("ownerResults").innerHTML =
+          '<div class="wf-empty">{{ t("No client matches that. Add them as new.", "لا يوجد عميل مطابق. أضفه كعميل جديد.") }}</div>';
+        return;
+      }
+      $("ownerResults").innerHTML = rows.map((o) =>
+        '<button type="button" class="wf-card" data-owner=\'' +
+        esc(JSON.stringify(o)) + "'>" +
+        '<span class="wf-avatar">' + esc((o.full_name || "?").slice(0, 2).toUpperCase()) + "</span>" +
+        "<span><b>" + esc(o.full_name) + "</b><small>" + esc(o.phone || "—") +
+        " · " + o.pet_count + " {{ t('pets', 'حيوان') }}</small></span></button>"
+      ).join("");
+    }, 220);
+  });
+
+  $("ownerResults").addEventListener("click", (e) => {
+    const card = e.target.closest("[data-owner]");
+    if (card) selectOwner(JSON.parse(card.dataset.owner));
+  });
+
+  $("btnNewOwner").addEventListener("click", () => {
+    $("newOwnerForm").hidden = !$("newOwnerForm").hidden;
+    if (!$("newOwnerForm").hidden) {
+      // Carry whatever they typed across — retyping a phone number they just
+      // searched for is the kind of small insult that makes staff avoid a tool.
+      const typed = $("ownerSearch").value.trim();
+      if (/^[0-9+\s-]+$/.test(typed)) $("o_phone").value = typed;
+      else $("o_full_name").value = typed;
+      $("o_full_name").focus();
+    }
+  });
+
+  $("btnSaveOwner").addEventListener("click", async (ev) => {
+    const name = $("o_full_name").value.trim();
+    const phone = $("o_phone").value.trim();
+    if (!name || !phone) { showError("{{ t('A name and a phone number are required.', 'الاسم ورقم الهاتف مطلوبان.') }}"); return; }
+    ev.target.disabled = true;
+    try {
+      const res = await postForm("/crm/owners/new", {
+        full_name: name, full_name_ar: $("o_full_name_ar").value.trim(),
+        phone: phone, whatsapp_phone: $("o_whatsapp_phone").value.trim() || phone,
+        email: $("o_email").value.trim(), address: $("o_address").value.trim(),
+        preferred_contact: "WhatsApp",
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      // Re-find by phone rather than parsing an id out of the HTML.
+      const rows = await getJSON("/workflow/api/owners?q=" + encodeURIComponent(phone));
+      const created = rows.find((o) => o.phone === phone) || rows[0];
+      if (!created) throw new Error("{{ t('The client was not saved.', 'لم يتم حفظ العميل.') }}");
+      selectOwner(created);
+    } catch (err) {
+      showError("{{ t('Could not save the client.', 'تعذر حفظ العميل.') }} " + err.message);
+    } finally { ev.target.disabled = false; }
+  });
+
+  async function selectOwner(owner) {
+    state.owner = owner;
+    const data = await getJSON("/workflow/api/owner/" + owner.id + "/pets");
+    const pets = data.pets || [];
+    $("petHint").textContent = pets.length
+      ? "{{ t('Registered to', 'مسجل باسم') }} " + owner.full_name
+      : "{{ t('This client has no animals registered yet.', 'لا يوجد حيوانات مسجلة لهذا العميل.') }}";
+    $("petResults").innerHTML = pets.map((p) =>
+      '<button type="button" class="wf-card" data-pet=\'' + esc(JSON.stringify(p)) + "'>" +
+      '<span class="wf-avatar">' + esc((p.pet_name || "?").slice(0, 2).toUpperCase()) + "</span>" +
+      "<span><b>" + esc(p.pet_name) + "</b><small>" + esc(p.species || "") +
+      (p.breed ? " · " + esc(p.breed) : "") +
+      (p.allergies ? ' · <span style="color:var(--c-danger)">⚠ ' + esc(p.allergies) + "</span>" : "") +
+      "</small></span></button>").join("");
+    if (!pets.length) { $("newPetForm").hidden = false; }
+    goto(2);
+  }
+
+  // ── 2. patient ───────────────────────────────────────────────────────────
+  $("petResults").addEventListener("click", (e) => {
+    const card = e.target.closest("[data-pet]");
+    if (card) selectPet(JSON.parse(card.dataset.pet));
+  });
+
+  $("btnNewPet").addEventListener("click", () => {
+    $("newPetForm").hidden = !$("newPetForm").hidden;
+    if (!$("newPetForm").hidden) $("pt_pet_name").focus();
+  });
+
+  $("btnSavePet").addEventListener("click", async (ev) => {
+    const nm = $("pt_pet_name").value.trim();
+    if (!nm) { showError("{{ t('The animal needs a name.', 'الحيوان يحتاج اسماً.') }}"); return; }
+    ev.target.disabled = true;
+    try {
+      const res = await postForm("/crm/pets/new", {
+        owner_id: state.owner.id, pet_name: nm,
+        species: $("pt_species").value, breed: $("pt_breed").value.trim(),
+        sex: $("pt_sex").value, weight_kg: $("pt_weight_kg").value,
+        dob: $("pt_dob").value, allergies: $("pt_allergies").value.trim(),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await getJSON("/workflow/api/owner/" + state.owner.id + "/pets");
+      const created = (data.pets || []).slice(-1)[0];
+      if (!created) throw new Error("{{ t('The patient was not saved.', 'لم يتم حفظ الحيوان.') }}");
+      selectPet(created);
+    } catch (err) {
+      showError("{{ t('Could not save the patient.', 'تعذر حفظ الحيوان.') }} " + err.message);
+    } finally { ev.target.disabled = false; }
+  });
+
+  async function selectPet(pet) {
+    state.pet = pet;
+    if (pet.weight_kg) $("v_weight_kg").value = pet.weight_kg;
+    // Allergies surface on the EXAM step, before anything is prescribed.
+    const hist = await getJSON("/workflow/api/pet/" + pet.id + "/history");
+    let html = "";
+    if (hist.allergies) {
+      html += '<div class="wf-alert warn">⚠ {{ t("Allergies", "حساسية") }}: <b>' +
+              esc(hist.allergies) + "</b></div>";
+    }
+    if ((hist.visits || []).length) {
+      html += '<div class="wf-hint"><b>{{ t("Recent visits", "زيارات سابقة") }}:</b> ' +
+        hist.visits.map((v) => esc(v.visit_date) + " — " +
+          esc(v.diagnosis || v.chief_complaint || "—")).join(" · ") + "</div>";
+    }
+    $("petHistory").innerHTML = html;
+    $("rxAllergyHint").innerHTML = hist.allergies
+      ? '⚠ {{ t("Allergic to", "حساسية من") }}: <b style="color:var(--c-danger)">' +
+        esc(hist.allergies) + "</b>" : "";
+    goto(3);
+  }
+
+  // ── 3. visit ─────────────────────────────────────────────────────────────
+  $("btnSaveVisit").addEventListener("click", async (ev) => {
+    const cc = $("v_chief_complaint").value.trim();
+    if (!cc) { showError("{{ t('What is the animal here for?', 'ما سبب الزيارة؟') }}"); return; }
+    ev.target.disabled = true;
+    try {
+      const res = await postForm("/visits/new", {
+        owner_id: state.owner.id, pet_id: state.pet.id,
+        doctor_name: $("v_doctor_name").value.trim(),
+        visit_type: $("v_visit_type").value, chief_complaint: cc,
+        symptoms: $("v_symptoms").value.trim(),
+        weight_kg: $("v_weight_kg").value, temp_c: $("v_temp_c").value,
+        heart_rate: $("v_heart_rate").value,
+        respiratory_rate: $("v_respiratory_rate").value,
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      // The visit id comes from the URL the route redirected to.
+      const m = res.url.match(/\/visits\/(\d+)/);
+      if (!m) throw new Error("{{ t('The visit was not created.', 'لم يتم إنشاء الزيارة.') }}");
+      state.visitId = Number(m[1]);
+      addRxRow();
+      goto(4);
+    } catch (err) {
+      showError("{{ t('Could not start the visit.', 'تعذر بدء الزيارة.') }} " + err.message);
+    } finally { ev.target.disabled = false; }
+  });
+
+  // ── 4. diagnosis ─────────────────────────────────────────────────────────
+  $("btnSaveDiagnosis").addEventListener("click", async (ev) => {
+    const dx = $("d_diagnosis_text").value.trim();
+    if (!dx) { showError("{{ t('A diagnosis is required.', 'التشخيص مطلوب.') }}"); return; }
+    ev.target.disabled = true;
+    try {
+      const res = await postForm("/visits/" + state.visitId + "/diagnosis", {
+        diagnosis_text: dx, severity: $("d_severity").value,
+        diagnosis_notes: $("d_diagnosis_notes").value.trim(),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      // Confirm from the server. complete_visit refuses without a diagnosis, so
+      // discovering it did not save at step 6 would be far too late.
+      const v = await getJSON("/workflow/api/visit/" + state.visitId);
+      if (!v.diagnoses || !v.diagnoses.length) {
+        throw new Error("{{ t('The diagnosis did not save.', 'لم يتم حفظ التشخيص.') }}");
+      }
+      goto(5);
+    } catch (err) {
+      showError("{{ t('Could not save the diagnosis.', 'تعذر حفظ التشخيص.') }} " + err.message);
+    } finally { ev.target.disabled = false; }
+  });
+
+  // ── 5. treatment ─────────────────────────────────────────────────────────
+  let rxCount = 0;
+  function addRxRow() {
+    rxCount++;
+    const i = rxCount;
+    const row = document.createElement("div");
+    row.className = "rx-row";
+    row.innerHTML =
+      '<div><label>{{ t("Medication", "الدواء") }}</label><input data-rx="medication_name" data-i="' + i + '"></div>' +
+      '<div><label>{{ t("Dose", "الجرعة") }}</label><input data-rx="dosage" data-i="' + i + '"></div>' +
+      '<div><label>{{ t("Frequency", "التكرار") }}</label><input data-rx="frequency" data-i="' + i + '" placeholder="BID"></div>' +
+      '<div><label>{{ t("Duration", "المدة") }}</label><input data-rx="duration" data-i="' + i + '" placeholder="7 days"></div>' +
+      '<div><label>{{ t("Qty", "الكمية") }}</label><input data-rx="quantity" data-i="' + i + '" type="number" min="1" value="1"></div>' +
+      '<div><button type="button" class="btn btn-ghost" data-rmrx>✕</button></div>';
+    $("rxRows").appendChild(row);
+  }
+  $("btnAddRxRow").addEventListener("click", addRxRow);
+  $("rxRows").addEventListener("click", (e) => {
+    if (e.target.closest("[data-rmrx]")) e.target.closest(".rx-row").remove();
+  });
+
+  async function saveRx(skip) {
+    const fields = { rx_notes: $("rx_notes").value.trim() };
+    let any = false;
+    if (!skip) {
+      document.querySelectorAll("#rxRows .rx-row").forEach((row) => {
+        const get = (k) => (row.querySelector('[data-rx="' + k + '"]') || {}).value || "";
+        const i = row.querySelector("[data-i]").dataset.i;
+        if (!get("medication_name").trim()) return;   // blank row: ignore
+        any = true;
+        fields["medication_name_" + i] = get("medication_name").trim();
+        fields["dosage_" + i] = get("dosage");
+        fields["frequency_" + i] = get("frequency");
+        fields["duration_" + i] = get("duration");
+        fields["quantity_" + i] = get("quantity") || "1";
+        fields["unit_" + i] = "unit";
+        fields["route_" + i] = "Oral";
+        fields["instructions_" + i] = "";
+      });
+    }
+    if (any) {
+      const res = await postForm("/visits/" + state.visitId + "/prescription", fields);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+    }
+    await completeVisit();
+  }
+
+  $("btnSaveRx").addEventListener("click", async (ev) => {
+    ev.target.disabled = true;
+    try { await saveRx(false); }
+    catch (err) { showError("{{ t('Could not save the prescription.', 'تعذر حفظ الروشتة.') }} " + err.message); }
+    finally { ev.target.disabled = false; }
+  });
+  $("btnSkipRx").addEventListener("click", async (ev) => {
+    ev.target.disabled = true;
+    try { await saveRx(true); }
+    catch (err) { showError(err.message); }
+    finally { ev.target.disabled = false; }
+  });
+
+  // ── 6. invoice & payment ─────────────────────────────────────────────────
+  async function completeVisit() {
+    // This is the clinical-to-money bridge. It prices the consultation from the
+    // service catalogue and turns prescription lines into invoice lines — 125
+    // lines of logic that this page deliberately does not reimplement.
+    const res = await postForm("/visits/" + state.visitId + "/complete", {});
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const v = await getJSON("/workflow/api/visit/" + state.visitId);
+    if (!v.invoice) {
+      throw new Error("{{ t('The visit completed but no invoice was raised.', 'اكتملت الزيارة لكن لم تصدر فاتورة.') }}");
+    }
+    state.invoice = v.invoice;
+    renderInvoice(v);
+    goto(6);
+  }
+
+  function renderInvoice(v) {
+    const inv = v.invoice;
+    const due = Number(inv.due_amount || 0);
+    let html =
+      '<div class="wf-summary" style="margin-bottom:14px">' +
+      "<span>{{ t('Invoice', 'فاتورة') }}:</span> <b>" + esc(inv.invoice_number) + "</b>" +
+      "<span>{{ t('Total', 'الإجمالي') }}:</span> <b>" + Number(inv.total).toFixed(2) + "</b>" +
+      "<span>{{ t('Due', 'المستحق') }}:</span> <b>" + due.toFixed(2) + "</b>" +
+      "<span>{{ t('Status', 'الحالة') }}:</span> <b>" + esc(inv.status) + "</b></div>";
+
+    if (due > 0.005) {
+      html +=
+        '<div class="wf-grid">' +
+        "<div><label>{{ t('Amount', 'المبلغ') }}</label>" +
+        '<input id="pay_amount" type="number" step="0.01" value="' + due.toFixed(2) + '"></div>' +
+        "<div><label>{{ t('Method', 'طريقة الدفع') }}</label><select id=\"pay_method\">" +
+        {% for gw in payment_methods %}
+        '<option value="{{ gw.name }}">{{ t(gw.label, gw.label_ar) }}</option>' +
+        {% endfor %}
+        "</select></div>" +
+        "<div><label>{{ t('Reference', 'مرجع') }}</label><input id=\"pay_reference\"></div></div>" +
+        '<div class="wf-actions">' +
+        '<button type="button" class="btn btn-primary" id="btnPay">{{ t("Take payment", "تحصيل الدفع") }}</button>' +
+        '<a class="btn btn-ghost" href="/finance/invoices/' + inv.id + '">{{ t("Open invoice", "فتح الفاتورة") }}</a>' +
+        "</div>";
+    } else {
+      html += '<div class="wf-alert ok">✓ {{ t("Settled in full.", "تم السداد بالكامل.") }}</div>' +
+        '<div class="wf-actions">' +
+        '<a class="btn btn-secondary" href="/visits/' + state.visitId + '">{{ t("Open visit", "فتح الزيارة") }}</a>' +
+        '<a class="btn btn-primary" href="/workflow/">{{ t("Start another visit", "بدء زيارة أخرى") }}</a></div>';
+    }
+    $("invoiceBox").innerHTML = html;
+
+    const payBtn = $("btnPay");
+    if (payBtn) payBtn.addEventListener("click", async (ev) => {
+      ev.target.disabled = true;
+      try {
+        const res = await postForm("/finance/invoices/" + inv.id + "/pay", {
+          amount: $("pay_amount").value,
+          method: $("pay_method").value,
+          reference: $("pay_reference").value.trim(),
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const fresh = await getJSON("/workflow/api/visit/" + state.visitId);
+        renderInvoice(fresh);
+        // The route refuses an overpayment with a message rather than clamping,
+        // so an unchanged balance means it was rejected — say so.
+        if (Number(fresh.invoice.due_amount) >= due - 0.005) {
+          showError("{{ t('The payment was not accepted. Check the amount against the balance due.', 'لم يتم قبول الدفع. راجع المبلغ مقابل المستحق.') }}", "warn");
+        }
+      } catch (err) {
+        showError("{{ t('Could not record the payment.', 'تعذر تسجيل الدفع.') }} " + err.message);
+      } finally { if (payBtn) payBtn.disabled = false; }
+    });
+  }
+
+  // Back links
+  document.querySelectorAll("[data-back]").forEach((b) =>
+    b.addEventListener("click", () => goto(Number(b.dataset.back))));
+
+  $("ownerSearch").focus();
+})();
+</script>
+{% endblock %}

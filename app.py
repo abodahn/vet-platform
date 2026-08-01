@@ -134,6 +134,7 @@ def create_app(cfg=None) -> Flask:
     from blueprints.launcher     import launcher_bp
     from blueprints.settings     import settings_bp
     from blueprints.crm          import crm_bp
+    from blueprints.workflow     import workflow_bp
     from blueprints.appointments import appointments_bp
     from blueprints.inventory    import inventory_bp
     from blueprints.finance      import finance_bp
@@ -161,6 +162,7 @@ def create_app(cfg=None) -> Flask:
     app.register_blueprint(launcher_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(crm_bp)
+    app.register_blueprint(workflow_bp)
     app.register_blueprint(appointments_bp)
     app.register_blueprint(inventory_bp)
     app.register_blueprint(finance_bp)
