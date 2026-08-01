@@ -325,6 +325,22 @@
     background: var(--c-warning-bg);
   }
 
+  /* ── Vaccination ────────────────────────────────────────────────────── */
+  .vax-box {
+    margin-top: 14px; padding: 13px; border: 1px solid var(--border);
+    border-radius: var(--r-md); background: var(--surface-sunk);
+  }
+  .vax-toggle {
+    display: flex; align-items: center; gap: 9px; cursor: pointer;
+    font-size: .86rem; font-weight: 600; color: var(--text-2);
+  }
+  .vax-toggle input { width: 17px; height: 17px; accent-color: var(--c-primary);
+                      cursor: pointer; }
+  .vax-note { font-size: .78rem; color: var(--text-3); margin: 10px 0 0;
+              line-height: 1.5; }
+  .vax-warn { color: #991B1B; font-weight: 600; }
+  [data-theme="dark"] .vax-warn { color: #FCA5A5; }
+
   /* ── Prescription rows ──────────────────────────────────────────────── */
   .rx-row {
     display: grid; grid-template-columns: 2fr 1fr 1fr 1fr .7fr auto;
@@ -576,6 +592,56 @@
       </button>
     </div>
     <div class="ai-panel" id="aiRxPanel"></div>
+
+    <div class="vax-box" id="vaxBox">
+      <label class="vax-toggle">
+        <input type="checkbox" id="vaxOn">
+        <span>{{ t('A vaccination was given', 'تم إعطاء تطعيم') }}</span>
+      </label>
+
+      <div id="vaxFields" hidden>
+        <div class="wf-grid" style="margin-top:12px">
+          <div class="wf-full">
+            <label>{{ t('Vaccine', 'التطعيم') }} <span class="wf-req">*</span></label>
+            <select id="vx_vaccine_name">
+              <option value="Rabies">{{ t('Rabies', 'السعار') }}</option>
+              <option value="DHPP (Distemper/Hepatitis/Parvovirus/Parainfluenza)">DHPP</option>
+              <option value="Bordetella">Bordetella</option>
+              <option value="Leptospirosis">Leptospirosis</option>
+              <option value="Feline FVRCP">Feline FVRCP</option>
+              <option value="FeLV (Feline Leukemia)">FeLV</option>
+              <option value="Custom">{{ t('Other…', 'أخرى…') }}</option>
+            </select>
+          </div>
+          <div class="wf-full" id="vxCustomWrap" hidden>
+            <label>{{ t('Vaccine name', 'اسم التطعيم') }}</label>
+            <input id="vx_custom_vaccine">
+          </div>
+          <div><label>{{ t('Brand', 'الماركة') }}</label><input id="vx_vaccine_brand"></div>
+          <div><label>{{ t('Batch number', 'رقم التشغيلة') }}</label>
+               <input id="vx_batch_number"></div>
+          <div><label>{{ t('Dose number', 'رقم الجرعة') }}</label>
+               <input id="vx_dose_number" type="number" min="1" value="1" inputmode="numeric"></div>
+          <div><label>{{ t('Site', 'موضع الحقن') }}</label>
+            <select id="vx_site">
+              <option value="Subcutaneous">{{ t('Subcutaneous', 'تحت الجلد') }}</option>
+              <option value="Intramuscular">{{ t('Intramuscular', 'عضلي') }}</option>
+              <option value="Intranasal">{{ t('Intranasal', 'أنفي') }}</option>
+            </select>
+          </div>
+          <div><label>{{ t('Given on', 'تاريخ الإعطاء') }}</label>
+               <input id="vx_administered_at" type="date"></div>
+          <div>
+            <label>{{ t('Next dose due', 'الجرعة القادمة') }} <span class="wf-req">*</span></label>
+            <input id="vx_next_due_at" type="date">
+          </div>
+        </div>
+        {#- Not a nicety. The WhatsApp recall selects on next_due_at, so a blank
+            one means the owner is never reminded and the animal quietly lapses.
+            It is pre-filled a year ahead and the consequence is stated. -#}
+        <p class="vax-note" id="vxDueNote"></p>
+      </div>
+    </div>
 
     <div class="wf-grid" style="margin-top:12px">
       <div class="wf-full"><label>{{ t('Instructions', 'تعليمات') }}</label>
@@ -847,6 +913,12 @@
       if (!m) throw new Error("{{ t('The visit was not created.', 'لم يتم إنشاء الزيارة.') }}");
       state.visitId = Number(m[1]);
       addRxRow();
+      // Booked as a vaccination: open the section rather than leaving the one
+      // thing the visit exists for behind an unticked box.
+      if ($("v_visit_type").value === "Vaccination" && vaxOn && !vaxOn.checked) {
+        vaxOn.checked = true;
+        vaxOn.dispatchEvent(new Event("change"));
+      }
       goto(4);
     } catch (err) {
       showError("{{ t('Could not start the visit.', 'تعذر بدء الزيارة.') }} " + err.message);
@@ -920,6 +992,9 @@
       const res = await postForm("/visits/" + state.visitId + "/prescription", fields);
       if (!res.ok) throw new Error("HTTP " + res.status);
     }
+    // Before completing: completing raises the invoice, and a vaccination
+    // recorded after that would miss its line on the bill.
+    await saveVaccination();
     await completeVisit();
   }
 
@@ -1339,6 +1414,102 @@
     }
     html += "</div>";
     el.innerHTML = html;
+  }
+
+
+  /* ── Vaccination ──────────────────────────────────────────────────────────
+     The visit-type dropdown offered "Vaccination" and the flow had nowhere to
+     record one, so a vaccination visit ran all the way to a paid invoice with
+     the vaccination itself never written. That is not just a missing record:
+     the WhatsApp recall selects on vaccinations.next_due_at, so no row means no
+     next-due date means the owner is never reminded and the animal lapses.
+
+     It lives on the treatment step because a prescription and a vaccination are
+     the same question — what was administered — and a vaccination can happen at
+     any visit, not only one booked as a vaccination. */
+  const VAX_INTERVAL_MONTHS = { "Rabies": 12, "Bordetella": 12, "Leptospirosis": 12 };
+  const VAX_DEFAULT_MONTHS = 12;
+
+  function addMonths(iso, months) {
+    const d = iso ? new Date(iso) : new Date();
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function vaxRecalcDue() {
+    const given = $("vx_administered_at").value || new Date().toISOString().slice(0, 10);
+    const name = $("vx_vaccine_name").value;
+    const months = VAX_INTERVAL_MONTHS[name] || VAX_DEFAULT_MONTHS;
+    $("vx_next_due_at").value = addMonths(given, months);
+    vaxDueNote();
+  }
+
+  function vaxDueNote() {
+    const note = $("vxDueNote");
+    if (!note) return;
+    note.innerHTML = $("vx_next_due_at").value
+      ? "{{ t('The owner is reminded by WhatsApp when this falls due.', 'يتم تذكير المالك عبر واتساب عند حلول الموعد.') }}"
+      : '<span class="vax-warn">' +
+        "{{ t('Without a next-due date no reminder is sent and the animal will lapse.', 'بدون تاريخ للجرعة القادمة لن يتم إرسال تذكير وسينتهي مفعول التطعيم.') }}" +
+        "</span>";
+  }
+
+  const vaxOn = $("vaxOn");
+  if (vaxOn) {
+    vaxOn.addEventListener("change", () => {
+      $("vaxFields").hidden = !vaxOn.checked;
+      if (vaxOn.checked) {
+        if (!$("vx_administered_at").value) {
+          $("vx_administered_at").value = new Date().toISOString().slice(0, 10);
+        }
+        // Default the species-appropriate vaccine so the commonest case is one
+        // tick rather than a dropdown hunt.
+        const sp = (state.pet || {}).species || "";
+        if (sp === "Cat") $("vx_vaccine_name").value = "Feline FVRCP";
+        vaxRecalcDue();
+        $("vx_vaccine_name").focus();
+      }
+    });
+    $("vx_vaccine_name").addEventListener("change", () => {
+      $("vxCustomWrap").hidden = $("vx_vaccine_name").value !== "Custom";
+      vaxRecalcDue();
+    });
+    $("vx_administered_at").addEventListener("change", vaxRecalcDue);
+    $("vx_next_due_at").addEventListener("change", vaxDueNote);
+  }
+
+  /* Posted to the SAME route the clinical module uses — no second copy of how a
+     vaccination is stored. visit_id goes with it so the record is attached to
+     the consultation rather than floating loose against the animal. */
+  async function saveVaccination() {
+    if (!vaxOn || !vaxOn.checked) return;
+    let name = $("vx_vaccine_name").value;
+    if (name === "Custom") {
+      name = $("vx_custom_vaccine").value.trim();
+      if (!name) throw new Error(
+        "{{ t('Name the vaccine that was given.', 'اكتب اسم التطعيم الذي تم إعطاؤه.') }}");
+    }
+    const res = await postForm("/clinical/vaccinations/new", {
+      pet_id: state.pet.id,
+      visit_id: state.visitId,
+      vaccine_name: $("vx_vaccine_name").value,
+      custom_vaccine: $("vx_custom_vaccine").value.trim(),
+      vaccine_brand: $("vx_vaccine_brand").value.trim(),
+      batch_number: $("vx_batch_number").value.trim(),
+      dose_number: $("vx_dose_number").value || "1",
+      site: $("vx_site").value,
+      administered_at: $("vx_administered_at").value,
+      next_due_at: $("vx_next_due_at").value,
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+
+    // Confirm from the server rather than trusting the post — a vaccination
+    // that silently failed would be discovered a year later, by its absence.
+    const check = await getJSON("/workflow/api/visit/" + state.visitId);
+    if (!(check.vaccinations || []).length) {
+      throw new Error(
+        "{{ t('The vaccination was not saved.', 'لم يتم حفظ التطعيم.') }}");
+    }
   }
 
   // Back links

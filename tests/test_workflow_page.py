@@ -414,3 +414,92 @@ def test_the_patient_panel_puts_allergies_above_the_facts(client, vet):
 
     assert ".wf-aside { position: sticky" in html, \
         "the patient panel scrolls away from the treatment step"
+
+
+# ── vaccination ──────────────────────────────────────────────────────────────
+
+def test_a_vaccination_recorded_in_the_flow_is_linked_to_the_visit(client, vet, app):
+    """vaccinations.visit_id existed and was never written by any route, so
+    every vaccination on file was orphaned from the consultation it happened at
+    and "what was given at this visit" could not be answered from the visit."""
+    import datetime
+    _post(client, "/crm/owners/new", {"full_name": "Vax Owner", "phone": "01022334455"})
+    owner = client.get("/workflow/api/owners?q=01022334455").get_json()[0]
+    _post(client, "/crm/pets/new", {"owner_id": owner["id"], "pet_name": "Shot",
+                                    "species": "Dog"})
+    pet = client.get(f"/workflow/api/owner/{owner['id']}/pets").get_json()["pets"][0]
+    _post(client, "/visits/new", {
+        "owner_id": owner["id"], "pet_id": pet["id"], "visit_type": "Vaccination",
+        "doctor_name": "Dr. Test", "chief_complaint": "Annual booster"})
+    with app.app_context():
+        conn = db.get_db()
+        visit_id = conn.execute(
+            "SELECT id FROM visits WHERE pet_id=? ORDER BY id DESC LIMIT 1",
+            (pet["id"],)).fetchone()["id"]
+        conn.close()
+
+    due = (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
+    _post(client, "/clinical/vaccinations/new", {
+        "pet_id": pet["id"], "visit_id": visit_id, "vaccine_name": "Rabies",
+        "dose_number": "1", "site": "Subcutaneous",
+        "administered_at": datetime.date.today().isoformat(),
+        "next_due_at": due})
+
+    v = client.get(f"/workflow/api/visit/{visit_id}").get_json()
+    assert v["vaccinations"], "the vaccination is not attached to the visit"
+    assert v["vaccinations"][0]["vaccine_name"] == "Rabies"
+    assert v["vaccinations"][0]["next_due_at"] == due
+
+
+def test_a_vaccination_without_a_next_due_date_would_never_remind(client, vet, app):
+    """The consequence that makes this more than a missing field.
+
+    blueprints/whatsapp/scheduler.py selects on vaccinations.next_due_at, so a
+    blank one means the owner is never reminded and the animal quietly lapses.
+    The route now warns; the workflow page pre-fills a year ahead.
+    """
+    import datetime
+    _post(client, "/crm/owners/new", {"full_name": "NoDue Owner", "phone": "01099001122"})
+    owner = client.get("/workflow/api/owners?q=01099001122").get_json()[0]
+    _post(client, "/crm/pets/new", {"owner_id": owner["id"], "pet_name": "Lapse",
+                                    "species": "Cat"})
+    pet = client.get(f"/workflow/api/owner/{owner['id']}/pets").get_json()["pets"][0]
+
+    r = _post(client, "/clinical/vaccinations/new", {
+        "pet_id": pet["id"], "vaccine_name": "Feline FVRCP", "dose_number": "1",
+        "administered_at": datetime.date.today().isoformat(), "next_due_at": ""})
+    assert "no reminder" in r.get_data(as_text=True).lower(), \
+        "a vaccination with no next-due date was accepted silently"
+
+    with app.app_context():
+        conn = db.get_db()
+        row = conn.execute(
+            "SELECT next_due_at FROM vaccinations WHERE pet_id=? ORDER BY id DESC LIMIT 1",
+            (pet["id"],)).fetchone()
+        conn.close()
+    assert row["next_due_at"] is None
+
+    # …and the reminder query genuinely cannot see it.
+    from blueprints.whatsapp import scheduler
+    with app.app_context():
+        conn = db.get_db()
+        due = conn.execute(
+            "SELECT COUNT(*) c FROM vaccinations WHERE pet_id=? AND next_due_at IS NOT NULL",
+            (pet["id"],)).fetchone()["c"]
+        conn.close()
+    assert due == 0, "premise changed: the row now has a due date"
+
+
+def test_the_page_offers_a_vaccination_section_on_the_treatment_step(client, vet):
+    """A vaccination can happen at any visit, not only one booked as one — so it
+    is always available, and merely pre-opened when the visit type says so."""
+    html = client.get("/workflow/").get_data(as_text=True)
+    assert 'id="vaxOn"' in html and 'id="vx_vaccine_name"' in html
+    assert 'id="vx_next_due_at"' in html
+    assert "saveVaccination" in html
+    # It must be saved BEFORE the visit is completed: completing raises the
+    # invoice, and a vaccination recorded after would miss its line on the bill.
+    body = html[html.index("async function saveRx"):]
+    body = body[:body.index("$(\"btnSaveRx\")")]
+    assert body.index("saveVaccination") < body.index("completeVisit"), \
+        "the vaccination is saved after the invoice is raised"

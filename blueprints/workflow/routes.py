@@ -174,6 +174,13 @@ def api_visit(visit_id):
             "FROM prescriptions pr "
             "JOIN prescription_items pi ON pi.prescription_id = pr.id "
             "WHERE pr.visit_id=? ORDER BY pi.id", (visit_id,)).fetchall()
+        # Attached to THIS visit, not merely to the animal. vaccinations.visit_id
+        # existed and was never written until now, so historic rows are all NULL
+        # and only new ones appear here — which is correct: the question is what
+        # was given at this consultation.
+        vax = conn.execute(
+            "SELECT id, vaccine_name, administered_at, next_due_at "
+            "FROM vaccinations WHERE visit_id=? ORDER BY id", (visit_id,)).fetchall()
         invoice = conn.execute(
             "SELECT id, invoice_number, total, paid_amount, due_amount, status "
             "FROM invoices WHERE visit_id=? ORDER BY id DESC LIMIT 1",
@@ -186,6 +193,7 @@ def api_visit(visit_id):
         "visit": dict(visit),
         "diagnoses": [dict(d) for d in diagnoses],
         "prescription": [dict(r) for r in rx],
+        "vaccinations": [dict(v) for v in vax],
         "invoice": dict(invoice) if invoice else None,
     })
 

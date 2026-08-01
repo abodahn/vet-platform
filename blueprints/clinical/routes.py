@@ -269,14 +269,24 @@ def vaccination_new():
         administered_at = request.form.get("administered_at", "").strip() or date.today().isoformat()
         next_due_raw    = request.form.get("next_due_at", "").strip()
 
+        # vaccinations.visit_id exists and was never written, so every
+        # vaccination on file is orphaned from the consultation it happened at
+        # and "what was given at this visit" cannot be answered from the visit.
+        # Optional, because a vaccination clinic day has no visit behind it.
+        try:
+            visit_id = int(request.form.get("visit_id") or 0) or None
+        except ValueError:
+            visit_id = None
+
         conn = db.get_db()
         with conn:
             conn.execute(
                 """INSERT INTO vaccinations
-                   (pet_id, vaccine_name, vaccine_brand, batch_number, dose_number,
-                    administered_by, administered_at, next_due_at, site, notes)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                (p_id, vaccine_name,
+                   (pet_id, visit_id, vaccine_name, vaccine_brand, batch_number,
+                    dose_number, administered_by, administered_at, next_due_at,
+                    site, notes)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (p_id, visit_id, vaccine_name,
                  request.form.get("vaccine_brand", "").strip(),
                  request.form.get("batch_number", "").strip(),
                  int(request.form.get("dose_number", 1) or 1),
@@ -287,6 +297,13 @@ def vaccination_new():
                  request.form.get("notes", "").strip()),
             )
         conn.close()
+
+        # A blank next-due date is not a neutral omission: the WhatsApp recall
+        # selects on vaccinations.next_due_at, so an empty one means the owner
+        # is never reminded and the animal quietly lapses.
+        if not next_due_raw:
+            flash("No next-due date was set, so no reminder will be sent for "
+                  "this vaccination.", "warning")
         flash(f"Vaccination '{vaccine_name}' recorded.", "success")
         return redirect(url_for("clinical.vaccinations"))
 
