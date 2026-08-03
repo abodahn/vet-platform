@@ -1,6 +1,7 @@
 """
 System Monitor Blueprint
 """
+import logging
 import os
 import sys
 import glob
@@ -16,6 +17,8 @@ import models.database as db
 import models.audit as audit
 import models.backup as bk
 from models.sync import get_sync_status_summary, resolve_conflict
+
+logger = logging.getLogger(__name__)
 
 
 def _db_path():
@@ -882,3 +885,100 @@ def role_assign():
     except Exception as e:
         flash(f"Error assigning role: {e}", "danger")
     return redirect(url_for("system.roles_list"))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TAKE YOUR DATA WITH YOU
+#
+# Every screen with a table has an Excel button, and the nightly backup writes a
+# database dump. Neither is what a clinic actually needs the day it wants to
+# leave, or the day it wants to prove to itself that its records are its own:
+# ONE file, containing EVERYTHING, in a format any spreadsheet opens without
+# this software and without us.
+#
+# The Data & Continuity Guarantee promises exactly that in writing. This is the
+# code that makes the promise true. A guarantee the software cannot honour is
+# worse than no guarantee.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Tables holding operational junk rather than the clinic's records. Excluded so
+# the export is the clinic's data, not our logs -- and so it stays a size a
+# receptionist can email.
+_EXPORT_SKIP = {
+    "app_logs", "backend_logs", "frontend_logs", "audit_logs", "sync_queue",
+    "sync_conflicts", "rate_hits", "user_sessions", "ai_conversations",
+    "petsy_usage", "login_attempts", "sqlite_sequence",
+}
+
+
+def _export_tables(conn):
+    """Every table in this clinic's database, minus the operational noise."""
+    if db.is_postgres():
+        rows = conn.execute(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema='public' AND table_type='BASE TABLE' "
+            "ORDER BY table_name").fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        ).fetchall()
+    return [r[0] for r in rows if r[0] not in _EXPORT_SKIP
+            and not str(r[0]).startswith("sqlite_")]
+
+
+@system_bp.route("/export/all")
+@role_required("super_admin", "clinic_owner")
+def export_everything():
+    """The whole database as a ZIP of CSVs. Opens in Excel, needs nothing of ours."""
+    import csv
+    import io as _io
+    import zipfile
+
+    conn = db.get_db()
+    try:
+        tables = _export_tables(conn)
+        buf = _io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            written = []
+            for table in tables:
+                try:
+                    cur = conn.execute(f"SELECT * FROM {table}")
+                    rows = cur.fetchall()
+                    cols = [d[0] for d in cur.description] if cur.description else []
+                except Exception:
+                    # One unreadable table must not cost the clinic the other 78.
+                    db.rollback_quietly(conn)
+                    logger.exception("export: skipped table %s", table)
+                    continue
+                if not cols:
+                    continue
+                s = _io.StringIO()
+                w = csv.writer(s)
+                w.writerow(cols)
+                for r in rows:
+                    w.writerow([r[c] for c in cols])
+                # utf-8-sig: without the BOM, Excel on a Windows machine in
+                # Egypt opens Arabic names as mojibake, and the clinic concludes
+                # its data is corrupt.
+                zf.writestr(f"{table}.csv", s.getvalue().encode("utf-8-sig"))
+                written.append(f"{table} ({len(rows)})")
+
+            zf.writestr("README.txt",
+                        ("Aleefy — full data export\n"
+                         "=========================\n\n"
+                         "One CSV per table. Open any of them in Excel, Google "
+                         "Sheets, or LibreOffice.\nThese files need no software "
+                         "from us to read.\n\n"
+                         "ملف CSV لكل جدول. تقدر تفتح أي واحد منهم في إكسل.\n"
+                         "الملفات دي مش محتاجة أي برنامج مننا عشان تقراها.\n\n"
+                         f"Exported: {datetime.now().isoformat(timespec='seconds')}\n"
+                         f"Tables: {len(written)}\n\n" + "\n".join(written)
+                         ).encode("utf-8-sig"))
+    finally:
+        conn.close()
+
+    buf.seek(0)
+    _audit_backup("data_export", f"Full data export ({len(tables)} tables)")
+    return send_file(
+        buf, mimetype="application/zip", as_attachment=True,
+        download_name=f"aleefy-data-{date.today().isoformat()}.zip")

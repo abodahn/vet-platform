@@ -257,6 +257,9 @@
         <div class="sec-title">{{ t('💾 Backup Status', '💾 حالة النسخ الاحتياطي') }}</div>
         <div class="sec-actions">
           <a href="{{ url_for('system.backup') }}" class="pf-btn pf-btn-secondary" style="font-size:12px;padding:6px 12px">{{ t('All Backups', 'جميع النسخ') }}</a>
+          {# The Continuity Guarantee promises the clinic can read its own data
+             without us. This is the button that makes that true. #}
+          <a href="{{ url_for('system.export_everything') }}" class="pf-btn pf-btn-secondary" style="font-size:12px;padding:6px 12px">{{ t('Export All Data', 'تصدير كل البيانات') }}</a>
           <form method="post" action="{{ url_for('system.backup_run') }}" onsubmit="return confirm('Run backup now?')" style="display:inline">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <button class="pf-btn pf-btn-primary" style="font-size:12px;padding:6px 12px">{{ t('💾 Now', '💾 الآن') }}</button>
