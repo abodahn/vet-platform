@@ -30,6 +30,33 @@ def create_app(cfg=None) -> Flask:
     # Logging first — so the POSTGRES_DSN fallback warning below is captured
     init_logging(app)
 
+    # ── The signing key must not be the one published in this repository ─────
+    #
+    # ProductionConfig.validate() above catches this, but ONLY when FLASK_ENV is
+    # literally "production". The default is "development", so a deployment that
+    # forgets to set that one variable booted silently on
+    # "dev-only-key-CHANGE-IN-PRODUCTION-please" -- a key anybody with a copy of
+    # this code knows. Session cookies are signed with it, so knowing it means
+    # being able to mint a cookie that says you are the clinic owner. Nothing
+    # warned; the app just started.
+    #
+    # Development keeps working and is told; anything else refuses to serve,
+    # because a silent insecure boot is the failure mode that reaches a clinic.
+    _key = app.config.get("SECRET_KEY") or ""
+    _weak = (not _key) or ("CHANGE" in _key) or len(_key) < 32
+    if _weak and not app.config.get("TESTING"):
+        if _os.environ.get("FLASK_ENV", "development").lower() == "development":
+            logger.warning(
+                "SECRET_KEY is the shipped development key. Fine locally; this "
+                "app will REFUSE to start with it outside development. Generate "
+                'one with: python -c "import secrets; print(secrets.token_hex(64))"')
+        else:
+            raise RuntimeError(
+                "PLATFORM_SECRET_KEY is unset, too short, or still the shipped "
+                "development key. Session cookies are signed with it, so this "
+                "would let anyone forge a login. Generate one with:\n"
+                '  python -c "import secrets; print(secrets.token_hex(64))"')
+
     # Secure cookie flags
     app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
     app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
@@ -469,6 +496,18 @@ def create_app(cfg=None) -> Flask:
     @app.errorhandler(500)
     def _500(e):
         logger.error(f"Internal server error: {e}", exc_info=True)
+        # Tell somebody. A log table nobody opens is not a support channel: the
+        # clinic hits an error, works around it, and mentions it days later as
+        # "the system was being weird", by which point there is nothing left to
+        # diagnose. Rate-limited per (path, exception type) so one broken page
+        # reloaded twenty times is one notification.
+        try:
+            from models import error_alerts
+            error_alerts.report(
+                request.path, e,
+                user=(session.get("user") or {}).get("username", ""))
+        except Exception:
+            logger.exception("error alert failed")
         return render_template("error.html", code=500,
                                msg="An internal error occurred. Please try again."), 500
 
@@ -529,62 +568,126 @@ def _start_scheduler(app, backup_dir: str) -> None:
 
         scheduler = BackgroundScheduler(daemon=True)
 
+        # ── Every nightly job runs ONCE PER CLINIC ───────────────────────────
+        #
+        # They used to run once, against whichever database the process started
+        # with. In a multi-tenant deployment that meant clinic number two
+        # onwards was never backed up, never had a WhatsApp reminder sent, and
+        # never had its logs swept — while the backup job logged success,
+        # because from where it stood it had succeeded. A backup that reports
+        # success for nineteen databases it never opened is worse than no
+        # backup: it stops anyone looking.
+        #
+        # One clinic failing must never stop the rest. A raise inside the loop
+        # would leave every clinic after it in the list unbacked up, and the
+        # order is stable, so the same clinics would lose out every night.
+        from models import tenancy
+
+        def _for_every_clinic(job_name, fn):
+            done, failed = 0, []
+            for slug, row in tenancy.each_clinic():
+                label = slug or "default"
+                try:
+                    fn(slug, row)
+                    done += 1
+                except Exception:
+                    failed.append(label)
+                    logger.exception("%s failed for clinic %s", job_name, label)
+            if failed:
+                logger.error("%s: %d/%d clinics failed — %s",
+                             job_name, len(failed), done + len(failed),
+                             ", ".join(failed))
+            else:
+                logger.info("%s: %d clinic(s) OK", job_name, done)
+            return done, failed
+
         # Daily backup at 02:00
         def _daily_backup():
             with app.app_context():
-                result = bk.run_backup()
-                if not result["success"]:
-                    logger.error(f"Scheduled backup failed: {result.get('error')}")
-                    db.notify_managers(
-                        title="Backup Failed",
-                        body=result.get("error", "Unknown error"),
-                        icon="❌",
-                        link="/system/monitor",
-                        module="system"
-                    )
-                else:
-                    logger.info(f"Scheduled backup OK: {result['filename']}")
+                def one(slug, row):
+                    with bk.for_clinic(slug, row.get("db_path", ""),
+                                       row.get("pg_dsn", "")):
+                        result = bk.run_backup()
+                    if not result["success"]:
+                        # Named, because "Backup Failed" across twenty clinics
+                        # does not tell anyone which database to go and look at.
+                        db.notify_managers(
+                            title=f"Backup Failed — {slug or 'clinic'}",
+                            body=result.get("error", "Unknown error"),
+                            icon="❌", link="/system/monitor", module="system")
+                        raise RuntimeError(result.get("error") or "backup failed")
+                    logger.info("backup OK for %s: %s", slug or "default",
+                                result["filename"])
+                _for_every_clinic("daily_backup", one)
         scheduler.add_job(_daily_backup, CronTrigger(hour=2, minute=0), id="daily_backup")
 
         # WhatsApp reminders at 09:00 daily
         def _daily_reminders():
             with app.app_context():
-                try:
-                    run_reminder_jobs()
-                except Exception as e:
-                    logger.error(f"Reminder job error: {e}")
+                _for_every_clinic("wa_reminders",
+                                  lambda slug, row: run_reminder_jobs())
         scheduler.add_job(_daily_reminders, CronTrigger(hour=9, minute=0), id="wa_reminders")
 
-        # Rate limit cleanup every hour
+        # Rate limit cleanup every hour. Per clinic too: the counters live in
+        # each clinic's own database, so sweeping only one leaves the others
+        # growing forever and their lockouts never expiring.
         def _cleanup():
-            sec.cleanup_rate_limits()
+            with app.app_context():
+                _for_every_clinic("rl_cleanup",
+                                  lambda slug, row: sec.cleanup_rate_limits())
         scheduler.add_job(_cleanup, CronTrigger(minute=0), id="rl_cleanup")
 
         # Backup health at 09:05. The nightly job can only report a backup it
         # actually attempted — if the job itself stops firing, nothing complains.
         # This checks the archives on disk instead, so a silently dead scheduler
-        # is still caught.
+        # is still caught. Per clinic, because one clinic's healthy archive says
+        # nothing about the other nineteen.
         def _backup_health():
             with app.app_context():
-                try:
-                    bk.check_and_notify()
-                except Exception:
-                    logger.exception("Backup health check failed")
+                def one(slug, row):
+                    with bk.for_clinic(slug, row.get("db_path", ""),
+                                       row.get("pg_dsn", "")):
+                        bk.check_and_notify()
+                _for_every_clinic("backup_health", one)
         scheduler.add_job(_backup_health, CronTrigger(hour=9, minute=5),
                           id="backup_health")
+
+        # Close yesterday's forgotten check-outs, 00:20, before anyone runs a
+        # report on the day. hours_worked is only ever written at check-out, so
+        # an employee who works a full day and forgets to clock out is paid for
+        # ZERO hours — payroll reads exactly that column. Every row this touches
+        # is stamped recorded_by='system' and says so in its notes, so a manager
+        # can tell reconstructed hours from observed ones.
+        def _close_attendance():
+            with app.app_context():
+                from blueprints.attendance.routes import close_forgotten_checkouts
+
+                def one(slug, row):
+                    conn = db.get_db()
+                    try:
+                        n = close_forgotten_checkouts(conn)
+                    finally:
+                        conn.close()
+                    if n:
+                        logger.info("attendance (%s): auto-closed %d forgotten "
+                                    "check-out(s)", slug or "default", n)
+                _for_every_clinic("attendance_close", one)
+        scheduler.add_job(_close_attendance, CronTrigger(hour=0, minute=20),
+                          id="attendance_close")
 
         # LOG_FILE_RETENTION_DAYS between restarts. init_logging() sweeps at
         # startup, which is enough for a clinic PC that reboots — but a VPS
         # instance can stay up for months and would keep expired logs forever.
         def _log_retention():
             with app.app_context():
-                try:
-                    from models.logging_db import cleanup_old_logs
+                from models.logging_db import cleanup_old_logs
+
+                def one(slug, row):
                     n = cleanup_old_logs()
                     if n:
-                        logger.info("Log retention: deleted %d expired log file(s)", n)
-                except Exception:
-                    logger.exception("Log retention sweep failed")
+                        logger.info("Log retention (%s): deleted %d expired file(s)",
+                                    slug or "default", n)
+                _for_every_clinic("log_retention", one)
         scheduler.add_job(_log_retention, CronTrigger(hour=3, minute=30),
                           id="log_retention")
 
