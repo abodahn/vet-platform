@@ -19,6 +19,37 @@ log()  { echo "${GREEN}[OK]${NC}  $*"; }
 warn() { echo "${YELLOW}[!!]${NC}  $*" >&2; }
 fail() { echo "${RED}[ERR]${NC} $*" >&2; exit 1; }
 
+# ── STOP. This script builds the deployment model the product no longer uses ──
+#
+# It stands up ONE CONTAINER AND NGINX SITE PER CLINIC, and it never writes a
+# row to the tenant registry. The application resolves clinics BY SUBDOMAIN out
+# of that registry, so a clinic created here does not resolve at all: the
+# container runs, nginx serves, and every request lands on "unknown tenant"
+# with nothing to explain why.
+#
+# The supported path is one deployment serving many clinics:
+#
+#     python scripts/add_clinic.py --slug nilevet --name "Nile Vet Clinic"
+#
+# See docs/PILOT.md, which explains why: with one person supporting the
+# business, per-clinic deployments make support load scale linearly with
+# customers, and database-per-tenant already gives the isolation that matters.
+#
+# Kept rather than deleted because its host-preparation steps (docker, nginx,
+# firewall) are still a useful reference. Set I_KNOW_THIS_IS_THE_OLD_MODEL=1 if
+# you genuinely want the per-clinic-deployment layout.
+if [[ "${I_KNOW_THIS_IS_THE_OLD_MODEL:-}" != "1" ]]; then
+  echo >&2
+  fail "This script uses the OLD one-deployment-per-clinic model and does NOT
+       register the clinic, so its subdomain will never resolve.
+
+       Use instead:
+           python scripts/add_clinic.py --slug <slug> --name \"<Clinic Name>\"
+
+       See docs/PILOT.md. To run this anyway:
+           I_KNOW_THIS_IS_THE_OLD_MODEL=1 $0 $*"
+fi
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$(cd "$HERE/../.." && pwd)"          # the platform checkout
 
