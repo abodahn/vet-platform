@@ -45,6 +45,78 @@ _POOL = None          # psycopg2.pool.ThreadedConnectionPool once configured
 _POOL_LOCK = threading.Lock()
 
 
+_TZ_WARNED = False
+
+
+def _set_session_timezone(raw_conn) -> None:
+    """Make this connection agree with the clinic about what day it is.
+
+    NOW() returns the SERVER's local time and the application compares every
+    such timestamp against date.today() -- the machine's local date. Managed
+    PostgreSQL (Neon, RDS, most containers) runs in UTC; a clinic in Cairo is
+    UTC+3. Between midnight and 03:00 the two disagree about the date, so a row
+    written "today" is stamped yesterday and disappears from every today-filtered
+    view. Overnight and emergency work happens in exactly that window.
+
+    Caught by the pharmacy history test the moment this session crossed
+    midnight: a dispensing done at 01:00 was missing from today's history.
+
+    Failure here is deliberately NOT fatal. A PostgreSQL build without full
+    tzdata rejects the zone name, and this module falls back to SQLite whenever
+    a connection cannot be made -- so treating an unknown zone as fatal would
+    quietly relocate a clinic's records into a local file. Warned once, then the
+    server default stands.
+    """
+    global _TZ_WARNED
+    tz = os.environ.get("CLINIC_TIMEZONE", "Africa/Cairo")
+
+    # Named zone first: it is the only form that follows DST correctly.
+    try:
+        cur = raw_conn.cursor()
+        cur.execute("SET TIME ZONE %s", (tz,))
+        cur.close()
+        return
+    except Exception:
+        try:
+            raw_conn.rollback()
+        except Exception:
+            pass
+
+    # A PostgreSQL built without full tzdata rejects the name. Fall back to this
+    # machine's actual UTC offset, which needs no zone database and is by
+    # definition the offset the date.today() comparisons are written against.
+    # Fixed rather than DST-aware, so re-derive it per connection: pooled
+    # connections are recycled often enough that a DST change lands within a day.
+    import datetime as _dt
+    off = _dt.datetime.now().astimezone().utcoffset() or _dt.timedelta(0)
+    total = int(off.total_seconds())
+    sign = "+" if total >= 0 else "-"
+    hh, mm = divmod(abs(total) // 60, 60)
+    literal = f"{sign}{hh:02d}:{mm:02d}"
+    try:
+        cur = raw_conn.cursor()
+        cur.execute(f"SET TIME ZONE INTERVAL '{literal}' HOUR TO MINUTE")
+        cur.close()
+        if not _TZ_WARNED:
+            _TZ_WARNED = True
+            logger.info(
+                "this PostgreSQL does not know the zone %r, so the session uses "
+                "this machine's offset (%s) instead. Correct today; it will not "
+                "follow a daylight-saving change on its own.", tz, literal)
+        return
+    except Exception as exc:
+        try:
+            raw_conn.rollback()
+        except Exception:
+            pass
+        if not _TZ_WARNED:
+            _TZ_WARNED = True
+            logger.warning(
+                "could not set the session timezone (%s). Timestamps will use "
+                "the server's zone; if that is not the clinic's, records written "
+                "after midnight can fall outside 'today'.", exc)
+
+
 def rollback_quietly(conn) -> None:
     """Undo a failed statement so the connection stays usable.
 
@@ -134,6 +206,32 @@ def configure_postgres(host="localhost", port=5432, dbname="vetclinic",
         more than ~15 concurrent Gunicorn workers.
     """
     global _PG_CONFIG, _POOL
+    # Pin the session timezone to the clinic's, rather than inheriting the
+    # server's.
+    #
+    # NOW() returns the SERVER's local time, and the application reads every one
+    # of those timestamps back against date.today() -- the machine's local date.
+    # Managed PostgreSQL (Neon, RDS, most containers) runs in UTC. A clinic in
+    # Cairo is UTC+3, so between midnight and 03:00 the two disagree about what
+    # day it is: a row written "today" is stamped yesterday and drops out of
+    # every today-filtered view. Emergency and overnight work happens in exactly
+    # that window.
+    #
+    # Caught by the pharmacy history test the moment this session crossed
+    # midnight -- the same failure _fix_sql_sqlite's comment already describes
+    # from the SQLite side. That fix made SQLite agree with the PG *server*;
+    # this one makes the PG server agree with the *clinic*.
+    #
+    # ponytail: the honest fix is storing UTC and converting on display, which
+    # is a schema-wide migration. TIMEZONE overrides for a clinic elsewhere.
+    # Applied AFTER connecting, not as a connect option. Passing
+    # `options=-c timezone=...` makes the whole connection FAIL when the server
+    # lacks that zone name -- a build without full tzdata answers
+    # `invalid value for parameter "TimeZone"` and refuses -- and this code
+    # falls back to SQLite on a failed pool, so one unknown zone name would
+    # silently move a clinic's records into a local file. Setting it per
+    # connection lets an unsupported zone degrade to the server default with a
+    # warning instead of taking the database down.
     _PG_CONFIG = dict(host=host, port=port, dbname=dbname,
                       user=user, password=password)
     try:
@@ -783,6 +881,7 @@ class _PGConn:
         self._conn.autocommit = False
         self._dict_factory = psycopg2.extras.DictCursor
         self._closed = False
+        _set_session_timezone(self._conn)
 
     def cursor(self):
         return _PGCursor(

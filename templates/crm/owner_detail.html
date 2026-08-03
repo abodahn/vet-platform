@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}{{ owner.full_name }}{% endblock %}
-{% block page_title %}{{ owner.full_name }}{% if owner.vip_flag %} ⭐{% endif %}{% endblock %}
+{% block page_title %}{{ loc(owner, 'full_name') }}{% if owner.vip_flag %} ⭐{% endif %}{% endblock %}
 {% block page_sub %}{{ t('Owner Profile','ملف المالك') }} — ID #{{ owner.id }}{% endblock %}
 
 {% block topbar_actions %}
@@ -294,7 +294,7 @@
     <div class="info-card">
       <div class="info-card-header">
         <div class="owner-initials-avatar">{{ (owner.full_name or 'U')[:2] | upper }}</div>
-        <div class="info-card-name">{{ owner.full_name }}</div>
+        <div class="info-card-name">{{ loc(owner, 'full_name') }}</div>
         {% if owner.get('full_name_ar') %}
         <div class="info-card-ar">{{ owner.full_name_ar }}</div>
         {% endif %}

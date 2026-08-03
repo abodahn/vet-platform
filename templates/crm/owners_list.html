@@ -237,7 +237,7 @@
           <div class="owner-name-cell">
             <div class="owner-avatar">{{ (owner.full_name or 'U')[:2] | upper }}</div>
             <div>
-              <div class="owner-name">{{ owner.full_name }}</div>
+              <div class="owner-name">{{ loc(owner, 'full_name') }}</div>
               {% if owner.email %}
               <div class="owner-email">{{ owner.email }}</div>
               {% endif %}

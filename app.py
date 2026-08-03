@@ -298,6 +298,36 @@ def create_app(cfg=None) -> Flask:
             """Return Arabic text when lang=='ar', English otherwise."""
             return ar if (lang == "ar" and ar) else en
 
+        def loc(row, field):
+            """A record's own name in the reader's language.
+
+            t() localises the INTERFACE. This localises the DATA, which nothing
+            did: the schema carries full_name_ar, name_ar, pet_name_ar and the
+            clinic fills them in, but every screen rendered the Latin column, so
+            a clinic working in Arabic typed its clients' Arabic names once and
+            never saw them again. For a product whose whole differentiator is
+            being Arabic-first, that is the differentiator not showing up.
+
+            Falls back to the Latin value whenever the Arabic one is absent, so
+            a half-filled record still reads sensibly rather than going blank.
+            """
+            if row is None:
+                return ""
+            try:
+                base = row[field]
+            except (KeyError, IndexError, TypeError):
+                base = None
+            if lang != "ar":
+                return base or ""
+            for suffix in ("_ar",):
+                try:
+                    alt = row[f"{field}{suffix}"]
+                except (KeyError, IndexError, TypeError):
+                    alt = None
+                if alt:
+                    return alt
+            return base or ""
+
         return dict(
             app_title     = app.config.get("APP_TITLE", "Aleefy"),
             app_title_ar  = app.config.get("APP_TITLE_AR", "اليفي"),
@@ -318,6 +348,7 @@ def create_app(cfg=None) -> Flask:
             # clinic is never offered a method that cannot complete.
             payment_methods = _payment_methods(),
             t             = t,
+            loc           = loc,
         )
 
     # ── Error handlers ───────────────────────────────────────────────────────

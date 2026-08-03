@@ -375,6 +375,32 @@ def seed_clinic(conn) -> None:
          "https://aleefy.online", "512-874-336", "VET-CAI-2019-0447",
          "Dr. Hossam Elmenshawy", "Happy Pets, Healthy Lives",
          "EGP", "Africa/Cairo"))
+
+    # Instapay, so the demo can show how a client actually pays.
+    #
+    # Without a handle the payment screen falls back to "no Instapay configured"
+    # and the whole cash-plus-Instapay story -- the full-screen QR a client
+    # scans at the counter -- is invisible in the one place it needs to be seen.
+    #
+    # A DEMO handle on purpose. The real one is a live payment address: a demo
+    # instance gets shown to strangers and left open on a laptop, and neither
+    # "somebody sends money to it by accident" nor "somebody harvests it" is a
+    # thing to risk for a screenshot. The clinic sets its own in Settings.
+    for col, val in (("instapay_handle", "aleefy.demo@instapay"),
+                     ("instapay_link", "https://ipn.eg/S/aleefy/demo/DEMO")):
+        try:
+            conn.execute(f"UPDATE clinic SET {col}=? WHERE id=1", (val,))
+        except Exception:
+            # Older database without the Instapay columns: the rest of the demo
+            # is still worth seeding.
+            pass
+
+    # The `admin` account comes from init_db(), not from STAFF above, so it
+    # misses the Arabic default and is exactly the login a demo is opened with.
+    try:
+        conn.execute("UPDATE users SET language='ar' WHERE username='admin'")
+    except Exception:
+        pass
     if _one(conn, "SELECT COUNT(*) FROM branches")[0] < 2:
         conn.execute("INSERT INTO branches (name, name_ar, phone, address) VALUES (?,?,?,?)",
                      ("Heliopolis Branch", ar("فرع مصر الجديدة"), "0224145566",
@@ -409,7 +435,18 @@ def seed_staff(conn, rnd: Random, today: date) -> dict:
              "role,branch_id,is_active,language,created_at) VALUES (?,?,?,?,?,?,?,?,1,?,?)",
              (uname, pw_hash, latin, ar(arabic), f"{uname}@{DEMO_EMAIL_DOMAIN}",
               _phone(rnd), role, 1 if i % 4 else 2,
-              "ar" if role in ("nurse", "reception", "boarding_staff") else "en",
+              # Arabic by default for everyone in the DEMO.
+              #
+              # The context processor reads the USER's stored language before
+              # session["lang"], so an English default means a vet opening the
+              # demo sees an English screen -- and the single loudest claim this
+              # product makes is that it is Arabic-first. The clinic's own
+              # clients are seeded with Arabic names, and none of them showed
+              # until the account reading them was in Arabic.
+              #
+              # Staff can still switch per user; this only changes what the
+              # demo opens on, which is the one impression that gets made.
+              "ar",
               _dt(today - timedelta(days=400), 9)))
         # These columns are added by blueprints.hr._ensure_hr_tables(), which
         # ensure_module_tables() has already run. If one is missing the ALTER
