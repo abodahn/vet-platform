@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="{{ current_lang or 'en' }}"
+      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}">
+<head>
+<meta charset="UTF-8">
+<title>{{ est.estimate_number }} — {{ clinic.clinic_name if clinic else 'Aleefy' }}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:#111;padding:32px;font-size:13px;line-height:1.5}
+.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:16px;margin-bottom:22px}
+.clinic{font-size:22px;font-weight:800}
+.clinic small{display:block;font-size:12px;font-weight:400;color:#555;margin-top:4px}
+.doc-title{text-align:end}
+.doc-title h1{font-size:20px;letter-spacing:.06em;text-transform:uppercase}
+.doc-title .no{font-size:14px;color:#444;margin-top:4px}
+.parties{display:flex;justify-content:space-between;gap:24px;margin-bottom:22px}
+.parties h3{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#666;margin-bottom:5px}
+table{width:100%;border-collapse:collapse;margin-bottom:18px}
+th{background:#111;color:#fff;padding:9px 11px;text-align:start;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+td{padding:9px 11px;border-bottom:1px solid #ddd}
+.num{text-align:end;font-variant-numeric:tabular-nums}
+.totals{width:290px;margin-inline-start:auto}
+.totals div{display:flex;justify-content:space-between;padding:6px 0}
+.totals .grand{border-top:2px solid #111;margin-top:6px;padding-top:10px;font-size:16px;font-weight:800}
+.terms{margin-top:26px;padding:14px 16px;background:#f6f6f6;border-inline-start:4px solid #111;font-size:12px;line-height:1.7}
+.sign{margin-top:40px;display:flex;justify-content:space-between;gap:40px}
+.sign div{flex:1;border-top:1px solid #111;padding-top:7px;font-size:11px;color:#444}
+.foot{margin-top:26px;text-align:center;font-size:10px;color:#888}
+@media print{body{padding:0}.noprint{display:none}}
+</style>
+</head>
+<body onload="window.print()">
+
+<div class="head">
+  <div class="clinic">
+    {{ clinic.clinic_name if clinic else 'Aleefy Veterinary' }}
+    <small>
+      {% if clinic and clinic.address %}{{ clinic.address }}<br>{% endif %}
+      {% if clinic and clinic.phone %}{{ clinic.phone }}{% endif %}
+    </small>
+  </div>
+  <div class="doc-title">
+    <h1>{{ 'عرض سعر' if current_lang == 'ar' else 'Estimate' }}</h1>
+    <div class="no">{{ est.estimate_number }}</div>
+    <div class="no">{{ est.issue_date }}</div>
+  </div>
+</div>
+
+<div class="parties">
+  <div>
+    <h3>{{ 'العميل' if current_lang == 'ar' else 'Client' }}</h3>
+    <strong>{{ est.owner_name }}</strong><br>
+    {{ est.owner_phone or '' }}
+  </div>
+  <div>
+    <h3>{{ 'المريض' if current_lang == 'ar' else 'Patient' }}</h3>
+    <strong>{{ est.pet_name or '—' }}</strong>
+  </div>
+  <div>
+    <h3>{{ 'صالح حتى' if current_lang == 'ar' else 'Valid Until' }}</h3>
+    <strong>{{ est.valid_until or '—' }}</strong>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>{{ 'الوصف' if current_lang == 'ar' else 'Description' }}</th>
+      <th class="num">{{ 'الكمية' if current_lang == 'ar' else 'Qty' }}</th>
+      <th class="num">{{ 'سعر الوحدة' if current_lang == 'ar' else 'Unit Price' }}</th>
+      <th class="num">{{ 'الإجمالي' if current_lang == 'ar' else 'Total' }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for l in est.lines %}
+    <tr>
+      <td>{{ l.description }}</td>
+      <td class="num">{{ '%g'|format(l.quantity or 0) }}</td>
+      <td class="num">{{ '%.2f'|format(l.unit_price or 0) }}</td>
+      <td class="num">{{ '%.2f'|format(l.total or 0) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="totals">
+  <div><span>{{ 'المجموع الفرعي' if current_lang == 'ar' else 'Subtotal' }}</span><span class="num">{{ '%.2f'|format(est.subtotal or 0) }}</span></div>
+  <div><span>{{ 'خصم' if current_lang == 'ar' else 'Discount' }}</span><span class="num">— {{ '%.2f'|format(est.discount_amount or 0) }}</span></div>
+  <div><span>{{ 'الضريبة' if current_lang == 'ar' else 'Tax' }}</span><span class="num">+ {{ '%.2f'|format(est.tax_amount or 0) }}</span></div>
+  <div class="grand"><span>{{ 'الإجمالي' if current_lang == 'ar' else 'TOTAL' }}</span><span class="num">{{ '%.2f'|format(est.total or 0) }} EGP</span></div>
+</div>
+
+<div class="terms">
+  {% if est.notes %}<p style="margin-bottom:8px">{{ est.notes }}</p>{% endif %}
+  <strong>{{ 'ملاحظة' if current_lang == 'ar' else 'Please note' }}:</strong>
+  {{ 'هذا عرض سعر وليس فاتورة. الأسعار تقديرية وقد تتغير إذا تغيّرت حالة الحيوان أو احتاج علاجاً إضافياً. سنخبرك قبل تنفيذ أي عمل إضافي.'
+     if current_lang == 'ar' else
+     'This is an estimate, not a bill. Prices are our best assessment of the planned treatment and may change if the animal\'s condition changes or additional care is needed. We will tell you before carrying out any additional work.' }}
+</div>
+
+<div class="sign">
+  <div>{{ 'توقيع العميل' if current_lang == 'ar' else 'Client signature' }}</div>
+  <div>{{ 'التاريخ' if current_lang == 'ar' else 'Date' }}</div>
+  <div>{{ 'الطبيب' if current_lang == 'ar' else 'Veterinarian' }}: {{ est.doctor_name or '' }}</div>
+</div>
+
+<div class="foot">{{ est.estimate_number }} · {{ clinic.clinic_name if clinic else 'Aleefy' }}</div>
+</body>
+</html>

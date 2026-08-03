@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}{{ est.estimate_number }}{% endblock %}
+{% block page_title %}{{ est.estimate_number }}{% endblock %}
+{% block page_sub %}{{ est.owner_name }}{% if est.pet_name %} · {{ est.pet_name }}{% endif %}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('finance.estimates_list') }}" class="btn btn-secondary">← {{ t('Estimates', 'عروض الأسعار') }}</a>
+<a href="{{ url_for('finance.estimate_print', est_id=est.id) }}" class="btn btn-secondary" target="_blank">🖨 {{ t('Print', 'طباعة') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.det-layout { display:grid; grid-template-columns:1fr 320px; gap:20px; align-items:start; }
+.card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); overflow:hidden; margin-bottom:20px; }
+.card-header { background:var(--cl-primary); color:#fff; padding:14px 22px; font-weight:700; display:flex; justify-content:space-between; align-items:center; }
+.card-body { padding:22px; }
+table.lines { width:100%; border-collapse:collapse; font-size:13px; }
+table.lines th { background:var(--cl-bg); padding:9px 12px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); border-bottom:1px solid var(--cl-border); }
+table.lines td { padding:10px 12px; border-bottom:1px solid var(--cl-border); }
+.num { text-align:right; font-variant-numeric:tabular-nums; }
+.summary-row { display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--cl-border); font-size:14px; }
+.summary-row:last-child { border-bottom:none; font-size:17px; font-weight:800; }
+.summary-label { color:var(--cl-muted); }
+.pill { padding:4px 12px; border-radius:999px; font-size:12px; font-weight:700; }
+.st-Draft { background:#e7e9ec; color:#3b4149; }
+.st-Sent { background:#dbeafe; color:#1e40af; }
+.st-Approved { background:#dcfce7; color:#14532d; }
+.st-Declined { background:#fee2e2; color:#7f1d1d; }
+.st-Expired { background:#fef3c7; color:#713f12; }
+.st-Converted { background:#ede9fe; color:#4c1d95; }
+.act { width:100%; padding:12px; border:none; border-radius:9px; font-size:14px; font-weight:700; cursor:pointer; margin-bottom:10px; }
+.act-approve { background:var(--cl-success,#16a34a); color:#fff; }
+.act-decline { background:var(--cl-danger,#dc2626); color:#fff; }
+.act-send    { background:var(--cl-primary); color:#fff; }
+.act-convert { background:#4c1d95; color:#fff; }
+.meta { font-size:12px; color:var(--cl-muted); line-height:1.7; }
+.notice { padding:12px 14px; border-radius:9px; font-size:13px; line-height:1.6; margin-bottom:14px; }
+.notice-info { background:#eef2ff; color:#312e81; }
+.notice-done { background:#ede9fe; color:#4c1d95; }
+.expired { background:#fef3c7; color:#713f12; }
+@media(max-width:900px){ .det-layout { grid-template-columns:1fr; } }
+</style>
+
+<div class="det-layout">
+  <div>
+    {% if est.valid_until and est.valid_until < today and est.status in ['Draft','Sent'] %}
+    <div class="notice expired">
+      ⚠️ {{ t('This estimate passed its valid-until date on', 'انتهت صلاحية هذا العرض في') }}
+      <strong>{{ est.valid_until }}</strong>.
+      {{ t('Prices may need re-checking before you approve it.', 'قد تحتاج الأسعار إلى مراجعة قبل الموافقة.') }}
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header">
+        <span>📋 {{ t('Estimate', 'عرض السعر') }}</span>
+        <span class="pill st-{{ est.status }}">{{ est.status }}</span>
+      </div>
+      <div class="card-body">
+        <table class="lines">
+          <thead>
+            <tr>
+              <th>{{ t('Description', 'الوصف') }}</th>
+              <th>{{ t('Type', 'النوع') }}</th>
+              <th class="num">{{ t('Qty', 'الكمية') }}</th>
+              <th class="num">{{ t('Unit', 'سعر الوحدة') }}</th>
+              <th class="num">{{ t('Disc %', 'خصم %') }}</th>
+              <th class="num">{{ t('Total', 'الإجمالي') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for l in est.lines %}
+            <tr>
+              <td>{{ l.description }}</td>
+              <td>{{ l.line_type }}</td>
+              <td class="num">{{ '%g'|format(l.quantity or 0) }}</td>
+              <td class="num">{{ '%.2f'|format(l.unit_price or 0) }}</td>
+              <td class="num">{{ '%g'|format(l.discount or 0) }}</td>
+              <td class="num"><strong>{{ '%.2f'|format(l.total or 0) }}</strong></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if est.notes %}
+        <p style="margin-top:18px;font-size:13px;line-height:1.6"><strong>{{ t('Notes', 'ملاحظات') }}:</strong> {{ est.notes }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-header">💰 {{ t('Summary', 'الملخص') }}</div>
+      <div class="card-body">
+        <div class="summary-row"><span class="summary-label">{{ t('Subtotal', 'المجموع الفرعي') }}</span><span class="num">{{ '%.2f'|format(est.subtotal or 0) }}</span></div>
+        <div class="summary-row"><span class="summary-label">{{ t('Discount', 'خصم') }}</span><span class="num">— {{ '%.2f'|format(est.discount_amount or 0) }}</span></div>
+        <div class="summary-row"><span class="summary-label">{{ t('Tax', 'الضريبة') }}</span><span class="num">+ {{ '%.2f'|format(est.tax_amount or 0) }}</span></div>
+        <div class="summary-row"><span class="summary-label">{{ t('TOTAL', 'الإجمالي') }}</span><span class="num" style="color:var(--cl-primary)">{{ '%.2f'|format(est.total or 0) }} EGP</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">⚡ {{ t('Actions', 'الإجراءات') }}</div>
+      <div class="card-body">
+        {% if est.status == 'Converted' %}
+          <div class="notice notice-done">
+            {{ t('Invoiced. This estimate is locked so the bill and the quote cannot drift apart.',
+                 'تمت الفوترة. هذا العرض مقفل حتى لا يختلف عن الفاتورة.') }}
+          </div>
+          <a href="{{ url_for('finance.invoice_detail', inv_id=est.invoice_id) }}" class="act act-convert"
+             style="display:block;text-align:center;text-decoration:none">
+            🧾 {{ t('Open the invoice', 'فتح الفاتورة') }}
+          </a>
+        {% else %}
+          {% if est.status in ['Draft'] %}
+          <form method="post" action="{{ url_for('finance.estimate_decide', est_id=est.id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="decision" value="Sent">
+            <button class="act act-send">📤 {{ t('Mark as sent to client', 'تم إرساله للعميل') }}</button>
+          </form>
+          {% endif %}
+
+          {% if est.status in ['Draft','Sent','Declined','Expired'] %}
+          <form method="post" action="{{ url_for('finance.estimate_decide', est_id=est.id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="decision" value="Approved">
+            <button class="act act-approve">✓ {{ t('Client approved', 'وافق العميل') }}</button>
+          </form>
+          {% endif %}
+
+          {% if est.status in ['Draft','Sent','Approved'] %}
+          <form method="post" action="{{ url_for('finance.estimate_decide', est_id=est.id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="decision" value="Declined">
+            <button class="act act-decline">✕ {{ t('Client declined', 'رفض العميل') }}</button>
+          </form>
+          {% endif %}
+
+          {% if est.status == 'Approved' %}
+          <form method="post" action="{{ url_for('finance.estimate_convert', est_id=est.id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <button class="act act-convert">🧾 {{ t('Convert to invoice', 'تحويل إلى فاتورة') }}</button>
+          </form>
+          {% else %}
+          <div class="notice notice-info">
+            {{ t('An estimate becomes an invoice only after the client approves it.',
+                 'يتحول عرض السعر إلى فاتورة فقط بعد موافقة العميل.') }}
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body meta">
+        <div><strong>{{ t('Issued', 'تاريخ الإصدار') }}:</strong> {{ est.issue_date }}</div>
+        <div><strong>{{ t('Valid until', 'صالح حتى') }}:</strong> {{ est.valid_until or '—' }}</div>
+        <div><strong>{{ t('Doctor', 'الطبيب') }}:</strong> {{ est.doctor_name or '—' }}</div>
+        <div><strong>{{ t('Created by', 'أنشأه') }}:</strong> {{ est.created_by or '—' }}</div>
+        {% if est.decided_at %}
+        <div><strong>{{ t('Decision recorded', 'تم تسجيل القرار') }}:</strong> {{ est.decided_at }}{% if est.decided_by %} · {{ est.decided_by }}{% endif %}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

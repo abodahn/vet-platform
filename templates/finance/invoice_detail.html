@@ -194,6 +194,38 @@
       </div>
     </div>
 
+    <!-- Held credit. Shown before the payment form on purpose: taking cash from
+         a client who already has money on account is the mistake this prevents. -->
+    {% if credit_balance and credit_balance > 0 and invoice.status not in ('Paid','Cancelled') %}
+    <div class="side-card">
+      <div class="side-card-header">💳 {{ t('Client has credit', 'للعميل رصيد') }}</div>
+      <div class="side-card-body">
+        <p style="font-size:22px;font-weight:800;color:var(--cl-primary);margin-bottom:4px;font-variant-numeric:tabular-nums">
+          {{ '%.2f'|format(credit_balance) }} EGP
+        </p>
+        <p style="font-size:12px;color:var(--cl-muted);line-height:1.6;margin-bottom:12px">
+          {{ t('Already paid by this client and not yet used.', 'مدفوع مسبقاً من هذا العميل ولم يُستخدم بعد.') }}
+        </p>
+        <form method="post" action="{{ url_for('finance.invoice_apply_credit', inv_id=invoice.id) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <div class="form-group">
+            <label class="form-label">{{ t('Apply amount', 'المبلغ المستخدم') }}</label>
+            <input type="number" name="amount" class="form-control" step="0.01" min="0.01"
+                   max="{{ '%.2f'|format(credit_balance if credit_balance < (invoice.due_amount or 0) else (invoice.due_amount or 0)) }}"
+                   value="{{ '%.2f'|format(credit_balance if credit_balance < (invoice.due_amount or 0) else (invoice.due_amount or 0)) }}">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%">
+            {{ t('Apply credit', 'استخدام الرصيد') }}
+          </button>
+        </form>
+        <a href="{{ url_for('finance.owner_credit', owner_id=invoice.owner_id) }}"
+           style="display:block;text-align:center;margin-top:10px;font-size:12px">
+          {{ t('View account history', 'عرض سجل الحساب') }}
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Record payment -->
     {% if invoice.status not in ('Paid','Cancelled') %}
     <div class="side-card">

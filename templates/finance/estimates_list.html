@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Estimates', 'عروض الأسعار') }}{% endblock %}
+{% block page_title %}{{ t('Estimates', 'عروض الأسعار') }}{% endblock %}
+{% block page_sub %}{{ estimates|length }} {{ t('result(s)', 'نتيجة') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('finance.estimate_new') }}" class="btn btn-primary">+ {{ t('New Estimate', 'عرض سعر جديد') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.filter-bar { background:var(--cl-surface); border-radius:12px; padding:16px 20px; margin-bottom:20px; display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+.filter-group { display:flex; flex-direction:column; gap:4px; }
+.filter-label { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); }
+.filter-control { padding:8px 12px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; }
+.table-wrap { background:var(--cl-surface); border-radius:12px; overflow-x:auto; box-shadow:0 2px 8px rgba(0,0,0,.07); }
+table { width:100%; border-collapse:collapse; }
+th { background:var(--cl-primary); color:#fff; padding:12px 16px; text-align:left; font-size:12px; font-weight:600; text-transform:uppercase; white-space:nowrap; }
+td { padding:11px 16px; border-bottom:1px solid var(--cl-border); font-size:13px; }
+tr:hover td { background:rgba(0,0,0,.02); }
+.pill { padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
+/* Contrast checked against --cl-surface: each pairing is >= 4.5:1 so the
+   status is readable, not merely coloured. */
+.st-Draft     { background:#e7e9ec; color:#3b4149; }
+.st-Sent      { background:#dbeafe; color:#1e40af; }
+.st-Approved  { background:#dcfce7; color:#14532d; }
+.st-Declined  { background:#fee2e2; color:#7f1d1d; }
+.st-Expired   { background:#fef3c7; color:#713f12; }
+.st-Converted { background:#ede9fe; color:#4c1d95; }
+.empty { padding:48px; text-align:center; color:var(--cl-muted); }
+.num { text-align:right; font-variant-numeric:tabular-nums; }
+</style>
+
+<form class="filter-bar" method="get">
+  <div class="filter-group">
+    <label class="filter-label">{{ t('Status', 'الحالة') }}</label>
+    <select name="status" class="filter-control" onchange="this.form.submit()">
+      <option value="">{{ t('All', 'الكل') }}</option>
+      {% for s in ['Draft','Sent','Approved','Declined','Expired','Converted'] %}
+      <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>{{ t('Number', 'الرقم') }}</th>
+        <th>{{ t('Owner', 'المالك') }}</th>
+        <th>{{ t('Pet', 'الحيوان') }}</th>
+        <th>{{ t('Issued', 'تاريخ الإصدار') }}</th>
+        <th>{{ t('Valid Until', 'صالح حتى') }}</th>
+        <th class="num">{{ t('Total', 'الإجمالي') }}</th>
+        <th>{{ t('Status', 'الحالة') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in estimates %}
+      <tr onclick="location.href='{{ url_for('finance.estimate_detail', est_id=e.id) }}'" style="cursor:pointer">
+        <td><strong>{{ e.estimate_number }}</strong></td>
+        <td>{{ e.owner_name }}</td>
+        <td>{{ e.pet_name or '—' }}</td>
+        <td>{{ e.issue_date }}</td>
+        <td>{{ e.valid_until or '—' }}</td>
+        <td class="num"><strong>{{ '%.2f'|format(e.total or 0) }}</strong></td>
+        <td><span class="pill st-{{ e.status }}">{{ e.status }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">
+        {{ t('No estimates yet. Create one before a surgery or hospital stay so the client agrees the price in advance.',
+             'لا توجد عروض أسعار بعد. أنشئ عرضاً قبل الجراحة أو الإقامة ليوافق العميل على السعر مسبقاً.') }}
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

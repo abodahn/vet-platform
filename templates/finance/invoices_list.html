@@ -4,6 +4,7 @@
 {% block page_sub %}{{ invoices|length }} {{ t('result(s)', 'نتيجة') }}{% endblock %}
 
 {% block topbar_actions %}
+<a href="{{ url_for('finance.estimates_list') }}" class="btn btn-secondary">📋 {{ t('Estimates', 'عروض الأسعار') }}</a>
 <a href="{{ url_for('finance.invoice_new') }}" class="btn btn-primary">+ {{ t('New Invoice', 'فاتورة جديدة') }}</a>
 {% endblock %}
 

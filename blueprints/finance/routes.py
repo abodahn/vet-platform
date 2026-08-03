@@ -11,7 +11,7 @@ from . import finance_bp
 import logging
 
 import models.database as db
-from models import payments
+from models import money, payments
 
 logger = logging.getLogger(__name__)
 from blueprints.auth.routes import login_required, role_required
@@ -300,6 +300,9 @@ def invoice_detail(inv_id):
         invoice=invoice,
         visit=visit,
         today=date.today().isoformat(),
+        # Offer held credit here, where the money is actually being settled --
+        # a balance nobody is shown at the till may as well not exist.
+        credit_balance=db.owner_credit_balance(invoice["owner_id"]),
     )
 
 
@@ -314,7 +317,14 @@ def invoice_pay(inv_id):
     if not invoice:
         abort(404)
 
-    amount    = float(request.form.get("amount") or 0)
+    # Parsed, not coerced. A bare float() here raised ValueError on any typo --
+    # one letter in the amount box returned a 500 page to a receptionist with a
+    # client at the counter. Coercing silently to 0 would be worse: "1O0" with a
+    # letter O would post as zero and the till would be short with no trace.
+    amount, err = money.form_amount(request.form.get("amount"), "payment amount")
+    if err:
+        flash(err, "danger")
+        return redirect(url_for("finance.invoice_detail", inv_id=inv_id))
     method    = request.form.get("method", "Cash")
     reference = request.form.get("reference", "").strip()
 
@@ -474,7 +484,9 @@ def invoice_credit_note(inv_id):
     if not invoice:
         abort(404)
     reason = request.form.get("reason", "Credit note").strip() or "Credit note"
-    amount = float(request.form.get("amount") or invoice.get("paid_amount") or invoice.get("total") or 0)
+    amount, _err = money.form_amount(
+        request.form.get("amount") or invoice.get("paid_amount")
+        or invoice.get("total") or 0, "amount")
     if amount <= 0:
         flash("Credit note amount must be greater than zero.", "danger")
         return redirect(url_for("finance.invoice_detail", inv_id=inv_id))
@@ -809,3 +821,228 @@ def reports_export_xlsx():
     except Exception as e:
         flash(str(e), "danger")
         return redirect(url_for("finance.reports"))
+
+
+# ─────────────────────────────────────────────
+# ESTIMATES (QUOTES)
+#
+# The one thing every competing PIMS has that this did not. An estimate is a
+# priced plan the client agrees to BEFORE the work happens -- for surgery and
+# hospitalisation it is what stops the argument at the counter afterwards.
+#
+# These routes live in the finance blueprint on purpose: _permission_denied()
+# gates by blueprint, so they inherit the finance grant. A new blueprint would
+# have had no grant key and fallen OPEN to every role.
+# ─────────────────────────────────────────────
+
+def _estimate_form_ctx(page_title="New Estimate"):
+    conn = db.get_db()
+    owners = [dict(r) for r in conn.execute(
+        "SELECT id, full_name, phone FROM owners ORDER BY full_name LIMIT 500").fetchall()]
+    pets = [dict(r) for r in conn.execute(
+        "SELECT id, owner_id, pet_name, species FROM pets WHERE is_active=1 "
+        "ORDER BY pet_name").fetchall()]
+    conn.close()
+    return dict(active="finance", page_title=page_title, owners=owners, pets=pets,
+                today=date.today().isoformat(),
+                default_valid=(date.today() + timedelta(days=14)).isoformat())
+
+
+@finance_bp.route("/estimates")
+@login_required
+def estimates_list():
+    return render_template(
+        "finance/estimates_list.html",
+        active="finance",
+        page_title="Estimates",
+        estimates=db.list_estimates(status=request.args.get("status", "")),
+        status=request.args.get("status", ""),
+    )
+
+
+@finance_bp.route("/estimates/new", methods=["GET", "POST"])
+@login_required
+def estimate_new():
+    ctx = _estimate_form_ctx()
+    if request.method != "POST":
+        return render_template("finance/estimate_form.html", **ctx)
+
+    f = request.form
+    owner_id = f.get("owner_id", type=int)
+    if not owner_id:
+        flash("Owner is required.", "danger")
+        return render_template("finance/estimate_form.html", **ctx)
+
+    descriptions = f.getlist("description[]")
+    qtys         = f.getlist("qty[]")
+    unit_prices  = f.getlist("unit_price[]")
+    discounts    = f.getlist("discount[]")
+    line_types   = f.getlist("line_type[]")
+
+    lines = []
+    for i, desc in enumerate(descriptions):
+        if not desc.strip():
+            continue
+        qty  = float(qtys[i] if i < len(qtys) else 1) or 1
+        up   = float(unit_prices[i] if i < len(unit_prices) else 0) or 0
+        disc = float(discounts[i] if i < len(discounts) else 0) or 0
+        lines.append({
+            "line_type":   line_types[i] if i < len(line_types) else "service",
+            "description": desc.strip(),
+            "quantity":    qty,
+            "unit_price":  up,
+            "discount":    disc,
+            "total":       round(qty * up - (up * qty * disc / 100), 2),
+        })
+
+    if not lines:
+        flash("At least one line item is required.", "danger")
+        return render_template("finance/estimate_form.html", **ctx)
+
+    try:
+        est_id = db.create_estimate({
+            "owner_id":       owner_id,
+            "pet_id":         f.get("pet_id", type=int),
+            "visit_id":       f.get("visit_id", type=int),
+            "doctor_name":    f.get("doctor_name", "").strip(),
+            "issue_date":     f.get("issue_date") or date.today().isoformat(),
+            "valid_until":    f.get("valid_until", "").strip() or None,
+            "discount_type":  f.get("discount_type", "value"),
+            "discount_value": float(f.get("discount_value") or 0),
+            "tax_rate":       float(f.get("tax_rate") or 0),
+            "notes":          f.get("notes", "").strip(),
+            "created_by":     session["user"].get("full_name", ""),
+        }, lines)
+    except Exception as e:
+        flash(f"Error creating estimate: {e}", "danger")
+        return render_template("finance/estimate_form.html", **ctx)
+
+    flash("Estimate created.", "success")
+    return redirect(url_for("finance.estimate_detail", est_id=est_id))
+
+
+@finance_bp.route("/estimates/<int:est_id>")
+@login_required
+def estimate_detail(est_id):
+    est = db.get_estimate(est_id)
+    if not est:
+        flash("Estimate not found.", "danger")
+        return redirect(url_for("finance.estimates_list"))
+    return render_template("finance/estimate_detail.html", active="finance",
+                           page_title=est["estimate_number"], est=est,
+                           today=date.today().isoformat())
+
+
+@finance_bp.route("/estimates/<int:est_id>/decide", methods=["POST"])
+@login_required
+def estimate_decide(est_id):
+    decision = request.form.get("decision", "")
+    if decision not in ("Approved", "Declined", "Sent"):
+        flash("Unknown decision.", "danger")
+        return redirect(url_for("finance.estimate_detail", est_id=est_id))
+    est = db.get_estimate(est_id)
+    if not est:
+        flash("Estimate not found.", "danger")
+        return redirect(url_for("finance.estimates_list"))
+    if est.get("status") == "Converted":
+        # Re-deciding a converted estimate would leave an invoice with no
+        # approved quote behind it.
+        flash("This estimate is already invoiced and cannot be changed.", "warning")
+        return redirect(url_for("finance.estimate_detail", est_id=est_id))
+    db.decide_estimate(est_id, decision, session["user"].get("full_name", ""))
+    flash(f"Estimate marked {decision}.", "success")
+    return redirect(url_for("finance.estimate_detail", est_id=est_id))
+
+
+@finance_bp.route("/estimates/<int:est_id>/convert", methods=["POST"])
+@login_required
+def estimate_convert(est_id):
+    try:
+        inv_id = db.convert_estimate(est_id, session["user"].get("full_name", ""))
+    except ValueError as e:
+        flash(str(e), "danger")
+        return redirect(url_for("finance.estimate_detail", est_id=est_id))
+    flash("Invoice created from estimate.", "success")
+    return redirect(url_for("finance.invoice_detail", inv_id=inv_id))
+
+
+@finance_bp.route("/estimates/<int:est_id>/print")
+@login_required
+def estimate_print(est_id):
+    est = db.get_estimate(est_id)
+    if not est:
+        flash("Estimate not found.", "danger")
+        return redirect(url_for("finance.estimates_list"))
+    return render_template("finance/estimate_print.html", est=est)
+
+
+# ─────────────────────────────────────────────
+# CLIENT DEPOSITS / ACCOUNT CREDIT
+#
+# Money taken before there is an invoice: boarding and surgery deposits. There
+# was no way to record it at all, so front desks were either refusing deposits
+# or keeping them on paper.
+# ─────────────────────────────────────────────
+
+@finance_bp.route("/owners/<int:owner_id>/credit", methods=["GET", "POST"])
+@login_required
+def owner_credit(owner_id):
+    conn = db.get_db()
+    owner = conn.execute("SELECT id, full_name, phone FROM owners WHERE id=?",
+                         (owner_id,)).fetchone()
+    conn.close()
+    if not owner:
+        flash("Owner not found.", "danger")
+        return redirect(url_for("finance.invoices_list"))
+    owner = dict(owner)
+
+    if request.method == "POST":
+        action = request.form.get("action", "deposit")
+        try:
+            amount, _err = money.form_amount(request.form.get("amount"), "amount")
+            if _err:
+                flash(_err, "danger")
+                return redirect(url_for("finance.owner_credit", owner_id=owner_id))
+            if action == "refund":
+                db.refund_credit(owner_id, amount,
+                                 request.form.get("note", "").strip(),
+                                 session["user"].get("full_name", ""))
+                flash("Refund recorded.", "success")
+            else:
+                db.add_deposit(owner_id, amount,
+                               request.form.get("method", "Cash"),
+                               request.form.get("reference", "").strip(),
+                               request.form.get("note", "").strip(),
+                               session["user"].get("full_name", ""))
+                flash("Deposit recorded.", "success")
+        except ValueError as e:
+            flash(str(e), "danger")
+        return redirect(url_for("finance.owner_credit", owner_id=owner_id))
+
+    return render_template(
+        "finance/owner_credit.html",
+        active="finance",
+        page_title=f"Account — {owner['full_name']}",
+        owner=owner,
+        balance=db.owner_credit_balance(owner_id),
+        entries=db.list_owner_credits(owner_id),
+        open_invoices=[i for i in db.list_invoices(owner_id=owner_id)
+                       if (i.get("due_amount") or 0) > 0],
+    )
+
+
+@finance_bp.route("/invoices/<int:inv_id>/apply-credit", methods=["POST"])
+@login_required
+def invoice_apply_credit(inv_id):
+    inv = db.get_invoice(inv_id)
+    if not inv:
+        flash("Invoice not found.", "danger")
+        return redirect(url_for("finance.invoices_list"))
+    try:
+        db.apply_credit(inv["owner_id"], inv_id,
+                        money.form_amount(request.form.get("amount"), "amount")[0],
+                        session["user"].get("full_name", ""))
+        flash("Credit applied to the invoice.", "success")
+    except ValueError as e:
+        flash(str(e), "danger")
+    return redirect(url_for("finance.invoice_detail", inv_id=inv_id))

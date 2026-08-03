@@ -8,6 +8,9 @@
   <a href="{{ url_for('crm.pet_new', owner_id=owner.id) }}" class="pf-btn pf-btn-primary">
     🐾 {{ t('Add Pet','إضافة حيوان') }}
   </a>
+  <a href="{{ url_for('finance.owner_credit', owner_id=owner.id) }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-primary);border:1.5px solid var(--cl-primary);margin-left:8px;">
+    💳 {{ t('Account','الحساب') }}
+  </a>
   <a href="{{ url_for('crm.owner_edit', owner_id=owner.id) }}" class="pf-btn" style="background:var(--cl-surface);color:var(--cl-primary);border:1.5px solid var(--cl-primary);margin-left:8px;">
     ✏️ {{ t('Edit','تعديل') }}
   </a>

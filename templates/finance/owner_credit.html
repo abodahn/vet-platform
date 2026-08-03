@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Client Account', 'حساب العميل') }}{% endblock %}
+{% block page_title %}{{ owner.full_name }}{% endblock %}
+{% block page_sub %}{{ t('Deposits and account credit', 'الدفعات المقدمة ورصيد الحساب') }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('finance.invoices_list') }}" class="btn btn-secondary">← {{ t('Finance', 'المالية') }}</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.cr-layout { display:grid; grid-template-columns:1fr 330px; gap:20px; align-items:start; }
+.card { background:var(--cl-surface); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); overflow:hidden; margin-bottom:20px; }
+.card-header { background:var(--cl-primary); color:#fff; padding:14px 22px; font-weight:700; }
+.card-body { padding:22px; }
+.balance { font-size:34px; font-weight:800; color:var(--cl-primary); font-variant-numeric:tabular-nums; }
+.balance small { display:block; font-size:12px; font-weight:600; color:var(--cl-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { background:var(--cl-bg); padding:9px 12px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; color:var(--cl-muted); border-bottom:1px solid var(--cl-border); }
+td { padding:10px 12px; border-bottom:1px solid var(--cl-border); }
+.num { text-align:right; font-variant-numeric:tabular-nums; }
+.in  { color:#14532d; font-weight:700; }
+.out { color:#7f1d1d; font-weight:700; }
+.form-group { display:flex; flex-direction:column; gap:5px; margin-bottom:13px; }
+.form-label { font-size:12px; font-weight:600; }
+.form-control { padding:9px 13px; border:1.5px solid var(--cl-border); border-radius:8px; background:var(--cl-bg); color:var(--cl-text); font-size:13px; width:100%; box-sizing:border-box; }
+.act { width:100%; padding:12px; border:none; border-radius:9px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; }
+.act-add { background:var(--cl-success,#16a34a); }
+.act-ref { background:var(--cl-danger,#dc2626); }
+.empty { padding:34px; text-align:center; color:var(--cl-muted); }
+.hint { font-size:12px; color:var(--cl-muted); line-height:1.6; margin-top:10px; }
+@media(max-width:900px){ .cr-layout { grid-template-columns:1fr; } }
+</style>
+
+<div class="cr-layout">
+  <div>
+    <div class="card">
+      <div class="card-header">📒 {{ t('Account History', 'سجل الحساب') }}</div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('When', 'التاريخ') }}</th>
+              <th>{{ t('Type', 'النوع') }}</th>
+              <th>{{ t('Note', 'ملاحظة') }}</th>
+              <th>{{ t('By', 'بواسطة') }}</th>
+              <th class="num">{{ t('Amount', 'المبلغ') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in entries %}
+            <tr>
+              <td>{{ e.created_at }}</td>
+              <td>{{ e.kind }}</td>
+              <td>{{ e.note or '—' }}{% if e.reference %} <em>({{ e.reference }})</em>{% endif %}</td>
+              <td>{{ e.created_by or '—' }}</td>
+              <td class="num {{ 'in' if e.amount > 0 else 'out' }}">
+                {{ '+' if e.amount > 0 else '' }}{{ '%.2f'|format(e.amount) }}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="empty">
+              {{ t('No deposits recorded for this client yet.', 'لا توجد دفعات مقدمة لهذا العميل بعد.') }}
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if open_invoices and balance > 0 %}
+    <div class="card">
+      <div class="card-header">🧾 {{ t('Apply credit to an unpaid invoice', 'استخدام الرصيد في فاتورة غير مدفوعة') }}</div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('Invoice', 'الفاتورة') }}</th>
+              <th>{{ t('Issued', 'التاريخ') }}</th>
+              <th class="num">{{ t('Still owed', 'المتبقي') }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for i in open_invoices %}
+            <tr>
+              <td><a href="{{ url_for('finance.invoice_detail', inv_id=i.id) }}">{{ i.invoice_number }}</a></td>
+              <td>{{ i.issue_date }}</td>
+              <td class="num">{{ '%.2f'|format(i.due_amount or 0) }}</td>
+              <td>
+                <form method="post" action="{{ url_for('finance.invoice_apply_credit', inv_id=i.id) }}"
+                      style="display:flex;gap:6px;align-items:center">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                  <input type="number" name="amount" class="form-control" style="width:110px;padding:6px 9px"
+                         step="0.01" min="0.01"
+                         max="{{ '%.2f'|format(balance if balance < (i.due_amount or 0) else (i.due_amount or 0)) }}"
+                         value="{{ '%.2f'|format(balance if balance < (i.due_amount or 0) else (i.due_amount or 0)) }}">
+                  <button class="act act-add" style="width:auto;padding:7px 14px;font-size:13px">
+                    {{ t('Apply', 'استخدام') }}
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-body">
+        <div class="balance">
+          <small>{{ t('On account', 'الرصيد') }}</small>
+          {{ '%.2f'|format(balance) }} EGP
+        </div>
+        <p class="hint">{{ t('Money the client has paid that is not yet against any invoice.',
+                             'أموال دفعها العميل ولم تُخصم بعد من أي فاتورة.') }}</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">➕ {{ t('Take a deposit', 'تسجيل دفعة مقدمة') }}</div>
+      <div class="card-body">
+        <form method="post">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="action" value="deposit">
+          <div class="form-group">
+            <label class="form-label">{{ t('Amount', 'المبلغ') }} *</label>
+            <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Method', 'طريقة الدفع') }}</label>
+            <select name="method" class="form-control">
+              <option value="Cash">{{ t('Cash', 'نقدي') }}</option>
+              <option value="Instapay">Instapay</option>
+              <option value="Card">{{ t('Card', 'بطاقة') }}</option>
+              <option value="Transfer">{{ t('Bank transfer', 'تحويل بنكي') }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Reference', 'المرجع') }}</label>
+            <input type="text" name="reference" class="form-control"
+                   placeholder="{{ t('Transaction no.', 'رقم العملية') }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Note', 'ملاحظة') }}</label>
+            <input type="text" name="note" class="form-control"
+                   placeholder="{{ t('e.g. boarding deposit', 'مثال: دفعة إقامة') }}">
+          </div>
+          <button class="act act-add">{{ t('Record deposit', 'تسجيل الدفعة') }}</button>
+        </form>
+      </div>
+    </div>
+
+    {% if balance > 0 %}
+    <div class="card">
+      <div class="card-header">↩ {{ t('Refund credit', 'رد الرصيد') }}</div>
+      <div class="card-body">
+        <form method="post" onsubmit="return confirm('{{ t('Refund this amount to the client?', 'رد هذا المبلغ للعميل؟') }}')">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="action" value="refund">
+          <div class="form-group">
+            <label class="form-label">{{ t('Amount', 'المبلغ') }} *</label>
+            <input type="number" name="amount" class="form-control" step="0.01" min="0.01"
+                   max="{{ '%.2f'|format(balance) }}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ t('Reason', 'السبب') }}</label>
+            <input type="text" name="note" class="form-control">
+          </div>
+          <button class="act act-ref">{{ t('Record refund', 'تسجيل الرد') }}</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
