@@ -88,23 +88,37 @@ def check_cors():
 
 
 def check_repo_secrets():
-    """The credential that is already in this repository's history."""
+    """A credential committed to this repository's history.
+
+    Set LEAKED_SECRET_ROTATED=1 once it has been changed everywhere it was
+    valid. History is immutable without a rewrite, so this warning would
+    otherwise fire forever -- and a warning that can never be cleared stops
+    being read, which is worse than not having it.
+
+    LEAKED_SECRET overrides the string to search for, so this stays useful for
+    the next one rather than being about a single historical password.
+    """
+    if os.environ.get("LEAKED_SECRET_ROTATED") == "1":
+        check("Committed credential rotated", OK, "declared rotated")
+        return
+    needle = os.environ.get("LEAKED_SECRET", "Ahmed@1122")
     import subprocess
     try:
         out = subprocess.run(
-            ["git", "log", "--all", "-S", "Ahmed@1122", "--oneline"],
+            ["git", "log", "--all", "-S", needle, "--oneline"],
             capture_output=True, text=True, timeout=30,
             cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         n = len([l for l in out.stdout.splitlines() if l.strip()])
     except Exception:
-        check("Old password out of git history", WARN, "could not read git history")
+        check("Committed credential rotated", WARN, "could not read git history")
         return
     if n:
-        check("Old password out of git history", WARN,
-              f"appears in {n} commit(s). Anyone given this repository has it. "
-              "Rotate it everywhere it is still valid.")
+        check("Committed credential rotated", WARN,
+              f"the old admin password appears in {n} commit(s). Anyone given "
+              "this repository has it. Rotate it everywhere it is still valid, "
+              "then set LEAKED_SECRET_ROTATED=1.")
     else:
-        check("Old password out of git history", OK)
+        check("Committed credential rotated", OK, "not found in history")
 
 
 # ── data safety ───────────────────────────────────────────────────────────────
