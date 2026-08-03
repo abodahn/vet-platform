@@ -46,6 +46,42 @@ def _exp(places: int) -> Decimal:
     return _TWO_PLACES if places == 2 else Decimal(1).scaleb(-places)
 
 
+# Arabic-Indic and Eastern Arabic-Indic digits -> ASCII. A keyboard set to
+# Arabic produces ٠١٢٣, which float() rejects, and this product's whole point
+# is that it is usable in Arabic.
+_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+
+
+def form_amount(raw, field: str = "amount"):
+    """Parse a number a human typed. Returns (float, error_message).
+
+    `float(request.form.get("amount") or 0)` appears in thirteen places in this
+    codebase and raises ValueError on anything that is not a clean number -- so
+    one mistyped letter in the payment box returned a 500 page to a
+    receptionist with a client standing at the counter.
+
+    Silently coercing to 0 would be worse than the crash: a payment of "1O0"
+    (letter O) would be recorded as zero and the till would be short with no
+    trace. So this reports the problem instead of guessing, and the caller
+    tells the user which box to fix.
+
+    Accepts what people actually type: thousands separators ("1,500"), Arabic
+    digits, stray spaces, and a leading currency symbol.
+    """
+    if raw is None:
+        return 0.0, ""
+    s = str(raw).strip()
+    if not s:
+        return 0.0, ""
+    s = s.translate(_DIGITS).replace(",", "").replace("٫", ".").replace(" ", "")
+    for sym in ("EGP", "egp", "ج.م", "£", "$"):
+        s = s.replace(sym, "")
+    try:
+        return float(Decimal(s)), ""
+    except (InvalidOperation, ValueError, TypeError):
+        return 0.0, f"“{str(raw).strip()}” is not a valid {field}."
+
+
 def format_money(value, places: int = 2) -> str:
     """Render for display. Identical output whatever the engine returned."""
     return f"{to_decimal(value, places):.{places}f}"

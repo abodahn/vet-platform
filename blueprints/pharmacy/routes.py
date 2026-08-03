@@ -158,7 +158,31 @@ def dispense(rx_id):
             qty_form = request.form.get(f"qty_{pi_id}")
 
             if not item_id:
-                continue  # free-text item, no inventory
+                # Free-text medication -- prescribed by name, not linked to a
+                # stock item. It was `continue`d, which left it dispensed=0
+                # forever. `all_done` counts exactly that column, so the
+                # prescription could never leave "Partial": the pharmacist
+                # clicked Dispense, handed the medicine over, and the queue kept
+                # the prescription open for good. The vet's form is a free-text
+                # box, so this was the DEFAULT path, not an edge case.
+                #
+                # It is still not written to dispensing_log -- that table is the
+                # stock-movement register (item_id NOT NULL, batch, quantity) and
+                # a drug that is not in inventory has no stock movement to record.
+                # The handover goes to the audit log instead, so there IS a record
+                # of who gave what to whom.
+                conn.execute(
+                    "UPDATE prescription_items SET dispensed=1 WHERE id=?", (pi_id,))
+                conn.execute(
+                    """INSERT INTO audit_log(username,role,action,module,entity_type,
+                       entity_id,details)
+                       VALUES(?,?,?,?,?,?,?)""",
+                    (user["username"], user["role"], "dispensed_untracked_medication",
+                     "pharmacy", "prescription_items", str(pi_id),
+                     f"{item['medication_name']} (not a stock item) for RX#{rx_id} "
+                     f"pet {rx['pet_id']}"))
+                dispensed_any = True
+                continue
 
             qty_dispense = float(qty_form) if qty_form else qty_needed
 

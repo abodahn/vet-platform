@@ -214,3 +214,62 @@ def test_the_five_modules_that_had_no_key_now_have_one(app):
     known = {k for k, _ in db.ALL_PERMISSIONS}
     for key in ("payroll", "inpatient", "telemedicine", "imaging", "petshop"):
         assert key in known
+
+
+# ── the doctor boundary ──────────────────────────────────────────────────────
+#
+# Added after driving a full clinical day as a real `doctor` user. The doctor
+# has the widest clinical grant in the product -- patients, appointments,
+# visits, pharmacy, inpatient, telemedicine, imaging, reports, catalog, ai --
+# which makes it the role most likely to quietly widen when someone adds a
+# module and copies the nearest permission list. The existing tests here cover
+# reception, groomer and nurse; nobody was watching this one.
+
+_DOCTOR_MUST_REACH = [
+    ("/visits/", "the medical record"),
+    ("/clinical/vaccinations", "vaccinations"),
+    ("/clinical/lab", "lab requests"),
+    ("/pharmacy/", "the pharmacy queue they prescribe into"),
+    ("/inpatient/", "the ward"),
+    ("/imaging/", "imaging"),
+    ("/doctor/", "their own workspace"),
+    ("/attendance/checkin", "their own timesheet"),
+]
+
+_DOCTOR_MUST_NOT_REACH = [
+    ("/payroll/", "what colleagues are paid"),
+    ("/accounting/", "the clinic's books"),
+    ("/procurement/", "purchasing"),
+    ("/system/backup", "the clinic's backups"),
+    ("/system/roles", "who may do what"),
+]
+
+
+@pytest.mark.parametrize("url,what", _DOCTOR_MUST_REACH)
+def test_a_doctor_can_reach_the_medical_record(app, client, url, what):
+    _set_permissions(app, "doctor", db.DEFAULT_ROLE_PERMISSIONS["doctor"])
+    _as(client, "doctor")
+    r = client.get(url, follow_redirects=False)
+    assert r.status_code not in (302, 303, 401, 403), \
+        f"a doctor was locked out of {what} ({url})"
+
+
+@pytest.mark.parametrize("url,what", _DOCTOR_MUST_NOT_REACH)
+def test_a_doctor_cannot_reach_the_money_or_the_keys(app, client, url, what):
+    """A doctor's grant is the medical record and what they prescribe from it.
+    Money and administration are deliberately not on it."""
+    _set_permissions(app, "doctor", db.DEFAULT_ROLE_PERMISSIONS["doctor"])
+    _as(client, "doctor")
+    r = client.get(url, follow_redirects=False)
+    assert r.status_code in (302, 303, 401, 403), \
+        f"a doctor could open {what} ({url}) — returned {r.status_code}"
+
+
+def test_the_doctor_default_grant_carries_no_money_module(app):
+    """Asserted against the grant itself, not just the routes, so adding a new
+    money module does not silently inherit access."""
+    grant = set(db.DEFAULT_ROLE_PERMISSIONS["doctor"])
+    for money_module in ("accounting", "payroll", "invoicing", "inventory",
+                         "procurement", "hr", "system"):
+        assert money_module not in grant, \
+            f"the doctor default grant now includes {money_module!r}"

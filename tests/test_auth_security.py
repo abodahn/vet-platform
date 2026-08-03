@@ -13,6 +13,8 @@ import os
 import sys
 import tempfile
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import models.database as db
@@ -31,12 +33,55 @@ from blueprints.auth.routes import (
 FALLBACK = "/home"
 
 
-def _reset_roles(rows):
-    """(re)create a minimal roles table holding `rows` of (name, permissions_json)."""
+@pytest.fixture(autouse=True)
+def _restore_roles(app):
+    """Put the real roles back after every test in this module.
+
+    Depends on `app` so the schema actually exists. It did not before: these
+    tests requested no fixtures at all, and the old helper's DROP + CREATE was
+    quietly doing double duty as schema creation against whatever database
+    db.get_db() happened to return.
+
+    These tests rewrite the roles table to control what has_permission() sees.
+    They used to DROP it and build a stand-in with no `id` column, which did two
+    kinds of damage: the id-less table broke the INSERT ... RETURNING id path on
+    PostgreSQL, and -- worse -- the roles table stayed replaced for the REST OF
+    THE SESSION, so unrelated later tests were quietly running against a schema
+    this module invented. That is what made the failures move around depending
+    on test order.
+    """
     conn = db.get_db()
     try:
-        conn.execute("DROP TABLE IF EXISTS roles")
-        conn.execute("CREATE TABLE roles (name TEXT PRIMARY KEY, permissions_json TEXT)")
+        saved = [(r["name"], r["permissions_json"])
+                 for r in conn.execute("SELECT name, permissions_json FROM roles").fetchall()]
+    except Exception:
+        saved = []
+    finally:
+        conn.close()
+    yield
+    conn = db.get_db()
+    try:
+        conn.execute("DELETE FROM roles")
+        for name, pj in saved:
+            conn.execute("INSERT INTO roles (name, permissions_json) VALUES (?,?)", (name, pj))
+        conn.commit()
+    except Exception:
+        db.rollback_quietly(conn)
+    finally:
+        conn.close()
+    clear_permission_cache()
+
+
+def _reset_roles(rows):
+    """Replace the CONTENTS of the roles table, never its shape.
+
+    DELETE, not DROP + CREATE: the real schema (with its id column and defaults)
+    is what the application expects, and keeping it means this helper works
+    identically on SQLite and PostgreSQL.
+    """
+    conn = db.get_db()
+    try:
+        conn.execute("DELETE FROM roles")
         for name, pj in rows:
             conn.execute("INSERT INTO roles (name, permissions_json) VALUES (?,?)", (name, pj))
         conn.commit()

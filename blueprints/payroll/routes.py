@@ -6,6 +6,7 @@ from flask import render_template, request, redirect, url_for, session, flash, j
 from datetime import date
 from . import payroll_bp
 import models.database as db
+from models import money
 from blueprints.auth.routes import login_required, self_service, role_required
 from blueprints.hr.routes import can_view_staff, _ensure_hr_tables, _db_target
 from models.excel_export import make_workbook
@@ -606,8 +607,8 @@ def salary_grades():
     conn = db.get_db()
     if request.method == "POST":
         for role in _ROLES:
-            basic = float(request.form.get(f"basic_{role}", 0))
-            ot_r  = float(request.form.get(f"ot_{role}", 0))
+            basic, _ = money.form_amount(request.form.get(f"basic_{role}"), "basic salary")
+            ot_r, _  = money.form_amount(request.form.get(f"ot_{role}"), "overtime rate")
             notes = request.form.get(f"notes_{role}", "")
             conn.execute("""
                 INSERT INTO salary_grades (role, basic_salary, overtime_rate, notes)

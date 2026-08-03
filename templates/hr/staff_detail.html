@@ -353,8 +353,9 @@
           </div>
           <div style="text-align:right">
             {% if c.expiry_date %}
-              {% set today_str = today.isoformat() if today else '' %}
-              <div style="font-size:12px;font-weight:600;color:{% if c.expiry_date < today_str %}#dc2626{% else %}#16a34a{% endif %}">
+              {# c.expired is decided in the route: the raw column is a date on
+                 PostgreSQL and a string on SQLite, so comparing it here raised. #}
+              <div style="font-size:12px;font-weight:600;color:{% if c.expired %}#dc2626{% else %}#16a34a{% endif %}">
                 Exp: {{ c.expiry_date }}
               </div>
             {% else %}

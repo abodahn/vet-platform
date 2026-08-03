@@ -117,6 +117,31 @@ def _generate_slots(appt_date_str, doctor="", exclude_appt_id=None):
     return slots
 
 
+def _pet_belongs_to(pet_id, owner_id) -> bool:
+    """True only if this pet exists AND belongs to this owner.
+
+    Both halves matter. Existence stops a stale form reaching the INSERT and
+    raising an unhandled foreign-key error (a 500 page, with a client waiting
+    at the desk). Ownership stops one client's animal being filed under
+    another's name, which is the kind of slip nobody notices until it has
+    followed the animal through a year of records.
+    """
+    try:
+        pid, oid = int(pet_id), int(owner_id)
+    except (TypeError, ValueError):
+        return False
+    conn = db.get_db()
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM pets WHERE id=? AND owner_id=?", (pid, oid)).fetchone()
+    except Exception:
+        db.rollback_quietly(conn)
+        return False
+    finally:
+        conn.close()
+    return row is not None
+
+
 def _slot_is_free(appt_date_str, doctor, appt_start, exclude_appt_id=None):
     """Server-side guard: return True if the slot is free for that doctor."""
     slots = _generate_slots(appt_date_str, doctor, exclude_appt_id=exclude_appt_id)
@@ -253,6 +278,20 @@ def appt_new():
 
         if not owner_id or not pet_id:
             flash("Owner and pet are required.", "danger")
+        elif not _pet_belongs_to(pet_id, owner_id):
+            # Present is not the same as real. Only the two fields being
+            # non-empty was checked, so a stale form -- one left open while
+            # somebody else merged or removed the pet, or simply an edited
+            # request -- reached the INSERT and died on the foreign key with an
+            # unhandled sqlite3.IntegrityError. The receptionist got a 500 page
+            # while a client stood at the desk.
+            #
+            # The pair is checked together, not just existence, because that
+            # also stops one client's pet being booked under another client's
+            # name -- which reads as a data-entry slip and then follows the
+            # animal through its whole record.
+            flash("That pet is no longer on file for this client. "
+                  "Please re-select the client and pet.", "danger")
         else:
             # Calculate end time
             appt_start   = request.form.get("appt_start", "09:00")

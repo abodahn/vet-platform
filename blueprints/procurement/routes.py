@@ -3,6 +3,7 @@ from datetime import date
 from . import procurement_bp
 from blueprints.auth.routes import login_required
 from models.database import get_db
+from models import money
 
 
 # ── DASHBOARD ────────────────────────────────────────────────────────────────
@@ -259,8 +260,8 @@ def order_new_submit():
     for i in indexes:
         item_id = request.form.get(f"item_id_{i}")
         try:
-            qty   = float(request.form.get(f"quantity_{i}", 0) or 0)
-            price = float(request.form.get(f"unit_price_{i}", 0) or 0)
+            qty, _   = money.form_amount(request.form.get(f"quantity_{i}"), "quantity")
+            price, _ = money.form_amount(request.form.get(f"unit_price_{i}"), "unit price")
         except ValueError:
             qty, price = 0.0, 0.0
         desc = request.form.get(f"description_{i}", "").strip()

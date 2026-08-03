@@ -4,6 +4,7 @@ from . import boarding_bp
 from blueprints.auth.routes import login_required
 from models.database import get_db
 import models.database as db
+from models import money
 
 
 @boarding_bp.route("/")
@@ -361,7 +362,7 @@ def room_new():
     room_number = request.form.get("room_number", "").strip()
     room_type   = request.form.get("room_type", "Standard")
     capacity    = int(request.form.get("capacity") or 1)
-    daily_rate  = float(request.form.get("daily_rate") or 0)
+    daily_rate, _  = money.form_amount(request.form.get("daily_rate"), "daily rate")
     is_active   = 1 if request.form.get("is_active") else 0
 
     if not room_number:

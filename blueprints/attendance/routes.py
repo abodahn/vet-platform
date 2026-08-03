@@ -3,11 +3,13 @@ Attendance & Leave Management — Aleefy Platform
 Full HR attendance: check-in/out, shifts, leaves, balances, reports.
 """
 from flask import render_template, request, redirect, url_for, flash, session, jsonify, send_file
+import os
 from datetime import date, datetime, timedelta
 from . import attendance_bp
 from blueprints.auth.routes import login_required
 from blueprints.hr.routes import can_view_staff
 from models.database import get_db
+from models import money
 from models.excel_export import make_workbook
 
 
@@ -25,6 +27,103 @@ def _calc_hours(check_in: str, check_out: str, break_min: int = 0) -> float:
         return round(max(0, mins / 60), 2)
     except Exception:
         return 0.0
+
+
+def default_shift(conn):
+    """The clinic's working day. Shifts are clinic-wide, not per employee.
+
+    Falls back to 08:00-17:00 with an hour's break, which is what the schema
+    itself defaults to, so a clinic that never opened the shifts screen still
+    gets sane behaviour instead of none.
+    """
+    try:
+        row = conn.execute(
+            "SELECT start_time, end_time, break_minutes FROM shifts "
+            "WHERE is_active=1 ORDER BY id LIMIT 1").fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return {"start_time": "08:00", "end_time": "17:00", "break_minutes": 60}
+    return {"start_time": (row["start_time"] or "08:00")[:5],
+            "end_time": (row["end_time"] or "17:00")[:5],
+            "break_minutes": int(row["break_minutes"] or 0)}
+
+
+# Minutes after the shift start that still count as on time. Traffic in Cairo
+# makes a zero-tolerance clock a source of arguments rather than information.
+LATE_GRACE_MINUTES = int(os.environ.get("ATTENDANCE_GRACE_MINUTES", "15"))
+
+
+def _minutes(hhmm: str) -> int:
+    try:
+        h, m = str(hhmm)[:5].split(":")
+        return int(h) * 60 + int(m)
+    except Exception:
+        return 0
+
+
+def status_for_checkin(conn, check_in: str) -> tuple:
+    """('Present'|'Late', minutes_late) for an arrival time.
+
+    The 'Late' status has existed in this schema from the start and NOTHING
+    EVER SET IT — the dashboard counted late days and the count was always
+    zero. A status only ever counted and never assigned is a report that lies
+    quietly, which is worse than not having the column.
+    """
+    shift = default_shift(conn)
+    late_by = _minutes(check_in) - _minutes(shift["start_time"]) - LATE_GRACE_MINUTES
+    if late_by > 0:
+        return "Late", late_by
+    return "Present", 0
+
+
+def close_forgotten_checkouts(conn, on_date: str = None) -> int:
+    """Close attendance records left open, and return how many.
+
+    THE BUG THIS FIXES COSTS STAFF THEIR PAY. hours_worked is only ever written
+    at check-out; nothing else sets it. So an employee who works a full day and
+    forgets to clock out has hours_worked = 0, and payroll — which reads exactly
+    that column — pays them for nothing. The dashboard counted open records and
+    no code acted on the count.
+
+    Closes at the shift end rather than at "now", because a record found open at
+    03:00 the next morning did not represent someone working through the night.
+
+    Deliberately NOT silent. Every row it touches is stamped recorded_by='system'
+    and says so in its notes, so a manager reviewing the month can see which
+    hours were reconstructed rather than observed. Paying an estimate is fairer
+    than paying zero; paying an estimate nobody can identify afterwards is not.
+    """
+    on_date = on_date or (date.today() - timedelta(days=1)).isoformat()
+    shift = default_shift(conn)
+    rows = conn.execute(
+        "SELECT id, check_in, break_minutes FROM attendance_records "
+        "WHERE work_date=? AND check_in IS NOT NULL AND check_in <> '' "
+        "  AND (check_out IS NULL OR check_out = '')", (on_date,)).fetchall()
+
+    closed = 0
+    for r in rows:
+        brk = int(r["break_minutes"] or shift["break_minutes"] or 0)
+        end = shift["end_time"]
+        # Someone who arrived after the shift ended gets their arrival time, so
+        # the record closes with zero hours rather than a negative day.
+        if _minutes(r["check_in"]) > _minutes(end):
+            end = r["check_in"]
+        hrs = _calc_hours(r["check_in"], end, brk)
+        conn.execute(
+            "UPDATE attendance_records "
+            "SET check_out=?, hours_worked=?, break_minutes=?, "
+            "    recorded_by='system', "
+            "    notes = TRIM(COALESCE(notes,'') || ?), "
+            "    updated_at=datetime('now','localtime') "
+            "WHERE id=?",
+            (end, hrs, brk,
+             f" [auto-closed at shift end {end}; no check-out was recorded]",
+             r["id"]))
+        closed += 1
+    if closed:
+        conn.commit()
+    return closed
 
 def _business_days(start: str, end: str, conn) -> int:
     """Count weekdays (Sat=6, Sun=0 depending on locale) excl. public holidays."""
@@ -166,16 +265,24 @@ def checkin():
                 flash("Already checked in today.", "warning")
             else:
                 u_row = conn.execute("SELECT * FROM users WHERE id=?", (target_user_id,)).fetchone()
+                st, late_by = status_for_checkin(conn, now)
                 conn.execute(
                     """INSERT INTO attendance_records
                            (user_id,username,full_name,work_date,check_in,status,notes,recorded_by)
-                       VALUES(?,?,?,?,?,'Present',?,?)""",
+                       VALUES(?,?,?,?,?,?,?,?)""",
                     (target_user_id,
                      u_row["username"] if u_row else "",
                      u_row["full_name"] if u_row else "",
-                     today, now, notes, user["username"]))
+                     today, now, st, notes, user["username"]))
                 conn.commit()
-                flash("Check-in recorded successfully.", "success")
+                if st == "Late":
+                    # Said plainly at the moment it happens. Discovering it in a
+                    # payroll deduction at the end of the month is how a system
+                    # loses the staff's trust.
+                    flash(f"Checked in at {now} — {late_by} minutes after the "
+                          f"shift start (grace {LATE_GRACE_MINUTES} min).", "warning")
+                else:
+                    flash("Check-in recorded successfully.", "success")
 
         elif action == "checkout":
             if not rec or not rec["check_in"]:
@@ -623,7 +730,7 @@ def leave_type_save():
     lt_id   = request.form.get("lt_id")
     name    = request.form.get("name", "").strip()
     name_ar = request.form.get("name_ar", "").strip()
-    days    = float(request.form.get("days_per_year", 21) or 21)
+    days, _    = money.form_amount(request.form.get("days_per_year") or 21, "days per year")
     is_paid = 1 if request.form.get("is_paid") else 0
     color   = request.form.get("color", "#6366f1")
     is_act  = 1 if request.form.get("is_active") else 0
@@ -687,14 +794,26 @@ def balance_set():
     user_id = request.form.get("user_id")
     lt_id   = request.form.get("leave_type_id")
     year    = int(request.form.get("year", date.today().year))
-    alloc   = float(request.form.get("allocated", 0) or 0)
-    used    = float(request.form.get("used", 0) or 0)
-    pending = float(request.form.get("pending", 0) or 0)
+    alloc, _   = money.form_amount(request.form.get("allocated"), "allocated days")
+    used, _    = money.form_amount(request.form.get("used"), "used days")
+    pending, _ = money.form_amount(request.form.get("pending"), "pending days")
     remaining = max(0, alloc - used - pending)
+    # Explicit ON CONFLICT ... DO UPDATE, not INSERT OR REPLACE.
+    #
+    # _fix_sql turns "INSERT OR REPLACE" into "ON CONFLICT DO NOTHING", which is
+    # the OPPOSITE instruction: on PostgreSQL, editing a balance that already
+    # existed kept the old row and the screen still said "Balance updated." The
+    # manager saw a success message and nothing changed.
+    #
+    # This spelling needs no translation -- SQLite has supported it since 3.24
+    # and it means the same thing on both engines.
     conn.execute(
-        """INSERT OR REPLACE INTO leave_balances
+        """INSERT INTO leave_balances
                (user_id,leave_type_id,year,allocated,used,pending,remaining)
-           VALUES(?,?,?,?,?,?,?)""",
+           VALUES(?,?,?,?,?,?,?)
+           ON CONFLICT(user_id,leave_type_id,year) DO UPDATE SET
+               allocated=excluded.allocated, used=excluded.used,
+               pending=excluded.pending,     remaining=excluded.remaining""",
         (user_id, lt_id, year, alloc, used, pending, remaining))
     conn.commit()
     conn.close()
@@ -789,15 +908,18 @@ def holidays():
         return redirect(url_for("attendance.dashboard"))
     conn = get_db()
     year = int(request.args.get("year", date.today().year))
-    # EXTRACT, not strftime: PostgreSQL has no strftime, so this page was the
-    # one query in the codebase that would have raised there. EXTRACT is the
-    # portable spelling — _fix_sql_sqlite rewrites it back to strftime for
-    # SQLite, which is exactly what the bidirectional translator is for.
-    # It yields a number, so the parameter is an int rather than a string.
+    # substr, not EXTRACT. The previous comment here claimed EXTRACT was "the
+    # portable spelling" and it is not: holiday_date is a TEXT column, and
+    # PostgreSQL's EXTRACT takes a date/timestamp, so this raised
+    # "function pg_catalog.extract(unknown, text) does not exist" -- the exact
+    # failure the comment said it was avoiding, just on the other engine.
+    # substr() is native to BOTH engines and treats the column as what it
+    # actually is, so no translation is involved at all. Dates are stored
+    # ISO-first, so the leading four characters are the year.
     holidays_list = conn.execute(
-        "SELECT * FROM public_holidays WHERE EXTRACT(YEAR FROM holiday_date)=? "
+        "SELECT * FROM public_holidays WHERE substr(holiday_date,1,4)=? "
         "ORDER BY holiday_date",
-        (year,)).fetchall()
+        (str(year),)).fetchall()
     conn.close()
     return render_template("attendance/holidays.html", active="attendance",
                            holidays=holidays_list, year=year)

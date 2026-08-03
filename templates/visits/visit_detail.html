@@ -487,6 +487,35 @@
               id="rxForm"
               style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;padding:1rem">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+          {# Only a veterinarian may be recorded as the prescriber. Anyone else
+             may still enter the prescription -- a vet dictating while a nurse
+             types is how a busy clinic runs -- but must say whose it is. #}
+          {% if not can_prescribe %}
+          <div style="margin-bottom:.9rem">
+            <label class="pf-label" style="font-size:.78rem">
+              {{ t('Prescribing veterinarian','الطبيب المعالج') }} *
+            </label>
+            {% if prescribers %}
+            <select name="prescribed_by" class="pf-input" style="font-size:.85rem" required>
+              <option value="">— {{ t('Select the vet','اختر الطبيب') }} —</option>
+              {% for vet in prescribers %}
+              <option value="{{ vet }}">{{ vet }}</option>
+              {% endfor %}
+            </select>
+            <div style="font-size:.76rem;color:var(--cl-muted);margin-top:.3rem">
+              {{ t('You may enter this on their behalf; it will be recorded in their name.',
+                   'يمكنك إدخالها نيابةً عنه، وستُسجَّل باسمه.') }}
+            </div>
+            {% else %}
+            <div style="font-size:.82rem;color:var(--cl-danger)">
+              {{ t('No veterinarian is set up on this system, so a prescription cannot be recorded.',
+                   'لا يوجد طبيب بيطري مُسجَّل، لذا لا يمكن تسجيل وصفة.') }}
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+
           <div id="rxLines" style="display:flex;flex-direction:column;gap:.8rem;margin-bottom:.8rem">
             <!-- Line 1 -->
             <div class="rx-line">

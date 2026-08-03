@@ -209,6 +209,11 @@ def visit_detail(visit_id):
     ).fetchone()
     invoice = dict(invoice_row) if invoice_row else None
 
+    # Who may be named as the prescriber, and whether THIS user is one. A nurse
+    # gets a vet to choose from rather than a form that refuses her on submit.
+    vets = prescribers(conn)
+    user_role = (session.get("user") or {}).get("role")
+
     conn.close()
     return render_template(
         "visits/visit_detail.html",
@@ -219,6 +224,8 @@ def visit_detail(visit_id):
         rx_items=rx_items,
         lab_requests=lab_requests,
         invoice=invoice,
+        prescribers=vets,
+        can_prescribe=(user_role in PRESCRIBER_ROLES),
         active="visits",
     )
 
@@ -292,6 +299,55 @@ def save_treatment(visit_id):
     return redirect(url_for("visits.visit_detail", visit_id=visit_id) + "#treatment")
 
 
+# Roles whose holder may lawfully prescribe. A clinic owner is on the list
+# because in a small Egyptian practice the owner IS the vet; a practice where
+# that is not true should take the role off its owner account rather than have
+# the software guess.
+PRESCRIBER_ROLES = ("doctor", "clinic_owner", "super_admin")
+
+
+def prescribers(conn) -> list:
+    """Active staff who may be named as the prescriber."""
+    marks = ",".join("?" for _ in PRESCRIBER_ROLES)
+    try:
+        rows = conn.execute(
+            f"SELECT full_name, username FROM users "
+            f"WHERE is_active=1 AND role IN ({marks}) ORDER BY full_name",
+            PRESCRIBER_ROLES).fetchall()
+    except Exception:
+        return []
+    return [(r["full_name"] or r["username"]) for r in rows]
+
+
+def _resolve_prescriber(conn, user, requested: str):
+    """(name, error). Who this prescription is recorded against.
+
+    A prescriber writing their own prescription needs no extra step. Anyone else
+    must name a veterinarian, and the name must match an actual active one --
+    a free-text box would let "Dr. Someone" through and put the clinic right
+    back where it started.
+    """
+    available = prescribers(conn)
+    requested = (requested or "").strip()
+
+    if user.get("role") in PRESCRIBER_ROLES and not requested:
+        return (user.get("full_name") or user.get("username", "")), ""
+
+    if not requested:
+        if not available:
+            return "", ("No veterinarian is set up on this system, so a "
+                        "prescription cannot be attributed to one. Add a user "
+                        "with the doctor role first.")
+        return "", ("Select the prescribing veterinarian. Only a vet may be "
+                    "recorded as the prescriber, though you may enter the "
+                    "prescription on their behalf.")
+
+    if requested not in available:
+        return "", (f"“{requested}” is not an active veterinarian on this "
+                    f"system, so a prescription cannot be recorded against them.")
+    return requested, ""
+
+
 @visits_bp.route("/<int:visit_id>/prescription", methods=["POST"])
 @login_required
 def add_prescription(visit_id):
@@ -311,12 +367,35 @@ def add_prescription(visit_id):
         flash("Visit not found.", "error")
         return redirect(url_for("visits.visits_list"))
 
+    # A prescription must name the VETERINARIAN who prescribed it.
+    #
+    # This used to stamp prescribed_by with whoever was logged in. add_prescription
+    # is @login_required only and `visits` is on the nurse grant, so a nurse could
+    # write and sign a prescription under her own name -- it saved, and went into
+    # the pharmacy queue attributed to a person who may not lawfully prescribe.
+    # That is the clinic's regulatory exposure, not ours, which is exactly why the
+    # software should not make it possible.
+    #
+    # A nurse may still TYPE it -- a vet dictating while someone else enters it is
+    # how a busy clinic actually runs, and how paper works. What she cannot do is
+    # be recorded as the prescriber.
+    prescriber, perr = _resolve_prescriber(conn, user, request.form.get("prescribed_by", ""))
+    if perr:
+        conn.close()
+        flash(perr, "danger")
+        return redirect(url_for("visits.visit_detail", visit_id=visit_id))
+
+    # Who typed it is kept too. If a dispute reaches the record later, "Dr X
+    # prescribed, Nurse Y entered it" is the answer; a single name is not.
+    typed_by = user.get("full_name") or user.get("username", "")
+    if typed_by and typed_by != prescriber:
+        rx_notes = (rx_notes + f"\n[entered by {typed_by} on behalf of {prescriber}]").strip()
+
     cur = conn.execute(
         """INSERT INTO prescriptions(visit_id, pet_id, owner_id, prescribed_by,
            status, notes, created_at)
            VALUES(?,?,?,?,'Active',?,datetime('now'))""",
-        (visit_id, visit["pet_id"], visit["owner_id"],
-         user.get("full_name") or user.get("username", ""), rx_notes),
+        (visit_id, visit["pet_id"], visit["owner_id"], prescriber, rx_notes),
     )
     rx_id = cur.lastrowid
 
