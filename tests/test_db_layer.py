@@ -30,13 +30,91 @@ def test_fix_sql_insert_or_ignore_translation():
     assert out == "INSERT INTO roles (name) VALUES (%s) ON CONFLICT DO NOTHING"
 
 
-def test_fix_sql_insert_or_replace_translation():
-    out = db._fix_sql("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)")
+def test_fix_sql_refuses_insert_or_replace():
+    """It used to translate to ON CONFLICT DO NOTHING, which is the OPPOSITE.
+
+    REPLACE means overwrite; DO NOTHING means keep. That inversion silently
+    turned two real writes into no-ops on PostgreSQL -- saving a clinic setting,
+    and editing a staff leave balance -- both of which reported success and
+    changed nothing. There is no correct generic translation, because DO UPDATE
+    needs a conflict target that cannot be inferred from the statement, so the
+    translator now refuses instead of guessing.
+    """
+    with pytest.raises(ValueError, match="explicit upsert"):
+        db._fix_sql("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)")
+
+
+def test_fix_sql_still_translates_insert_or_ignore():
+    """IGNORE -> DO NOTHING IS faithful, and must keep working."""
+    out = db._fix_sql("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)")
     assert out == "INSERT INTO settings(key,value) VALUES(%s,%s) ON CONFLICT DO NOTHING"
+
+
+def test_an_explicit_upsert_survives_translation_unharmed():
+    """The replacement spelling must reach PostgreSQL intact."""
+    out = db._fix_sql(
+        "INSERT INTO settings(key,value) VALUES(?,?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+    assert "ON CONFLICT(key) DO UPDATE SET value=excluded.value" in out
+    assert "DO NOTHING" not in out
 
 
 def test_fix_sql_datetime_now():
     assert "NOW()" in db._fix_sql("INSERT INTO t(a) VALUES(datetime('now'))")
+
+
+def test_fix_sql_translates_sqlite_date_now():
+    """date() is a SQLite function; PostgreSQL has no such thing.
+
+    Untranslated it reached the server verbatim and died with "function
+    date(unknown) does not exist". Two production paths used it -- raising a
+    purchase order and marking one received -- so ORDERING STOCK was broken
+    outright on the production engine while every SQLite test passed. Twenty-five
+    payment tests also errored on PostgreSQL for the same reason.
+    """
+    assert "CURRENT_DATE" in db._fix_sql("INSERT INTO t(a) VALUES(date('now'))")
+    assert "CURRENT_DATE" in db._fix_sql("UPDATE t SET a=date('now','localtime')")
+    assert "date(" not in db._fix_sql("UPDATE po SET received_date=date('now')")
+
+
+def test_fix_sql_date_rule_does_not_eat_datetime():
+    """`datetime('now')` is "date" + "time(" -- the date rule must not claim it,
+    or timestamps would silently lose their time component."""
+    assert db._fix_sql("SELECT datetime('now')").strip().endswith("NOW()")
+    assert "CURRENT_DATE" not in db._fix_sql("SELECT datetime('now','localtime')")
+
+
+def test_fix_sql_translates_scalar_max_and_min():
+    """SQLite's MAX(a,b) is scalar; PostgreSQL's MAX is an aggregate only.
+
+    Untranslated, "function max(integer, numeric) does not exist" took out the
+    two UPDATEs that clamp a value at zero -- leave balances, and point-of-sale
+    stock -- so on PostgreSQL a shop sale failed outright.
+    """
+    assert "GREATEST(0, stock_qty - %s)" in db._fix_sql(
+        "UPDATE ps_products SET stock_qty = MAX(0, stock_qty - ?) WHERE id=?")
+    assert "LEAST(" in db._fix_sql("UPDATE t SET a = MIN(5, b)")
+
+
+def test_fix_sql_does_not_touch_aggregate_max():
+    """One-argument MAX is a real aggregate and must survive untouched, or every
+    report that finds a latest date would break."""
+    assert "GREATEST" not in db._fix_sql("SELECT MAX(issue_date) FROM invoices")
+    assert "MAX(issue_date)" in db._fix_sql("SELECT MAX(issue_date) FROM invoices")
+
+
+def test_fix_sql_does_not_touch_an_aggregate_over_a_nested_call():
+    """MIN(SUBSTRING(x,1,10)) has commas, but they belong to the inner call."""
+    out = db._fix_sql("SELECT MIN(SUBSTRING(d.created_at::text,1,10)) FROM d")
+    assert "LEAST" not in out
+    assert "MIN(SUBSTRING(" in out
+
+
+def test_fix_sql_leaves_a_date_column_alone():
+    """Only the literal date('now') call is a SQLite-ism. A column or function
+    named date elsewhere must survive untouched."""
+    out = db._fix_sql("SELECT date FROM t WHERE date > ?")
+    assert "CURRENT_DATE" not in out
 
 
 def test_fix_sql_translates_the_TWO_ARGUMENT_datetime_form():
@@ -130,8 +208,13 @@ def test_no_id_table_list_matches_EVERY_table_the_app_creates():
 
 
 def test_get_db_returns_working_sqlite_connection():
+    # use_sqlite(), not set_path(): set_path only assigns _db_path, and
+    # _connect() checks the PostgreSQL pool first -- so under
+    # TEST_POSTGRES_DSN this "SQLite connection" test was silently handed a
+    # PostgreSQL connection and asserted SQLite behaviour against it.
+    # conftest's autouse fixture restores the globals afterwards.
     with tempfile.TemporaryDirectory() as d:
-        db.set_path(os.path.join(d, "t.db"))
+        db.use_sqlite(os.path.join(d, "t.db"))
         conn = db.get_db()
         try:
             conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")

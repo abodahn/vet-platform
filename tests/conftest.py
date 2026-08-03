@@ -156,11 +156,20 @@ def _restore_db_globals():
     a directory that no longer exists. Snapshot and restore around every test
     so the leak cannot cross a test boundary.
     """
+    import models.backup as bk
     import models.database as db
     import models.security as sec
     saved = (db._db_path, db._PG_CONFIG, db._POOL)
+    # models.backup has the same hazard and was NOT guarded here, so a test that
+    # repointed it left every later test that checks backup's target failing
+    # with "models.backup targets X, the app targets Y" — in files with nothing
+    # to do with backups. Individual test modules were restoring it by hand,
+    # which works right up until someone writes a new one and forgets. Guarding
+    # it centrally means they cannot.
+    saved_bk = (bk._db_path, bk._backup_dir, bk._tenant_dsn)
     yield
     db._db_path, db._PG_CONFIG, db._POOL = saved
+    bk._db_path, bk._backup_dir, bk._tenant_dsn = saved_bk
     # The latch is now keyed by database, so it corrects itself when a test
     # points the DB elsewhere — this clear is belt and braces, kept because it
     # costs nothing and documents the hazard.
@@ -187,3 +196,20 @@ def get_csrf(auth_client):
     from models.security import _CSRF_SESSION_KEY
     with auth_client.session_transaction() as sess:
         return sess.get(_CSRF_SESSION_KEY, "")
+
+
+def table_columns(conn, table):
+    """Column names of `table`, on either engine.
+
+    `PRAGMA table_info(x)` is SQLite-only and raises a syntax error on
+    PostgreSQL, so tests that introspect a table were checking schema on one
+    engine and failing on the other -- which is exactly backwards, since schema
+    drift between the two is the thing worth checking.
+    """
+    import models.database as db
+    if db.is_postgres():
+        rows = conn.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema='public' AND table_name=?", (table,)).fetchall()
+        return {r[0] for r in rows}
+    return {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}

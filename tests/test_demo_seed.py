@@ -58,6 +58,32 @@ def _count(path, table, where="1=1"):
 
 # ── The safety guard ─────────────────────────────────────────────────────────
 
+def test_seeding_a_file_path_does_not_touch_a_configured_postgres(seeder, tmp_path):
+    """The guard validated the FILE PATH and never asked which engine was live.
+
+    _connect() consults the PostgreSQL pool before _db_path, so
+    `db.set_path(scratch_file)` did not redirect anything on a process already
+    connected to PostgreSQL. run() wipes before it seeds -- so seeding a
+    throwaway file on a production server overwrote the clinic's real
+    PostgreSQL data with demo records, and resolve_guard() approved it, because
+    the path it was shown was innocent.
+    """
+    import models.database as db
+    saved = (db._db_path, db._PG_CONFIG, db._POOL)
+    try:
+        # Pretend this process is connected to PostgreSQL.
+        db._PG_CONFIG = {"host": "prod.example", "port": 5432,
+                         "dbname": "live_clinic", "user": "u", "password": "p"}
+        db._POOL = None
+        path = str(tmp_path / "scratch.db")
+        db.use_sqlite(path)
+        assert not db._PG_CONFIG, "still pointed at PostgreSQL after use_sqlite()"
+        assert db.is_postgres() is False
+        assert db._db_path == path
+    finally:
+        db._db_path, db._PG_CONFIG, db._POOL = saved
+
+
 def test_refuses_the_configured_database(seeder):
     from config import Config
     with pytest.raises(SystemExit) as exc:

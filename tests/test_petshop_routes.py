@@ -63,7 +63,12 @@ def test_table_bootstrap_tops_up_an_older_ps_orders(auth_client):
     predates the finance bridge has no invoice_id — and tests/test_pet_shop.py
     creates exactly that shape — so every POS sale failed to link its invoice
     inside a warning-only except."""
-    cols = {r[1] for r in _rows_raw("PRAGMA table_info(ps_orders)")}
+    from tests.conftest import table_columns
+    conn = db.get_db()
+    try:
+        cols = table_columns(conn, "ps_orders")
+    finally:
+        conn.close()
     assert "invoice_id" in cols, \
         "ensure_petshop_tables() left an older ps_orders without invoice_id"
 

@@ -235,7 +235,10 @@ def test_pg_flavoured_dashboards_render(auth_client, url):
 def test_get_db_returns_translating_conn(tmp_path):
     from models import database
     old = database._db_path
-    database.set_path(str(tmp_path / "t.db"))
+    # use_sqlite(), not set_path(): under TEST_POSTGRES_DSN, set_path leaves the
+    # PostgreSQL pool in charge, so get_db() returned a _PGConn and this
+    # assertion failed while testing nothing about the SQLite path.
+    database.use_sqlite(str(tmp_path / "t.db"))
     try:
         c = database.get_db()
         assert isinstance(c, _SQLiteConn)

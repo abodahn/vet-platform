@@ -160,7 +160,11 @@ def _build_patient_context(visit_id: int) -> str:
         age_str = ""
         if visit.get("dob"):
             try:
-                from datetime import date
+                # No local `from datetime import date` here: a function-local
+                # import binds the name for the WHOLE function, so every other
+                # use of `date` became "cannot access local variable 'date'"
+                # whenever this branch did not run. It is imported at module
+                # scope already.
                 dob  = date.fromisoformat(str(visit["dob"])[:10])
                 days = (date.today() - dob).days
                 if days >= 365:
@@ -186,13 +190,19 @@ def _build_patient_context(visit_id: int) -> str:
             ORDER BY pr.created_at DESC LIMIT 5
         """, (visit["pet_id"],)).fetchall()
 
-        # Upcoming vaccinations
+        # Upcoming vaccinations.
+        #
+        # The cutoff is bound from Python, not CURRENT_DATE. next_due_at is a
+        # TEXT column, and PostgreSQL refuses `text >= date` outright --
+        # "operator does not exist: text >= date" -- which took out the whole
+        # patient-context panel the doctor's AI assistant reads from. SQLite
+        # compared the strings happily, so this passed every test.
         vax = conn.execute("""
             SELECT vaccine_name, next_due_at
             FROM vaccinations
-            WHERE pet_id = ? AND next_due_at >= CURRENT_DATE
+            WHERE pet_id = ? AND next_due_at >= ?
             ORDER BY next_due_at LIMIT 5
-        """, (visit["pet_id"],)).fetchall()
+        """, (visit["pet_id"], date.today().isoformat())).fetchall()
 
         lines = [
             "═══ PATIENT CONTEXT (current visit) ═══",

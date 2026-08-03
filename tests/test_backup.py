@@ -4,6 +4,15 @@ Backup / restore tests.
 SQLite only, no PostgreSQL, and never the developer's database: every test
 runs against a throwaway file under tmp_path. Destroying a real database while
 testing backup software would be a memorable irony.
+
+Skipped entirely under TEST_POSTGRES_DSN. These assert the internals of a
+SQLite archive -- the magic header, PRAGMA integrity_check, sqlite_master --
+and the PostgreSQL path correctly produces a pg_dump instead, which has none of
+those. They used to "pass" on a PostgreSQL session only because _postgres_dsn()
+read an environment variable the test never set, so the backup went looking for
+a SQLite file while the app's data was in PostgreSQL. That was the bug, not the
+skip: a deployment configured through app config rather than POSTGRES_DSN got a
+nightly backup that failed with "source database is not there".
 """
 import os
 import sqlite3
@@ -11,6 +20,11 @@ import sqlite3
 import pytest
 
 import models.backup as bk
+
+pytestmark = pytest.mark.skipif(
+    bool(os.environ.get("TEST_POSTGRES_DSN")),
+    reason="asserts SQLite archive internals; the PostgreSQL path produces a pg_dump",
+)
 
 
 def _seed(path: str, note: str) -> None:

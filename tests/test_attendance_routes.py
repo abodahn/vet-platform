@@ -153,8 +153,19 @@ def test_checkin_get_renders(app, nurse):
     assert c.get("/attendance/checkin").status_code == 200
 
 
-def test_checkin_creates_my_own_record(app, nurse):
-    from datetime import date
+def test_checkin_creates_my_own_record(app, nurse, monkeypatch):
+    from datetime import date, datetime
+    # Pin the shift to start now. Check-in is stamped with the wall clock, and
+    # once 'Late' was actually implemented this test began asserting Present or
+    # Late purely according to what time of day the suite happened to run -- it
+    # passed in the morning and failed after 08:15. Pinning the shift keeps the
+    # status assertion meaningful instead of weakening it to "either".
+    import blueprints.attendance.routes as att
+    monkeypatch.setattr(att, "default_shift", lambda conn: {
+        "start_time": datetime.now().strftime("%H:%M"),
+        "end_time": "23:59",
+        "break_minutes": 0,
+    })
     today = date.today().isoformat()
     _exec(app, "DELETE FROM attendance_records WHERE user_id=? AND work_date=?",
           (nurse["id"], today))

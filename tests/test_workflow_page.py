@@ -586,7 +586,8 @@ def test_the_instapay_qr_survives_a_backup_and_restore(app):
     bad time."""
     with app.app_context():
         conn = db.get_db()
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(clinic)").fetchall()]
+        from tests.conftest import table_columns
+        cols = table_columns(conn, "clinic")
         conn.close()
     assert "instapay_qr" in cols and "instapay_handle" in cols
 

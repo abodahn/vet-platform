@@ -44,6 +44,41 @@ _PG_CONFIG: dict = {}
 _POOL = None          # psycopg2.pool.ThreadedConnectionPool once configured
 _POOL_LOCK = threading.Lock()
 
+
+def rollback_quietly(conn) -> None:
+    """Undo a failed statement so the connection stays usable.
+
+    PostgreSQL aborts the ENTIRE transaction on any error: every statement after
+    a failure returns "current transaction is aborted" until someone rolls back.
+    SQLite does not, which is why the pattern
+
+        try:    rows = conn.execute(...)      # optional panel
+        except: rows = []                     # never mind
+
+    is harmless on SQLite and catastrophic on PostgreSQL -- one optional panel
+    whose table happens not to exist silently kills every query after it on the
+    same connection, including the ones the page actually needs.
+
+    Call this in any `except` that intends to CONTINUE using the connection.
+    Safe on SQLite (rollback of a read is a no-op) and never raises, because a
+    failure to clean up must not replace the error the caller is handling.
+    """
+    try:
+        conn.rollback()
+    except Exception:
+        pass
+
+
+def is_postgres() -> bool:
+    """True when this process talks to PostgreSQL rather than SQLite.
+
+    The SQL translator handles dialect differences inside a statement, but some
+    things have no translation at all -- PRAGMA, sqlite_master, "is the database
+    file writable" -- and callers need to branch instead. They were reaching
+    into db._PG_CONFIG directly, or more often just assuming SQLite.
+    """
+    return bool(_PG_CONFIG)
+
 # ── In-process TTL cache ───────────────────────────────────────
 # { key: (value, expires_at) }
 _CACHE: dict = {}
@@ -128,8 +163,40 @@ def configure_postgres(host="localhost", port=5432, dbname="vetclinic",
 
 
 def set_path(path: str) -> None:
+    """Set the SQLite file path.
+
+    NOTE: this does NOT switch engines. _connect() checks the PostgreSQL pool
+    first, so on a process that has called configure_postgres() this call has no
+    effect on where queries go. Use use_sqlite() when you mean "send queries to
+    this file".
+    """
     global _db_path
     _db_path = path
+
+
+def use_sqlite(path: str) -> None:
+    """Actually route queries to this SQLite file, whatever was configured before.
+
+    set_path() alone is not enough and the difference is dangerous. _connect()
+    consults _POOL / _PG_CONFIG *before* _db_path, so a script that did
+
+        db.set_path("/tmp/throwaway.db")
+        wipe_everything()
+
+    on a process connected to PostgreSQL wiped the PRODUCTION database while
+    believing it was working on a scratch file. The demo seeder did exactly
+    that, and its safety guard could not catch it because the guard validates
+    the file path -- which was innocent -- and never asked which engine the
+    process was actually pointed at.
+
+    The pool is detached, not closed: the caller (or a test fixture) may restore
+    the previous globals afterwards, and closing would invalidate a pool the
+    surrounding application is still using.
+    """
+    global _db_path, _PG_CONFIG, _POOL
+    _db_path = path
+    _PG_CONFIG = {}
+    _POOL = None
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -192,6 +259,34 @@ def _fix_sql(sql: str) -> str:
     # NOW() is the correct target for both. PostgreSQL evaluates it in the
     # server's own timezone, which is what 'localtime' asks for.
     s = re.sub(r"datetime\(\s*'now'\s*(?:,\s*'localtime'\s*)?\)", "NOW()", s)
+    # SQLite date('now') -> PostgreSQL CURRENT_DATE.
+    #
+    # The sibling of the bug above, and it was still live: date() is a SQLite
+    # function and PostgreSQL has no such thing, so any statement using it died
+    # with "function date(unknown) does not exist". Two production paths in
+    # blueprints/procurement/routes.py use it -- raising a purchase order and
+    # marking one received -- which means ordering stock was broken outright on
+    # the production engine while every test passed on SQLite.
+    #
+    # `\bdate\(` cannot match inside "datetime(", which is "date" + "time(",
+    # so this stays clear of the rule above regardless of order.
+    # CURRENT_DATE needs no reverse rule: SQLite understands it natively.
+    s = re.sub(r"\bdate\(\s*'now'\s*(?:,\s*'localtime'\s*)?\)", "CURRENT_DATE", s,
+               flags=re.IGNORECASE)
+    # SQLite's two-argument MAX/MIN are SCALAR functions; PostgreSQL's MAX/MIN
+    # are aggregates only, and the scalar spelling is GREATEST/LEAST. Untranslated
+    # this died with "function max(integer, numeric) does not exist" and took out
+    # the two places that clamp a number at zero: leave balances in attendance,
+    # and point-of-sale stock in petshop. Both are UPDATEs, so on PostgreSQL the
+    # sale failed outright rather than writing a wrong number.
+    #
+    # The argument pattern deliberately excludes parens and commas, so a genuine
+    # aggregate over a nested call -- MIN(SUBSTRING(x,1,10)) -- cannot match, and
+    # neither can a one-argument aggregate.
+    s = re.sub(r"\bMAX\s*\(\s*([^(),]+?)\s*,\s*([^(),]+?)\s*\)", r"GREATEST(\1, \2)",
+               s, flags=re.IGNORECASE)
+    s = re.sub(r"\bMIN\s*\(\s*([^(),]+?)\s*,\s*([^(),]+?)\s*\)", r"LEAST(\1, \2)",
+               s, flags=re.IGNORECASE)
     # SQLite AUTOINCREMENT primary key -> PostgreSQL SERIAL
     s = re.sub(r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b', 'SERIAL PRIMARY KEY', s, flags=re.IGNORECASE)
     # TEXT DEFAULT (NOW()) -> TEXT DEFAULT (NOW()::TEXT), keeping the column TEXT
@@ -212,11 +307,30 @@ def _fix_sql(sql: str) -> str:
     if has_ignore:
         s = re.sub(r'\bINSERT\s+OR\s+IGNORE\b', 'INSERT', s, flags=re.IGNORECASE)
         s = s.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
-    # INSERT OR REPLACE -> INSERT ... ON CONFLICT DO NOTHING (simplified)
-    has_replace = bool(re.search(r'\bINSERT\s+OR\s+REPLACE\b', s, re.IGNORECASE))
-    if has_replace:
-        s = re.sub(r'\bINSERT\s+OR\s+REPLACE\b', 'INSERT', s, flags=re.IGNORECASE)
-        s = s.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+    # INSERT OR REPLACE has NO faithful generic translation, so it is refused
+    # rather than guessed at.
+    #
+    # This used to rewrite it to "ON CONFLICT DO NOTHING" -- described in the
+    # old comment as "(simplified)", which it was not: it is the OPPOSITE
+    # instruction. REPLACE means overwrite the existing row; DO NOTHING means
+    # keep it. On PostgreSQL that silently turned two real updates into no-ops:
+    # saving any clinic setting, and editing a staff leave balance. Both
+    # reported success and changed nothing, which is the worst way for a write
+    # to fail.
+    #
+    # DO UPDATE needs a conflict target (ON CONFLICT (cols)) that cannot be
+    # inferred from the statement text, so there is nothing correct to emit.
+    # Write the upsert explicitly instead -- SQLite has supported
+    # `ON CONFLICT(cols) DO UPDATE SET x=excluded.x` since 3.24, so one spelling
+    # works on both engines and needs no translation at all.
+    if re.search(r'\bINSERT\s+OR\s+REPLACE\b', s, re.IGNORECASE):
+        raise ValueError(
+            "INSERT OR REPLACE cannot be translated to PostgreSQL faithfully. "
+            "Write an explicit upsert instead: "
+            "INSERT INTO t(...) VALUES(...) "
+            "ON CONFLICT(<key cols>) DO UPDATE SET col=excluded.col. "
+            "That syntax is valid on SQLite too, so it needs no translation."
+        )
     _FIX_CACHE[sql] = s
     return s
 
@@ -523,6 +637,18 @@ class _PGCursor:
         self.lastrowid = None
         self.rowcount = 0
         self._sp_seq = 0
+
+    @property
+    def description(self):
+        """Column metadata for the last query.
+
+        Part of the DB-API that sqlite3.Cursor provides, so anything reading
+        column names off a cursor -- the usual "does this table have column X
+        yet" check -- worked on SQLite and raised AttributeError on PostgreSQL.
+        This class exists to be sqlite3-shaped; leaving a standard attribute off
+        it means the difference surfaces as a crash somewhere far away.
+        """
+        return self._cur.description
 
     def _new_sp(self) -> str:
         self._sp_seq += 1
@@ -1402,6 +1528,74 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
     FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 );
 
+-- Estimates (quotes) live in their OWN tables rather than as an invoices row
+-- with status='Estimate'. That shortcut was tempting and wrong: 27 queries in
+-- this codebase sum invoice money, and at least two filter only on
+-- status!='Cancelled'. An estimate stored as an invoice would have been booked
+-- as revenue by every one of those, silently. Separate tables mean a forgotten
+-- WHERE cannot inflate the books -- the same reasoning as database-per-tenant.
+CREATE TABLE IF NOT EXISTS estimates (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    estimate_number TEXT UNIQUE NOT NULL,
+    owner_id        INTEGER NOT NULL,
+    pet_id          INTEGER,
+    visit_id        INTEGER,
+    branch_id       INTEGER DEFAULT 1,
+    doctor_name     TEXT,
+    issue_date      TEXT NOT NULL,
+    valid_until     TEXT,
+    -- Draft/Sent/Approved/Declined/Expired/Converted
+    status          TEXT DEFAULT 'Draft',
+    subtotal        REAL DEFAULT 0.0,
+    discount_type   TEXT DEFAULT 'value',
+    discount_value  REAL DEFAULT 0.0,
+    discount_amount REAL DEFAULT 0.0,
+    tax_rate        REAL DEFAULT 0.0,
+    tax_amount      REAL DEFAULT 0.0,
+    total           REAL DEFAULT 0.0,
+    notes           TEXT,
+    decided_at      TEXT,
+    decided_by      TEXT,
+    invoice_id      INTEGER,
+    created_by      TEXT,
+    created_at      TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (owner_id) REFERENCES owners(id)
+);
+
+CREATE TABLE IF NOT EXISTS estimate_lines (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    estimate_id  INTEGER NOT NULL,
+    line_type    TEXT DEFAULT 'service',
+    item_id      INTEGER,
+    description  TEXT NOT NULL,
+    quantity     REAL DEFAULT 1.0,
+    unit_price   REAL DEFAULT 0.0,
+    discount     REAL DEFAULT 0.0,
+    total        REAL DEFAULT 0.0,
+    FOREIGN KEY (estimate_id) REFERENCES estimates(id) ON DELETE CASCADE
+);
+
+-- Client money held before there is an invoice to put it against: boarding and
+-- surgery deposits. It cannot live in `payments` because invoice_id is NOT NULL
+-- there, and it must not be invented as a column on `owners` because a single
+-- mutable balance loses the history of how it got that way. Append-only signed
+-- rows: +ve took money in, -ve gave it back or spent it. The balance is always
+-- SUM(amount), so it can be recomputed from the ledger and cannot drift.
+CREATE TABLE IF NOT EXISTS owner_credits (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id   INTEGER NOT NULL,
+    amount     REAL NOT NULL,
+    kind       TEXT NOT NULL,          -- deposit / applied / refund
+    invoice_id INTEGER,                -- set when kind='applied'
+    method     TEXT DEFAULT 'Cash',
+    reference  TEXT,
+    note       TEXT,
+    created_by TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (owner_id) REFERENCES owners(id)
+);
+
 CREATE TABLE IF NOT EXISTS payments (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     invoice_id     INTEGER NOT NULL,
@@ -2204,8 +2398,18 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
     conn = get_db()
     with conn:
         conn.executescript(_SCHEMA)
-        # PostgreSQL-mode migrations: create tables that were added after initial schema
-        if _PG_CONFIG:
+        # PostgreSQL-mode migrations: create tables that were added after initial
+        # schema.
+        #
+        # Gated on the CONNECTION, not on _PG_CONFIG. Those are different things
+        # under multi-tenancy: _connect() routes to the current tenant first, so
+        # on a PostgreSQL deployment provisioning a SQLite-backed clinic gives a
+        # _SQLiteConn while _PG_CONFIG is still set. The old check then fed
+        # `SERIAL PRIMARY KEY` and `TIMESTAMP DEFAULT NOW()` to SQLite, which
+        # died with `near "(": syntax error` -- so provisioning a SQLite clinic
+        # rolled back and failed on exactly the deployments that have more than
+        # one clinic.
+        if isinstance(conn, _PGConn):
             _run_pg_migrations(conn)
         # SOAP columns migration (safe: ADD COLUMN is idempotent via try/except)
         for _col, _type in [
@@ -2542,7 +2746,16 @@ def set_setting(key: str, value: str, category: str = "general", updated_by: str
     conn = get_db()
     with conn:
         conn.execute(
-            "INSERT OR REPLACE INTO settings(key,value,category,updated_at,updated_by) VALUES(?,?,?,datetime('now'),?)",
+            # Explicit upsert. _fix_sql renders "INSERT OR REPLACE" as
+            # "ON CONFLICT DO NOTHING", so on PostgreSQL every setting that
+            # already had a value silently kept its OLD one -- set_setting()
+            # returned normally and changed nothing. This spelling works
+            # unchanged on both engines.
+            "INSERT INTO settings(key,value,category,updated_at,updated_by) "
+            "VALUES(?,?,?,datetime('now'),?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, "
+            "category=excluded.category, updated_at=excluded.updated_at, "
+            "updated_by=excluded.updated_by",
             (key, value, category, updated_by))
     conn.close()
     cache_invalidate(f"setting:{key}")
@@ -3153,6 +3366,246 @@ def list_invoices(owner_id: Optional[int] = None, status: str = "",
     rows = conn.execute(q, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+# ─── Estimates (quotes) ───────────────────────────────────────────────────────
+
+def _next_estimate_number() -> str:
+    """Deliberately MAX(id)+1, not COUNT(*).
+
+    _next_invoice_number() uses COUNT(*), which repeats a number as soon as any
+    row is deleted -- and invoice_number is UNIQUE, so the next insert raises.
+    Not fixing that here (it would renumber a live ledger), but not copying it
+    either.
+    """
+    conn = get_db()
+    n = conn.execute("SELECT COALESCE(MAX(id),0) FROM estimates").fetchone()[0]
+    conn.close()
+    return f"EST-{date.today().year}-{(n+1):05d}"
+
+
+def _money(lines: list, data: dict) -> tuple:
+    """(subtotal, disc_amt, tax_amt, total) -- same arithmetic as create_invoice.
+
+    Shared so an approved estimate cannot total differently from the invoice it
+    becomes. A quote the client signed and a bill that says something else is
+    the one bug this feature absolutely must not have.
+    """
+    subtotal  = round(sum(round(float(l.get("total", 0)), 2) for l in lines), 2)
+    disc_type = data.get("discount_type", "value")
+    disc_val  = float(data.get("discount_value", 0) or 0)
+    disc_amt  = round(disc_val, 2) if disc_type == "value" else round(subtotal * disc_val / 100, 2)
+    tax_rate  = float(data.get("tax_rate", 0) or 0)
+    tax_amt   = round((subtotal - disc_amt) * tax_rate / 100, 2)
+    return subtotal, disc_amt, tax_amt, round(subtotal - disc_amt + tax_amt, 2)
+
+
+def create_estimate(data: dict, lines: list) -> int:
+    est_no = _next_estimate_number()
+    subtotal, disc_amt, tax_amt, total = _money(lines, data)
+    conn = get_db()
+    with conn:
+        cur = conn.execute(
+            """INSERT INTO estimates(estimate_number,owner_id,pet_id,visit_id,doctor_name,
+               issue_date,valid_until,status,subtotal,discount_type,discount_value,
+               discount_amount,tax_rate,tax_amount,total,notes,created_by)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (est_no, data["owner_id"], data.get("pet_id"), data.get("visit_id"),
+             data.get("doctor_name", ""), data.get("issue_date", date.today().isoformat()),
+             data.get("valid_until"), data.get("status", "Draft"), subtotal,
+             data.get("discount_type", "value"), float(data.get("discount_value", 0) or 0),
+             disc_amt, float(data.get("tax_rate", 0) or 0), tax_amt, total,
+             data.get("notes", ""), data.get("created_by", "")))
+        est_id = cur.lastrowid
+        for line in lines:
+            lt = float(line.get("total", float(line.get("quantity", 1)) * float(line.get("unit_price", 0))))
+            conn.execute(
+                "INSERT INTO estimate_lines(estimate_id,line_type,item_id,description,"
+                "quantity,unit_price,discount,total) VALUES(?,?,?,?,?,?,?,?)",
+                (est_id, line.get("line_type", "service"), line.get("item_id"),
+                 line.get("description", ""), float(line.get("quantity", 1)),
+                 float(line.get("unit_price", 0)), float(line.get("discount", 0)), lt))
+    conn.close()
+    return est_id
+
+
+def get_estimate(est_id: int) -> Optional[dict]:
+    conn = get_db()
+    row = conn.execute(
+        "SELECT e.*, o.full_name owner_name, o.phone owner_phone, o.whatsapp_phone,"
+        " p.pet_name FROM estimates e JOIN owners o ON o.id=e.owner_id"
+        " LEFT JOIN pets p ON p.id=e.pet_id WHERE e.id=?", (est_id,)).fetchone()
+    if not row:
+        conn.close()
+        return None
+    est = dict(row)
+    est["lines"] = [dict(r) for r in conn.execute(
+        "SELECT * FROM estimate_lines WHERE estimate_id=? ORDER BY id", (est_id,)).fetchall()]
+    conn.close()
+    return est
+
+
+def list_estimates(owner_id: Optional[int] = None, status: str = "",
+                   limit: int = 100) -> list:
+    conn = get_db()
+    q = ("SELECT e.*, o.full_name owner_name, p.pet_name FROM estimates e"
+         " JOIN owners o ON o.id=e.owner_id LEFT JOIN pets p ON p.id=e.pet_id WHERE 1=1")
+    params = []
+    if owner_id: q += " AND e.owner_id=?"; params.append(owner_id)
+    if status:   q += " AND e.status=?";   params.append(status)
+    q += " ORDER BY e.created_at DESC, e.id DESC LIMIT ?"; params.append(limit)
+    rows = conn.execute(q, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def decide_estimate(est_id: int, decision: str, decided_by: str = "") -> None:
+    """Record the client's answer. 'Approved' or 'Declined'."""
+    conn = get_db()
+    with conn:
+        conn.execute(
+            "UPDATE estimates SET status=?, decided_at=datetime('now'), decided_by=?,"
+            " updated_at=datetime('now') WHERE id=?", (decision, decided_by, est_id))
+    conn.close()
+
+
+def convert_estimate(est_id: int, created_by: str = "") -> int:
+    """Turn an approved estimate into a real invoice. Returns the invoice id.
+
+    Guarded against double-conversion: two clicks on 'Convert' would otherwise
+    bill the client twice for one quote. The guard is a re-read inside the same
+    call rather than a UNIQUE constraint because invoice_id is nullable for
+    every estimate that never converts.
+    """
+    est = get_estimate(est_id)
+    if not est:
+        raise ValueError("estimate not found")
+    if est.get("invoice_id"):
+        return int(est["invoice_id"])
+    if est.get("status") != "Approved":
+        raise ValueError("only an approved estimate can be converted")
+
+    inv_id = create_invoice({
+        "owner_id":       est["owner_id"],
+        "pet_id":         est.get("pet_id"),
+        "visit_id":       est.get("visit_id"),
+        "doctor_name":    est.get("doctor_name", ""),
+        "issue_date":     date.today().isoformat(),
+        "discount_type":  est.get("discount_type", "value"),
+        "discount_value": est.get("discount_value", 0),
+        "tax_rate":       est.get("tax_rate", 0),
+        "notes":          f"From estimate {est['estimate_number']}. {est.get('notes','') or ''}".strip(),
+        "created_by":     created_by,
+    }, est["lines"])
+
+    conn = get_db()
+    with conn:
+        conn.execute(
+            "UPDATE estimates SET status='Converted', invoice_id=?,"
+            " updated_at=datetime('now') WHERE id=?", (inv_id, est_id))
+    conn.close()
+    return inv_id
+
+
+# ─── Client deposits / account credit ─────────────────────────────────────────
+
+def owner_credit_balance(owner_id: int) -> float:
+    """Always derived from the ledger, never stored. See the table comment."""
+    conn = get_db()
+    v = conn.execute(
+        "SELECT COALESCE(SUM(amount),0) FROM owner_credits WHERE owner_id=?",
+        (owner_id,)).fetchone()[0]
+    conn.close()
+    return round(float(v or 0), 2)
+
+
+def list_owner_credits(owner_id: int, limit: int = 100) -> list:
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM owner_credits WHERE owner_id=? ORDER BY id DESC LIMIT ?",
+        (owner_id, limit)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_deposit(owner_id: int, amount: float, method: str = "Cash",
+                reference: str = "", note: str = "", created_by: str = "") -> int:
+    """Take money from a client before there is anything to bill it against."""
+    amount = round(float(amount), 2)
+    if amount <= 0:
+        raise ValueError("a deposit must be a positive amount")
+    conn = get_db()
+    with conn:
+        cur = conn.execute(
+            "INSERT INTO owner_credits(owner_id,amount,kind,method,reference,note,created_by)"
+            " VALUES(?,?,'deposit',?,?,?,?)",
+            (owner_id, amount, method, reference, note, created_by))
+        cid = cur.lastrowid
+    conn.close()
+    return cid
+
+
+def apply_credit(owner_id: int, invoice_id: int, amount: float,
+                 created_by: str = "") -> None:
+    """Spend held credit against an invoice.
+
+    Two guards, both of which protect real money:
+
+      - never more than the client actually has on account, or the clinic would
+        be crediting an invoice with money nobody ever paid;
+      - never more than the invoice still owes, or the excess disappears -- the
+        invoice cannot go below zero, so the credit would be consumed and not
+        show up anywhere.
+
+    The invoice side goes through add_payment() rather than touching
+    paid_amount, so it lands in the same ledger as every other payment and is
+    refundable and reconcilable by the same code.
+    """
+    amount = round(float(amount), 2)
+    if amount <= 0:
+        raise ValueError("the amount to apply must be positive")
+
+    balance = owner_credit_balance(owner_id)
+    if amount > balance:
+        raise ValueError(f"only {balance:.2f} is available on account")
+
+    inv = get_invoice(invoice_id)
+    if not inv:
+        raise ValueError("invoice not found")
+    due = round(float(inv.get("due_amount") or 0), 2)
+    if amount > due:
+        raise ValueError(f"this invoice only owes {due:.2f}")
+
+    conn = get_db()
+    with conn:
+        conn.execute(
+            "INSERT INTO owner_credits(owner_id,amount,kind,invoice_id,method,note,created_by)"
+            " VALUES(?,?,'applied',?,'Credit',?,?)",
+            (owner_id, -amount, invoice_id,
+             f"Applied to invoice {inv.get('invoice_number','')}", created_by))
+    conn.close()
+
+    add_payment(invoice_id, owner_id, amount, method="Credit",
+                reference="account credit", received_by=created_by)
+
+
+def refund_credit(owner_id: int, amount: float, note: str = "",
+                  created_by: str = "") -> None:
+    """Give unspent credit back to the client."""
+    amount = round(float(amount), 2)
+    if amount <= 0:
+        raise ValueError("the refund must be a positive amount")
+    balance = owner_credit_balance(owner_id)
+    if amount > balance:
+        raise ValueError(f"only {balance:.2f} is available to refund")
+    conn = get_db()
+    with conn:
+        conn.execute(
+            "INSERT INTO owner_credits(owner_id,amount,kind,method,note,created_by)"
+            " VALUES(?,?,'refund','Cash',?,?)",
+            (owner_id, -amount, note or "Refunded to client", created_by))
+    conn.close()
+
 
 def add_payment(invoice_id: int, owner_id: int, amount: float,
                 method: str = "Cash", reference: str = "", received_by: str = "",

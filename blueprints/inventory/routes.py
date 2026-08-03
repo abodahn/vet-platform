@@ -183,7 +183,7 @@ def item_new():
         conn = db.get_db()
         try:
             with conn:
-                conn.execute(
+                cur = conn.execute(
                     """INSERT INTO items(category_id, sku, barcode, name, name_ar,
                        unit, cost_price, sell_price, reorder_level, max_stock,
                        is_medication, is_controlled, requires_rx, storage_notes,
@@ -206,7 +206,11 @@ def item_new():
                         f.get("storage_notes", "").strip() or None,
                     )
                 )
-                item_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                # cur.lastrowid, NOT last_insert_rowid(): that is a SQLite
+                # function and PostgreSQL has no such thing, so creating an
+                # inventory item failed outright on the production engine. The
+                # cursor wrapper fills lastrowid from RETURNING on both engines.
+                item_id = cur.lastrowid
         except Exception as e:
             flash(f"Error creating item: {e}", "danger")
             conn.close()
@@ -259,7 +263,10 @@ def item_detail(item_id):
     stock_by_wh = [dict(r) for r in conn.execute(
         "SELECT w.name as warehouse_name, COALESCE(SUM(b.quantity),0) as qty "
         "FROM batches b JOIN warehouses w ON w.id = b.warehouse_id "
-        "WHERE b.item_id = ? AND b.quantity > 0 GROUP BY b.warehouse_id",
+        # w.name must be in the GROUP BY. SQLite allows a bare selected column
+        # and silently picks an arbitrary row for it; PostgreSQL refuses the
+        # query outright, so this whole panel 500'd on the production engine.
+        "WHERE b.item_id = ? AND b.quantity > 0 GROUP BY b.warehouse_id, w.name",
         (item_id,)
     ).fetchall()]
 

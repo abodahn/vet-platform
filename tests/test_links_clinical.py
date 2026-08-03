@@ -86,14 +86,22 @@ def test_prescription_without_a_visit_renders_cleanly(app, auth_client):
     with app.app_context():
         conn = db.get_db()
         # The FK is what normally stops this row existing; turn it off to
-        # reproduce the state a deleted visit leaves behind.
-        conn.execute("PRAGMA foreign_keys=OFF")
+        # reproduce the state a deleted visit leaves behind. PRAGMA is
+        # SQLite-only and is a syntax error on PostgreSQL, whose equivalent is
+        # to suspend the FK triggers for this session.
+        if db.is_postgres():
+            conn.execute("SET session_replication_role = replica")
+        else:
+            conn.execute("PRAGMA foreign_keys=OFF")
         with conn:
             owner_id, pet_id = _mk_owner_pet(conn, "Orphan")
             missing_visit_id = (conn.execute(
                 "SELECT COALESCE(MAX(id),0)+1000 FROM visits").fetchone()[0])
             rx_id = _mk_prescription(conn, missing_visit_id, pet_id, owner_id)
-        conn.execute("PRAGMA foreign_keys=ON")
+        if db.is_postgres():
+            conn.execute("SET session_replication_role = origin")
+        else:
+            conn.execute("PRAGMA foreign_keys=ON")
         conn.close()
 
     resp = auth_client.get(f"/pharmacy/prescription/{rx_id}")

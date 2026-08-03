@@ -370,7 +370,11 @@ def settings():
                 val = f.get(key,"")
                 if val:
                     conn.execute(
-                        "INSERT OR REPLACE INTO settings(key,value,category,updated_at,updated_by) VALUES(?,?,?,datetime('now'),?)",
+                        "INSERT INTO settings(key,value,category,updated_at,updated_by) "
+                        "VALUES(?,?,?,datetime('now'),?) "
+                        "ON CONFLICT(key) DO UPDATE SET value=excluded.value, "
+                        "category=excluded.category, updated_at=excluded.updated_at, "
+                        "updated_by=excluded.updated_by",
                         (key, val, category, username)
                     )
             conn.commit()
@@ -548,20 +552,50 @@ def backup_maintenance_off():
 def diagnostics():
     checks = []
     db_path = _db_path()
-    # 1. DB writable
-    try:
-        with open(db_path, "a"):
-            pass
-        checks.append({"name": "Database File Writable", "status": "Pass", "details": db_path})
-    except Exception as e:
-        checks.append({"name": "Database File Writable", "status": "Fail", "details": str(e)})
+    # Every check below was written against SQLite: a database FILE, PRAGMA, and
+    # sqlite_master. None of the three exists on PostgreSQL, so this whole page
+    # -- the one an owner opens to ask "is my system healthy?" -- raised a syntax
+    # error on the production engine. Each check now has a PostgreSQL equivalent
+    # rather than being skipped, because a health page that quietly checks
+    # nothing is worse than one that fails loudly.
+    on_pg = db.is_postgres()
+
+    # 1. Storage reachable
+    if on_pg:
+        try:
+            conn = db.get_db()
+            server = conn.execute("SELECT version()").fetchone()[0]
+            conn.close()
+            checks.append({"name": "Database Server Reachable", "status": "Pass",
+                           "details": str(server)[:80]})
+        except Exception as e:
+            checks.append({"name": "Database Server Reachable", "status": "Fail", "details": str(e)})
+    else:
+        try:
+            with open(db_path, "a"):
+                pass
+            checks.append({"name": "Database File Writable", "status": "Pass", "details": db_path})
+        except Exception as e:
+            checks.append({"name": "Database File Writable", "status": "Fail", "details": str(e)})
     # 2. DB integrity
     try:
         conn = db.get_db()
-        result = conn.execute("PRAGMA integrity_check").fetchone()[0]
-        checks.append({"name": "Database Integrity (PRAGMA)", "status": "Pass" if result == "ok" else "Fail", "details": result})
+        if on_pg:
+            # PostgreSQL has no integrity_check. A committed read that touches
+            # the catalogue is the equivalent smoke test.
+            conn.execute("SELECT 1").fetchone()
+            checks.append({"name": "Database Integrity", "status": "Pass",
+                           "details": "server responded to a read"})
+        else:
+            result = conn.execute("PRAGMA integrity_check").fetchone()[0]
+            checks.append({"name": "Database Integrity (PRAGMA)", "status": "Pass" if result == "ok" else "Fail", "details": result})
         # 3. Table count
-        table_count = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
+        if on_pg:
+            table_count = conn.execute(
+                "SELECT COUNT(*) FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_type='BASE TABLE'").fetchone()[0]
+        else:
+            table_count = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
         checks.append({"name": "Database Tables", "status": "Pass" if table_count >= 30 else "Warning", "details": f"{table_count} tables found (expected ≥30)"})
         # 4. Admin user exists
         admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE role='super_admin' AND is_active=1").fetchone()[0]

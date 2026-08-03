@@ -225,6 +225,35 @@ def all_tenants(active_only: bool = True) -> list:
         return [dict(r) for r in conn.execute(sql + " ORDER BY slug").fetchall()]
 
 
+def each_clinic():
+    """Yield (slug, row) for every clinic this process is responsible for,
+    with that clinic already selected as the current tenant.
+
+        for slug, row in tenancy.each_clinic():
+            run_the_nightly_job()          # already scoped to that clinic
+
+    Yields ("", {}) exactly once when no tenants are registered, so a
+    single-clinic install runs its jobs unchanged.
+
+    THIS EXISTS BECAUSE THE NIGHTLY JOBS WERE BLIND TO TENANTS. Backup,
+    WhatsApp reminders and log retention each ran once against whichever
+    database the process started with. With twenty clinics that meant nineteen
+    were never backed up and never had a reminder sent — and the backup job
+    reported success, because from where it stood it had succeeded.
+
+    One clinic raising must never stop the rest: a caller that lets an
+    exception escape would leave every clinic after it in the list unbacked up.
+    Callers iterate and handle their own failures per clinic.
+    """
+    rows = all_tenants(active_only=True)
+    if not rows:
+        yield "", {}
+        return
+    for row in rows:
+        with use(row["slug"]):
+            yield row["slug"], row
+
+
 def target(slug: str = None) -> dict:
     """Where the given tenant's data lives: {'db_path':...} or {'pg_dsn':...}.
 

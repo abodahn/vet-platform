@@ -32,6 +32,7 @@ import os
 import shutil
 import sqlite3
 import subprocess
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote, urlparse
@@ -69,9 +70,75 @@ def configure(db_path: str, backup_dir: str) -> None:
     Path(backup_dir).mkdir(parents=True, exist_ok=True)
 
 
+# Set only while backing up one specific clinic in a multi-tenant deployment.
+# Empty means "use the deployment's own database", which is every single-clinic
+# install and the behaviour this module had before tenants existed.
+_tenant_dsn: str = ""
+
+
+@contextmanager
+def for_clinic(slug: str, db_path: str = "", pg_dsn: str = ""):
+    """Point this module at one clinic's database for the duration of a block.
+
+    Each clinic gets its OWN archive directory. Sharing one would be worse than
+    untidy: retention purges by age across the whole directory, so the clinic
+    that backs up most often would delete the archives of the ones that do not.
+
+    Restores the previous target on the way out, including on exception — a
+    failure mid-loop must not leave the next clinic, or the manual backup
+    button, pointed at somebody else's database.
+    """
+    global _db_path, _backup_dir, _tenant_dsn
+    prev = (_db_path, _backup_dir, _tenant_dsn)
+    try:
+        if slug:
+            _backup_dir = str(Path(prev[1]) / slug)
+            Path(_backup_dir).mkdir(parents=True, exist_ok=True)
+            _db_path = db_path or ""
+            _tenant_dsn = pg_dsn or ""
+        yield
+    finally:
+        _db_path, _backup_dir, _tenant_dsn = prev
+
+
 def _postgres_dsn() -> str:
-    """The DSN this deployment is actually using, or '' when on SQLite."""
-    return os.environ.get("POSTGRES_DSN", "").strip()
+    """The DSN this backup should use, or '' when the target is SQLite.
+
+    A per-clinic DSN wins over the deployment's: in a multi-tenant install the
+    process-wide POSTGRES_DSN points at whichever database the app started
+    with, and using it for every clinic would dump the same database N times
+    under N different clinic names — the most dangerous possible outcome,
+    because every archive would look present and correct.
+    """
+    if _tenant_dsn:
+        return _tenant_dsn.strip()
+    env = os.environ.get("POSTGRES_DSN", "").strip()
+    if env:
+        return env
+    # Fall back to what the app is ACTUALLY connected to.
+    #
+    # Reading only the environment variable meant the backup chose its engine
+    # from configuration that the running process may never have used. A
+    # deployment that configures PostgreSQL through the app config rather than
+    # POSTGRES_DSN -- which config.py fully supports -- got a backup that went
+    # looking for a SQLite file, found nothing, and failed every night with
+    # "source database is not there" while the clinic's real data sat in
+    # PostgreSQL, unbacked-up.
+    #
+    # db._PG_CONFIG is set by configure_postgres() from whatever source won, so
+    # it is the only honest answer to "which database is this process using".
+    try:
+        import models.database as _db
+        cfg = getattr(_db, "_PG_CONFIG", None)
+        if cfg:
+            user = quote(str(cfg.get("user", "")), safe="")
+            pwd  = quote(str(cfg.get("password", "")), safe="")
+            auth = f"{user}:{pwd}@" if user else ""
+            return (f"postgresql://{auth}{cfg.get('host','localhost')}:"
+                    f"{cfg.get('port',5432)}/{cfg.get('dbname','')}")
+    except Exception:
+        logger.exception("could not derive a PostgreSQL DSN from the live connection")
+    return ""
 
 
 def _fail(msg: str) -> dict:

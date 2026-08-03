@@ -1374,7 +1374,14 @@ def run(target: str, force: bool = False, wipe_only: bool = False,
         parent = os.path.dirname(path)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        db.set_path(path)
+        # use_sqlite(), not set_path(). set_path only assigns _db_path, and
+        # _connect() consults the PostgreSQL pool FIRST -- so on a process
+        # already connected to PostgreSQL (a server with POSTGRES_DSN set, or
+        # anything that imported the app) this function wiped and reseeded the
+        # LIVE PostgreSQL database while resolve_guard() happily approved the
+        # harmless-looking file path it was handed. run() wipes before it seeds,
+        # so that was a demo-data overwrite of a clinic's real records.
+        db.use_sqlite(path)
 
     db.init_db(admin_user="admin", admin_pass=os.environ.get("DEMO_ADMIN_PASS", DEMO_PASSWORD))
     ensure_module_tables()

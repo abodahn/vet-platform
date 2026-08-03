@@ -124,7 +124,16 @@ def test_diagnostics_reports_the_live_database_as_healthy(app, admin):
     assert "Super Admin User Exists" in body
     assert "Clinic Record" in body
     # The page must name the database it actually checked, not a hardcoded path.
-    assert os.path.basename(target) in body
+    # On PostgreSQL there IS no database file to name -- the whole page used to
+    # raise there, because every check was written against SQLite (a file,
+    # PRAGMA, sqlite_master). It now reports the server instead, so the identity
+    # assertion has to follow the engine rather than assume a filename.
+    import models.database as _db
+    if _db.is_postgres():
+        assert "Database Server Reachable" in body
+        assert "PostgreSQL" in body, "the page did not identify the server it checked"
+    else:
+        assert os.path.basename(target) in body
     assert 'class="status-fail"' not in body, (
         "a diagnostics check failed on a healthy database")
     assert body.count('class="status-pass"') >= 6
@@ -142,6 +151,9 @@ def test_diagnostics_is_closed_to_a_role_without_system_access(app, client):
 # BACKUP — the archive has to be a database, not just a file
 # ═════════════════════════════════════════════════════════════════════════════
 
+@pytest.mark.skipif(
+    bool(os.environ.get("TEST_POSTGRES_DSN")),
+    reason="asserts SQLite archive internals; PostgreSQL backups are pg_dump files")
 def test_backup_run_produces_a_readable_archive_holding_the_real_rows(app, admin):
     target = _safe(app)
     with app.app_context():
@@ -170,6 +182,9 @@ def test_backup_run_produces_a_readable_archive_holding_the_real_rows(app, admin
         conn.close()
 
 
+@pytest.mark.skipif(
+    bool(os.environ.get("TEST_POSTGRES_DSN")),
+    reason="asserts SQLite archive internals; PostgreSQL backups are pg_dump files")
 def test_backup_run_writes_an_audit_row(app, admin):
     _safe(app)
     with app.app_context():
@@ -290,6 +305,9 @@ def test_upload_writes_an_audit_row(app, admin, tmp_path):
     ("truncated header", b"SQLite format 3\x00" + b"\x00" * 100),
     ("garbage", b"not a database at all" * 40),
 ])
+@pytest.mark.skipif(
+    bool(os.environ.get("TEST_POSTGRES_DSN")),
+    reason="asserts SQLite archive internals; PostgreSQL backups are pg_dump files")
 def test_restore_refuses_a_corrupt_archive_and_touches_nothing(app, admin,
                                                                label, payload):
     """The live database must be byte-identical afterwards and no pre-restore
@@ -317,6 +335,9 @@ def test_restore_refuses_a_corrupt_archive_and_touches_nothing(app, admin,
     assert bk.maintenance_active() is None, "maintenance was left on after a refusal"
 
 
+@pytest.mark.skipif(
+    bool(os.environ.get("TEST_POSTGRES_DSN")),
+    reason="swaps a SQLite database file; PostgreSQL restores are pg_restore")
 def test_restore_is_cancelled_when_the_typed_filename_does_not_match(app, admin,
                                                                      tmp_path):
     target = _safe(app)
@@ -340,6 +361,9 @@ def test_restore_refuses_a_traversal_filename(admin):
                         "reach for when something went wrong months ago"),
     (None, "fresh, taken today"),
 ])
+@pytest.mark.skipif(
+    bool(os.environ.get("TEST_POSTGRES_DSN")),
+    reason="asserts SQLite archive internals; PostgreSQL backups are pg_dump files")
 def test_a_good_restore_snapshots_first_then_swaps(app, admin, tmp_path,
                                                    monkeypatch, stamp, why):
     """Driven through the real route, but pointed at a fresh database in

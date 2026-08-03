@@ -5,7 +5,7 @@ Covers: HR dashboard, staff CRUD with full profile, shift assignment,
 """
 import hashlib
 import logging
-from datetime import date
+from datetime import date, timedelta
 from flask import (
     render_template, request, redirect, url_for,
     session, flash, jsonify,
@@ -267,7 +267,10 @@ def dashboard():
         "SELECT COUNT(*) FROM leave_requests WHERE status='Pending'"
     ).fetchone()[0]
 
-    # Payroll this month
+    # Payroll this month. Year and month are bound from Python rather than asked
+    # of the database: period_year/period_month are plain integers, and
+    # EXTRACT returns numeric on PostgreSQL, so the comparison depended on an
+    # implicit cast that is not guaranteed.
     try:
         pm = conn.execute("""
             SELECT COUNT(*) AS tot,
@@ -275,22 +278,40 @@ def dashboard():
                    COUNT(*) FILTER (WHERE status='Paid') AS paid_cnt,
                    COALESCE(SUM(net) FILTER (WHERE status='Paid'),0) AS paid_net
             FROM salaries
-            WHERE period_year=EXTRACT(YEAR FROM CURRENT_DATE)
-              AND period_month=EXTRACT(MONTH FROM CURRENT_DATE)
-        """).fetchone()
+            WHERE period_year=? AND period_month=?
+        """, (int(today[:4]), int(today[5:7]))).fetchone()
         payroll_stats = dict(pm) if pm else {}
     except Exception:
+        # Logged, not swallowed silently. On PostgreSQL a caught error still
+        # aborts the transaction, so a query that fails here breaks every later
+        # query on this connection -- and used to do it invisibly.
+        logger.exception("HR dashboard: payroll summary failed")
+        db.rollback_quietly(conn)
         payroll_stats = {}
 
     # Recent hires (last 90 days)
+    #
+    # THE BUG THAT TOOK OUT THE WHOLE PAGE. hire_date is a TEXT column, and
+    # `CURRENT_DATE - INTERVAL '90 days'` is a date, so PostgreSQL refused the
+    # comparison. The `except` below swallowed it -- but PostgreSQL aborts the
+    # ENTIRE TRANSACTION on any error, so every query after this one on the same
+    # connection failed with "current transaction is aborted", including ones
+    # that were perfectly valid. One silently-caught error took down the rest of
+    # the HR dashboard.
+    #
+    # The cutoff is computed in Python and bound, so it is a text-to-text
+    # comparison on both engines and cannot fail in the first place.
+    cutoff_90 = (date.today() - timedelta(days=90)).isoformat()
     try:
         recent_hires = [dict(r) for r in conn.execute(
             """SELECT id, full_name, role, hire_date, contract_type, job_title
                FROM users
-               WHERE hire_date >= (CURRENT_DATE - INTERVAL '90 days') AND is_active=1
-               ORDER BY hire_date DESC LIMIT 6"""
+               WHERE hire_date >= ? AND is_active=1
+               ORDER BY hire_date DESC LIMIT 6""", (cutoff_90,)
         ).fetchall()]
     except Exception:
+        logger.exception("HR dashboard: recent hires failed")
+        db.rollback_quietly(conn)
         recent_hires = []
 
     pending_reviews = 0
@@ -299,7 +320,8 @@ def dashboard():
             "SELECT COUNT(*) FROM performance_reviews WHERE status='Draft'"
         ).fetchone()[0]
     except Exception:
-        pass
+        logger.exception("HR dashboard: pending reviews failed")
+        db.rollback_quietly(conn)
 
     # Staff without shift assignment
     unassigned_shifts = conn.execute("""
@@ -311,34 +333,52 @@ def dashboard():
           )
     """, (today,)).fetchone()[0]
 
-    # Birthdays this month (by dob month/day)
+    # dob and hire_date are TEXT columns holding ISO dates, so EXTRACT(... FROM dob)
+    # asked PostgreSQL to pull a field out of a string and raised
+    # "function pg_catalog.extract(unknown, text) does not exist". Both panels sit
+    # inside `except: pass`, so on the production engine they did not error --
+    # they silently rendered EMPTY, every month, and nobody could tell the
+    # difference between "no birthdays" and "this feature does not work".
+    #
+    # substr on an ISO date is native to both engines: YYYY-MM-DD, so month is
+    # characters 6-7 and day is 9-10. The month is bound from Python rather than
+    # asking the database for its own idea of today.
+    this_month = today[5:7]
+
     birthdays_this_month = []
     try:
         birthdays_this_month = [dict(r) for r in conn.execute("""
             SELECT id, full_name, role, dob,
-                   EXTRACT(DAY FROM dob) AS bday
+                   substr(dob,9,2) AS bday
             FROM users
-            WHERE is_active=1 AND dob IS NOT NULL
-              AND EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM CURRENT_DATE)
-            ORDER BY EXTRACT(DAY FROM dob)
-        """).fetchall()]
+            WHERE is_active=1 AND dob IS NOT NULL AND dob <> ''
+              AND substr(dob,6,2) = ?
+            ORDER BY substr(dob,9,2)
+        """, (this_month,)).fetchall()]
     except Exception:
-        pass
+        db.rollback_quietly(conn)
 
     # Work anniversaries this month
     anniversaries_this_month = []
     try:
         anniversaries_this_month = [dict(r) for r in conn.execute("""
-            SELECT id, full_name, role, hire_date,
-                   EXTRACT(YEAR FROM AGE(hire_date))::int AS years
+            SELECT id, full_name, role, hire_date
             FROM users
-            WHERE is_active=1 AND hire_date IS NOT NULL
-              AND EXTRACT(MONTH FROM hire_date) = EXTRACT(MONTH FROM CURRENT_DATE)
-              AND hire_date < CURRENT_DATE
-            ORDER BY EXTRACT(DAY FROM hire_date)
-        """).fetchall()]
+            WHERE is_active=1 AND hire_date IS NOT NULL AND hire_date <> ''
+              AND substr(hire_date,6,2) = ?
+              AND hire_date < ?
+            ORDER BY substr(hire_date,9,2)
+        """, (this_month, today)).fetchall()]
+        # Years of service in Python: AGE() is PostgreSQL-only, and the
+        # arithmetic is a subtraction the database has no business doing.
+        this_year = int(today[:4])
+        for a in anniversaries_this_month:
+            try:
+                a["years"] = this_year - int(str(a["hire_date"])[:4])
+            except (ValueError, TypeError):
+                a["years"] = 0
     except Exception:
-        pass
+        db.rollback_quietly(conn)
 
     # Certifications expiring in next 30 days
     expiring_certs = []
@@ -354,7 +394,7 @@ def dashboard():
         for c in expiring_certs:
             c["days_left"] = _days_left(c["expiry_date"])
     except Exception:
-        pass
+        db.rollback_quietly(conn)
 
     # Recent warnings (last 5)
     recent_warnings = []
@@ -366,7 +406,7 @@ def dashboard():
             ORDER BY sw.created_at DESC LIMIT 5
         """).fetchall()]
     except Exception:
-        pass
+        db.rollback_quietly(conn)
 
     # Pending overtime approvals
     pending_overtime = 0
@@ -375,7 +415,7 @@ def dashboard():
             "SELECT COUNT(*) FROM overtime_log WHERE status='Pending'"
         ).fetchone()[0]
     except Exception:
-        pass
+        db.rollback_quietly(conn)
 
     conn.close()
     return render_template("hr/dashboard.html",
@@ -553,6 +593,7 @@ def staff_new():
             flash(f"Staff member '{username}' created successfully.", "success")
             return redirect(url_for("hr.staff_list"))
         except Exception as e:
+            db.rollback_quietly(conn)
             flash(f"Error creating user: {e}", "danger")
             conn2 = db.get_db()
             branches, shifts = _get_form_deps(conn2)
@@ -614,6 +655,7 @@ def staff_detail(user_id):
             ORDER BY period_year DESC, period_month DESC LIMIT 6
         """, (user_id,)).fetchall()]
     except Exception:
+        db.rollback_quietly(conn)
         salary_history = []
 
     # Attendance this month
@@ -630,6 +672,7 @@ def staff_detail(user_id):
         """, (user_id, month_start)).fetchone()
         att_summary = dict(att) if att else {}
     except Exception:
+        db.rollback_quietly(conn)
         att_summary = {}
 
     # Leave balances this year
@@ -654,17 +697,31 @@ def staff_detail(user_id):
             WHERE sw.user_id=? ORDER BY sw.issued_date DESC
         """, (user_id,)).fetchall()]
     except Exception:
-        pass
+        db.rollback_quietly(conn)
 
     # Certifications
+    #
+    # expiry_date is a DATE column, so psycopg2 hands back a datetime.date while
+    # sqlite3 hands back a string. The template compared it to an ISO string,
+    # which is fine on SQLite and raises
+    # "'<' not supported between instances of 'datetime.date' and 'str'" on
+    # PostgreSQL -- taking out the whole staff profile page. Deciding "expired"
+    # here, where the value's type is known, keeps that judgement out of a
+    # template that cannot ask which engine it is running on.
     certifications = []
     try:
         certifications = [dict(r) for r in conn.execute(
             "SELECT * FROM staff_certifications WHERE user_id=? ORDER BY expiry_date ASC NULLS LAST",
             (user_id,)
         ).fetchall()]
+        for c in certifications:
+            left = _days_left(c.get("expiry_date"))
+            c["days_left"] = left
+            c["expired"] = (left is not None and left < 0)
+            if c.get("expiry_date"):
+                c["expiry_date"] = str(c["expiry_date"])[:10]
     except Exception:
-        pass
+        db.rollback_quietly(conn)
 
     # HR Notes
     hr_notes = []
@@ -675,7 +732,7 @@ def staff_detail(user_id):
             WHERE sn.user_id=? ORDER BY sn.created_at DESC LIMIT 20
         """, (user_id,)).fetchall()]
     except Exception:
-        pass
+        db.rollback_quietly(conn)
 
     # Overtime log (last 10)
     overtime = []
@@ -687,7 +744,7 @@ def staff_detail(user_id):
             WHERE ol.user_id=? ORDER BY ol.work_date DESC LIMIT 10
         """, (user_id,)).fetchall()]
     except Exception:
-        pass
+        db.rollback_quietly(conn)
 
     conn.close()
     return render_template("hr/staff_detail.html",
@@ -738,6 +795,7 @@ def staff_edit(user_id):
             flash("Staff member updated successfully.", "success")
             return redirect(url_for("hr.staff_detail", user_id=user_id))
         except Exception as e:
+            db.rollback_quietly(conn)
             flash(f"Error updating user: {e}", "danger")
 
     return render_template("hr/staff_form.html",
@@ -889,6 +947,7 @@ def performance_new():
             flash("Performance review created.", "success")
             return redirect(url_for("hr.performance_list"))
         except Exception as e:
+            db.rollback_quietly(conn)
             conn.close()
             flash(f"Error: {e}", "danger")
 
@@ -957,6 +1016,7 @@ def performance_edit(rev_id):
             flash("Review updated.", "success")
             return redirect(url_for("hr.performance_detail", rev_id=rev_id))
         except Exception as e:
+            db.rollback_quietly(conn)
             conn.close()
             flash(f"Error: {e}", "danger")
 
@@ -1014,6 +1074,7 @@ def add_warning(user_id):
         conn.commit()
         flash("Warning recorded.", "warning")
     except Exception as e:
+        db.rollback_quietly(conn)
         flash(f"Error: {e}", "danger")
     finally:
         conn.close()
@@ -1089,6 +1150,7 @@ def add_certification(user_id):
         conn.commit()
         flash("Certification added.", "success")
     except Exception as e:
+        db.rollback_quietly(conn)
         flash(f"Error: {e}", "danger")
     finally:
         conn.close()
@@ -1124,6 +1186,7 @@ def add_note(user_id):
         conn.commit()
         flash("Note saved.", "success")
     except Exception as e:
+        db.rollback_quietly(conn)
         flash(f"Error: {e}", "danger")
     finally:
         conn.close()
@@ -1301,6 +1364,7 @@ def add_overtime(user_id):
         conn.commit()
         flash(f"{hours}h overtime recorded.", "success")
     except Exception as e:
+        db.rollback_quietly(conn)
         flash(f"Error: {e}", "danger")
     finally:
         conn.close()
@@ -1511,6 +1575,7 @@ def hr_attendance_add():
         conn.commit()
         flash("Attendance record saved.", "success")
     except Exception as e:
+        db.rollback_quietly(conn)
         flash(f"Error: {e}", "danger")
     finally:
         conn.close()

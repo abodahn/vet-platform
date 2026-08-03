@@ -4,7 +4,7 @@ All API calls proxy through the backend so the token stays server-side.
 """
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import (
     render_template, request, redirect, url_for,
     session, flash, jsonify, Response,
@@ -816,6 +816,14 @@ def reminder_admin():
         "SELECT COUNT(*) FROM reminders WHERE status='Failed'"
     ).fetchone()[0]
 
+    # Bound as a parameter rather than NOW(). `scheduled_for` is a TEXT column,
+    # and PostgreSQL will not compare text to the timestamptz that NOW() returns
+    # -- "operator does not exist: text >= timestamp with time zone" -- so this
+    # whole screen 500'd on the production engine while passing on SQLite, which
+    # compares the two as strings without complaint. A bound ISO string is
+    # correct on both and sorts identically to the values already stored.
+    now_s = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     # Upcoming reminders (next 7 days)
     upcoming = [dict(r) for r in conn.execute(
         """SELECT r.*, o.full_name as owner_name, o.whatsapp_phone,
@@ -824,9 +832,9 @@ def reminder_admin():
            LEFT JOIN owners o ON r.owner_id = o.id
            LEFT JOIN pets   p ON r.pet_id   = p.id
            WHERE r.status='Pending'
-           AND r.scheduled_for >= NOW()
+           AND r.scheduled_for >= ?
            ORDER BY r.scheduled_for
-           LIMIT 50"""
+           LIMIT 50""", (now_s,)
     ).fetchall()]
 
     # Overdue reminders
@@ -837,9 +845,9 @@ def reminder_admin():
            LEFT JOIN owners o ON r.owner_id = o.id
            LEFT JOIN pets   p ON r.pet_id   = p.id
            WHERE r.status='Pending'
-           AND r.scheduled_for < NOW()
+           AND r.scheduled_for < ?
            ORDER BY r.scheduled_for
-           LIMIT 50"""
+           LIMIT 50""", (now_s,)
     ).fetchall()]
 
     # Recent run log
@@ -1109,13 +1117,24 @@ def scheduler_run():
 def scheduler_clear_history():
     """Clear reminder_runs history older than 30 days."""
     conn = db.get_db()
+    # One portable statement instead of try-PostgreSQL-then-fall-back-to-SQLite.
+    #
+    # run_at is a TEXT column, so `run_at < NOW() - INTERVAL '30 days'` made
+    # PostgreSQL compare text to a timestamp and refuse. That failure ABORTED
+    # THE TRANSACTION, so the SQLite fallback in the except could not run either
+    # -- it died with "current transaction is aborted" and the user was told
+    # "Could not clear history". The fallback existed precisely for this case
+    # and was unreachable.
+    #
+    # Binding the cutoff as an ISO string makes it a text-to-text comparison on
+    # both engines, so neither branch is needed.
+    cutoff = (datetime.now() - timedelta(days=30)).isoformat(sep=" ", timespec="seconds")
     try:
-        conn.execute(
-            "DELETE FROM reminder_runs WHERE run_at < NOW() - INTERVAL '30 days'"
-        )
+        conn.execute("DELETE FROM reminder_runs WHERE run_at < ?", (cutoff,))
         conn.commit()
         flash("History cleared (entries older than 30 days removed).", "success")
     except Exception:
+        db.rollback_quietly(conn)
         try:
             conn.execute(
                 "DELETE FROM reminder_runs WHERE run_at < datetime('now', '-30 days')"
