@@ -19,3 +19,18 @@ pytest>=8.0.0
 #
 # See scripts/run_postgres_tests.py for the one-command version.
 pgembed>=0.2.0
+
+# Reads back the PDFs the app writes, so a test can assert that a medical
+# history report actually contains the diagnosis and that no Arabic letter was
+# dropped on the way to paper.
+#
+# This replaced ~90 lines of hand-rolled PDF in tests/test_crm_routes.py:
+# inflate the page streams, scrape /ToUnicode CMaps, undo string escaping, map
+# glyph ids back to characters. It decoded every glyph run with every font's
+# map and accepted any result that matched, so the wrong subset's numbering
+# produced plausible garbage -- a test passed for a year on text the PDF never
+# contained, then failed claiming letters were being dropped from medical
+# records when nothing was wrong. A test helper that can raise a false alarm
+# about a patient record has negative value. pypdf is pure Python, has no
+# transitive dependencies, and is right.
+pypdf>=5.0.0

@@ -379,104 +379,39 @@ def test_pet_edit_rejects_blank_name_without_writing(app, auth_client):
 
 # ═══ crm.pet_history_pdf ══════════════════════════════════════════════════════
 
-_PDF_ESCAPES = {0x6E: 10, 0x72: 13, 0x74: 9, 0x62: 8, 0x66: 12}   # n r t b f
+def _pdf_text(data: bytes) -> str:
+    """Every character drawn into a PDF, as Unicode.
 
+    This used to be ninety lines of hand-rolled PDF: inflate the page streams,
+    scrape /ToUnicode CMaps, undo string escaping, map 2-byte glyph ids back to
+    characters. It got the answer wrong in both directions. First it decoded
+    every literal with every font's map and asked whether ANY result contained
+    the needle -- so the wrong subset's numbering produced plausible garbage
+    that happened to contain "Patient:", and the test passed on an artifact.
+    Then, when the page data shifted, the same garbage stopped containing it
+    and the suite reported "Arabic letters are being dropped from medical
+    records" about a PDF that was correct all along.
 
-def _pdf_unescape(lit: bytes) -> bytes:
-    """Undo PDF string escaping inside a `( ... )` literal.
+    A test helper that can raise a false alarm about a medical record is worse
+    than no helper. pypdf resolves fonts to their CMaps properly; the whole
+    thing is now one line, and it is right.
 
-    Glyph ids are 2-byte big-endian, so a glyph whose low byte happens to be
-    0x0D arrives as the two characters `\\r` and a naive "drop the backslash"
-    turns it into 0x72 — silently decoding to the wrong letter. That is how the
-    letter `د` (glyph 0x000D here) went missing from this decoder's output.
+    NFKC because the shaper writes Arabic as presentation forms (U+FE70..FEFF).
+    "did any letter get dropped" is a question about letters, not about which
+    contextual form they were drawn in.
     """
-    out = bytearray()
-    i = 0
-    while i < len(lit):
-        if lit[i] != 0x5C:                       # not a backslash
-            out.append(lit[i])
-            i += 1
-            continue
-        i += 1
-        if i >= len(lit):
-            break
-        if 0x30 <= lit[i] <= 0x37:               # \ooo octal, up to 3 digits
-            j = 0
-            while j < 3 and i + j < len(lit) and 0x30 <= lit[i + j] <= 0x37:
-                j += 1
-            out.append(int(lit[i:i + j], 8) & 0xFF)
-            i += j
-        elif lit[i] == 0x0A:                     # line continuation
-            i += 1
-        else:
-            out.append(_PDF_ESCAPES.get(lit[i], lit[i]))
-            i += 1
-    return bytes(out)
+    import unicodedata
+    from io import BytesIO
 
+    from pypdf import PdfReader
 
-def _pdf_variants(data: bytes) -> list:
-    """The text drawn into a PDF, decoded back to Unicode — one string per font.
-
-    Nothing in this repo can parse a PDF, and `b"Limping" in data` is always
-    False: fpdf2 deflates every page stream and writes embedded-font text as
-    2-byte glyph ids. zlib plus the document's own /ToUnicode CMaps is enough to
-    read it back, which is what makes it possible to assert that a report
-    contains a diagnosis rather than only that it is 4 KB of something.
-
-    Regular and Bold are separate subsets with separate glyph numbering, and the
-    page stream switches between them mid-page, so no single map decodes the
-    whole page. Decoding once per map and letting the caller ask "does any one
-    variant contain all of these" is the cheap correct answer — text drawn in
-    one weight always lands in one variant together.
-    """
-    import re
-    import zlib
-
-    # No `\r?\n` required before `endstream`. fpdf2 does not always write one --
-    # whether it does depends on the compressed byte length, which changes with
-    # the DATA on the page. So this decoder silently returned "" for some pet
-    # names and not others, and the test read as "Arabic letters are being
-    # dropped from medical records" when the PDF was correct all along.
-    # A decoder that fails by returning nothing makes every assertion built on
-    # it either vacuous or alarming, and there is no way to tell which.
-    streams = []
-    for raw in re.findall(rb"stream\r?\n(.*?)endstream", data, re.S):
-        raw = raw.rstrip(b"\r\n")
-        try:
-            streams.append(zlib.decompress(raw))
-        except Exception:
-            streams.append(raw)
-
-    # /ToUnicode: `<glyph-id> <utf-16be codepoint(s)>`
-    maps = []
-    for s in streams:
-        pairs = re.findall(rb"<([0-9A-Fa-f]{4})>\s*<([0-9A-Fa-f]{4,})>", s)
-        if pairs:
-            maps.append({int(g, 16): "".join(
-                chr(int(u[i:i + 4], 16)) for i in range(0, len(u), 4))
-                for g, u in pairs})
-
-    # Both text operators. `Tj` draws one string; `TJ` draws an array of strings
-    # with kerning numbers between them, and fpdf2 emits either depending on the
-    # run. Reading only Tj means a page drawn as TJ decodes to nothing.
-    literals = []
-    for s in streams:
-        for lit in re.findall(rb"\((.*?)\)\s*Tj", s, re.S):
-            literals.append(_pdf_unescape(lit))
-        for arr in re.findall(rb"\[(.*?)\]\s*TJ", s, re.S):
-            joined = b"".join(re.findall(rb"\((.*?)\)", arr, re.S))
-            if joined:
-                literals.append(_pdf_unescape(joined))
-
-    return ["\n".join(
-        "".join(gid.get(int.from_bytes(lit[i:i + 2], "big"), "�")
-                for i in range(0, len(lit) - 1, 2))
-        for lit in literals) for gid in maps]
+    return unicodedata.normalize("NFKC", "\n".join(
+        page.extract_text() or "" for page in PdfReader(BytesIO(data)).pages))
 
 
 def _pdf_has(data: bytes, *needles) -> bool:
-    """True when one single decoding contains every needle."""
-    return any(all(n in v for n in needles) for v in _pdf_variants(data))
+    text = _pdf_text(data)
+    return all(n in text for n in needles)
 
 
 def test_pdf_text_helper_reads_back_what_was_drawn():
@@ -492,6 +427,7 @@ def test_pdf_text_helper_reads_back_what_was_drawn():
     assert _pdf_has(data, "Cranial cruciate rupture")
     assert _pdf_has(data, "د", "و")
     assert not _pdf_has(data, "Cranial cruciate ruptures")
+    assert _pdf_text(data).strip(), "the decoder returned nothing at all"
 
 
 def test_pet_history_pdf_contains_the_medical_record(app, auth_client):
@@ -530,7 +466,10 @@ def test_pet_history_pdf_contains_the_medical_record(app, auth_client):
     assert resp.data[:4] == b"%PDF"
     assert "attachment" in resp.headers["Content-Disposition"]
 
-    assert _pdf_has(resp.data, "Patient:", "Pdfdog")
+    # The report has no "Patient:" label -- the pet's name is a heading under
+    # "Patient Medical History Report". The old assertion only ever passed
+    # because a mis-decoded glyph run happened to spell it.
+    assert _pdf_has(resp.data, "Patient Medical History Report", "Pdfdog")
     assert _pdf_has(resp.data, "01000000820"), \
         "the owner's phone is missing from the report"
     assert _pdf_has(resp.data, "Rabies"), \
@@ -588,15 +527,23 @@ def test_arabic_letters_that_do_not_join_are_not_dropped_from_the_pdf(app, auth_
 
     resp = auth_client.get(f"/crm/pets/{pid}/history.pdf")
     assert resp.status_code == 200
-    variants = _pdf_variants(resp.data)
-    assert any("Patient:" in v for v in variants), \
-        "the report did not render its own patient header"
+    text = _pdf_text(resp.data)
+    assert "Patient Medical History Report" in text, \
+        "the report did not render its own header"
 
-    # every letter, in the same weight as the "Patient:" label it sits next to
-    assert _pdf_has(resp.data, "Patient:", *set(AR_NOTDEF_BAIT)), (
-        f"a letter of {AR_NOTDEF_BAIT!r} was dropped to notdef — the pet's name "
-        f"is wrong on the printed record. Decoded: "
-        f"{[v for v in variants if 'Patient:' in v]}")
+    missing = sorted(set(AR_NOTDEF_BAIT) - set(text))
+    assert not missing, (
+        f"{missing} dropped to notdef from {AR_NOTDEF_BAIT!r} — the pet's name "
+        f"is wrong on the printed record. Extracted: {text[:400]!r}")
+
+    # Not just the letters in isolation: the name must survive as one word, or
+    # a reordered "دودو" would pass a per-letter check while printing nonsense.
+    assert AR_NOTDEF_BAIT in text, (
+        f"every letter of {AR_NOTDEF_BAIT!r} is present but the name is not "
+        f"intact. Extracted: {text[:400]!r}")
+
+    # The owner's name is drawn by the same shaper, in a different weight.
+    assert "رشا عبد الرازق" in text, "the owner's Arabic name did not survive"
 
 
 # ═══ loyalty — redeem ═════════════════════════════════════════════════════════
