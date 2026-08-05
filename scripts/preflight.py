@@ -154,21 +154,71 @@ def check_database():
         check("Database reachable", FAIL, str(exc)[:120])
 
 
-def check_backups():
+def _configure_like_the_app():
+    """Point models.backup and models.tenancy where create_app() points them.
+
+    Both keep their target in module globals that ONLY create_app() sets, and
+    preflight never builds an app. So every check below ran against an
+    unconfigured module and reported "no backup has ever been taken" and "no
+    clinics registered" on a server that demonstrably had both -- a go-live
+    gate that cries wolf is a go-live gate people learn to skip, which is worse
+    than not having one.
+
+    Derived exactly as app.py:156 derives it. If this and create_app() ever
+    disagree, preflight is checking somewhere the server never looks.
+    """
     import models.backup as bk
+    from config import Config
+    from models import tenancy
+    data_dir = os.path.dirname(Config.DATABASE_PATH) or "."
+    bk.configure(db_path=Config.DATABASE_PATH,
+                 backup_dir=os.path.join(data_dir, "backups"))
+    tenancy.configure(os.path.join(data_dir, "tenants.db"))
+
+
+def _report_backups(label, get_health):
     try:
-        h = bk.health()
+        h = get_health()
     except Exception as exc:
-        check("Backups", FAIL, f"could not read backup health: {str(exc)[:80]}")
+        check(label, FAIL, f"could not read backup health: {str(exc)[:80]}")
         return
     if not h.get("has_backup"):
-        check("Backups", FAIL,
+        check(label, FAIL,
               "no backup has ever been taken. Run one and open the archive "
               "before handing this to anyone.")
     elif h.get("stale"):
-        check("Backups", FAIL, h.get("message", "the last backup is out of date"))
+        check(label, FAIL, h.get("message", "the last backup is out of date"))
     else:
-        check("Backups", OK, h.get("message", ""))
+        check(label, OK, h.get("message", ""))
+
+
+def check_backups():
+    import models.backup as bk
+    from models import tenancy
+    _configure_like_the_app()
+
+    try:
+        clinics = tenancy.all_tenants(active_only=True)
+    except Exception:
+        clinics = []
+
+    if not clinics:
+        _report_backups("Backups", bk.health)
+        return
+
+    # Per clinic, because each one has its OWN archive directory. "The server
+    # has a backup" answers the wrong question: with twenty clinics it is true
+    # the moment any single one of them is backed up, and the other nineteen
+    # can have nothing at all.
+    for row in clinics:
+        slug = row["slug"]
+
+        def _health(row=row, slug=slug):
+            with bk.for_clinic(slug, db_path=row.get("db_path", ""),
+                               pg_dsn=row.get("pg_dsn", "")):
+                return bk.health()
+
+        _report_backups(f"Backups: {slug}", _health)
 
 
 def check_pg_dump():
@@ -185,6 +235,7 @@ def check_pg_dump():
 
 def check_clinics():
     from models import tenancy
+    _configure_like_the_app()
     try:
         rows = tenancy.all_tenants(active_only=False)
     except Exception:

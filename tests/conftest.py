@@ -167,9 +167,17 @@ def _restore_db_globals():
     # which works right up until someone writes a new one and forgets. Guarding
     # it centrally means they cannot.
     saved_bk = (bk._db_path, bk._backup_dir, bk._tenant_dsn)
+    # models.tenancy has the identical hazard: its registry path is a module
+    # global, and anything that calls tenancy.configure() -- provisioning,
+    # scripts/preflight.py, scripts/add_clinic.py -- repoints it for every test
+    # that follows. A leaked registry is worse than a leaked db path, because
+    # the wrong registry does not error; it just reports the wrong clinics.
+    from models import tenancy
+    saved_tn = tenancy._registry_path
     yield
     db._db_path, db._PG_CONFIG, db._POOL = saved
     bk._db_path, bk._backup_dir, bk._tenant_dsn = saved_bk
+    tenancy._registry_path = saved_tn
     # The latch is now keyed by database, so it corrects itself when a test
     # points the DB elsewhere — this clear is belt and braces, kept because it
     # costs nothing and documents the hazard.

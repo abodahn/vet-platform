@@ -252,6 +252,18 @@ def create_app(cfg=None) -> Flask:
     # ── Security middleware ──────────────────────────────────────────────────
     @app.before_request
     def _security_checks():
+        # Resolve the clinic BEFORE anything else touches a database.
+        #
+        # UnknownTenant used to be raised lazily, at whichever line first
+        # reached get_db(). A page that renders without reading data — the
+        # sign-in page is exactly that — therefore came back 200 under a
+        # subdomain no clinic is registered at. No records leaked (target()
+        # still refused the moment a query ran), but a stranger typing
+        # "demoo.aleefy.online" got a branded login form that could never work,
+        # and every real clinic's subdomain typo looked like a live login page.
+        # Deciding once, here, makes the 404 the FIRST thing that happens.
+        tenancy.target()
+
         # Session timeout check
         if sec.check_session_timeout():
             session.clear()
@@ -283,8 +295,21 @@ def create_app(cfg=None) -> Flask:
     def _inject_globals():
         user = session.get("user") or {}
         theme = user.get("theme_preference") or session.get("theme") or "medical"
-        lang  = user.get("language") or session.get("lang") or "en"
-        clinic = db.get_clinic()
+        # The fallback is the language a VISITOR sees — the sign-in page, the
+        # error pages, anything before a user row exists. Hardcoding "en" meant
+        # an Egyptian clinic's first screen was English on an Arabic-first
+        # product. Deployment decides: PLATFORM_DEFAULT_LANG=ar.
+        lang  = (user.get("language") or session.get("lang")
+                 or os.environ.get("PLATFORM_DEFAULT_LANG", "en"))
+        # An error page must render when the database is exactly what is broken.
+        # This is the single choke point every template render passes through,
+        # so an exception here turns any handled error into an unhandled 500 —
+        # which is how UnknownTenant (a deliberate, caught 404) became a 500 on
+        # every mistyped subdomain, and fired a manager alert each time.
+        try:
+            clinic = db.get_clinic()
+        except Exception:
+            clinic = {}
         # CSRF token for templates
         csrf_token = sec.generate_csrf_token()
         # Unread notification count

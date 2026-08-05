@@ -432,8 +432,16 @@ def _pdf_variants(data: bytes) -> list:
     import re
     import zlib
 
+    # No `\r?\n` required before `endstream`. fpdf2 does not always write one --
+    # whether it does depends on the compressed byte length, which changes with
+    # the DATA on the page. So this decoder silently returned "" for some pet
+    # names and not others, and the test read as "Arabic letters are being
+    # dropped from medical records" when the PDF was correct all along.
+    # A decoder that fails by returning nothing makes every assertion built on
+    # it either vacuous or alarming, and there is no way to tell which.
     streams = []
-    for raw in re.findall(rb"stream\r?\n(.*?)\r?\nendstream", data, re.S):
+    for raw in re.findall(rb"stream\r?\n(.*?)endstream", data, re.S):
+        raw = raw.rstrip(b"\r\n")
         try:
             streams.append(zlib.decompress(raw))
         except Exception:
@@ -448,10 +456,17 @@ def _pdf_variants(data: bytes) -> list:
                 chr(int(u[i:i + 4], 16)) for i in range(0, len(u), 4))
                 for g, u in pairs})
 
+    # Both text operators. `Tj` draws one string; `TJ` draws an array of strings
+    # with kerning numbers between them, and fpdf2 emits either depending on the
+    # run. Reading only Tj means a page drawn as TJ decodes to nothing.
     literals = []
     for s in streams:
         for lit in re.findall(rb"\((.*?)\)\s*Tj", s, re.S):
             literals.append(_pdf_unescape(lit))
+        for arr in re.findall(rb"\[(.*?)\]\s*TJ", s, re.S):
+            joined = b"".join(re.findall(rb"\((.*?)\)", arr, re.S))
+            if joined:
+                literals.append(_pdf_unescape(joined))
 
     return ["\n".join(
         "".join(gid.get(int.from_bytes(lit[i:i + 2], "big"), "�")

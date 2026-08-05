@@ -1446,6 +1446,18 @@ def run(target: str, force: bool = False, wipe_only: bool = False,
         n_exp, n_close = seed_finance_extras(conn, rnd, today)
         n_wa, n_notif, n_audit = seed_comms(conn, rnd, today, users)
 
+        # init_db() only creates the admin when the users table is EMPTY, so on
+        # a database that add_clinic.py provisioned first it silently keeps the
+        # password add_clinic generated -- while this script goes on to PRINT
+        # the one it was given. The credential on screen did not open the
+        # system, which is the worst possible failure for a demo being read
+        # aloud to a customer. The seeder owns every other row here; it owns
+        # this one too.
+        admin_pass = os.environ.get("DEMO_ADMIN_PASS", DEMO_PASSWORD)
+        conn.execute("UPDATE users SET password_hash=? WHERE username=?",
+                     (db._hash(admin_pass), "admin"))
+        conn.commit()
+
         counts = dict(
             staff=len(users), owners=len(owners), pets=len(pets),
             items=len(items), suppliers=len(suppliers), low_stock_items=n_low,

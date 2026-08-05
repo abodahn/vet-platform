@@ -913,9 +913,23 @@
     btn.addEventListener('click',function(){
       var lang=this.getAttribute('data-lang-btn');
       var token=(document.querySelector('meta[name=csrf-token]')||{}).content||'';
-      fetch('/settings/lang/'+lang,{method:'POST',headers:{'X-CSRF-Token':token}})
-        .then(function(){location.reload();})
-        .catch(function(){document.cookie='lang='+lang+';path=/';location.reload();});
+      /* settings.set_lang is POST /settings/lang and reads request.form['lang'].
+         This posted to /settings/lang/<lang> with no body, so it 404'd every
+         time -- and fetch() does not reject on 404, so .then() reloaded the
+         page anyway and the button looked like it had worked. On an
+         Arabic-first product the language switch was dead in the toolbar, and
+         the only way to change language was the profile page. */
+      fetch('/settings/lang',{
+        method:'POST',
+        headers:{'X-CSRF-Token':token,
+                 'Content-Type':'application/x-www-form-urlencoded'},
+        body:'lang='+encodeURIComponent(lang)
+      }).then(function(resp){
+        /* Only reload when it actually took. Reloading regardless is what hid
+           this bug for so long. */
+        if(resp.ok){location.reload();}
+        else{console.error('language switch failed: '+resp.status);}
+      }).catch(function(e){console.error('language switch failed',e);});
     });
   });
 

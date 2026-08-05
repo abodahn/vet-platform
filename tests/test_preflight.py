@@ -43,6 +43,18 @@ def pf(monkeypatch, tmp_path):
     monkeypatch.setenv("SESSION_COOKIE_SECURE", "1")
     monkeypatch.setenv("CORS_ALLOWED_ORIGIN", "https://aleefy.online")
     monkeypatch.delenv("POSTGRES_DSN", raising=False)
+    # preflight now derives the backup dir and the tenant registry from
+    # Config.DATABASE_PATH, exactly as create_app() does. Point that at tmp so
+    # a developer's real data/ directory cannot decide whether a test passes.
+    # setattr, not setenv: Config reads the environment at import time.
+    from config import Config
+    dbfile = tmp_path / "platform.db"
+    monkeypatch.setattr(Config, "DATABASE_PATH", str(dbfile))
+    # check_database() opens that same path, so it has to be a real database.
+    # The autouse _restore_db_globals fixture puts models.database back after.
+    import models.database as db
+    db.use_sqlite(str(dbfile))
+    db.init_db(admin_user="admin", admin_pass="preflight-fixture-pass")
     import models.backup as bk
     monkeypatch.setattr(bk, "health",
                         lambda: {"has_backup": True, "stale": False,
@@ -170,3 +182,65 @@ def test_a_check_that_itself_errors_is_reported_not_swallowed(pf, monkeypatch):
     monkeypatch.setattr(pf, "CHECKS", [explode])
     assert pf.run([]) == 1
     assert any(s == "FAIL" for s, _, _ in pf._results)
+
+
+# ── it has to look where the server actually looks ───────────────────────────
+#
+# Found on the live demo server: preflight reported "no backup has ever been
+# taken" and "no clinics registered" on a box that had a verified backup and a
+# registered clinic. models.backup and models.tenancy keep their target in
+# module globals that only create_app() sets, and preflight never builds an
+# app -- so both checks ran against an unconfigured module and failed shut.
+#
+# Failing shut is the right default. Failing shut ALWAYS is a gate people
+# learn to ignore, which is the same as having no gate at all.
+
+def test_preflight_configures_backup_where_create_app_does(pf, tmp_path):
+    import models.backup as bk
+    pf._configure_like_the_app()
+    assert bk._backup_dir == os.path.join(str(tmp_path), "backups")
+    assert bk._db_path == str(tmp_path / "platform.db")
+
+
+def test_preflight_configures_the_tenant_registry(pf, tmp_path):
+    from models import tenancy
+    pf._configure_like_the_app()
+    assert tenancy._registry_path == os.path.join(str(tmp_path), "tenants.db")
+
+
+def test_registered_clinics_are_reported_not_missed(pf, tmp_path):
+    from models import tenancy
+    tenancy.configure(str(tmp_path / "tenants.db"))
+    with tenancy._registry() as conn:
+        conn.execute(
+            "INSERT INTO tenants (slug,name,db_path,status) VALUES (?,?,?,?)",
+            ("demo", "Demo Clinic", str(tmp_path / "demo.db"), "active"))
+        conn.commit()
+    pf.run([])
+    assert _statuses(pf).get("Clinics registered") == "OK"
+
+
+def test_backups_are_checked_per_clinic_not_once_for_the_server(pf, tmp_path,
+                                                               monkeypatch):
+    """Two clinics, one backed up. The server "has a backup" either way; the
+    clinic that does not must still be named and must still block."""
+    from models import tenancy
+    import models.backup as bk
+    tenancy.configure(str(tmp_path / "tenants.db"))
+    with tenancy._registry() as conn:
+        for slug in ("backedup", "forgotten"):
+            conn.execute(
+                "INSERT INTO tenants (slug,name,db_path,status) VALUES (?,?,?,?)",
+                (slug, slug, str(tmp_path / f"{slug}.db"), "active"))
+        conn.commit()
+
+    monkeypatch.setattr(bk, "health", lambda: (
+        {"has_backup": True, "stale": False, "message": "1 hour ago"}
+        if bk._backup_dir.endswith("backedup")
+        else {"has_backup": False, "stale": True, "message": ""}))
+
+    rc = pf.run([])
+    st = _statuses(pf)
+    assert st.get("Backups: backedup") == "OK"
+    assert st.get("Backups: forgotten") == "FAIL"
+    assert rc == 1, "a clinic with no backup at all must block go-live"
