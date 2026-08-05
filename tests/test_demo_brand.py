@@ -100,3 +100,39 @@ def test_reset_puts_the_generic_demo_back(demo_tenant):
 def test_it_needs_a_name_or_reset(demo_tenant):
     with pytest.raises(SystemExit):
         demo_brand.main(["--slug", "demo"])
+
+
+# ── it has to find the registry on its own ───────────────────────────────────
+#
+# The first version of this script died with UnknownTenant on the live server
+# while the clinic plainly existed: models.tenancy keeps its registry path in a
+# module global that only create_app() sets, and a CLI script never builds an
+# app. scripts/preflight.py had the identical bug, found the same day. The
+# fixture above configured tenancy by hand, so the tests passed and the command
+# did not work.
+
+def test_it_configures_the_registry_itself(app, tmp_path, monkeypatch):
+    """No create_app, no fixture setting it up -- exactly how it runs in a car
+    outside a clinic."""
+    import demo_brand
+    from models import tenancy
+
+    registry = tmp_path / "tenants.db"
+    monkeypatch.setattr(tenancy, "_registry_path", "")
+    monkeypatch.setenv("TENANT_REGISTRY", str(registry))
+
+    demo_brand._configure_registry()
+    assert tenancy._registry_path == str(registry)
+
+
+def test_it_falls_back_to_the_path_create_app_uses(app, tmp_path, monkeypatch):
+    import demo_brand
+    from config import Config
+    from models import tenancy
+
+    monkeypatch.setattr(tenancy, "_registry_path", "")
+    monkeypatch.delenv("TENANT_REGISTRY", raising=False)
+    monkeypatch.setattr(Config, "DATABASE_PATH", str(tmp_path / "platform.db"))
+
+    demo_brand._configure_registry()
+    assert tenancy._registry_path == os.path.join(str(tmp_path), "tenants.db")

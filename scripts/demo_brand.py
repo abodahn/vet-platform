@@ -38,6 +38,26 @@ DEMO_DEFAULTS = dict(
 )
 
 
+def _configure_registry() -> None:
+    """Point tenancy where create_app() points it.
+
+    models.tenancy keeps the registry path in a module global that ONLY
+    create_app() sets, and a CLI script never builds an app -- so without this
+    every run dies with UnknownTenant on a server where the clinic plainly
+    exists. scripts/preflight.py had the identical bug. Derived the same way
+    add_clinic.py derives it, so the three agree.
+    """
+    if tenancy._registry_path:
+        return
+    env = os.environ.get("TENANT_REGISTRY", "").strip()
+    if env:
+        tenancy.configure(env)
+        return
+    from config import Config
+    tenancy.configure(os.path.join(
+        os.path.dirname(Config.DATABASE_PATH) or ".", "tenants.db"))
+
+
 def _guard(slug: str) -> None:
     """A rename is harmless; a rename of the wrong clinic is a support call
     from a customer whose system suddenly carries a stranger's name."""
@@ -62,6 +82,7 @@ def main(argv=None) -> int:
     a = p.parse_args(argv)
 
     _guard(a.slug)
+    _configure_registry()
 
     fields = dict(DEMO_DEFAULTS) if a.reset else {}
     if not a.reset:
