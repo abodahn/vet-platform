@@ -948,6 +948,49 @@ def finish_inventory(conn, rnd: Random, today: date, items):
     return low
 
 
+def seed_prior_vaccinations(conn, rnd: Random, today: date, pets, users) -> int:
+    """Vaccination history from BEFORE the digital record starts.
+
+    Every vaccination seeded above is next due exactly 365 days after it was
+    given, and the visit history only goes back 182 days -- so nothing in this
+    dataset is ever due, and the reminder screen, the overdue count and the
+    WhatsApp reminder queue all render empty.
+
+    That is the single worst thing this demo could get wrong. "The system tells
+    you which animals are due and messages the owner" is one of the three
+    reasons a vet buys this at all, and demonstrating it as an empty list is
+    worse than not showing it.
+
+    A real clinic on day one has exactly this: paper vaccination history older
+    than anything in the computer. So give roughly half the animals a shot from
+    last year, dated so the year falls due across a realistic spread -- some
+    already overdue, some this week, some later this month.
+    """
+    doctors = [users[u]["full_name"] for u in DOCTORS if u in users]
+    n = 0
+    for pid, _oid, species, _name in pets:
+        if rnd.random() > 0.55:
+            continue
+        # 330..400 days ago -> due between 35 days overdue and 35 days out.
+        given = today - timedelta(days=rnd.randint(330, 400))
+        name = ("FVRCP Feline Vaccine" if species == "Cat"
+                else "DHPP Combo Vaccine" if species == "Dog"
+                else "Multivalent Vaccine")
+        conn.execute(
+            "INSERT INTO vaccinations (pet_id,visit_id,vaccine_name,vaccine_brand,"
+            "batch_number,dose_number,administered_by,administered_at,next_due_at,"
+            "site,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (pid, None, name, rnd.choice(["Nobivac", "Vanguard", "Purevax"]),
+             f"VB{rnd.randint(10000, 99999)}", 1,
+             rnd.choice(doctors) if doctors else "dr.sara",
+             given.isoformat(), (given + timedelta(days=365)).isoformat(),
+             "Subcutaneous", "سجل ورقي سابق — قبل التحول للنظام",
+             _dt(given, 10)))
+        n += 1
+    conn.commit()
+    return n
+
+
 def seed_grooming_boarding(conn, rnd: Random, today: date, pets):
     gs = conn.execute("SELECT id, name, price FROM grooming_services").fetchall()
     rooms = conn.execute("SELECT id, name, room_type, price_per_night FROM boarding_rooms").fetchall()
@@ -1438,6 +1481,7 @@ def run(target: str, force: bool = False, wipe_only: bool = False,
         services = {r["code"]: dict(r) for r in conn.execute(
             "SELECT code, name, name_ar, standard_price FROM service_catalog").fetchall()}
         clinical = seed_clinical(conn, rnd, today, users, owners, pets, items, services)
+        n_prior_vax = seed_prior_vaccinations(conn, rnd, today, pets, users)
         n_low = finish_inventory(conn, rnd, today, items)
         n_groom, n_board = seed_grooming_boarding(conn, rnd, today, pets)
         n_inpatient = seed_inpatient(conn, rnd, today, users, pets)
@@ -1466,6 +1510,7 @@ def run(target: str, force: bool = False, wipe_only: bool = False,
             attendance=n_att, leave_requests=n_leave, payslips=n_pay, hr_records=n_hr,
             expenses=n_exp, daily_closings=n_close,
             whatsapp=n_wa, notifications=n_notif, audit=n_audit,
+            prior_vaccinations=n_prior_vax,
             **clinical,
         )
     finally:
