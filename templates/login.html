@@ -314,6 +314,34 @@ body {
   transform: scale(1.05);
 }
 
+/* Language switch.
+   The only language control used to live at the bottom of the sidebar, and the
+   sign-in page has no sidebar -- so the first screen anyone sees was fixed in
+   whatever language the deployment defaulted to, with no way out of it until
+   after they had signed in. */
+.lang-switch {
+  position: absolute;
+  top: 24px; right: 74px;
+  display: flex;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  height: 40px;
+}
+[dir="rtl"] .lang-switch { right: auto; left: 74px; }
+[dir="rtl"] .theme-toggle { right: auto; left: 24px; }
+.lang-btn {
+  padding: 0 12px;
+  background: var(--bg);
+  border: none;
+  font: 600 0.78rem/1 inherit;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.lang-btn:hover { background: var(--border); }
+.lang-btn.active { background: var(--brand, #0B7A6B); color: #fff; }
+
 .form-inner {
   width: 100%;
   max-width: 360px;
@@ -676,6 +704,21 @@ body {
 
 <!-- ══ RIGHT PANEL — Login Form ════════════════════════════════════════════ -->
 <div class="form-panel">
+
+  <!-- Language switch. A plain form, not fetch: this page has no JS
+       dependency of its own and the route already reads request.form. -->
+  <form class="lang-switch" method="post" action="{{ url_for('settings.set_lang') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    {# set_lang falls back to the Referer header, which browsers and privacy
+       settings are free to strip -- and losing it would land a signed-out
+       visitor on the launcher, which bounces them straight back here having
+       apparently done nothing. #}
+    <input type="hidden" name="next" value="{{ url_for('auth.login') }}">
+    <button class="lang-btn {% if (current_lang or 'en') != 'ar' %}active{% endif %}"
+            type="submit" name="lang" value="en" lang="en">EN</button>
+    <button class="lang-btn {% if current_lang == 'ar' %}active{% endif %}"
+            type="submit" name="lang" value="ar" lang="ar">عربي</button>
+  </form>
 
   <!-- Theme toggle -->
   <button class="theme-toggle" id="theme-toggle" title="{{ t('Toggle theme', 'تبديل الوضع') }}" aria-label="{{ t('Toggle dark/light mode', 'تبديل الوضع الليلي/النهاري') }}">

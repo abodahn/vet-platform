@@ -86,3 +86,39 @@ def test_switching_back_to_english_flips_it_returns(auth_client):
 
 def test_an_unknown_language_falls_back_rather_than_breaking(auth_client):
     assert _switch(auth_client, "fr") == "ltr"
+
+
+# ── the sign-in page needs its own switch ────────────────────────────────────
+#
+# The toolbar buttons live in the sidebar, and login.html has no sidebar. So the
+# first screen anyone sees -- including a vet being shown the demo -- was locked
+# to whatever PLATFORM_DEFAULT_LANG the deployment set, with no way out until
+# after they had signed in. On an Arabic-first product sold to some clinics that
+# work in English, that is the wrong first impression and no way to fix it.
+
+def test_the_sign_in_page_has_a_language_switch(client):
+    body = client.get("/auth/login").get_data(as_text=True)
+    assert 'name="lang" value="ar"' in body, "no Arabic button on the sign-in page"
+    assert 'name="lang" value="en"' in body, "no English button on the sign-in page"
+
+
+def test_a_signed_out_visitor_can_switch_language(client):
+    """No session, no user row -- the route must still take it."""
+    assert _page_direction(client.get("/auth/login").get_data(as_text=True)) == "ltr"
+
+    r = client.post("/settings/lang", data={"lang": "ar"})
+    assert r.status_code in (200, 302), r.status_code
+    assert _page_direction(
+        client.get("/auth/login").get_data(as_text=True)) == "rtl"
+
+
+def test_switching_language_returns_to_the_sign_in_page(client):
+    """set_lang redirects to `next`, then the Referer, then the launcher. A
+    signed-out visitor sent to the launcher gets bounced back here having
+    apparently accomplished nothing, so login.html posts `next` explicitly."""
+    body = client.get("/auth/login").get_data(as_text=True)
+    assert 'name="next" value="/auth/login"' in body
+
+    r = client.post("/settings/lang", data={"lang": "ar", "next": "/auth/login"})
+    assert r.status_code == 302
+    assert r.headers["Location"].endswith("/auth/login")
