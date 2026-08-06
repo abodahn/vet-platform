@@ -17,14 +17,58 @@ from blueprints.petsy import routes as petsy
 
 
 def test_real_ip_is_used_not_proxy_address(app):
-    """Behind a proxy every visitor would otherwise share one rate-limit bucket."""
+    """Behind a proxy every visitor would otherwise share one rate-limit bucket.
+
+    This used to assert the LEFTMOST X-Forwarded-For entry, which is the
+    documented meaning of the header but is only trustworthy when every hop is
+    trusted. Ours is not: nginx is configured with $proxy_add_x_forwarded_for,
+    which APPENDS the real peer to whatever the client sent — so the leftmost
+    value is chosen by the client. A security audit proved it live: five failed
+    logins carrying a forged address locked that address out for fifteen
+    minutes and wrote the forged address into the audit log.
+
+    X-Real-IP is set by nginx to $remote_addr on every request and cannot be
+    influenced by the client. Prefer it; fall back to the RIGHTMOST hop, which
+    is the one our own nginx appended.
+    """
+    from flask import request
+
+    # 1. X-Real-IP wins, even against a forged X-Forwarded-For.
     with app.test_request_context(
         "/petsy/chat", method="POST",
-        headers={"X-Forwarded-For": "197.1.2.3, 10.0.0.1"},
+        headers={"X-Forwarded-For": "197.1.2.3, 10.0.0.1", "X-Real-IP": "10.0.0.1"},
         environ_base={"REMOTE_ADDR": "10.0.0.1"},
     ):
-        from flask import request
-        assert petsy._sec.get_real_ip(request) == "197.1.2.3"
+        assert petsy._sec.get_real_ip(request) == "10.0.0.1"
+
+    # 2. Without it, the hop nginx appended — not the one the client sent.
+    with app.test_request_context(
+        "/petsy/chat", method="POST",
+        headers={"X-Forwarded-For": "203.0.113.99, 41.44.1.7"},
+        environ_base={"REMOTE_ADDR": "10.0.0.1"},
+    ):
+        assert petsy._sec.get_real_ip(request) == "41.44.1.7"
+
+    # 3. The original point still holds: two visitors, two buckets.
+    seen = set()
+    for peer in ("41.44.1.7", "156.205.9.9"):
+        with app.test_request_context(
+            "/petsy/chat", method="POST", headers={"X-Real-IP": peer},
+        ):
+            seen.add(petsy._sec.get_real_ip(request))
+    assert len(seen) == 2, "all visitors collapsed into one rate-limit bucket"
+
+
+def test_a_forged_forwarded_for_cannot_choose_the_bucket(app):
+    """The attack the audit demonstrated: pick a victim's address, spend five
+    failed logins, and refuse that address for fifteen minutes."""
+    from flask import request
+    with app.test_request_context(
+        "/petsy/chat", method="POST",
+        headers={"X-Forwarded-For": "203.0.113.77", "X-Real-IP": "41.44.1.7"},
+        environ_base={"REMOTE_ADDR": "41.44.1.7"},
+    ):
+        assert petsy._sec.get_real_ip(request) != "203.0.113.77"
 
 
 def test_empty_message_rejected(client):

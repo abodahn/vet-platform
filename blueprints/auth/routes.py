@@ -342,6 +342,24 @@ def _establish_session(user_row, theme, lang, ip, method="password") -> dict:
     session.pop(_PENDING_2FA, None)
     session.permanent = True
     session["user"]   = user
+    # WHICH CLINIC this session belongs to.
+    #
+    # Without it the cookie is a bearer token for the whole deployment: one
+    # SECRET_KEY signs every clinic's cookies, login_required only asks
+    # "is there a user in the session", and get_db() routes purely by the
+    # subdomain in the URL. So a receptionist at clinic A could open
+    # clinicb.aleefy.online, her clinic-A cookie would ride along, and she
+    # would be logged in against clinic B's database at her own role.
+    #
+    # Proved against the live server before this line existed: an admin cookie
+    # minted on demo.aleefy.online returned 200 and real financial rows on the
+    # default database under a different Host header.
+    #
+    # The database-per-clinic isolation was always correct. Only the session
+    # forgot which clinic it was for. app.py enforces the match on every
+    # request; storing it is the other half.
+    from models import tenancy
+    session["tenant"] = tenancy.current()
     session["theme"]  = user.get("theme_preference", theme)
     session["lang"]   = lang
     sec.touch_session()

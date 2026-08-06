@@ -459,6 +459,18 @@
 {% block scripts %}
 {{ super() }}
 <script>
+/* tojson, not bare interpolation. Today's date is server-set and harmless,
+   but a Jinja value pasted straight into a JS template literal is the pattern
+   that made an inventory item name executable in the purchase-order form, so
+   the rule is: no Jinja output inside a backtick string, with no exceptions to
+   remember. tests/test_security_audit_fixes.py enforces it across every
+   template.
+
+   NOTE TO WHOEVER EDITS THIS: a JavaScript comment is not a comment to Jinja.
+   Writing the example syntax in here is itself a template error — it cost a
+   broken Reception page and eight failing tests to learn that twice. */
+const TODAY = {{ today_str | tojson }};
+
 /* ── Owner search filter ─────────────────────────────────── */
 const searchInput  = document.getElementById('ownerSearchInput');
 const ownerResults = document.getElementById('ownerResults');
@@ -501,10 +513,14 @@ async function selectOwner(row) {
     if (pets.length === 0) {
       petsWrap.innerHTML = '<span style="font-size:0.78rem;color:var(--cl-text-muted)">No pets registered</span>';
     } else {
+      /* escapeHtml on every value: pet_name and species come from the PUBLIC
+         booking API (/api/public/book, no auth, no CSRF), so a stranger can
+         put markup in them and it lands on this exact screen — the one the
+         receptionist opens to check the morning's bookings. */
       petsWrap.innerHTML = pets.map(p =>
         `<a class="pet-chip"
-            href="/appointments/new?owner_id=${ownerId}&pet_id=${p.id}&date={{ today_str }}">
-           🐾 ${p.pet_name}${p.species ? ' <span style="opacity:.7;font-size:.72rem">(${p.species})</span>' : ''}
+            href="/appointments/new?owner_id=${encodeURIComponent(ownerId)}&pet_id=${encodeURIComponent(p.id)}&date=${TODAY}">
+           🐾 ${escapeHtml(p.pet_name)}${p.species ? ` <span style="opacity:.7;font-size:.72rem">(${escapeHtml(p.species)})</span>` : ''}
          </a>`
       ).join('');
     }

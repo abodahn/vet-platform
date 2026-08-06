@@ -6,6 +6,33 @@
 (function () {
   'use strict';
 
+  /* ── HTML escaping ──────────────────────────────────────────
+     Global, because the alternative is every screen remembering.
+
+     A security audit found three screens building rows with innerHTML from
+     unescaped API data, and one of the sources is the PUBLIC booking form:
+     anyone on the internet can POST /api/public/book with a pet named
+     "<img src=x onerror=...>", and it runs in the receptionist's browser the
+     moment she opens the day's bookings. The cookie is HttpOnly so it cannot
+     be stolen — it does not need to be. The script runs inside her session,
+     reads the CSRF token out of <meta name="csrf-token">, and acts as her.
+
+     Escaping at the sink is the fix that cannot be bypassed by a new input
+     path, which is why it lives here and not in a validator.
+
+     Prefer document.createElement + .textContent where the markup is simple;
+     use this where string-building is genuinely easier to read. */
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"'`]/g, function (c) {
+      return {
+        '&': '&amp;', '<': '&lt;', '>': '&gt;',
+        '"': '&quot;', "'": '&#39;', '`': '&#96;'
+      }[c];
+    });
+  }
+  window.escapeHtml = escapeHtml;
+  window.esc = window.esc || escapeHtml;
+
   /* ── Theme ─────────────────────────────────────────────────── */
 
   const THEMES = ['medical', 'logo'];

@@ -306,9 +306,20 @@ function searchOwner(q){
       .then(function(data){
         var dd=document.getElementById('owner-dropdown');
         if(!data.length){dd.style.display='none';return;}
-        dd.innerHTML=data.map(function(o){
-          return '<div class="owner-opt" onclick="selectOwner('+o.id+',\''+o.full_name+'\')">'+o.full_name+' — '+o.phone+'</div>';
-        }).join('');
+        /* Built with the DOM, not string concatenation. The old version put
+           o.full_name straight into innerHTML AND into an inline onclick
+           handler inside a single-quoted string — an owner name containing a
+           quote broke the page, and one containing markup ran as script. Owner
+           names arrive from the PUBLIC booking API, so the attacker needs no
+           account at all. */
+        dd.textContent='';
+        data.forEach(function(o){
+          var el=document.createElement('div');
+          el.className='owner-opt';
+          el.textContent=(o.full_name||'')+' — '+(o.phone||'');
+          el.addEventListener('click',function(){selectOwner(o.id,o.full_name);});
+          dd.appendChild(el);
+        });
         dd.style.display='block';
       });
   },300);

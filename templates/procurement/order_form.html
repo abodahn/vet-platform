@@ -107,7 +107,43 @@
 <script>
 // Starts past the server-rendered rows so an added line never reuses an index.
 var lineCount = {{ [prefill|length, 1]|max }};
-var itemOptions = `{% for it in items %}<option value="{{ it.id }}">{{ it.name }} ({{ it.unit }})</option>{% endfor %}`;
+// Data as JSON, markup built in the DOM.
+//
+// This was a backtick template literal with the item name interpolated into
+// it by Jinja (the example is not written out here: a JS comment is not a
+// comment to Jinja, and spelling it would break the page). Jinja
+// autoescaping protects HTML — & < > " ' — and does NOT touch a backtick or
+// ${...}. So an inventory item named  ${fetch('/system/users')...}  rendered
+// harmlessly in the stock list and then EXECUTED here, as whoever opened this
+// page, the moment the literal was evaluated. No angle brackets involved, so
+// it survived any review that greps for <script>.
+//
+// | tojson is the right escaper for putting server data into JavaScript, and
+// the rest of the codebase already uses it (imaging/analyzer.html,
+// reports/builder.html).
+var ITEMS = {{ items | map(attribute='id') | list | tojson }};
+var ITEM_LABELS = {{ items | map(attribute='name') | list | tojson }};
+var ITEM_UNITS = {{ items | map(attribute='unit') | list | tojson }};
+
+function buildItemSelect(name, onchange) {
+  var sel = document.createElement('select');
+  sel.name = name;
+  sel.className = 'pf-input';
+  sel.style.fontSize = '.85rem';
+  sel.setAttribute('onchange', onchange);
+  var blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = '— Select Item —';
+  sel.appendChild(blank);
+  ITEMS.forEach(function (id, i) {
+    var o = document.createElement('option');
+    o.value = id;
+    // textContent, so a name can contain anything at all and stays a name.
+    o.textContent = (ITEM_LABELS[i] || '') + ' (' + (ITEM_UNITS[i] || '') + ')';
+    sel.appendChild(o);
+  });
+  return sel;
+}
 
 function addLine() {
   lineCount++;
@@ -116,10 +152,7 @@ function addLine() {
   row.id = 'line_' + n;
   row.innerHTML = `
     <td>
-      <select name="item_id_${n}" class="pf-input" onchange="updateRow(${n})" style="font-size:.85rem">
-        <option value="">— Select Item —</option>
-        ${itemOptions}
-      </select>
+      <span data-item-select></span>
       <input type="hidden" name="description_${n}" id="desc_${n}" value="">
     </td>
     <td><input type="number" name="quantity_${n}" id="qty_${n}" class="pf-input" step="0.01" min="0" value="1" onchange="updateRow(${n})" style="font-size:.85rem"></td>
@@ -127,6 +160,10 @@ function addLine() {
     <td><span id="total_${n}" style="font-weight:600;color:var(--pf-primary)">0.00</span></td>
     <td><button type="button" onclick="removeLine(${n})" class="pf-btn pf-btn-ghost" style="padding:2px 6px;color:#ef4444">✕</button></td>
   `;
+  // The <select> is built with the DOM and swapped in, so no item name ever
+  // becomes markup or JavaScript.
+  var slot = row.querySelector('[data-item-select]');
+  slot.replaceWith(buildItemSelect('item_id_' + n, 'updateRow(' + n + ')'));
   document.getElementById('lineBody').appendChild(row);
 }
 

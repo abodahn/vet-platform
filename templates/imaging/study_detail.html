@@ -92,7 +92,14 @@
         {{ t('🔬 AI Veterinary Analysis', '🔬 التحليل البيطري بالذكاء الاصطناعي') }}
       </div>
       <div style="padding:18px;line-height:1.7;font-size:.92rem;color:var(--cl-text);">
-        {{ study.ai_analysis | replace('\n\n','</p><p>') | replace('\n','<br>') | replace('**','<strong>') | safe }}
+        {# `| e` FIRST, so only the <br> this template inserts is ever markup.
+           The old chain ended in `| safe` on a value that arrives verbatim
+           from POST /imaging/analyzer/save — any nurse or vet could store
+           <img src=x onerror=...> and it ran in the next colleague's browser
+           who opened the study. The `**` -> <strong> replace is gone with it:
+           it emitted an unclosed tag on every second occurrence, so it was
+           already producing broken markup. #}
+        {{ study.ai_analysis | e | replace('\n\n','<br><br>') | replace('\n','<br>') | safe }}
       </div>
     </div>
     {% else %}

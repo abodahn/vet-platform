@@ -737,13 +737,26 @@ function v3LoadTodayAppts() {
         'done': 'v3-status-done',
         'cancelled': 'v3-status-cancelled'
       }[a.status] || 'v3-status-scheduled';
+      /* Cells written with textContent. This is the dashboard EVERY staff
+         member lands on after login, and pet_name / owner_name originate in
+         the public booking API — the widest possible blast radius for one
+         unescaped string. statusClass is server-chosen from a fixed map, so
+         only the badge text needs escaping. */
       var tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td>' + (a.time || a.appointment_time || '—') + '</td>' +
-        '<td>' + (a.pet_name || a.pet || '—') + '</td>' +
-        '<td>' + (a.owner_name || a.owner || '—') + '</td>' +
-        '<td>' + (a.doctor_name || a.doctor || '—') + '</td>' +
-        '<td><span class="v3-status-badge ' + statusClass + '">' + (a.status || 'scheduled') + '</span></td>';
+      [a.time || a.appointment_time || '—',
+       a.pet_name || a.pet || '—',
+       a.owner_name || a.owner || '—',
+       a.doctor_name || a.doctor || '—'].forEach(function (v) {
+        var td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      });
+      var tdStatus = document.createElement('td');
+      var badge = document.createElement('span');
+      badge.className = 'v3-status-badge ' + statusClass;
+      badge.textContent = a.status || 'scheduled';
+      tdStatus.appendChild(badge);
+      tr.appendChild(tdStatus);
       tbody.appendChild(tr);
     });
   })

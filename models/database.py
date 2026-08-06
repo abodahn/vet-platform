@@ -2719,6 +2719,21 @@ def _hash_password(pw: str) -> str:
     return _hash(pw)
 
 
+# A real bcrypt hash of a value nobody will ever type, computed once at import.
+# Its only job is to cost the same as a genuine check, so an unknown username
+# and a wrong password take the same time to refuse.
+_DUMMY_HASH = _bcrypt.hashpw(
+    b"aleefy-constant-time-placeholder", _bcrypt.gensalt(rounds=12))
+
+
+def _verify_dummy(password: str) -> None:
+    """Spend a bcrypt verification on nothing, so timing reveals nothing."""
+    try:
+        _bcrypt.checkpw((password or "").encode(), _DUMMY_HASH)
+    except Exception:
+        pass
+
+
 def _verify_and_migrate(row, password: str, conn) -> bool:
     """
     Verify password against bcrypt (preferred) or SHA-256 (legacy).
@@ -2752,6 +2767,13 @@ def verify_credentials(username: str, password: str) -> Optional[dict]:
         "SELECT * FROM users WHERE username=? AND is_active=1", (username,)).fetchone()
     if not row:
         conn.close()
+        # Burn the same time an existing user would. Returning immediately made
+        # the response ~0.26s for an unknown username and ~0.59s for a real one
+        # (bcrypt cost 12 runs only when there is a hash to check), which is a
+        # reliable oracle: an anonymous stranger can script the login form and
+        # read the clock to recover every staff username without one correct
+        # password. That list then feeds a targeted lockout.
+        _verify_dummy(password)
         return None
     ok = _verify_and_migrate(row, password, conn)
     conn.close()

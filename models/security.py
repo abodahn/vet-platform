@@ -309,20 +309,33 @@ def touch_session() -> None:
 # ── Real IP Extraction ────────────────────────────────────────────────────────
 
 def get_real_ip(req=None) -> str:
-    """Extract the real client IP, trusting X-Forwarded-For from the first proxy.
+    """The client IP, from a header the client cannot forge.
 
-    Render, Koyeb, and Cloudflare all set X-Forwarded-For.
-    We take only the FIRST (leftmost) address — the client IP as seen by the
-    first proxy — which is the real client under standard proxy chaining.
+    This used to take the LEFTMOST X-Forwarded-For entry. nginx is configured
+    with `$proxy_add_x_forwarded_for`, which APPENDS the real peer address to
+    whatever the client sent — so the leftmost value is entirely
+    attacker-supplied.
 
-    Falls back to request.remote_addr if no forwarding header is present.
+    That was demonstrated against the live server: five failed logins carrying
+    `X-Forwarded-For: 203.0.113.77` locked that address out of logging in for
+    fifteen minutes, and every audit row recorded the forged address. An
+    attacker could pick a clinic's office IP and keep its staff out, and poison
+    the one column you would look at afterwards to find out who did it.
+
+    X-Real-IP is set by nginx to $remote_addr and is overwritten on every
+    request, so a client cannot influence it. Prefer it; fall back to the
+    RIGHTMOST X-Forwarded-For hop (the one our own proxy appended) and finally
+    to the socket address.
     """
     if req is None:
         req = request
+    real_ip = (req.headers.get("X-Real-IP") or "").strip()
+    if real_ip:
+        return real_ip
     forwarded_for = req.headers.get("X-Forwarded-For", "")
     if forwarded_for:
-        # "X-Forwarded-For: client, proxy1, proxy2" — take leftmost (client IP)
-        candidate = forwarded_for.split(",")[0].strip()
+        # Rightmost, not leftmost: everything to its left came from the client.
+        candidate = forwarded_for.split(",")[-1].strip()
         if candidate:
             return candidate
     return req.remote_addr or "unknown"

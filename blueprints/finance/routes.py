@@ -637,8 +637,15 @@ def invoice_whatsapp(inv_id):
 # EXPENSES
 # ─────────────────────────────────────────────
 
+# The clinic's own money, not a client's bill. The finance blueprint maps to
+# the "invoicing" grant, which reception legitimately holds so she can take
+# payments -- so @login_required alone put the P&L, the expense ledger and
+# their export in front of every receptionist. Verified live: rec.yasmine
+# loaded /finance/reports and read Revenue 441,605 / Net 107,801, plus rent
+# and marketing spend. models/database.py says of this role: "Front desk:
+# books, bills and talks to clients. Not the clinic's accounts."
 @finance_bp.route("/expenses", methods=["GET", "POST"])
-@login_required
+@role_required("super_admin", "clinic_owner", "branch_manager", "finance", "auditor")
 def expenses_list():
     if request.method == "POST":
         f = request.form
@@ -710,8 +717,15 @@ def expenses_list():
 # REPORTS — P&L
 # ─────────────────────────────────────────────
 
+# The clinic's own money, not a client's bill. The finance blueprint maps to
+# the "invoicing" grant, which reception legitimately holds so she can take
+# payments -- so @login_required alone put the P&L, the expense ledger and
+# their export in front of every receptionist. Verified live: rec.yasmine
+# loaded /finance/reports and read Revenue 441,605 / Net 107,801, plus rent
+# and marketing spend. models/database.py says of this role: "Front desk:
+# books, bills and talks to clients. Not the clinic's accounts."
 @finance_bp.route("/reports")
-@login_required
+@role_required("super_admin", "clinic_owner", "branch_manager", "finance", "auditor")
 def reports():
     today      = date.today().isoformat()
     month_start = date.today().replace(day=1).isoformat()
@@ -769,8 +783,15 @@ def reports():
 # REPORTS — EXCEL EXPORT
 # ─────────────────────────────────────────────
 
+# The clinic's own money, not a client's bill. The finance blueprint maps to
+# the "invoicing" grant, which reception legitimately holds so she can take
+# payments -- so @login_required alone put the P&L, the expense ledger and
+# their export in front of every receptionist. Verified live: rec.yasmine
+# loaded /finance/reports and read Revenue 441,605 / Net 107,801, plus rent
+# and marketing spend. models/database.py says of this role: "Front desk:
+# books, bills and talks to clients. Not the clinic's accounts."
 @finance_bp.route("/reports/export/xlsx")
-@login_required
+@role_required("super_admin", "clinic_owner", "branch_manager", "finance", "auditor")
 def reports_export_xlsx():
     today       = date.today().isoformat()
     month_start = date.today().replace(day=1).isoformat()

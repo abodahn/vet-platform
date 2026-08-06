@@ -264,6 +264,32 @@ def create_app(cfg=None) -> Flask:
         # Deciding once, here, makes the 404 the FIRST thing that happens.
         tenancy.target()
 
+        # A session is valid for the clinic it was issued for and no other.
+        #
+        # One SECRET_KEY signs every clinic's cookies and get_db() routes by
+        # the subdomain in the URL, so without this check a cookie minted at
+        # clinic A authenticates against clinic B's database — at clinic A's
+        # role. Verified live before the fix: an admin cookie from
+        # demo.aleefy.online returned 200 and real financial rows against a
+        # different database under a different Host header.
+        #
+        # Enforced here rather than in login_required because it must hold for
+        # every route, including any that forgets the decorator.
+        if session.get("user"):
+            issued_for = session.get("tenant")
+            if issued_for is None:
+                # Minted before this check existed. Adopt it rather than
+                # logging everyone out on deploy — the clinic it is being used
+                # on right now is the only one it has ever been able to read.
+                session["tenant"] = tenancy.current()
+            elif issued_for != tenancy.current():
+                logger.warning(
+                    "session for tenant %r presented to tenant %r — cleared",
+                    issued_for, tenancy.current())
+                session.clear()
+                flash("Please sign in to this clinic.", "warning")
+                return redirect(url_for("auth.login"))
+
         # Session timeout check
         if sec.check_session_timeout():
             session.clear()

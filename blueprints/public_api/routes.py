@@ -121,10 +121,27 @@ def book():
         return rl
     data = request.get_json(silent=True) or {}
 
-    owner_name = (data.get("ownerName") or "").strip()
-    mobile     = (data.get("mobile") or "").strip()
-    pet_name   = (data.get("petName") or "").strip()
-    appt_date  = (data.get("date") or "").strip()
+    # This endpoint is the widest door in the building: no auth, no CSRF, no
+    # API key, open to the whole internet. Whatever arrives here is stored and
+    # later rendered on the reception screen and on the dashboard every staff
+    # member lands on after login.
+    #
+    # The templates escape it now, which is the fix that actually holds. This
+    # is the second layer: a name is a name, so markup and control characters
+    # never enter the database in the first place, and a later screen that
+    # forgets to escape has nothing dangerous to render.
+    def _clean(value, limit=120):
+        s = str(value or "").strip()[:limit]
+        # Strip angle brackets and the JS template-literal characters rather
+        # than rejecting: a real client called "O'Brien & Sons" must still be
+        # able to book, and refusing their booking to stop an attack nobody has
+        # attempted yet is the wrong trade for a clinic.
+        return "".join(ch for ch in s if ch not in "<>`" and (ch >= " " or ch == "\n"))
+
+    owner_name = _clean(data.get("ownerName"))
+    mobile     = _clean(data.get("mobile"), 32)
+    pet_name   = _clean(data.get("petName"))
+    appt_date  = _clean(data.get("date"), 32)
 
     # Validation
     missing = [f for f, v in [("ownerName", owner_name), ("mobile", mobile),
@@ -132,19 +149,19 @@ def book():
     if missing:
         return jsonify({"ok": False, "error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    whatsapp    = (data.get("whatsapp") or mobile).strip()
-    email       = (data.get("email") or "").strip()
-    species     = (data.get("species") or "").strip()
-    breed       = (data.get("breed") or "").strip()
-    appt_time   = (data.get("time") or "").strip()
-    doctor      = (data.get("doctor") or "").strip()
-    service     = (data.get("service") or "").strip()
-    branch      = (data.get("branch") or "").strip()
-    notes_raw   = (data.get("notes") or "").strip()
-    reason      = (data.get("reason") or "").strip()
+    whatsapp    = _clean(data.get("whatsapp") or mobile, 32)
+    email       = _clean(data.get("email"), 120)
+    species     = _clean(data.get("species"), 40)
+    breed       = _clean(data.get("breed"), 60)
+    appt_time   = _clean(data.get("time"), 16)
+    doctor      = _clean(data.get("doctor"))
+    service     = _clean(data.get("service"))
+    branch      = _clean(data.get("branch"))
+    notes_raw   = _clean(data.get("notes"), 1000)
+    reason      = _clean(data.get("reason"), 200)
     notes       = f"{reason}\n{notes_raw}".strip() if reason else notes_raw
-    reminder    = (data.get("reminder") or "").strip()
-    wa_opt_in   = (data.get("whatsappOptIn") or "No").strip()
+    reminder    = _clean(data.get("reminder"), 40)
+    wa_opt_in   = _clean(data.get("whatsappOptIn") or "No", 8)
 
     # Provenance and branch go into columns that EXIST. The previous version
     # wrote owners.source, pets.source, appointments.service_name and
