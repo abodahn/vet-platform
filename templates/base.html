@@ -256,10 +256,12 @@
           <svg class="v3-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="v3-nav-items">
+          {% if ai_enabled %}
           <a href="{{ url_for('ai_assistant.index') }}" class="v3-nav-item">
             <span class="v3-nav-icon"><i class="bi bi-stars"></i></span>
             <span>{{ t('AI Assistant', 'المساعد الذكي') }}</span>
           </a>
+          {% endif %}
           <a href="{{ url_for('whatsapp.control_center') }}" class="v3-nav-item">
             <span class="v3-nav-icon"><i class="bi bi-whatsapp"></i></span>
             <span>{{ t('WhatsApp', 'واتساب') }}</span>
@@ -497,7 +499,10 @@
 <!-- ═══════════════════════════════════════════════════
      PETSY V3 — Global AI Chatbot FAB
 ═══════════════════════════════════════════════════ -->
-{% if current_user %}
+{# ai_enabled, not just current_user: with no AI provider configured this
+   button sat on every page of the hosted demo and answered every question
+   with "Petsy is temporarily unavailable". Nothing was temporary about it. #}
+{% if current_user and ai_enabled %}
 <style>
 /* ── Petsy V4 — Lively FAB ───────────────────────────────── */
 #petsy-fab-global {
@@ -818,7 +823,7 @@
     <div class="v3-cmd-header">
       <i class="bi bi-stars v3-cmd-sparkle"></i>
       <input id="v3-cmd-input" type="text" class="v3-cmd-input" autocomplete="off"
-             placeholder="{{ t('Ask AI anything about your clinic…', 'اسأل المساعد الذكي عن عيادتك…') }}"
+             placeholder="{% if ai_enabled %}{{ t('Ask AI anything about your clinic…', 'اسأل المساعد الذكي عن عيادتك…') }}{% else %}{{ t('Search…', 'ابحث…') }}{% endif %}"
              onkeydown="v3CmdKey(event)">
       <kbd class="v3-cmd-esc" onclick="v3CloseCmdPalette()">ESC</kbd>
     </div>

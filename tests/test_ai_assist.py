@@ -61,11 +61,28 @@ def test_ai_is_not_configured_without_a_key(monkeypatch):
 
 def test_a_local_proxy_needs_no_key(monkeypatch):
     """A localhost proxy is legitimately keyless; refusing it would disable AI
-    for the deployment this app shipped with."""
+    for the deployment this app shipped with.
+
+    But it has to BE there. This used to pass on the strength of the string
+    "localhost" appearing in the URL — which is the default, so the check
+    returned True on every deployment that had configured nothing at all. See
+    the test below, and tests/test_ai_not_configured.py.
+    """
     monkeypatch.setattr(ai, "_OPENAI_AVAILABLE", True)
     monkeypatch.setattr(ai, "FREELLM_API_KEY", "")
     monkeypatch.setattr(ai, "FREELLM_BASE_URL", "http://localhost:3001/v1")
+    monkeypatch.setattr(ai, "_local_proxy_reachable", lambda url: True)
     assert ai.ai_configured() is True
+
+
+def test_a_local_proxy_that_is_not_running_is_not_configured(monkeypatch):
+    """The shipped default with nothing behind it — the state the hosted demo
+    was actually in while advertising an AI assistant on three screens."""
+    monkeypatch.setattr(ai, "_OPENAI_AVAILABLE", True)
+    monkeypatch.setattr(ai, "FREELLM_API_KEY", "")
+    monkeypatch.setattr(ai, "FREELLM_BASE_URL", "http://localhost:3001/v1")
+    monkeypatch.setattr(ai, "_local_proxy_reachable", lambda url: False)
+    assert ai.ai_configured() is False
 
 
 def test_ai_is_not_configured_without_the_package(monkeypatch):

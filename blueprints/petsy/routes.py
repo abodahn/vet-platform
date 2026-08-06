@@ -683,7 +683,17 @@ def _fetch_platform_data(message: str, user: dict) -> str:
 
 def _call_petsy(messages: list, system: str) -> tuple[str, str]:
     if not _OK:
-        return "AI requires the openai package. Run: pip install openai", "none"
+        # "Run: pip install openai" is an instruction to an operator, printed
+        # into a chat window a pet owner is looking at.
+        return ("🐾 بيتسي مش مفعّل على النظام ده.\n"
+                "Petsy is not enabled on this installation."), "none"
+    from blueprints.ai_assistant.routes import ai_configured
+    if not ai_configured():
+        # Not "temporarily unavailable" — there is no provider configured, and
+        # nothing about that is temporary. Saying otherwise leaves a pet owner
+        # retrying a button that will never work.
+        return ("🐾 بيتسي مش مفعّل على النظام ده.\n"
+                "Petsy is not enabled on this installation."), "none"
     try:
         client = _OpenAI(base_url=_BASE_URL, api_key=_API_KEY)
         full   = [{"role": "system", "content": system}, *messages]

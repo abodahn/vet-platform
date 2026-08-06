@@ -301,6 +301,15 @@ def create_app(cfg=None) -> Flask:
         # product. Deployment decides: PLATFORM_DEFAULT_LANG=ar.
         lang  = (user.get("language") or session.get("lang")
                  or os.environ.get("PLATFORM_DEFAULT_LANG", "en"))
+        # Whether to offer the Petsy button at all. A chat widget on every page
+        # that can only answer "temporarily unavailable" is a broken promise on
+        # every screen, and on the demo it was the most visible thing there.
+        try:
+            from blueprints.ai_assistant.routes import ai_configured
+            ai_enabled = ai_configured()
+        except Exception:
+            ai_enabled = False
+
         # An error page must render when the database is exactly what is broken.
         # This is the single choke point every template render passes through,
         # so an exception here turns any handled error into an unhandled 500 —
@@ -366,6 +375,7 @@ def create_app(cfg=None) -> Flask:
             clinic        = clinic,
             csrf_token    = csrf_token,
             unread_count  = unread_count,
+            ai_enabled    = ai_enabled,
             # Payment methods, from the registry rather than hardcoded in each
             # template. This is what makes "add a gateway without
             # redevelopment" true: register it and it appears in the UI. An

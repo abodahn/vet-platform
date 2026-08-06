@@ -25,6 +25,9 @@ _logger = _logging.getLogger(__name__)
 
 # ── AI config — read from environment only (no hardcoded key fallback) ───────
 import os as _os
+import socket as _socket
+import time as _time
+from urllib.parse import urlparse as _urlparse
 FREELLM_BASE_URL = _os.environ.get("AI_BASE_URL", "http://localhost:3001/v1")
 FREELLM_API_KEY  = _os.environ.get("AI_API_KEY",  "")   # Must be set via env var
 FREELLM_MODEL    = _os.environ.get("AI_MODEL",    "gemini-2.5-flash")
@@ -84,14 +87,51 @@ def ai_configured() -> bool:
     shape as a half-configured payment gateway: the dangerous state is not
     "off", it is "looks on".
 
-    A local proxy on localhost legitimately needs no key, so that is allowed.
+    A local proxy on localhost legitimately needs no key, so that is allowed —
+    but only if it is actually there. This function used to return True for any
+    URL with "localhost" in it, which is the default (http://localhost:3001/v1)
+    and therefore true on every deployment that had configured nothing at all.
+    So the hosted demo advertised an AI assistant card and a floating Petsy
+    button with nothing listening on :3001, and answered every question with
+    the OpenAI SDK's raw "Missing credentials. Please pass an `api_key`…" text.
+    Exactly the "looks on" state the paragraph above warns about.
     """
     if not _OPENAI_AVAILABLE:
         return False
     if FREELLM_API_KEY:
         return True
     host = (FREELLM_BASE_URL or "").lower()
-    return "localhost" in host or "127.0.0.1" in host
+    if "localhost" in host or "127.0.0.1" in host:
+        return _local_proxy_reachable(FREELLM_BASE_URL)
+    return False
+
+
+_PROBE_CACHE: dict = {}
+_PROBE_TTL = 60.0
+
+
+def _local_proxy_reachable(url: str) -> bool:
+    """Is a local AI proxy listening, as opposed to merely named in a URL?
+
+    Cached for a minute because ai_configured() is called on every page render
+    — the launcher card and the Petsy button both ask — and a TCP connect per
+    render is a cost with no benefit when the answer changes about never.
+    """
+    u = _urlparse(url or "")
+    host = u.hostname or "127.0.0.1"
+    port = u.port or (443 if u.scheme == "https" else 80)
+    key = (host, port)
+    now = _time.monotonic()
+    hit = _PROBE_CACHE.get(key)
+    if hit and now - hit[0] < _PROBE_TTL:
+        return hit[1]
+    try:
+        with _socket.create_connection((host, port), timeout=0.5):
+            ok = True
+    except OSError:
+        ok = False
+    _PROBE_CACHE[key] = (now, ok)
+    return ok
 
 
 def _client() -> "_OpenAI":
@@ -132,7 +172,19 @@ def call_ai(messages: list, role: str,
             routed_via = model_used
         return text, model_used, routed_via
     except Exception as e:
-        return f"AI service temporarily unavailable: {str(e)}", "none", ""
+        # The provider's own text used to go straight to the screen, so a
+        # clinic with no AI configured read: "Missing credentials. Please pass
+        # an `api_key`, `workload_identity`, `admin_api_key`, or set the
+        # OPENAI_API_KEY environment variable." That names another vendor,
+        # blames the reader, and tells an attacker what we run. Log it, do not
+        # print it.
+        _logger.warning("AI request failed: %s", e)
+        if not ai_configured():
+            return ("🤖 المساعد الذكي غير مُفعَّل على هذا النظام. "
+                    "تواصل مع مزوّد النظام لتفعيله.\n"
+                    "AI is not enabled on this installation."), "none", ""
+        return ("🤖 المساعد الذكي غير متاح مؤقتاً. حاول بعد قليل.\n"
+                "The AI assistant is temporarily unavailable."), "none", ""
 
 
 # ── Patient context builder ───────────────────────────────────────────────────
