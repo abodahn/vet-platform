@@ -126,3 +126,18 @@ def test_petsy_says_not_enabled_rather_than_temporarily_unavailable(no_ai):
         "'temporarily unavailable' invites a pet owner to keep retrying a "
         "button that will never work")
     assert "not enabled" in text.lower() or "مفعّل" in text
+
+
+def test_no_clickable_ai_link_survives_anywhere(no_ai, auth_client):
+    """Checked against the VISIBLE markup, with <script> blocks stripped.
+
+    Two hid from a plain substring search: an "AI Chat" chip in the command
+    palette (href="/ai", no trailing slash) and a string inside a .catch()
+    handler that never runs. Only one of those was real — which is exactly why
+    this asserts on rendered anchors rather than on the page text.
+    """
+    import re
+    html = auth_client.get("/").get_data(as_text=True)
+    visible = re.sub(r"<script\b.*?</script>", "", html, flags=re.S | re.I)
+    links = re.findall(r'<a[^>]+href="(/ai\b[^"]*)"', visible)
+    assert not links, f"AI links still clickable with no provider: {links}"

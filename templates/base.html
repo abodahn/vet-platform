@@ -837,7 +837,7 @@
         <a href="/visits" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">🏥 {{ t('Visits','زيارات') }}</a>
         <a href="/reports" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">📊 {{ t('Reports','تقارير') }}</a>
         <a href="/telemedicine" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">🎥 {{ t('Telemedicine','عن بُعد') }}</a>
-        <a href="/ai" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">🤖 {{ t('AI Chat','دردشة AI') }}</a>
+        {% if ai_enabled %}<a href="/ai" onclick="v3CloseCmdPalette()" class="v3-cmd-chip">🤖 {{ t('AI Chat','دردشة AI') }}</a>{% endif %}
       </div>
     </div>
     <div id="v3-cmd-response" class="v3-cmd-response" style="display:none"></div>
