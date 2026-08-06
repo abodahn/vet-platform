@@ -559,14 +559,7 @@ def _visible_modules(role: str) -> list:
     role sees nothing, matching the check in open_module() below."""
     if not role:
         return []
-    mods = [m for m in MODULES if role == "super_admin" or role in m["roles"]]
-    # A card badged "Live" that cannot answer is worse than no card. The AI
-    # assistant needs a provider; a deployment with none configured showed the
-    # card anyway and replied with the OpenAI SDK's "Missing credentials" text.
-    from blueprints.ai_assistant.routes import ai_configured
-    if not ai_configured():
-        mods = [m for m in mods if m["id"] != "ai_assistant"]
-    return mods
+    return [m for m in MODULES if role == "super_admin" or role in m["roles"]]
 
 
 def _grouped(modules: list) -> list:

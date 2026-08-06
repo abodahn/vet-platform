@@ -89,18 +89,22 @@ def test_the_probe_is_cached(monkeypatch):
 
 
 # ── what the user sees ────────────────────────────────────────────────────────
+#
+# The AI entry points are shown WHETHER OR NOT a provider is configured. That is
+# a deliberate product decision: the owner wants the feature visible in the
+# system he is selling, and hiding it made the product look smaller than it is.
+#
+# What is NOT negotiable is what happens when one is clicked — see below. A
+# button that explains itself is fine; a button that prints another vendor's
+# credential error is not.
 
-def test_no_petsy_button_when_there_is_no_ai(no_ai, auth_client):
+def test_the_ai_entry_points_are_always_offered(no_ai, auth_client):
     body = auth_client.get("/").get_data(as_text=True)
-    assert "petsy-fab-global" not in body
+    assert "petsy-fab-global" in body, "the Petsy button must stay on the page"
+    assert "المساعد الذكي" in body, "the AI Assistant must stay in the launcher"
 
 
-def test_no_ai_card_on_the_dashboard_when_there_is_no_ai(no_ai, auth_client):
-    body = auth_client.get("/").get_data(as_text=True)
-    assert "المساعد الذكي" not in body
-
-
-def test_the_petsy_button_comes_back_when_ai_is_configured(with_ai, auth_client):
+def test_they_are_still_there_with_a_provider(with_ai, auth_client):
     body = auth_client.get("/").get_data(as_text=True)
     assert "petsy-fab-global" in body
 
@@ -128,16 +132,11 @@ def test_petsy_says_not_enabled_rather_than_temporarily_unavailable(no_ai):
     assert "not enabled" in text.lower() or "مفعّل" in text
 
 
-def test_no_clickable_ai_link_survives_anywhere(no_ai, auth_client):
-    """Checked against the VISIBLE markup, with <script> blocks stripped.
-
-    Two hid from a plain substring search: an "AI Chat" chip in the command
-    palette (href="/ai", no trailing slash) and a string inside a .catch()
-    handler that never runs. Only one of those was real — which is exactly why
-    this asserts on rendered anchors rather than on the page text.
-    """
+def test_the_ai_links_are_clickable_even_with_no_provider(no_ai, auth_client):
+    """Checked against the VISIBLE markup, with <script> blocks stripped, so it
+    counts what a vet can actually click rather than strings in dead JS."""
     import re
     html = auth_client.get("/").get_data(as_text=True)
-    visible = re.sub(r"<script\b.*?</script>", "", html, flags=re.S | re.I)
-    links = re.findall(r'<a[^>]+href="(/ai\b[^"]*)"', visible)
-    assert not links, f"AI links still clickable with no provider: {links}"
+    visible = re.sub(r"<script.*?</script>", "", html, flags=re.S | re.I)
+    links = re.findall(r'<a[^>]+href="(/ai(?:/[^"]*)?)"', visible)
+    assert links, "the AI assistant must stay reachable from the dashboard"

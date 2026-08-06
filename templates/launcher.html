@@ -475,13 +475,11 @@
     <div class="v3-launcher-name-ar">{% if (current_lang or 'en') == 'ar' %}Pet Shop{% else %}متجر الحيوانات{% endif %}</div>
   </a>
 
-  {% if ai_enabled %}
   <a href="/ai/" class="v3-launcher-card">
     <div class="v3-launcher-icon" style="background:rgba(27,107,92,0.12);color:var(--al-primary,#1B6B5C)">🤖</div>
     <div class="v3-launcher-name">{{ t('AI Assistant', 'المساعد الذكي') }}</div>
     <div class="v3-launcher-name-ar">{% if (current_lang or 'en') == 'ar' %}AI Assistant{% else %}المساعد الذكي{% endif %}</div>
   </a>
-  {% endif %}
 
   <a href="/reports/" class="v3-launcher-card">
     <div class="v3-launcher-icon" style="background:rgba(243,156,18,0.12);color:#F39C12">📊</div>
@@ -542,10 +540,6 @@
   <div class="v3-panel-stack">
 
     <!-- AI Insights -->
-    {# Without a provider this card sat on the dashboard showing loading
-       skeletons that never resolved — the worst of the three, because it looks
-       like the system is thinking rather than like nothing is there. #}
-    {% if ai_enabled %}
     <div class="v3-sub-card" style="--sub-accent:#1ABC9C">
       <div class="v3-sub-title">🤖 {{ t('AI Insights', 'رؤى الذكاء الاصطناعي') }}</div>
       <div class="v3-sub-body" id="ai-insights-text">
@@ -554,7 +548,6 @@
       </div>
       <a href="/ai/" class="v3-sub-link">{{ t('Open AI Assistant', 'فتح المساعد الذكي') }} →</a>
     </div>
-    {% endif %}
 
     <!-- Inventory Alerts -->
     <div class="v3-sub-card" style="--sub-accent:#E74C3C">
