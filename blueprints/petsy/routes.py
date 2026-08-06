@@ -717,7 +717,11 @@ def _call_petsy(messages: list, system: str) -> tuple[str, str]:
         # worker timeout was the only thing that ever ended it.
         #
         # A chat bubble a pet owner reads on a phone should be short anyway.
-        client = _OpenAI(base_url=_BASE_URL, api_key=_API_KEY, timeout=_TIMEOUT)
+        # max_retries=0: the SDK retries twice by default, turning the
+        # timeout into a ceiling three times as high. A retry against a slow
+        # free model buys nothing but another wait.
+        client = _OpenAI(base_url=_BASE_URL, api_key=_API_KEY,
+                         timeout=_TIMEOUT, max_retries=0)
         full   = [{"role": "system", "content": system}, *messages]
         resp   = client.chat.completions.create(
             model=_MODEL, messages=full, max_tokens=_MAX_TOKENS

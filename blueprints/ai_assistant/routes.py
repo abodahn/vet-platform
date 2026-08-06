@@ -144,8 +144,13 @@ def _local_proxy_reachable(url: str) -> bool:
 
 
 def _client() -> "_OpenAI":
+    # max_retries=0 deliberately. The SDK retries twice by default, so the
+    # 45s timeout was really a 135s ceiling -- one staff question measured
+    # 55 seconds against a 45s limit, which is how that was noticed. On a
+    # slow free model a retry does not fix anything; it just makes the user
+    # wait for the same slowness again.
     return _OpenAI(base_url=FREELLM_BASE_URL, api_key=FREELLM_API_KEY,
-                   timeout=AI_TIMEOUT)
+                   timeout=AI_TIMEOUT, max_retries=0)
 
 
 def call_ai(messages: list, role: str,

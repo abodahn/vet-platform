@@ -191,3 +191,15 @@ def test_both_limits_are_deployment_configurable():
         src = open(os.path.join(root, rel), encoding="utf-8").read()
         assert 'environ.get("AI_MAX_TOKENS"' in src, f"{rel} hardcodes the token budget"
         assert 'environ.get("AI_TIMEOUT_SECONDS"' in src, f"{rel} hardcodes the timeout"
+
+
+def test_the_sdk_does_not_multiply_the_timeout_by_retrying():
+    """The openai SDK retries twice by default, so a 45s timeout is really a
+    135s ceiling. One staff question measured 55 seconds against a 45s limit,
+    which is how this was noticed. Against a slow free model a retry buys
+    nothing but another wait."""
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for rel in ("blueprints/ai_assistant/routes.py", "blueprints/petsy/routes.py"):
+        src = open(os.path.join(root, rel), encoding="utf-8").read()
+        assert "max_retries=0" in src, f"{rel}: the SDK will retry and triple the wait"
