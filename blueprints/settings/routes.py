@@ -4,6 +4,7 @@ import logging
 
 from flask import request, session, redirect, url_for, jsonify
 from . import settings_bp
+from blueprints.auth.routes import safe_redirect_target
 import models.database as db
 
 logger = logging.getLogger(__name__)
@@ -136,8 +137,13 @@ def set_theme():
     if request.is_json:
         return jsonify({"ok": True, "theme": theme})
 
-    next_page = request.form.get("next") or request.referrer or url_for("launcher.index")
-    return redirect(next_page)
+    # Through the same-site check, not straight into redirect(). Both of
+    # these routes are in _CSRF_EXEMPT, so this is the one shape of
+    # off-site redirect an attacker does not need a token to reach. The
+    # helper already existed and was used correctly by /auth/login.
+    return redirect(safe_redirect_target(
+        request.form.get("next") or request.referrer,
+        url_for("launcher.index")))
 
 
 @settings_bp.route("/lang", methods=["POST"])
@@ -152,5 +158,10 @@ def set_lang():
         user["language"] = lang
         session["user"] = user
 
-    next_page = request.form.get("next") or request.referrer or url_for("launcher.index")
-    return redirect(next_page)
+    # Through the same-site check, not straight into redirect(). Both of
+    # these routes are in _CSRF_EXEMPT, so this is the one shape of
+    # off-site redirect an attacker does not need a token to reach. The
+    # helper already existed and was used correctly by /auth/login.
+    return redirect(safe_redirect_target(
+        request.form.get("next") or request.referrer,
+        url_for("launcher.index")))

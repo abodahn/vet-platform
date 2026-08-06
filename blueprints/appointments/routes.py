@@ -715,12 +715,20 @@ def _waiting_room_token() -> str:
 
 
 def _waiting_room_authorized() -> bool:
-    """True if the display token matches — or if no token is configured.
+    """True if the display token matches. Fails CLOSED when none is configured.
 
-    Fail-OPEN when unconfigured is deliberate: an existing clinic whose TV is
-    already running must not go blank on deploy. It is logged loudly once.
-    # ponytail: fail-open until WAITING_ROOM_TOKEN is set everywhere; flip the
-    # `return True` below to `return False` once ops confirms it is deployed.
+    This used to fail open, so that a clinic whose TV was already running did
+    not go blank on deploy. The 6 August audit found the consequence: the demo
+    server was hand-deployed, never got a token, and /appointments/api/queue
+    was serving the day's pet names, times, doctors and appointment types to
+    anyone on the internet who found the URL.
+
+    Fail-closed is the right default for a screen that publishes a clinic's
+    schedule. scripts/provision/clinic_env.py mints a token for every
+    provisioned clinic, so a correctly-installed clinic is unaffected; the only
+    thing that breaks is a deployment that skipped it, and breaking is what
+    should happen there. The warning below tells whoever is looking exactly
+    what to set.
     """
     global _TOKEN_WARNED
     if session.get("user"):
@@ -730,11 +738,11 @@ def _waiting_room_authorized() -> bool:
         if not _TOKEN_WARNED:
             _TOKEN_WARNED = True
             logger.warning(
-                "WAITING_ROOM_TOKEN is not configured — /appointments/waiting-room "
-                "and /appointments/api/queue are serving unauthenticated. Set "
-                "WAITING_ROOM_TOKEN to lock the TV display down."
+                "WAITING_ROOM_TOKEN is not configured — the waiting-room display "
+                "is REFUSING anonymous requests. Set WAITING_ROOM_TOKEN in the "
+                "environment and open the TV on ?t=<token> once."
             )
-        return True
+        return False
     supplied = request.args.get("t") or request.cookies.get(WAITING_ROOM_COOKIE) or ""
     return hmac.compare_digest(supplied, expected)
 

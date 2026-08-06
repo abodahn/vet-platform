@@ -72,16 +72,38 @@ def seeded(app):
 
 # ── T2b: /api/queue leaks nothing and the query actually runs ─────────────────
 
-def test_api_queue_returns_rows_at_all(seeded, client):
+@pytest.fixture
+def wr_token(app):
+    """A configured waiting-room token, which is how a real clinic runs.
+
+    The gate used to fail OPEN when no token was set, so these tests reached
+    the display anonymously. It now fails closed: the 6 August audit found the
+    demo server was hand-deployed, never got a token, and served the day's pet
+    names, times and doctors to anyone who found the URL. What these tests
+    actually check — that the SQL returns rows and that owner names are masked
+    on a public screen — is unchanged and still worth checking.
+    """
+    saved = app.config.get("WAITING_ROOM_TOKEN")
+    app.config["WAITING_ROOM_TOKEN"] = "tv-secret"
+    yield "tv-secret"
+    if saved is None:
+        app.config.pop("WAITING_ROOM_TOKEN", None)
+    else:
+        app.config["WAITING_ROOM_TOKEN"] = saved
+
+
+def test_api_queue_returns_rows_at_all(seeded, client, wr_token):
     """Regression: the old query referenced a.appt_time / appt_date::text and
     silently returned [] forever."""
-    rows = client.get("/appointments/api/queue").get_json()
+    rows = client.get(f"/appointments/api/queue?t={wr_token}").get_json()
     assert rows, "queue is empty — the SQL is broken again"
     assert rows[0]["pet_name"] == "Rex"
 
 
-def test_api_queue_masks_owner_for_anonymous(seeded, client):
-    resp = client.get("/appointments/api/queue")
+def test_api_queue_masks_owner_for_anonymous(seeded, client, wr_token):
+    """Authorised by token, but still a PUBLIC screen — masking is what stops
+    a waiting room learning every client's full name."""
+    resp = client.get(f"/appointments/api/queue?t={wr_token}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     rows = resp.get_json()
@@ -90,8 +112,8 @@ def test_api_queue_masks_owner_for_anonymous(seeded, client):
     assert "El Gohary" not in body
 
 
-def test_waiting_room_page_masks_owner(seeded, client):
-    body = client.get("/appointments/waiting-room").get_data(as_text=True)
+def test_waiting_room_page_masks_owner(seeded, client, wr_token):
+    body = client.get(f"/appointments/waiting-room?t={wr_token}").get_data(as_text=True)
     assert "Ahmed G." in body
     assert "El Gohary" not in body
 

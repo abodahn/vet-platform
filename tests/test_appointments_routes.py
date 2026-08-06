@@ -365,17 +365,17 @@ def test_mask_owner_name_unit():
     assert mask_owner_name(None) == ""
 
 
-def test_waiting_room_queue_is_not_empty(client, waiting):
+def test_waiting_room_queue_is_not_empty(client, wr_token, waiting):
     """The regression that mattered: the queue query used to name a column that
     does not exist (`a.appt_time` vs `appt_start`) and the crash was swallowed,
     so this display was permanently blank."""
-    rows = client.get("/appointments/api/queue").get_json()
+    rows = client.get(f"/appointments/api/queue?t={wr_token}").get_json()
     assert any(r["id"] == waiting["appt_id"] for r in rows), \
         "today's checked-in appointment is missing from the waiting-room queue"
 
 
-def test_waiting_room_api_masks_owner_names_for_the_public(client, waiting):
-    rows = client.get("/appointments/api/queue").get_json()
+def test_waiting_room_api_masks_owner_names_for_the_public(client, wr_token, waiting):
+    rows = client.get(f"/appointments/api/queue?t={wr_token}").get_json()
     mine = next(r for r in rows if r["id"] == waiting["appt_id"])
     assert mine["owner_display"] == "منى ا."
     assert "owner_name" not in mine, "full owner name leaked to an anonymous caller"
@@ -384,8 +384,8 @@ def test_waiting_room_api_masks_owner_names_for_the_public(client, waiting):
         assert "owner_name" not in r
 
 
-def test_waiting_room_page_masks_owner_names(client, waiting):
-    resp = client.get("/appointments/waiting-room")
+def test_waiting_room_page_masks_owner_names(client, wr_token, waiting):
+    resp = client.get(f"/appointments/waiting-room?t={wr_token}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert waiting["full_name"] not in body, "full owner name rendered on a public TV"
@@ -400,11 +400,19 @@ def test_waiting_room_api_gives_staff_the_full_name(auth_client, waiting):
     assert mine["owner_display"] == "منى ا."
 
 
-def test_waiting_room_open_when_no_token_configured(app, client, waiting):
-    """Documented fail-open: an already-deployed TV must not go blank."""
+def test_waiting_room_is_closed_when_no_token_configured(app, client, waiting):
+    """This used to fail OPEN so an already-deployed TV would not go blank.
+
+    The 6 August audit found what that cost: the demo server was
+    hand-deployed, never got a token, and served the day's pet names,
+    times, doctors and appointment types to anyone who found the URL.
+    scripts/provision/clinic_env.py mints a token for every provisioned
+    clinic, so the only install this breaks is one that skipped it — and
+    breaking is what should happen there.
+    """
     assert not (app.config.get("WAITING_ROOM_TOKEN") or "").strip()
-    assert client.get("/appointments/waiting-room").status_code == 200
-    assert client.get("/appointments/api/queue").status_code == 200
+    assert client.get("/appointments/waiting-room").status_code == 404
+    assert client.get("/appointments/api/queue").status_code == 404
 
 
 def test_waiting_room_404s_without_token_when_configured(client, wr_token, waiting):
@@ -430,12 +438,13 @@ def test_waiting_room_lets_staff_in_without_a_token(auth_client, wr_token, waiti
     assert auth_client.get("/appointments/api/queue").status_code == 200
 
 
-def test_waiting_room_excludes_finished_and_cancelled(app, client, desk):
+def test_waiting_room_excludes_finished_and_cancelled(app, client, wr_token, desk):
     with app.app_context():
         done = _mk_appt(desk["owner_id"], desk["pet_en"], TODAY, "08:45",
                         status="Completed")
         gone = _mk_appt(desk["owner_id"], desk["pet_en"], TODAY, "08:50",
                         status="Cancelled")
-    ids = {r["id"] for r in client.get("/appointments/api/queue").get_json()}
+    ids = {r["id"] for r in
+           client.get(f"/appointments/api/queue?t={wr_token}").get_json()}
     assert done not in ids
     assert gone not in ids

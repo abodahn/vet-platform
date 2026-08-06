@@ -299,3 +299,85 @@ def test_the_dummy_verification_actually_runs_bcrypt():
     assert elapsed > 0.02, (
         f"the dummy check took {elapsed*1000:.1f}ms — bcrypt cost 12 should be "
         "tens of milliseconds; this is not costing what a real check costs")
+
+
+# ── 8. the smaller findings, closed after the main four ──────────────────────
+
+def test_the_waiting_room_gate_fails_closed(app, monkeypatch):
+    """It used to fail OPEN when no token was configured, so that a clinic's TV
+    did not go blank on deploy. The demo server was hand-deployed, never got a
+    token, and served the day's pet names, times and doctors to anyone on the
+    internet who found /appointments/api/queue.
+
+    Provisioning mints a token for every real clinic, so the only thing this
+    breaks is an install that skipped it — which is exactly what should break.
+    """
+    import blueprints.appointments.routes as ar
+    monkeypatch.setattr(ar, "_waiting_room_token", lambda: "")
+    monkeypatch.setattr(ar, "_TOKEN_WARNED", True)
+    with app.test_request_context("/appointments/api/queue"):
+        assert ar._waiting_room_authorized() is False
+
+
+def test_the_waiting_room_still_opens_with_the_right_token(app, monkeypatch):
+    import blueprints.appointments.routes as ar
+    monkeypatch.setattr(ar, "_waiting_room_token", lambda: "s3cret")
+    with app.test_request_context("/appointments/api/queue?t=s3cret"):
+        assert ar._waiting_room_authorized() is True
+    with app.test_request_context("/appointments/api/queue?t=wrong"):
+        assert ar._waiting_room_authorized() is False
+
+
+def test_staff_never_need_the_token(app, monkeypatch):
+    """The gate is for the anonymous TV, not for the people who work there."""
+    import blueprints.appointments.routes as ar
+    monkeypatch.setattr(ar, "_waiting_room_token", lambda: "s3cret")
+    with app.test_request_context("/appointments/api/queue") as ctx:
+        from flask import session
+        session["user"] = {"id": 1, "username": "admin"}
+        assert ar._waiting_room_authorized() is True
+
+
+@pytest.mark.parametrize("evil", [
+    "http://evil.com", "//evil.com", "https:evil.com", "/\evil.com",
+])
+def test_the_language_and_theme_switches_cannot_redirect_off_site(app, evil):
+    """Both are in _CSRF_EXEMPT, so this is the one open-redirect shape an
+    attacker reaches without a token. The helper already existed and was used
+    correctly by /auth/login; these two just never called it."""
+    c = app.test_client()
+    for path, data in (("/settings/lang", {"lang": "ar"}),
+                       ("/settings/theme", {"theme": "medical"})):
+        r = c.post(path, data={**data, "next": evil})
+        loc = r.headers.get("Location", "")
+        assert "evil.com" not in loc, f"{path} redirected to {loc}"
+
+
+def test_an_hr_password_reset_obeys_the_same_rule_as_everywhere_else():
+    """This accepted six characters while the rest of the app required twelve —
+    on the one path that sets a password FOR somebody else."""
+    src = _read("blueprints/hr/routes.py")
+    assert "len(new_password) < 6" not in src, "the local six-character rule is back"
+    assert "validate_password_strength(new_password)" in src
+
+    import models.security as sec
+    ok, _ = sec.validate_password_strength("abc123")
+    assert not ok, "six characters should be refused"
+
+
+def test_no_local_env_file_carries_a_key_that_is_in_git_history():
+    """These are gitignored and never deployed, so the exposure only becomes
+    real if someone stands up a second production box from this directory."""
+    import re
+    import subprocess
+    for name in (".env", ".env.production", ".env.development"):
+        path = os.path.join(_ROOT, name)
+        if not os.path.exists(path):
+            continue
+        m = re.search(r"^PLATFORM_SECRET_KEY=(.+)$",
+                      open(path, encoding="utf-8").read(), re.M)
+        if not m or len(m.group(1).strip()) < 32:
+            continue
+        out = subprocess.run(["git", "log", "--oneline", "-S", m.group(1).strip(), "--all"],
+                             cwd=_ROOT, capture_output=True, text=True).stdout
+        assert not out.strip(), f"{name} carries a key that appears in git history"

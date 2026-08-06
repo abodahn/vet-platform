@@ -296,13 +296,13 @@ def test_reset_password_actually_changes_the_hash(app, owner, subject):
     c = _client(app, owner)
     c.get("/hr/dashboard")
     r = _post(c, f"/hr/staff/{subject['id']}/reset-password",
-              {"new_password": "BrandNewPass1"})
+              {"new_password": "BrandNewPass1!"})
     assert r.status_code == 200
     after = _one(app, "SELECT password_hash FROM users WHERE id=?",
                  (subject["id"],))["password_hash"]
     assert after != before, "reset-password returned 200 but the hash is unchanged"
     from blueprints.hr.routes import _hash
-    assert after == _hash("BrandNewPass1")
+    assert after == _hash("BrandNewPass1!")
 
 
 def test_reset_password_rejects_short_password(app, owner, subject):

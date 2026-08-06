@@ -13,6 +13,7 @@ from flask import (
 from . import hr_bp
 from blueprints.auth.routes import login_required, self_service, role_required
 import models.database as db
+import models.security as _sec
 
 logger = logging.getLogger(__name__)
 
@@ -810,8 +811,15 @@ def staff_edit(user_id):
 @role_required("super_admin", "clinic_owner", "support_admin")
 def staff_reset_password(user_id):
     new_password = request.form.get("new_password", "")
-    if not new_password or len(new_password) < 6:
-        flash("Password must be at least 6 characters.", "danger")
+    # The SAME rule the rest of the app enforces. This accepted six
+    # characters while models/security.py required twelve everywhere
+    # else -- so the one path that sets a password FOR somebody else,
+    # used by an owner resetting a vet who is locked out, was the
+    # weakest. A six-character password on a clinical account is worth
+    # less than the bcrypt cost protecting it.
+    ok, why = _sec.validate_password_strength(new_password)
+    if not ok:
+        flash(why, "danger")
         return redirect(url_for("hr.staff_detail", user_id=user_id))
     try:
         conn = db.get_db()
