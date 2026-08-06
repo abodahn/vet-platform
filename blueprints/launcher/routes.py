@@ -20,22 +20,15 @@ import models.database as db
 
 MODULES = [
     # ── CLINICAL ────────────────────────────────────────────────────────────
-    {
-        "id":          "examination",
-        "name":        "Examination & Medical Records",
-        "name_ar":     "الفحص والسجلات الطبية",
-        "icon":        "🩺",
-        "description": "Full visit workflow · Diagnosis · Prescriptions · Medical history · Visit summary",
-        "url_key":     "launcher.launch_legacy",
-        "url":         "/launcher/legacy/start",
-        "target":      "_blank",
-        "legacy":      False,
-        "roles":       ["super_admin","clinic_owner","branch_manager","doctor","nurse","reception","staff"],
-        "status":      "active",
-        "category":    "clinical",
-        "color":       "#1a3a6b",
-        "badge":       "Live",
-    },
+    # "examination" used to live here, pointing at /launcher/legacy/start — the
+    # Windows desktop app. It was the FIRST card on the dashboard and it was a
+    # 500 on every hosted deployment, because that route referenced
+    # subprocess.CREATE_NEW_CONSOLE, which does not exist off Windows.
+    #
+    # Deleted rather than repointed: "visits" below already does the same job
+    # ("In-platform visit workflow · SOAP notes · Diagnoses · Prescriptions"),
+    # in the platform, and two cards for one workflow is worse on a demo than
+    # one. The id was referenced nowhere else — no grant, no template, no route.
     {
         "id":          "appointments",
         "name":        "Appointments & Reception",
@@ -530,9 +523,13 @@ MODULES = [
         "name_ar":     "الإعدادات والتكوين",
         "icon":        "⚙️",
         "description": "Clinic profile · Users · Roles · Permissions · Theme · Integrations · Backup",
-        "url_key":     "legacy_config",
-        "legacy":      True,
-        "legacy_path": "/config",
+        # Was legacy_path "/config", rendered as http://localhost:5000/config —
+        # the visitor's OWN machine, so this card was a connection error for
+        # every hosted user. system.settings is the real page and carries the
+        # same two roles.
+        "url_key":     "system.settings",
+        "url":         "/system/settings",
+        "legacy":      False,
         "roles":       ["super_admin","clinic_owner"],
         "status":      "active",
         "category":    "system",
@@ -619,6 +616,7 @@ def index():
         grouped=grouped,
         stats=stats,
         legacy_url=legacy_url,
+        legacy_enabled=legacy_available(),
         active_count=sum(1 for m in modules if m["status"] == "active"),
         total_count=len(MODULES),
     )
@@ -655,6 +653,9 @@ def open_module(module_id: str):
     )
 
     if mod.get("legacy"):
+        if not legacy_available():
+            flash("This module is not available on this installation.", "warning")
+            return redirect(url_for("launcher.index"))
         return redirect(legacy_url + mod.get("legacy_path", "/"))
 
     return redirect(url_for("launcher.stub", module_id=module_id))
@@ -675,10 +676,36 @@ def _legacy_port_open(port: int = 5000) -> bool:
         return False
 
 
+def legacy_available() -> bool:
+    """Whether this deployment can reach a legacy desktop app at all.
+
+    The legacy examination app is a Windows program that ran on the SAME
+    machine as the platform, back when the platform was installed on a clinic's
+    own PC. None of that holds on a hosted server:
+
+      * LEGACY_APP_URL is http://localhost:5000, which from a visitor's browser
+        means THEIR machine, not ours — so the link is a connection error on a
+        vet's laptop and a mystery on his phone.
+      * The "start it" route spawned a process ON THE SERVER, on behalf of any
+        logged-in user of any clinic.
+      * subprocess.CREATE_NEW_CONSOLE does not exist off Windows, so the route
+        was an AttributeError -> 500 rather than anything meaningful.
+
+    LEGACY_APP_ENABLED already existed as the switch and only the system
+    monitor page ever read it. The launcher — where a user actually clicks —
+    ignored it completely, so the demo server showed two legacy buttons at the
+    top of the dashboard: the first screen anyone is shown.
+    """
+    return bool(current_app.config.get("LEGACY_APP_ENABLED"))
+
+
 @launcher_bp.route("/launcher/legacy/start")
 @login_required
 def launch_legacy():
     """Start the legacy examination app if not running, then redirect to it."""
+    if not legacy_available():
+        abort(404)
+
     legacy_url = current_app.config.get("LEGACY_APP_URL", "http://localhost:5000")
     port = int(legacy_url.rsplit(":", 1)[-1]) if ":" in legacy_url.split("//", 1)[-1] else 5000
 
@@ -689,7 +716,10 @@ def launch_legacy():
         subprocess.Popen(
             ["python", "app.py"],
             cwd=legacy_dir,
-            creationflags=subprocess.CREATE_NEW_CONSOLE,
+            # Windows-only, and referencing it unconditionally is what made this
+            # route a 500 on every non-Windows deployment. 0 means "no special
+            # flags", which is the correct POSIX behaviour.
+            creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
         )
         # Wait up to 12 seconds for the app to bind its port
         for _ in range(24):
@@ -705,8 +735,11 @@ def launch_legacy():
 def legacy_ping():
     """Return JSON status of whether the legacy app is reachable."""
     from flask import jsonify
-    up = _legacy_port_open(5000)
-    return jsonify({"up": up})
+    if not legacy_available():
+        # Not "down" — absent. A hosted deployment has no legacy app to be down,
+        # and reporting it as down invites someone to go looking for it.
+        return jsonify({"enabled": False, "up": False})
+    return jsonify({"enabled": True, "up": _legacy_port_open(5000)})
 
 
 @launcher_bp.route("/coming-soon")

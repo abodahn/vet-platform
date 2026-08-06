@@ -5,12 +5,18 @@
 {% block page_sub %}{% endblock %}
 
 {% block topbar_actions %}
-  <a href="/launcher/legacy/start" target="_blank" class="al-btn al-btn-primary al-btn-sm">
-    🩺 {{ t('Open Exam Module', 'وحدة الفحص') }}
-  </a>
-  <a href="{{ legacy_url }}/easy/landing" target="_blank" class="al-btn al-btn-gold al-btn-sm">
-    🧾 {{ t('Quick Invoice', 'فاتورة سريعة') }}
-  </a>
+  {# Both of these open the legacy Windows app on localhost:5000. On a hosted
+     server that is the VISITOR'S machine, not ours — so they were a 500 and a
+     connection error, on the first screen anyone is shown. Gated on
+     LEGACY_APP_ENABLED, which is 0 on every hosted deployment. #}
+  {% if legacy_enabled %}
+    <a href="/launcher/legacy/start" target="_blank" class="al-btn al-btn-primary al-btn-sm">
+      🩺 {{ t('Open Exam Module', 'وحدة الفحص') }}
+    </a>
+    <a href="{{ legacy_url }}/easy/landing" target="_blank" class="al-btn al-btn-gold al-btn-sm">
+      🧾 {{ t('Quick Invoice', 'فاتورة سريعة') }}
+    </a>
+  {% endif %}
 {% endblock %}
 
 {% block content %}

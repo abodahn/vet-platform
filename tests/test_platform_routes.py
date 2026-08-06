@@ -1008,9 +1008,18 @@ def test_coming_soon_renders_the_requested_module(admin):
 
 
 def test_open_module_redirects_to_the_platform_stub(admin):
-    r = admin.get("/module/examination")
+    # Was /module/examination. That card pointed at the legacy Windows app and
+    # was a 500 on every hosted deployment, so it was deleted — "visits" does
+    # the same workflow inside the platform. multi_branch is the honest stub
+    # case now: a planned module with no url of its own.
+    r = admin.get("/module/multi_branch")
     assert r.status_code == 302
-    assert r.headers["Location"].endswith("/module/examination/stub")
+    assert r.headers["Location"].endswith("/module/multi_branch/stub")
+
+
+def test_the_deleted_legacy_module_is_gone(admin):
+    """It should 404, not quietly resolve to something else."""
+    assert admin.get("/module/examination").status_code == 404
 
 
 def test_open_module_writes_an_audit_row(app, admin):
@@ -1041,10 +1050,13 @@ def test_module_stub_renders(admin):
 
 
 def test_legacy_ping_reports_the_port_state(admin, monkeypatch):
+    # The reply now carries `enabled` as well. A hosted deployment has no
+    # legacy app to be down, and reporting it as merely "down" invited someone
+    # to go looking for it — see tests/test_legacy_app_gate.py.
     monkeypatch.setattr(launcher_routes, "_legacy_port_open", lambda port=5000: True)
-    assert admin.get("/launcher/legacy/ping").get_json() == {"up": True}
+    assert admin.get("/launcher/legacy/ping").get_json() == {"enabled": True, "up": True}
     monkeypatch.setattr(launcher_routes, "_legacy_port_open", lambda port=5000: False)
-    assert admin.get("/launcher/legacy/ping").get_json() == {"up": False}
+    assert admin.get("/launcher/legacy/ping").get_json() == {"enabled": True, "up": False}
 
 
 def test_launch_legacy_does_not_spawn_a_process_when_the_port_is_open(

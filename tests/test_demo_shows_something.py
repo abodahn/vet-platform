@@ -26,14 +26,29 @@ import models.database as db  # noqa: E402
 
 @pytest.fixture(scope="module")
 def demo(tmp_path_factory):
-    """Seed the demo dataset once and read it back."""
+    """Seed the demo dataset once and read it back.
+
+    The save/restore is not optional, and leaving it out cost 336 failures
+    across the suite. conftest's _restore_db_globals is FUNCTION-scoped, so it
+    cannot protect against a module-scoped fixture: this one repointed
+    models.database at the demo file and the global outlived every restore
+    window, so every later test signed in as the demo's admin — wrong password,
+    302 on everything. A module-scoped fixture that touches those globals has
+    to put them back itself, exactly as test_demo_seed.py does.
+    """
     import demo_showcase
+    saved = (db._db_path, db._PG_CONFIG, db._POOL)
     path = tmp_path_factory.mktemp("demo") / "demo.db"
-    demo_showcase.run(str(path), quiet=True)
-    db.use_sqlite(str(path))
-    conn = db.get_db()
-    yield conn
-    conn.close()
+    try:
+        demo_showcase.run(str(path), quiet=True)
+        db.use_sqlite(str(path))
+        conn = db.get_db()
+        try:
+            yield conn
+        finally:
+            conn.close()
+    finally:
+        db._db_path, db._PG_CONFIG, db._POOL = saved
 
 
 def _count(conn, sql, *params):
