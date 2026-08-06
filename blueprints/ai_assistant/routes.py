@@ -50,6 +50,10 @@ def get_system_prompt(role: str) -> str:
         "Always be professional, accurate, and include a disclaimer that AI suggestions "
         "should be reviewed by a licensed veterinarian.\n"
         "You support both English and Arabic. Respond in the same language as the user's message.\n"
+        # Length is latency. Measured on the demo's free model: the same
+        # question took 70 seconds answered at length and under 3 seconds
+        # answered well. Staff read this between patients.
+        "BE CONCISE. Lead with the answer. Stay under 150 words unless detail is asked for.\n"
     )
     role_context = {
         "doctor": (
