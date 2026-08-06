@@ -140,3 +140,54 @@ def test_the_ai_links_are_clickable_even_with_no_provider(no_ai, auth_client):
     visible = re.sub(r"<script.*?</script>", "", html, flags=re.S | re.I)
     links = re.findall(r'<a[^>]+href="(/ai(?:/[^"]*)?)"', visible)
     assert links, "the AI assistant must stay reachable from the dashboard"
+
+
+# ── one slow answer must not freeze the clinic ────────────────────────────────
+#
+# Measured on the live demo: a single Arabic question to Petsy held a gunicorn
+# worker for 91.5 seconds and returned 200. There are three workers. Three
+# people asking at once froze every other page in the building, and the 120s
+# worker timeout was the only thing that ever ended it.
+#
+# A free model generates roughly ten tokens a second, so the 800- and
+# 1024-token budgets WERE the ninety seconds. Both are now bounded, and the
+# client carries a timeout so a hung provider fails instead of hanging.
+
+def test_the_token_budget_cannot_outlast_the_worker():
+    """max_tokens / 10 tokens-per-sec must stay clear of gunicorn's 120s."""
+    from blueprints.ai_assistant import routes as ai_r
+    from blueprints.petsy import routes as petsy
+
+    for name, budget in (("assistant", ai_r.AI_MAX_TOKENS),
+                         ("petsy", petsy._MAX_TOKENS)):
+        worst_case = budget / 10.0
+        assert worst_case < 100, (
+            f"{name}: {budget} tokens is ~{worst_case:.0f}s on a free model, "
+            "which reaches gunicorn's 120s worker timeout")
+
+
+def test_the_provider_client_has_a_timeout():
+    """Without one, a provider that accepts the connection and then stalls
+    holds the worker until gunicorn kills it."""
+    from blueprints.ai_assistant import routes as ai_r
+    from blueprints.petsy import routes as petsy
+
+    assert 0 < ai_r.AI_TIMEOUT <= 90
+    assert 0 < petsy._TIMEOUT <= 90
+
+
+def test_both_limits_are_deployment_configurable():
+    """A paid model answers in two seconds and can afford longer replies, so
+    the ceiling has to be raisable without a code change.
+
+    Asserted on the source, not by reloading the module: these live in Flask
+    blueprints, and reloading a registered blueprint raises "The setup method
+    'route' can no longer be called".
+    """
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.dirname(here)
+    for rel in ("blueprints/ai_assistant/routes.py", "blueprints/petsy/routes.py"):
+        src = open(os.path.join(root, rel), encoding="utf-8").read()
+        assert 'environ.get("AI_MAX_TOKENS"' in src, f"{rel} hardcodes the token budget"
+        assert 'environ.get("AI_TIMEOUT_SECONDS"' in src, f"{rel} hardcodes the timeout"

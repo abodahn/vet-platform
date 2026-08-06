@@ -29,6 +29,11 @@ _logger = _log.getLogger(__name__)
 _BASE_URL = _os.environ.get("AI_BASE_URL", "http://localhost:3001/v1")
 _API_KEY  = _os.environ.get("AI_API_KEY",  "")   # Must be set via env var — no hardcoded fallback
 _MODEL    = _os.environ.get("AI_MODEL",    "gemini-2.5-flash")
+# Both bounded so one slow answer cannot occupy a gunicorn worker until the
+# 120s kill. Raise AI_MAX_TOKENS on a fast paid model if longer replies are
+# wanted; the ceiling exists for the free ones.
+_MAX_TOKENS = int(_os.environ.get("AI_MAX_TOKENS", "350") or 350)
+_TIMEOUT    = float(_os.environ.get("AI_TIMEOUT_SECONDS", "45") or 45)
 
 # ── Rate limiter (public endpoint) ────────────────────────────────────────────
 _rate: dict = defaultdict(list)
@@ -695,10 +700,19 @@ def _call_petsy(messages: list, system: str) -> tuple[str, str]:
         return ("🐾 بيتسي مش مفعّل على النظام ده.\n"
                 "Petsy is not enabled on this installation."), "none"
     try:
-        client = _OpenAI(base_url=_BASE_URL, api_key=_API_KEY)
+        # timeout, and a smaller budget than 800.
+        #
+        # A free model generates about ten tokens a second, so 800 tokens is a
+        # ninety-second request — measured, not guessed: one Arabic question
+        # held a gunicorn worker for 91.5s. There are three workers. Three
+        # people asking Petsy at once froze the whole clinic, and the 120s
+        # worker timeout was the only thing that ever ended it.
+        #
+        # A chat bubble a pet owner reads on a phone should be short anyway.
+        client = _OpenAI(base_url=_BASE_URL, api_key=_API_KEY, timeout=_TIMEOUT)
         full   = [{"role": "system", "content": system}, *messages]
         resp   = client.chat.completions.create(
-            model=_MODEL, messages=full, max_tokens=800
+            model=_MODEL, messages=full, max_tokens=_MAX_TOKENS
         )
         choice = resp.choices[0]
         # Handle content-filter / safety blocks gracefully

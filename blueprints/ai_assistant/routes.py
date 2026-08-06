@@ -31,6 +31,11 @@ from urllib.parse import urlparse as _urlparse
 FREELLM_BASE_URL = _os.environ.get("AI_BASE_URL", "http://localhost:3001/v1")
 FREELLM_API_KEY  = _os.environ.get("AI_API_KEY",  "")   # Must be set via env var
 FREELLM_MODEL    = _os.environ.get("AI_MODEL",    "gemini-2.5-flash")
+# Bounded so one slow answer cannot hold a gunicorn worker until the 120s
+# kill. A free model generates ~10 tokens/sec, so 1024 tokens was a
+# 100-second request and there are only three workers.
+AI_MAX_TOKENS    = int(_os.environ.get("AI_MAX_TOKENS", "700") or 700)
+AI_TIMEOUT       = float(_os.environ.get("AI_TIMEOUT_SECONDS", "45") or 45)
 
 # Maximum length for user chat messages (prevents token abuse)
 AI_MAX_MESSAGE_LENGTH = 2000
@@ -135,7 +140,8 @@ def _local_proxy_reachable(url: str) -> bool:
 
 
 def _client() -> "_OpenAI":
-    return _OpenAI(base_url=FREELLM_BASE_URL, api_key=FREELLM_API_KEY)
+    return _OpenAI(base_url=FREELLM_BASE_URL, api_key=FREELLM_API_KEY,
+                   timeout=AI_TIMEOUT)
 
 
 def call_ai(messages: list, role: str,
@@ -160,7 +166,7 @@ def call_ai(messages: list, role: str,
         resp = client.chat.completions.create(
             model=FREELLM_MODEL,
             messages=full_messages,
-            max_tokens=1024,
+            max_tokens=AI_MAX_TOKENS,
         )
         text       = resp.choices[0].message.content or ""
         model_used = resp.model or FREELLM_MODEL
@@ -820,7 +826,7 @@ def analyze_photo():
                 {"role": "system", "content": system_txt},
                 {"role": "user",   "content": user_content},
             ],
-            max_tokens=1024,
+            max_tokens=AI_MAX_TOKENS,
         )
         analysis = resp.choices[0].message.content or ""
         return jsonify({"analysis": analysis})
