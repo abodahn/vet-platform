@@ -519,7 +519,11 @@ def create_app(cfg=None) -> Flask:
         else:
             checks["scheduler"] = "running" if sched.running else "stopped"
 
-        backup = bk.health()
+        # Scoped to the clinic this request is for. Unscoped, this reported the
+        # deployment's own database, which no clinic backs up — so it read
+        # "stale" forever while every clinic's real backup was hours old.
+        with bk.for_current_clinic():
+            backup = bk.health()
         checks["backup"] = "ok" if backup.get("ok") else "stale"
 
         # The HTTP status answers ONE question: can this instance serve

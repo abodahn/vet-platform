@@ -101,6 +101,42 @@ def for_clinic(slug: str, db_path: str = "", pg_dsn: str = ""):
         _db_path, _backup_dir, _tenant_dsn = prev
 
 
+@contextmanager
+def for_current_clinic():
+    """Scope the READING functions to the clinic being served right now.
+
+    for_clinic() is explicit on purpose — a restore or a retention purge must
+    never silently retarget. But the reporting paths had the opposite problem:
+    health(), list_backups() and get_latest_backup() read _backup_dir, which in
+    a multi-tenant deployment is the DEPLOYMENT's directory, while the nightly
+    job writes each clinic's archives into <backup_dir>/<slug>.
+
+    So every one of them answered about a database no clinic owns. On the live
+    demo that meant /healthz reported "backup stale, 60 hours" — permanently,
+    and for a reason that had nothing to do with the clinic's data, whose
+    backup was in fact four hours old. An alarm that is always on is worse than
+    no alarm: it trains everyone to ignore the one time it is real.
+
+    A single-clinic install has no slug, so this is a no-op there and behaviour
+    is unchanged. Never raises: a health probe must not fail because the tenant
+    registry is unreadable.
+    """
+    slug = ""
+    tgt = {}
+    try:
+        from models import tenancy
+        slug = tenancy.current() or ""
+        if slug:
+            tgt = tenancy.target(slug) or {}
+    except Exception:                      # no registry, no app context, no tenant
+        slug = ""
+    if not slug:
+        yield
+        return
+    with for_clinic(slug, tgt.get("db_path", ""), tgt.get("pg_dsn", "")):
+        yield
+
+
 def _postgres_dsn() -> str:
     """The DSN this backup should use, or '' when the target is SQLite.
 

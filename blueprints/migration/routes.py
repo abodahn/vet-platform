@@ -151,7 +151,12 @@ def index():
     finally:
         conn.close()
 
-    latest_backup = bk.get_latest_backup()
+    # This page's whole job is to tell you whether it is safe to run a
+    # destructive import. Unscoped it read the deployment's archives, so a
+    # clinic could be shown a reassuring "last backup 4 hours ago" that
+    # belonged to a different database entirely.
+    with bk.for_current_clinic():
+        latest_backup = bk.get_latest_backup()
 
     return render_template(
         "migration/index.html",

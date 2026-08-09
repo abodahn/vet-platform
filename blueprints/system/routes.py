@@ -444,13 +444,21 @@ def _audit_backup(action: str, details: str) -> None:
 def backup():
     # Page load is the one thing guaranteed to still happen when the scheduler
     # has quietly died, so this is where a stale backup gets noticed.
-    health = bk.check_and_notify()
+    #
+    # Scoped to THIS clinic. Unscoped, a clinic opening its own backup page was
+    # shown the deployment's archives instead of its own — so the list was
+    # empty or ancient while its real nightly backup sat in <backup_dir>/<slug>
+    # where the nightly job puts it.
+    with bk.for_current_clinic():
+        health = bk.check_and_notify()
+        backups = bk.list_backups()
+        maintenance = bk.maintenance_active()
     return render_template(
         "system/backup.html",
-        backups=bk.list_backups(),
+        backups=backups,
         latest=health.get("latest"),
         health=health,
-        maintenance=bk.maintenance_active(),
+        maintenance=maintenance,
         active="backup",
     )
 
