@@ -10,6 +10,27 @@ import importlib
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _restore_version_info():
+    """Put config.VERSION_INFO back exactly as it was.
+
+    These tests reload `config` to exercise the GIT_COMMIT fallback, and a
+    reload recomputes VERSION_INFO for the WHOLE session — every later test
+    sees the new value. That is not hypothetical: with no GIT_COMMIT set,
+    _git_commit() reads .git/HEAD, so a commit landing while the suite runs
+    changed the value mid-session and broke an unrelated assertion in
+    test_observability.py that compares a release string captured at app-import
+    time against config.VERSION_INFO read at assert time.
+
+    Restoring the original object, rather than reloading again, means the
+    result cannot depend on what git is doing at that moment.
+    """
+    import config
+    saved = config.VERSION_INFO
+    yield
+    config.VERSION_INFO = saved
+
+
 def _version_info(monkeypatch, commit="", build_date=""):
     """Re-read config with the given environment — VERSION_INFO is module-level."""
     import config

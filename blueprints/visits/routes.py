@@ -744,8 +744,8 @@ def _exam_context(conn, pet_id):
             return []
 
     vaccines = rows(
-        "SELECT vaccine_name, vaccine_brand, administered_at, next_due_at,"
-        " administered_by, dose_number FROM vaccinations"
+        "SELECT id, visit_id, vaccine_name, vaccine_brand, administered_at,"
+        " next_due_at, administered_by, dose_number FROM vaccinations"
         " WHERE pet_id=? ORDER BY COALESCE(administered_at,'') DESC LIMIT 25",
         (pet_id,))
     today_iso = date.today().isoformat()
@@ -756,14 +756,14 @@ def _exam_context(conn, pet_id):
             date.today().replace(day=1).isoformat()[:8] + "28") and due >= today_iso)
 
     meds = rows(
-        "SELECT pi.medication_name, pi.dosage, pi.frequency, pi.duration,"
-        " pi.route, pi.dispensed, p.created_at, p.status"
+        "SELECT p.id AS prescription_id, p.visit_id, pi.medication_name, pi.dosage,"
+        " pi.frequency, pi.duration, pi.route, pi.dispensed, p.created_at, p.status"
         " FROM prescription_items pi JOIN prescriptions p ON p.id=pi.prescription_id"
         " WHERE p.pet_id=? ORDER BY p.created_at DESC LIMIT 25", (pet_id,))
 
     chronic = rows(
-        "SELECT diagnosis, severity, is_chronic, created_at FROM diagnoses"
-        " WHERE pet_id=? ORDER BY created_at DESC LIMIT 25", (pet_id,))
+        "SELECT id, visit_id, diagnosis, severity, is_chronic, created_at"
+        " FROM diagnoses WHERE pet_id=? ORDER BY created_at DESC LIMIT 25", (pet_id,))
 
     invoices = rows(
         "SELECT id, invoice_number, issue_date, total, paid_amount, due_amount,"
@@ -776,7 +776,7 @@ def _exam_context(conn, pet_id):
         (owner_id, pet_id))
 
     upcoming = rows(
-        "SELECT appt_date, appt_start, appointment_type, doctor_name, status"
+        "SELECT id, appt_date, appt_start, appointment_type, doctor_name, status"
         " FROM appointments WHERE pet_id=? AND appt_date>=?"
         " AND status NOT IN ('Cancelled','Completed','No-Show')"
         " ORDER BY appt_date, appt_start LIMIT 5", (pet_id, today_iso))

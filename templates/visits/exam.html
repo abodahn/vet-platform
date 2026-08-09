@@ -24,12 +24,14 @@
     <div id="hwCurrent" class="hw-current" hidden>
       <div>
         <span class="hw-chip-label">{{ t('Client', 'العميل') }}</span>
-        <strong id="hwOwnerName">—</strong>
-        <span id="hwOwnerPhone" class="hw-muted"></span>
+        <a id="hwOwnerName" class="hw-link hw-strong" href="#">—</a>
+        <a id="hwOwnerPhone" class="hw-link hw-muted" href="#"></a>
+        <a id="hwOwnerWa" class="hw-link hw-muted" href="#" target="_blank"
+           rel="noopener" hidden>WhatsApp</a>
       </div>
       <div>
         <span class="hw-chip-label">{{ t('Pet', 'الحيوان') }}</span>
-        <strong id="hwPetName">—</strong>
+        <a id="hwPetName" class="hw-link hw-strong" href="#">—</a>
         <span id="hwPetMeta" class="hw-muted"></span>
       </div>
       <div id="hwSiblings" class="hw-siblings"></div>
@@ -380,6 +382,17 @@
            grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
 .hw-span-all{grid-column:1/-1}
 
+/* Clickable must LOOK clickable, and must survive a keyboard. */
+.hw-link{color:var(--pf-primary,#0369a1);text-decoration:none;border-bottom:1px solid transparent}
+.hw-link:hover,.hw-link:focus{text-decoration:underline;border-bottom-color:currentColor}
+.hw-strong{font-weight:700;font-size:1.05rem}
+.hw-rowlink{cursor:pointer}
+.hw-rowlink:hover{background:var(--pf-hover-bg,#eef4fb)}
+@media (prefers-color-scheme:dark){.hw-rowlink:hover{background:rgba(255,255,255,.06)}}
+.hw-alert-link{cursor:pointer;text-decoration:none}
+.hw-alert-link:hover{filter:brightness(.96);text-decoration:underline}
+.hw-petbtn{transition:background .12s,color .12s}
+
 .hw-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:.9rem;
           padding-top:.8rem;border-top:2px dashed var(--pf-border,#d0d5dd)}
 .hw-total span{font-size:1.1rem;font-weight:700}
@@ -518,21 +531,45 @@
   // ── loading a pet, without leaving the page ───────────────────────
   // Every table below goes through this. textContent, never innerHTML: these
   // are clinic notes and client names typed by staff, not trusted markup.
-  function fillTable(bodyId, emptyId, countId, rows, cells) {
+  //
+  // `link(r)` returns a URL, and then the whole row goes there. The first cell
+  // gets a real <a> so the keyboard, middle-click and "open in new tab" all
+  // behave; the row click is a convenience on top, not the only way in.
+  function fillTable(bodyId, emptyId, countId, rows, cells, link) {
     var tb = $(bodyId);
     while (tb.firstChild) tb.removeChild(tb.firstChild);
     (rows || []).forEach(function (r) {
       var tr = document.createElement('tr');
-      cells(r).forEach(function (c) {
+      var href = link ? link(r) : null;
+      var vals = cells(r);
+
+      vals.forEach(function (c, i) {
         var td = document.createElement('td');
-        if (c && typeof c === 'object') {
-          td.textContent = c.text;
-          if (c.cls) td.className = c.cls;
+        var text = (c && typeof c === 'object') ? c.text : c;
+        if (text === null || text === undefined || text === '') text = '—';
+        if (c && typeof c === 'object' && c.cls) td.className = c.cls;
+
+        if (href && i === 0) {
+          var a = document.createElement('a');
+          a.href = href;
+          a.textContent = text;
+          a.className = 'hw-link';
+          td.appendChild(a);
         } else {
-          td.textContent = (c === null || c === undefined || c === '') ? '—' : c;
+          td.textContent = text;
         }
         tr.appendChild(td);
       });
+
+      if (href) {
+        tr.className = 'hw-rowlink';
+        tr.title = href;
+        tr.addEventListener('click', function (e) {
+          if (e.target.tagName === 'A') return;         // the anchor handles itself
+          if (e.metaKey || e.ctrlKey) window.open(href, '_blank');
+          else window.location.href = href;
+        });
+      }
       tb.appendChild(tr);
     });
     $(emptyId).style.display = (rows && rows.length) ? 'none' : '';
@@ -543,9 +580,12 @@
   function d2(v) { return v == null ? '—' : Number(v).toFixed(2); }
   function day(v) { return (v || '').slice(0, 10) || '—'; }
 
-  function alert3(cls, label, text) {
-    var box = document.createElement('div');
-    box.className = 'hw-alert ' + cls;
+  // An alert that names a problem should take you to the problem. `href` is
+  // optional — allergies are a fact about the animal, not somewhere to go.
+  function alert3(cls, label, text, href) {
+    var box = document.createElement(href ? 'a' : 'div');
+    box.className = 'hw-alert ' + cls + (href ? ' hw-alert-link' : '');
+    if (href) { box.href = href; }
     var b = document.createElement('b'); b.textContent = label;
     var s = document.createElement('span'); s.textContent = text;
     box.appendChild(b); box.appendChild(s);
@@ -563,24 +603,29 @@
     var chronicDx = (d.chronic || []).filter(function (c) { return c.is_chronic; });
     if (chronicDx.length) {
       alert3('hw-warn', L.chronic,
-             chronicDx.map(function (c) { return c.diagnosis; }).join(' · '));
+             chronicDx.map(function (c) { return c.diagnosis; }).join(' · '),
+             chronicDx[0].visit_id ? '/visits/' + chronicDx[0].visit_id : null);
     }
 
     var od = (d.vaccines || []).filter(function (v) { return v.overdue; });
     if (od.length) {
       alert3('hw-warn', L.overdueVax,
              od.map(function (v) { return v.vaccine_name + ' (' + day(v.next_due_at) + ')'; })
-               .join(' · '));
+               .join(' · '),
+             '/clinical/vaccinations?pet_id=' + p.id);
     }
 
     if (Number(d.outstanding) > 0) {
-      alert3('hw-danger', L.owes, d2(d.outstanding) + ' EGP');
+      // Straight to what they owe, filtered to this client.
+      alert3('hw-danger', L.owes, d2(d.outstanding) + ' EGP',
+             '/finance/invoices?owner_id=' + (d.owner || {}).id + '&status=Unpaid');
     }
 
     (d.upcoming || []).forEach(function (a) {
       alert3('hw-info', L.booked,
              day(a.appt_date) + ' ' + (a.appt_start || '') + ' · ' +
-             (a.appointment_type || '') + (a.doctor_name ? ' · ' + a.doctor_name : ''));
+             (a.appointment_type || '') + (a.doctor_name ? ' · ' + a.doctor_name : ''),
+             a.id ? '/appointments/' + a.id : '/appointments/');
     });
 
     if (p.diet_notes) alert3('hw-info', L.diet, p.diet_notes);
@@ -640,22 +685,39 @@
     fillTable('hwVaxBody', 'hwNoVax', 'hwVaxCount', data.vaccines, function (v) {
       return [v.vaccine_name, day(v.administered_at),
               {text: day(v.next_due_at), cls: v.overdue ? 'hw-od' : ''}];
+    }, function (v) {
+      // The certificate is the useful artefact — it is what the client asks for.
+      return v.id ? '/clinical/vaccinations/' + v.id + '/certificate'
+                  : (v.visit_id ? '/visits/' + v.visit_id : null);
     });
+
     fillTable('hwMedBody', 'hwNoMed', 'hwMedCount', data.meds, function (m) {
       return [m.medication_name, m.dosage, m.frequency, day(m.created_at)];
+    }, function (m) {
+      return m.prescription_id ? '/pharmacy/prescription/' + m.prescription_id
+                               : (m.visit_id ? '/visits/' + m.visit_id : null);
     });
+
     fillTable('hwDxBody', 'hwNoDx', 'hwDxCount', data.chronic, function (c) {
       return [c.diagnosis, c.severity, day(c.created_at)];
-    });
+    }, function (c) { return c.visit_id ? '/visits/' + c.visit_id : null; });
+
     fillTable('hwInvBody', 'hwNoInv', 'hwInvCount', data.invoices, function (i) {
       return [i.invoice_number, day(i.issue_date), d2(i.total), d2(i.paid_amount),
               {text: d2(i.due_amount), cls: Number(i.due_amount) > 0 ? 'hw-od' : ''},
               i.status];
-    });
+    }, function (i) { return '/finance/invoices/' + i.id; });
 
+    var wa = (txt(o.whatsapp_phone) || txt(o.phone)).replace(/[^\d]/g, '');
     $('hwOwnerName').textContent  = txt(o.full_name) || '—';
+    $('hwOwnerName').href         = '/crm/owners/' + o.id;
     $('hwOwnerPhone').textContent = txt(o.phone);
+    $('hwOwnerPhone').href        = 'tel:' + txt(o.phone);
+    $('hwOwnerWa').hidden         = !wa;
+    // Egyptian mobiles are stored as 01…; wa.me needs the country code.
+    $('hwOwnerWa').href = 'https://wa.me/' + (wa.indexOf('0') === 0 ? '2' + wa : wa);
     $('hwPetName').textContent    = txt(p.pet_name) || '—';
+    $('hwPetName').href           = '/crm/pets/' + p.id;
     $('hwPetMeta').textContent    = [txt(p.species), txt(p.breed), txt(p.sex),
                                      txt(p.age_text)].filter(Boolean).join(' · ');
     $('lnkVaccine').href = '/clinical/vaccinations?pet_id=' + p.id;
@@ -666,7 +728,7 @@
       return [(h.visit_date || '').slice(0, 16),
               h.chief_complaint || h.symptoms,
               d1(h.weight_kg), d1(h.temp_c), h.doctor_name];
-    });
+    }, function (h) { return '/visits/' + h.id; });
 
     $('hwCurrent').hidden = false;
     empty.hidden = true;

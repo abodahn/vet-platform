@@ -351,3 +351,75 @@ def test_a_pet_with_no_extra_records_still_loads(auth_client, leo):
     for key in ("vaccines", "meds", "chronic", "invoices", "siblings", "upcoming"):
         assert isinstance(data[key], list)
     assert isinstance(data["outstanding"], float)
+
+
+# ── every clickable thing must go somewhere real ─────────────────────────
+
+
+def test_the_ids_needed_to_build_links_are_returned(auth_client, leo):
+    """Rows without an id render as dead text. Every panel needs its key."""
+    from datetime import date, timedelta
+    _post(auth_client, leo["pet_id"])          # makes a visit and an invoice
+    conn = db.get_db()
+    visit_id = conn.execute(
+        "SELECT id FROM visits WHERE pet_id=? ORDER BY id DESC LIMIT 1",
+        (leo["pet_id"],)).fetchone()[0]
+    conn.execute("INSERT INTO vaccinations(pet_id, visit_id, vaccine_name,"
+                 " administered_at, next_due_at) VALUES(?,?,?,?,?)",
+                 (leo["pet_id"], visit_id, "Rabies", "2026-01-01",
+                  (date.today() + timedelta(days=200)).isoformat()))
+    # diagnoses.visit_id is NOT NULL — a diagnosis belongs to a consultation.
+    conn.execute("INSERT INTO diagnoses(pet_id, visit_id, diagnosis, severity)"
+                 " VALUES(?,?,?,?)", (leo["pet_id"], visit_id, "Otitis", "Mild"))
+    conn.commit()
+    conn.close()
+
+    d = auth_client.get("/visits/exam/api/pet/%d" % leo["pet_id"]).get_json()
+    assert d["pet"]["id"], "the pet link needs an id"
+    assert d["owner"]["id"], "the owner link needs an id"
+    for h in d["history"]:
+        assert h["id"], "a history row with no id cannot link to its visit"
+    for v in d["vaccines"]:
+        assert "id" in v and "visit_id" in v
+    for c in d["chronic"]:
+        assert "id" in c and "visit_id" in c
+    for m in d["meds"]:
+        assert "prescription_id" in m and "visit_id" in m
+    for i in d["invoices"]:
+        assert i["id"], "an invoice row with no id cannot link to the invoice"
+    for a in d["upcoming"]:
+        assert "id" in a
+
+
+def test_every_link_target_the_screen_builds_is_a_real_route(app):
+    """The two dead dashboard cards survived for months because nobody asked."""
+    targets = [
+        "/visits/1",
+        "/finance/invoices/1",
+        "/crm/owners/1",
+        "/crm/pets/1",
+        "/pharmacy/prescription/1",
+        "/clinical/vaccinations/1/certificate",
+        "/clinical/vaccinations",
+        "/finance/invoices",
+        "/appointments/1",
+        "/appointments/",
+    ]
+    adapter = app.url_map.bind("localhost")
+    for path in targets:
+        base = path.split("?")[0]
+        try:
+            adapter.match(base)
+        except Exception as exc:            # NotFound / MethodNotAllowed
+            if exc.__class__.__name__ == "MethodNotAllowed":
+                continue                    # the rule exists, just not for GET
+            raise AssertionError("%s is not a route: %s" % (base, exc))
+
+
+def test_the_rows_are_rendered_as_links_not_plain_text(auth_client, leo):
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+    assert "hw-rowlink" in body, "clickable rows lost their class"
+    assert "'/finance/invoices/'" in body, "invoice rows must link to the invoice"
+    assert "'/visits/' + h.id" in body, "history rows must link to the visit"
+    assert "/crm/owners/" in body and "/crm/pets/" in body
+    assert "wa.me" in body, "the WhatsApp shortcut is gone"
