@@ -539,9 +539,13 @@ def create_app(cfg=None) -> Flask:
                     if (k == "backup" and v != "ok")
                     or (k == "scheduler" and v == "stopped")]
 
+        # The public probe carries the version NUMBER, which is what a clinic
+        # reads back over the phone. The commit stays behind the operator key
+        # below: it fingerprints the exact build to anyone who asks, and
+        # /healthz is unauthenticated by design.
         body = {"status": "ok" if serving and not degraded
                           else "degraded" if serving else "down",
-                "version": VERSION_INFO["full"]}
+                "version": VERSION_INFO["version"]}
         if degraded:
             body["degraded"] = degraded
 
@@ -553,6 +557,8 @@ def create_app(cfg=None) -> Flask:
             body["checks"] = checks
             body["last_backup_hours"] = backup.get("age_hours")
             body["commit"] = VERSION_INFO["commit"]
+            body["built"] = VERSION_INFO["built"]
+            body["full"] = VERSION_INFO["full"]
         return jsonify(body), 200 if serving else 503
 
     @app.after_request
