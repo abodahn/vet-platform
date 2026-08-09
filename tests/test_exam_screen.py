@@ -254,3 +254,100 @@ def test_a_deep_link_with_pet_id_lands_on_the_loaded_screen(auth_client, leo):
                            follow_redirects=True)
     assert resp.status_code == 200
     assert leo["pet_name"] in resp.get_data(as_text=True)
+
+
+# ── the wider picture: everything about the owner and the pet ────────────
+
+
+def test_age_is_computed_from_the_date_of_birth():
+    from blueprints.visits.routes import _age_text
+    from datetime import date, timedelta
+    today = date.today()
+    assert _age_text((today - timedelta(days=400)).isoformat()).endswith("m")
+    assert _age_text((today - timedelta(days=400)).isoformat()).startswith("1y")
+    assert _age_text((today - timedelta(days=60)).isoformat()) in ("1m", "2m")
+    assert _age_text("") == ""
+    assert _age_text("not-a-date") == ""
+    assert _age_text((today + timedelta(days=30)).isoformat()) == "", \
+        "a birth date in the future must not render a negative age"
+
+
+def test_the_pet_record_reaches_the_screen_in_full(auth_client, leo):
+    conn = db.get_db()
+    conn.execute(
+        "UPDATE pets SET color=?, microchip_id=?, neutered=1, allergies=?,"
+        " chronic_conditions=?, diet_notes=?, notes=?, dob=? WHERE id=?",
+        ("Ginger", "CHIP-99", "Penicillin", "Chronic renal failure",
+         "Renal diet only", "Bites when scared", "2019-03-01", leo["pet_id"]))
+    conn.commit()
+    conn.close()
+
+    data = auth_client.get("/visits/exam/api/pet/%d" % leo["pet_id"]).get_json()
+    p = data["pet"]
+    assert p["color"] == "Ginger"
+    assert p["microchip_id"] == "CHIP-99"
+    assert p["neutered"] == 1
+    assert p["allergies"] == "Penicillin"
+    assert p["chronic_conditions"] == "Chronic renal failure"
+    assert p["diet_notes"] == "Renal diet only"
+    assert p["notes"] == "Bites when scared"
+    assert p["age_text"], "age should be computed, not left to the reader"
+
+
+def test_what_the_client_already_owes_is_on_the_screen(auth_client, leo):
+    """The number reception needs BEFORE taking money, from the ledger."""
+    _post(auth_client, leo["pet_id"], cash_received="0")   # 560 unpaid
+    data = auth_client.get("/visits/exam/api/pet/%d" % leo["pet_id"]).get_json()
+    assert data["outstanding"] >= 560.0
+    assert any(i["status"] in ("Unpaid", "Partial") for i in data["invoices"])
+
+
+def test_paying_in_full_clears_the_outstanding_figure(auth_client, leo):
+    _post(auth_client, leo["pet_id"], cash_received="560")
+    data = auth_client.get("/visits/exam/api/pet/%d" % leo["pet_id"]).get_json()
+    mine = [i for i in data["invoices"] if float(i["total"]) == 560.0]
+    assert mine and mine[0]["status"] == "Paid"
+    assert float(mine[0]["due_amount"]) == 0.0
+
+
+def test_the_owners_other_pets_are_listed(auth_client, leo):
+    data = auth_client.get("/visits/exam/api/pet/%d" % leo["pet_id"]).get_json()
+    names = [s["pet_name"] for s in data["siblings"]]
+    assert leo["pet_name"] not in names, "the pet is not its own sibling"
+    for s in data["siblings"]:
+        assert "age_text" in s
+
+
+def test_an_overdue_vaccine_is_flagged(auth_client, leo):
+    from datetime import date, timedelta
+    past = (date.today() - timedelta(days=30)).isoformat()
+    future = (date.today() + timedelta(days=90)).isoformat()
+    conn = db.get_db()
+    conn.execute(
+        "INSERT INTO vaccinations(pet_id, vaccine_name, administered_at, next_due_at)"
+        " VALUES(?,?,?,?)", (leo["pet_id"], "Rabies", "2025-08-01", past))
+    conn.execute(
+        "INSERT INTO vaccinations(pet_id, vaccine_name, administered_at, next_due_at)"
+        " VALUES(?,?,?,?)", (leo["pet_id"], "Feline Leukaemia", "2026-01-01", future))
+    conn.commit()
+    conn.close()
+
+    vax = auth_client.get("/visits/exam/api/pet/%d" % leo["pet_id"]).get_json()["vaccines"]
+    by_name = {v["vaccine_name"]: v for v in vax}
+    assert by_name["Rabies"]["overdue"] is True
+    assert by_name["Feline Leukaemia"]["overdue"] is False
+
+
+def test_the_detail_panels_are_all_on_the_page(auth_client, leo):
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+    for marker in ("hwAlerts", "hwVaxBody", "hwMedBody", "hwDxBody",
+                   "hwInvBody", "hwHistBody", "hwSibList"):
+        assert marker in body, "%s panel is missing from the page" % marker
+
+
+def test_a_pet_with_no_extra_records_still_loads(auth_client, leo):
+    """Empty is the common case for a new patient; it must not be an error."""
+    data = auth_client.get("/visits/exam/api/pet/%d" % leo["pet_id"]).get_json()
+    for key in ("vaccines", "meds", "chronic", "invoices", "siblings", "upcoming"):
+        assert isinstance(data[key], list)
+    assert isinstance(data["outstanding"], float)

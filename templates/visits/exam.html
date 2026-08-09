@@ -48,6 +48,9 @@
     <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="action" id="hwAction" value="save">
 
+    <!-- Things that must be seen before anyone touches the animal or the till -->
+    <div id="hwAlerts" class="hw-alerts"></div>
+
     <div class="hw-grid">
 
       <!-- LEFT: pet, symptom, owner -->
@@ -64,9 +67,20 @@
                <input class="hw-input" id="fSex" readonly></div>
           <div><label class="hw-label">{{ t('Date of birth', 'تاريخ الميلاد') }}</label>
                <input class="hw-input" id="fDob" readonly></div>
+          <div><label class="hw-label">{{ t('Age', 'العمر') }}</label>
+               <input class="hw-input" id="fAge" readonly></div>
+          <div><label class="hw-label">{{ t('Colour', 'اللون') }}</label>
+               <input class="hw-input" id="fColor" readonly></div>
+          <div><label class="hw-label">{{ t('Neutered', 'مخصي') }}</label>
+               <input class="hw-input" id="fNeutered" readonly></div>
+          <div><label class="hw-label">{{ t('Microchip', 'الشريحة') }}</label>
+               <input class="hw-input" id="fChip" readonly></div>
+          <div><label class="hw-label">{{ t('Insurance', 'التأمين') }}</label>
+               <input class="hw-input" id="fInsurance" readonly></div>
           <div><label class="hw-label" for="fVisitDate">{{ t('Visit date', 'تاريخ الزيارة') }}</label>
                <input type="date" class="hw-input" id="fVisitDate" name="visit_date"
                       value="{{ today }}"></div>
+          <div></div>
           <div><label class="hw-label" for="fWeight">{{ t('Weight (kg)', 'الوزن (كجم)') }}</label>
                <input class="hw-input hw-input-lg" id="fWeight" name="weight_kg"
                       inputmode="decimal"></div>
@@ -75,18 +89,35 @@
                       inputmode="decimal"></div>
         </div>
 
+        <div id="hwPetNotes" class="hw-notes" hidden></div>
+
         <label class="hw-label hw-mt" for="fSymptom">
           {{ t('Symptom or disease', 'العرض أو المرض') }}</label>
-        <textarea id="fSymptom" name="symptom" class="hw-input hw-area" rows="7"></textarea>
+        <textarea id="fSymptom" name="symptom" class="hw-input hw-area" rows="6"></textarea>
 
-        <h3 class="hw-h hw-mt">{{ t('Owner', 'المالك') }}</h3>
+        <h3 class="hw-h hw-mt">{{ t('Owner', 'المالك') }}
+          <span id="fVip" class="hw-badge hw-vip" hidden>VIP</span></h3>
         <div class="hw-pairs">
           <div><label class="hw-label">{{ t('Name', 'الاسم') }}</label>
                <input class="hw-input" id="fOwner" readonly></div>
           <div><label class="hw-label">{{ t('Phone', 'الهاتف') }}</label>
                <input class="hw-input" id="fPhone" readonly></div>
+          <div><label class="hw-label">{{ t('WhatsApp', 'واتساب') }}</label>
+               <input class="hw-input" id="fWhats" readonly></div>
+          <div><label class="hw-label">{{ t('Email', 'البريد') }}</label>
+               <input class="hw-input" id="fEmail" readonly></div>
           <div class="hw-span2"><label class="hw-label">{{ t('Address', 'العنوان') }}</label>
                <input class="hw-input" id="fAddress" readonly></div>
+          <div><label class="hw-label">{{ t('Preferred doctor', 'الطبيب المفضل') }}</label>
+               <input class="hw-input" id="fPrefDoc" readonly></div>
+          <div><label class="hw-label">{{ t('Contact by', 'وسيلة التواصل') }}</label>
+               <input class="hw-input" id="fPrefContact" readonly></div>
+        </div>
+        <div id="hwOwnerNotes" class="hw-notes" hidden></div>
+
+        <div id="hwSiblingsBox" class="hw-sibbox" hidden>
+          <label class="hw-label">{{ t('Other pets of this client', 'حيوانات أخرى لنفس العميل') }}</label>
+          <div id="hwSibList" class="hw-petbtns"></div>
         </div>
 
         <label class="hw-label hw-mt" for="fNotes">{{ t('Notes', 'ملاحظات') }}</label>
@@ -171,25 +202,100 @@
       </section>
     </div>
 
-    <!-- HISTORY — always on the page, never behind a click -->
-    <section class="pf-card hw-history">
-      <h3 class="hw-h">{{ t('History', 'السجل') }}
-        <span class="hw-muted" id="hwHistCount"></span></h3>
-      <div class="hw-tablewrap hw-histscroll">
-        <table class="hw-table">
-          <thead><tr>
-            <th>{{ t('Date', 'التاريخ') }}</th>
-            <th>{{ t('Symptom or disease', 'العرض أو المرض') }}</th>
-            <th class="hw-w">{{ t('Weight', 'الوزن') }}</th>
-            <th class="hw-w">{{ t('Temp', 'الحرارة') }}</th>
-            <th>{{ t('Doctor', 'الطبيب') }}</th>
-          </tr></thead>
-          <tbody id="hwHistBody"></tbody>
-        </table>
-        <p id="hwNoHist" class="hw-muted hw-center">
-          {{ t('No previous visits for this pet.', 'لا توجد زيارات سابقة لهذا الحيوان.') }}</p>
-      </div>
-    </section>
+    <!-- DETAIL PANELS — all on the page, nothing behind a click -->
+    <div class="hw-detail">
+
+      <section class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('History', 'السجل') }}
+          <span class="hw-muted" id="hwHistCount"></span></h3>
+        <div class="hw-tablewrap hw-scroll">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('Date', 'التاريخ') }}</th>
+              <th>{{ t('Symptom or disease', 'العرض أو المرض') }}</th>
+              <th class="hw-w">{{ t('Weight', 'الوزن') }}</th>
+              <th class="hw-w">{{ t('Temp', 'الحرارة') }}</th>
+              <th>{{ t('Doctor', 'الطبيب') }}</th>
+            </tr></thead>
+            <tbody id="hwHistBody"></tbody>
+          </table>
+          <p id="hwNoHist" class="hw-muted hw-center">
+            {{ t('No previous visits.', 'لا توجد زيارات سابقة.') }}</p>
+        </div>
+      </section>
+
+      <section class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Vaccinations', 'التطعيمات') }}
+          <span class="hw-muted" id="hwVaxCount"></span></h3>
+        <div class="hw-tablewrap hw-scroll">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('Vaccine', 'التطعيم') }}</th>
+              <th>{{ t('Given', 'أُعطي') }}</th>
+              <th>{{ t('Next due', 'الموعد القادم') }}</th>
+            </tr></thead>
+            <tbody id="hwVaxBody"></tbody>
+          </table>
+          <p id="hwNoVax" class="hw-muted hw-center">
+            {{ t('No vaccinations recorded.', 'لا توجد تطعيمات مسجلة.') }}</p>
+        </div>
+      </section>
+
+      <section class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Medications', 'الأدوية') }}
+          <span class="hw-muted" id="hwMedCount"></span></h3>
+        <div class="hw-tablewrap hw-scroll">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('Medication', 'الدواء') }}</th>
+              <th>{{ t('Dose', 'الجرعة') }}</th>
+              <th>{{ t('Frequency', 'التكرار') }}</th>
+              <th>{{ t('Date', 'التاريخ') }}</th>
+            </tr></thead>
+            <tbody id="hwMedBody"></tbody>
+          </table>
+          <p id="hwNoMed" class="hw-muted hw-center">
+            {{ t('No medications recorded.', 'لا توجد أدوية مسجلة.') }}</p>
+        </div>
+      </section>
+
+      <section class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Diagnoses', 'التشخيصات') }}
+          <span class="hw-muted" id="hwDxCount"></span></h3>
+        <div class="hw-tablewrap hw-scroll">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('Diagnosis', 'التشخيص') }}</th>
+              <th>{{ t('Severity', 'الشدة') }}</th>
+              <th>{{ t('Date', 'التاريخ') }}</th>
+            </tr></thead>
+            <tbody id="hwDxBody"></tbody>
+          </table>
+          <p id="hwNoDx" class="hw-muted hw-center">
+            {{ t('No diagnoses recorded.', 'لا توجد تشخيصات مسجلة.') }}</p>
+        </div>
+      </section>
+
+      <section class="pf-card hw-pane hw-span-all">
+        <h3 class="hw-h">{{ t("This client's invoices", 'فواتير العميل') }}
+          <span class="hw-muted" id="hwInvCount"></span></h3>
+        <div class="hw-tablewrap hw-scroll">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('Invoice', 'الفاتورة') }}</th>
+              <th>{{ t('Date', 'التاريخ') }}</th>
+              <th class="hw-w">{{ t('Total', 'الإجمالي') }}</th>
+              <th class="hw-w">{{ t('Paid', 'المدفوع') }}</th>
+              <th class="hw-w">{{ t('Due', 'المتبقي') }}</th>
+              <th>{{ t('Status', 'الحالة') }}</th>
+            </tr></thead>
+            <tbody id="hwInvBody"></tbody>
+          </table>
+          <p id="hwNoInv" class="hw-muted hw-center">
+            {{ t('No invoices for this client.', 'لا توجد فواتير لهذا العميل.') }}</p>
+        </div>
+      </section>
+    </div>
   </form>
 </div>
 
@@ -246,7 +352,33 @@
 .hw-table td{padding:.35rem .5rem;border-bottom:1px solid var(--pf-border,#eef1f5);
              vertical-align:middle}
 .hw-w{width:104px}
-.hw-histscroll{max-height:280px;overflow-y:auto}
+.hw-scroll{max-height:260px;overflow-y:auto}
+
+/* Alerts: the things nobody should have to click to discover. */
+.hw-alerts{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1rem}
+.hw-alerts:empty{display:none}
+.hw-alert{display:flex;align-items:baseline;gap:.5rem;padding:.6rem .9rem;
+          border-radius:10px;font-size:1.02rem;border:1px solid transparent}
+.hw-alert b{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;opacity:.9}
+.hw-danger{background:#fee2e2;color:#7f1d1d;border-color:#fca5a5}
+.hw-warn{background:#fef3c7;color:#78350f;border-color:#fcd34d}
+.hw-info{background:#dbeafe;color:#1e3a8a;border-color:#93c5fd}
+@media (prefers-color-scheme:dark){
+  .hw-danger{background:#450a0a;color:#fecaca;border-color:#991b1b}
+  .hw-warn{background:#422006;color:#fde68a;border-color:#a16207}
+  .hw-info{background:#172554;color:#bfdbfe;border-color:#1d4ed8}
+}
+.hw-badge{display:inline-block;padding:.1rem .5rem;border-radius:999px;
+          font-size:.72rem;font-weight:700;vertical-align:middle}
+.hw-vip{background:#fde68a;color:#78350f}
+.hw-od{color:#dc2626;font-weight:700}
+.hw-notes{margin-top:.7rem;padding:.55rem .75rem;border-radius:8px;font-size:.96rem;
+          background:var(--pf-muted-bg,#f4f6f8);white-space:pre-wrap}
+.hw-sibbox{margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--pf-border,#eef1f5)}
+
+.hw-detail{display:grid;gap:1rem;margin-top:1rem;
+           grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+.hw-span-all{grid-column:1/-1}
 
 .hw-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:.9rem;
           padding-top:.8rem;border-top:2px dashed var(--pf-border,#d0d5dd)}
@@ -269,7 +401,21 @@
 <script>
 (function () {
   var SERVICES = {{ services | tojson }};
-  var PRELOAD  = {{ {'pet': pet, 'owner': owner, 'history': history} | tojson }};
+  var PRELOAD  = {{ {'pet': pet, 'owner': owner, 'history': history,
+                     'vaccines': vaccines, 'meds': meds, 'chronic': chronic,
+                     'invoices': invoices, 'siblings': siblings,
+                     'upcoming': upcoming, 'outstanding': outstanding} | tojson }};
+  var L = {
+    allergies:  {{ t('Allergies', 'الحساسية') | tojson }},
+    chronic:    {{ t('Chronic', 'أمراض مزمنة') | tojson }},
+    owes:       {{ t('Owes', 'مديونية') | tojson }},
+    overdueVax: {{ t('Vaccine overdue', 'تطعيم متأخر') | tojson }},
+    booked:     {{ t('Booked', 'موعد قادم') | tojson }},
+    diet:       {{ t('Diet', 'النظام الغذائي') | tojson }},
+    notes:      {{ t('Notes', 'ملاحظات') | tojson }},
+    yes:        {{ t('Yes', 'نعم') | tojson }},
+    no:         {{ t('No', 'لا') | tojson }},
+  };
 
   var $ = function (id) { return document.getElementById(id); };
   var form = $('hwForm'), empty = $('hwEmpty'), body = $('hwItemsBody');
@@ -370,25 +516,95 @@
   });
 
   // ── loading a pet, without leaving the page ───────────────────────
-  function renderHistory(rows) {
-    var tb = $('hwHistBody');
+  // Every table below goes through this. textContent, never innerHTML: these
+  // are clinic notes and client names typed by staff, not trusted markup.
+  function fillTable(bodyId, emptyId, countId, rows, cells) {
+    var tb = $(bodyId);
     while (tb.firstChild) tb.removeChild(tb.firstChild);
-    (rows || []).forEach(function (h) {
+    (rows || []).forEach(function (r) {
       var tr = document.createElement('tr');
-      [ (h.visit_date || '').slice(0, 16),
-        h.chief_complaint || h.symptoms || '—',
-        h.weight_kg == null ? '—' : Number(h.weight_kg).toFixed(1),
-        h.temp_c    == null ? '—' : Number(h.temp_c).toFixed(1),
-        h.doctor_name || '—'
-      ].forEach(function (v) {
+      cells(r).forEach(function (c) {
         var td = document.createElement('td');
-        td.textContent = v;          // textContent, never innerHTML: this is clinic data
+        if (c && typeof c === 'object') {
+          td.textContent = c.text;
+          if (c.cls) td.className = c.cls;
+        } else {
+          td.textContent = (c === null || c === undefined || c === '') ? '—' : c;
+        }
         tr.appendChild(td);
       });
       tb.appendChild(tr);
     });
-    $('hwNoHist').style.display = (rows && rows.length) ? 'none' : '';
-    $('hwHistCount').textContent = (rows && rows.length) ? '(' + rows.length + ')' : '';
+    $(emptyId).style.display = (rows && rows.length) ? 'none' : '';
+    if (countId) $(countId).textContent = (rows && rows.length) ? '(' + rows.length + ')' : '';
+  }
+
+  function d1(v) { return v == null ? '—' : Number(v).toFixed(1); }
+  function d2(v) { return v == null ? '—' : Number(v).toFixed(2); }
+  function day(v) { return (v || '').slice(0, 10) || '—'; }
+
+  function alert3(cls, label, text) {
+    var box = document.createElement('div');
+    box.className = 'hw-alert ' + cls;
+    var b = document.createElement('b'); b.textContent = label;
+    var s = document.createElement('span'); s.textContent = text;
+    box.appendChild(b); box.appendChild(s);
+    $('hwAlerts').appendChild(box);
+  }
+
+  function renderAlerts(d) {
+    var host = $('hwAlerts');
+    while (host.firstChild) host.removeChild(host.firstChild);
+    var p = d.pet || {};
+
+    if (p.allergies) alert3('hw-danger', L.allergies, p.allergies);
+    if (p.chronic_conditions) alert3('hw-danger', L.chronic, p.chronic_conditions);
+
+    var chronicDx = (d.chronic || []).filter(function (c) { return c.is_chronic; });
+    if (chronicDx.length) {
+      alert3('hw-warn', L.chronic,
+             chronicDx.map(function (c) { return c.diagnosis; }).join(' · '));
+    }
+
+    var od = (d.vaccines || []).filter(function (v) { return v.overdue; });
+    if (od.length) {
+      alert3('hw-warn', L.overdueVax,
+             od.map(function (v) { return v.vaccine_name + ' (' + day(v.next_due_at) + ')'; })
+               .join(' · '));
+    }
+
+    if (Number(d.outstanding) > 0) {
+      alert3('hw-danger', L.owes, d2(d.outstanding) + ' EGP');
+    }
+
+    (d.upcoming || []).forEach(function (a) {
+      alert3('hw-info', L.booked,
+             day(a.appt_date) + ' ' + (a.appt_start || '') + ' · ' +
+             (a.appointment_type || '') + (a.doctor_name ? ' · ' + a.doctor_name : ''));
+    });
+
+    if (p.diet_notes) alert3('hw-info', L.diet, p.diet_notes);
+  }
+
+  function renderSiblings(list) {
+    var box = $('hwSibList');
+    while (box.firstChild) box.removeChild(box.firstChild);
+    (list || []).forEach(function (s) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'hw-petbtn';
+      b.textContent = s.pet_name + (s.species ? ' · ' + s.species : '') +
+                      (s.age_text ? ' · ' + s.age_text : '');
+      b.addEventListener('click', function () { loadPet(s.id); });
+      box.appendChild(b);
+    });
+    $('hwSiblingsBox').hidden = !(list && list.length);
+  }
+
+  function renderNotes(id, label, text) {
+    var el = $(id);
+    if (!text) { el.hidden = true; el.textContent = ''; return; }
+    el.textContent = label + ': ' + text;
+    el.hidden = false;
   }
 
   function show(data) {
@@ -399,22 +615,59 @@
     $('fSpecies').value = txt(p.species);
     $('fBreed').value   = txt(p.breed);
     $('fSex').value     = txt(p.sex);
-    $('fDob').value     = txt(p.dob);
-    $('fWeight').value  = txt(p.weight_kg);
-    $('fOwner').value   = txt(o.full_name);
-    $('fPhone').value   = txt(o.phone);
-    $('fAddress').value = txt(o.address);
+    $('fDob').value       = txt(p.dob);
+    $('fAge').value       = txt(p.age_text);
+    $('fColor').value     = txt(p.color);
+    $('fNeutered').value  = p.neutered ? L.yes : L.no;
+    $('fChip').value      = txt(p.microchip_id);
+    $('fInsurance').value = txt(p.insurance_number);
+    $('fWeight').value    = txt(p.weight_kg);
+
+    $('fOwner').value       = txt(o.full_name);
+    $('fPhone').value       = txt(o.phone);
+    $('fWhats').value       = txt(o.whatsapp_phone);
+    $('fEmail').value       = txt(o.email);
+    $('fAddress').value     = txt(o.address);
+    $('fPrefDoc').value     = txt(o.preferred_doctor);
+    $('fPrefContact').value = txt(o.preferred_contact);
+    $('fVip').hidden        = !o.vip_flag;
+
+    renderNotes('hwPetNotes', L.notes, p.notes);
+    renderNotes('hwOwnerNotes', L.notes, o.notes);
+    renderAlerts(data);
+    renderSiblings(data.siblings);
+
+    fillTable('hwVaxBody', 'hwNoVax', 'hwVaxCount', data.vaccines, function (v) {
+      return [v.vaccine_name, day(v.administered_at),
+              {text: day(v.next_due_at), cls: v.overdue ? 'hw-od' : ''}];
+    });
+    fillTable('hwMedBody', 'hwNoMed', 'hwMedCount', data.meds, function (m) {
+      return [m.medication_name, m.dosage, m.frequency, day(m.created_at)];
+    });
+    fillTable('hwDxBody', 'hwNoDx', 'hwDxCount', data.chronic, function (c) {
+      return [c.diagnosis, c.severity, day(c.created_at)];
+    });
+    fillTable('hwInvBody', 'hwNoInv', 'hwInvCount', data.invoices, function (i) {
+      return [i.invoice_number, day(i.issue_date), d2(i.total), d2(i.paid_amount),
+              {text: d2(i.due_amount), cls: Number(i.due_amount) > 0 ? 'hw-od' : ''},
+              i.status];
+    });
 
     $('hwOwnerName').textContent  = txt(o.full_name) || '—';
     $('hwOwnerPhone').textContent = txt(o.phone);
     $('hwPetName').textContent    = txt(p.pet_name) || '—';
-    $('hwPetMeta').textContent    = [txt(p.species), txt(p.breed), txt(p.sex)]
-                                      .filter(Boolean).join(' · ');
+    $('hwPetMeta').textContent    = [txt(p.species), txt(p.breed), txt(p.sex),
+                                     txt(p.age_text)].filter(Boolean).join(' · ');
     $('lnkVaccine').href = '/clinical/vaccinations?pet_id=' + p.id;
     $('lnkFiles').href   = '/crm/pets/' + p.id;
     $('lnkNext').href    = '/appointments/new?pet_id=' + p.id;
 
-    renderHistory(data.history);
+    fillTable('hwHistBody', 'hwNoHist', 'hwHistCount', data.history, function (h) {
+      return [(h.visit_date || '').slice(0, 16),
+              h.chief_complaint || h.symptoms,
+              d1(h.weight_kg), d1(h.temp_c), h.doctor_name];
+    });
+
     $('hwCurrent').hidden = false;
     empty.hidden = true;
     form.hidden = false;

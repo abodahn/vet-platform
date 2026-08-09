@@ -87,10 +87,10 @@ def visit_new_form():
     if owner_id:
         owner = conn.execute("SELECT * FROM owners WHERE id=?", (owner_id,)).fetchone()
 
-    # If no context provided, get list of owners + pets for selection
-    owners = conn.execute(
-        "SELECT id, full_name, phone FROM owners ORDER BY full_name LIMIT 200"
-    ).fetchall()
+    # Only the pre-selected owner is rendered; the rest are found by typing,
+    # against crm.owner_search_json. A capped list here silently hid every
+    # client past the cap.
+    owners = [owner] if owner else []
 
     conn.close()
     return render_template(
@@ -691,17 +691,43 @@ def exam_pick():
     conn.close()
     return render_template("visits/exam.html", active="visits",
                            today=date.today().isoformat(),
-                           pet={}, owner={}, history=[], services=services)
+                           pet={}, owner={}, history=[], services=services,
+                           vaccines=[], meds=[], chronic=[], invoices=[],
+                           siblings=[], upcoming=[], outstanding=0.0)
+
+
+def _age_text(dob):
+    """'3y 4m' from a date of birth, or '' — a vet doses by age, not birthday."""
+    if not dob:
+        return ""
+    try:
+        born = date.fromisoformat(str(dob)[:10])
+    except ValueError:
+        return ""
+    today = date.today()
+    months = (today.year - born.year) * 12 + (today.month - born.month)
+    if today.day < born.day:
+        months -= 1
+    if months < 0:
+        return ""
+    return ("%dy %dm" % (months // 12, months % 12)) if months >= 12 else ("%dm" % months)
 
 
 def _exam_context(conn, pet_id):
-    """Everything the exam screen shows, or None if the pet does not exist."""
+    """Everything the exam screen shows, or None if the pet does not exist.
+
+    The screen is meant to be the whole picture, so this is deliberately wide:
+    the vet should never have to open another tab to find out that the animal
+    in front of them is allergic to something, or that the owner walked out
+    owing money last time.
+    """
     pet = conn.execute(
         "SELECT * FROM pets WHERE id=? AND is_active=1", (pet_id,)).fetchone()
     if not pet:
         return None
-    owner = conn.execute(
-        "SELECT * FROM owners WHERE id=?", (pet["owner_id"],)).fetchone()
+    owner_id = pet["owner_id"]
+    owner = conn.execute("SELECT * FROM owners WHERE id=?", (owner_id,)).fetchone()
+
     services = [dict(r) for r in conn.execute(
         "SELECT id, name, name_ar, category, standard_price FROM service_catalog"
         " WHERE is_active=1 ORDER BY sort_order, name").fetchall()]
@@ -709,8 +735,76 @@ def _exam_context(conn, pet_id):
         "SELECT id, visit_date, visit_type, chief_complaint, symptoms,"
         " weight_kg, temp_c, doctor_name, status FROM visits"
         " WHERE pet_id=? ORDER BY visit_date DESC LIMIT 50", (pet_id,)).fetchall()]
-    return {"pet": dict(pet), "owner": dict(owner) if owner else {},
-            "services": services, "history": history}
+
+    def rows(sql, args=()):
+        """A missing optional table must not take the whole screen down."""
+        try:
+            return [dict(r) for r in conn.execute(sql, args).fetchall()]
+        except Exception:
+            return []
+
+    vaccines = rows(
+        "SELECT vaccine_name, vaccine_brand, administered_at, next_due_at,"
+        " administered_by, dose_number FROM vaccinations"
+        " WHERE pet_id=? ORDER BY COALESCE(administered_at,'') DESC LIMIT 25",
+        (pet_id,))
+    today_iso = date.today().isoformat()
+    for v in vaccines:
+        due = (v.get("next_due_at") or "")[:10]
+        v["overdue"] = bool(due and due < today_iso)
+        v["due_soon"] = bool(due and not v["overdue"] and due <= (
+            date.today().replace(day=1).isoformat()[:8] + "28") and due >= today_iso)
+
+    meds = rows(
+        "SELECT pi.medication_name, pi.dosage, pi.frequency, pi.duration,"
+        " pi.route, pi.dispensed, p.created_at, p.status"
+        " FROM prescription_items pi JOIN prescriptions p ON p.id=pi.prescription_id"
+        " WHERE p.pet_id=? ORDER BY p.created_at DESC LIMIT 25", (pet_id,))
+
+    chronic = rows(
+        "SELECT diagnosis, severity, is_chronic, created_at FROM diagnoses"
+        " WHERE pet_id=? ORDER BY created_at DESC LIMIT 25", (pet_id,))
+
+    invoices = rows(
+        "SELECT id, invoice_number, issue_date, total, paid_amount, due_amount,"
+        " status FROM invoices WHERE owner_id=? AND status!='Cancelled'"
+        " ORDER BY issue_date DESC, id DESC LIMIT 15", (owner_id,))
+
+    siblings = rows(
+        "SELECT id, pet_name, species, breed, sex, dob FROM pets"
+        " WHERE owner_id=? AND is_active=1 AND id!=? ORDER BY pet_name",
+        (owner_id, pet_id))
+
+    upcoming = rows(
+        "SELECT appt_date, appt_start, appointment_type, doctor_name, status"
+        " FROM appointments WHERE pet_id=? AND appt_date>=?"
+        " AND status NOT IN ('Cancelled','Completed','No-Show')"
+        " ORDER BY appt_date, appt_start LIMIT 5", (pet_id, today_iso))
+
+    # What this client owes across every open invoice. The stored
+    # owners.outstanding_balance drifts; the ledger does not.
+    owed = rows("SELECT COALESCE(SUM(due_amount),0) AS owed FROM invoices"
+                " WHERE owner_id=? AND status IN ('Unpaid','Partial')", (owner_id,))
+    outstanding = float(owed[0]["owed"]) if owed else 0.0
+
+    pet_d = dict(pet)
+    pet_d["age_text"] = _age_text(pet_d.get("dob"))
+    for s in siblings:
+        s["age_text"] = _age_text(s.get("dob"))
+
+    return {
+        "pet": pet_d,
+        "owner": dict(owner) if owner else {},
+        "services": services,
+        "history": history,
+        "vaccines": vaccines,
+        "meds": meds,
+        "chronic": chronic,
+        "invoices": invoices,
+        "siblings": siblings,
+        "upcoming": upcoming,
+        "outstanding": round(outstanding, 2),
+    }
 
 
 @visits_bp.route("/exam/<int:pet_id>", methods=["GET"])
