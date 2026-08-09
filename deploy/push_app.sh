@@ -25,12 +25,14 @@ cd "$(dirname "$0")/.."
 COMMIT=$(git rev-parse HEAD)
 SHORT=${COMMIT:0:12}
 DATE=$(date +%F)
-DIRTY=$(git status --porcelain -- . | grep -v '^?? ' | wc -l | tr -d ' ')
+# `|| true` because grep exits 1 when it matches nothing — which is the CLEAN
+# case, and under `set -o pipefail` that would abort the deploy on success.
+DIRTY=$(git status --porcelain -- . | { grep -v '^?? ' || true; } | wc -l | tr -d ' ')
 
 if [ "$DIRTY" != "0" ]; then
   echo "REFUSING: $DIRTY tracked file(s) modified but not committed." >&2
   echo "A stamp that names a commit the server is not running is worse than no stamp." >&2
-  git status --short -- . | grep -v '^?? ' >&2
+  git status --short -- . | { grep -v '^?? ' || true; } >&2
   exit 1
 fi
 
