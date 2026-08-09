@@ -4,7 +4,8 @@
 {% block page_sub %}{{ t('Clinical examination records', 'سجلات الفحص السريري') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn pf-btn-primary">+ {{ t('New Visit', 'زيارة جديدة') }}</a>
+<a href="{{ url_for('visits.exam_pick') }}" class="pf-btn pf-btn-primary">+ {{ t('New Visit', 'زيارة جديدة') }}</a>
+<a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn">{{ t('Long form', 'النموذج الكامل') }}</a>
 {% endblock %}
 
 {% block content %}

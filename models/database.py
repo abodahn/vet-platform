@@ -3433,6 +3433,11 @@ def create_invoice(data: dict, lines: list) -> int:
     disc_type = data.get("discount_type","value")
     disc_val  = float(data.get("discount_value",0))
     disc_amt  = round(disc_val, 2) if disc_type == "value" else round(subtotal * disc_val / 100, 2)
+    # A discount may not exceed what is being discounted, and may not be
+    # negative. Unclamped, "discount 5000" on a 560 invoice stored total
+    # -4440.00 and it landed in Outstanding as money the CLINIC owed. Clamped
+    # here rather than in each caller so every screen that bills is covered.
+    disc_amt  = max(0.0, min(disc_amt, subtotal))
     tax_rate  = float(data.get("tax_rate",0))
     tax_amt   = round((subtotal - disc_amt) * tax_rate / 100, 2)
     total     = round(subtotal - disc_amt + tax_amt, 2)

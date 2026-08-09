@@ -41,3 +41,10 @@ Thumbs.db
 startup.log
 startup_err.log
 logs/*.log*
+
+# Runtime logs in subdirectories — "logs/*.log" does not match logs/backend/*.log
+logs/**/*.log
+logs/**/*.log.*
+
+# Reference media for the Easy Visit screen — large binaries, kept local
+docs/reference/

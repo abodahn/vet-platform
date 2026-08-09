@@ -655,3 +655,204 @@ def visit_print(visit_id):
         rx_items=rx_items,
         lab_requests=lab_requests,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# EXAM — the one-screen visit
+#
+# Modelled on the Windows system Egyptian clinics already use: the vet never
+# leaves the page. Vitals, symptom, services, money, receipt — one save.
+# /visits/new keeps the long-form workflow; this is the fast lane.
+#
+# It writes through the SAME functions finance uses (db.create_invoice,
+# db.add_payment), so there is one money path in the product, not two.
+# ─────────────────────────────────────────────────────────────────────
+
+@visits_bp.route("/exam")
+@login_required
+def exam_pick():
+    """Client management: find the owner by phone or name, list their pets."""
+    q = (request.args.get("q") or "").strip()
+    conn = get_db()
+    owners, pets = [], []
+    if q:
+        like = "%" + q + "%"
+        owners = [dict(r) for r in conn.execute(
+            "SELECT id, full_name, phone, email, address FROM owners"
+            " WHERE full_name LIKE ? OR phone LIKE ? OR whatsapp_phone LIKE ?"
+            " ORDER BY full_name LIMIT 50", (like, like, like)).fetchall()]
+        if owners:
+            ids = [o["id"] for o in owners]
+            marks = ",".join("?" * len(ids))
+            pets = [dict(r) for r in conn.execute(
+                "SELECT id, owner_id, pet_name, species, breed, sex, dob, weight_kg"
+                " FROM pets WHERE is_active=1 AND owner_id IN (" + marks + ")"
+                " ORDER BY owner_id, pet_name", ids).fetchall()]
+    conn.close()
+    pets_by_owner = {}
+    for p in pets:
+        pets_by_owner.setdefault(p["owner_id"], []).append(p)
+    return render_template("visits/exam_pick.html", active="visits",
+                           q=q, owners=owners, pets_by_owner=pets_by_owner)
+
+
+def _exam_context(conn, pet_id):
+    """Everything the exam screen shows, or None if the pet does not exist."""
+    pet = conn.execute(
+        "SELECT * FROM pets WHERE id=? AND is_active=1", (pet_id,)).fetchone()
+    if not pet:
+        return None
+    owner = conn.execute(
+        "SELECT * FROM owners WHERE id=?", (pet["owner_id"],)).fetchone()
+    services = [dict(r) for r in conn.execute(
+        "SELECT id, name, name_ar, category, standard_price FROM service_catalog"
+        " WHERE is_active=1 ORDER BY sort_order, name").fetchall()]
+    history = [dict(r) for r in conn.execute(
+        "SELECT id, visit_date, visit_type, chief_complaint, symptoms,"
+        " weight_kg, temp_c, doctor_name, status FROM visits"
+        " WHERE pet_id=? ORDER BY visit_date DESC LIMIT 50", (pet_id,)).fetchall()]
+    return {"pet": dict(pet), "owner": dict(owner) if owner else {},
+            "services": services, "history": history}
+
+
+@visits_bp.route("/exam/<int:pet_id>", methods=["GET"])
+@login_required
+def exam_form(pet_id):
+    conn = get_db()
+    ctx = _exam_context(conn, pet_id)
+    conn.close()
+    if not ctx:
+        flash("Pet not found.", "danger")
+        return redirect(url_for("visits.exam_pick"))
+    return render_template("visits/exam.html", active="visits",
+                           today=date.today().isoformat(), **ctx)
+
+
+def _exam_num(form, name, default=0.0):
+    """A money/vitals box a tired person typed into. Never raises."""
+    raw = (form.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw.replace(",", ""))
+    except ValueError:
+        return default
+
+
+@visits_bp.route("/exam/<int:pet_id>", methods=["POST"])
+@login_required
+def exam_submit(pet_id):
+    """One submit: visit + invoice + payment. Partial payment is normal here —
+    the clinic takes what the client has and the rest shows as Due."""
+    f = request.form
+    user = session.get("user", {})
+    conn = get_db()
+    ctx = _exam_context(conn, pet_id)
+    if not ctx:
+        conn.close()
+        flash("Pet not found.", "danger")
+        return redirect(url_for("visits.exam_pick"))
+    owner_id = ctx["pet"]["owner_id"]
+
+    # ── the visit ────────────────────────────────────────────────────
+    symptom = (f.get("symptom") or "").strip()
+    weight = _exam_num(f, "weight_kg", None) if (f.get("weight_kg") or "").strip() else None
+    temp   = _exam_num(f, "temp_c", None) if (f.get("temp_c") or "").strip() else None
+    doctor = (f.get("doctor_name") or user.get("full_name", "")).strip()
+    visit_date = (f.get("visit_date") or "").strip() or date.today().isoformat()
+
+    cur = conn.execute(
+        """INSERT INTO visits(owner_id, pet_id, doctor_id, doctor_name, visit_date,
+           visit_type, status, chief_complaint, symptoms, weight_kg, temp_c,
+           notes, created_by)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (owner_id, pet_id, user.get("id"), doctor, visit_date,
+         "Consultation", "Completed", symptom, symptom, weight, temp,
+         (f.get("notes") or "").strip(), user.get("id")))
+    conn.commit()
+    visit_id = cur.lastrowid
+
+    # Vitals taken today are the pet's current vitals.
+    if weight is not None:
+        conn.execute("UPDATE pets SET weight_kg=?, updated_at=datetime('now')"
+                     " WHERE id=?", (weight, pet_id))
+        conn.commit()
+    conn.close()
+
+    # ── the bill ─────────────────────────────────────────────────────
+    names  = f.getlist("item_name[]")
+    prices = f.getlist("item_price[]")
+    qtys   = f.getlist("item_qty[]")
+    ids    = f.getlist("item_id[]")
+    lines = []
+    for i, name in enumerate(names):
+        name = (name or "").strip()
+        if not name:
+            continue
+        try:
+            price = float((prices[i] or "0").replace(",", "")) if i < len(prices) else 0.0
+        except ValueError:
+            price = 0.0
+        try:
+            qty = float((qtys[i] or "1").replace(",", "")) if i < len(qtys) else 1.0
+        except ValueError:
+            qty = 1.0
+        # A zero or negative quantity is a typo, not a free item. Billing it
+        # as 1 silently charges for something nobody ordered.
+        if qty <= 0 or price < 0:
+            continue
+        try:
+            item_id = int(ids[i]) if i < len(ids) and ids[i] else None
+        except ValueError:
+            item_id = None
+        lines.append({"line_type": "service", "item_id": item_id,
+                      "description": name, "quantity": qty,
+                      "unit_price": price, "discount": 0.0,
+                      "total": round(qty * price, 2)})
+
+    if not lines:
+        flash("Visit saved. No services were billed.", "success")
+        return redirect(url_for("visits.visit_detail", visit_id=visit_id))
+
+    inv_id = db.create_invoice({
+        "owner_id":       owner_id,
+        "pet_id":         pet_id,
+        "visit_id":       visit_id,
+        "doctor_name":    doctor,
+        "issue_date":     visit_date,
+        "discount_type":  "percent" if f.get("discount_type") == "percent" else "value",
+        "discount_value": max(0.0, _exam_num(f, "discount_value")),
+        "tax_rate":       0.0,
+        "notes":          (f.get("notes") or "").strip(),
+        "created_by":     user.get("full_name", ""),
+    }, lines)
+
+    # ── the money ────────────────────────────────────────────────────
+    # "Cash" on this screen is what the client HANDED OVER, which may be more
+    # than the bill — the difference is change, not an overpayment. Only what
+    # the invoice is actually owed gets recorded against it.
+    invoice = db.get_invoice(inv_id) or {}
+    total   = float(invoice.get("total") or 0.0)
+    handed  = max(0.0, _exam_num(f, "cash_received"))
+    applied = round(min(handed, total), 2)
+    if applied > 0:
+        db.add_payment(
+            inv_id, owner_id, applied,
+            method=("Visa" if f.get("payment_type") == "VISA" else "Cash"),
+            received_by=user.get("full_name", ""),
+            # One key per invoice: a double-clicked Save cannot bill twice.
+            idempotency_key="exam-%s-%s" % (visit_id, inv_id))
+
+    change = round(max(0.0, handed - total), 2)
+    due    = round(max(0.0, total - applied), 2)
+    msg = "Visit saved. Invoice %s — total %.2f" % (
+        invoice.get("invoice_number", ""), total)
+    if change:
+        msg += ", change %.2f" % change
+    if due:
+        msg += ", due %.2f" % due
+    flash(msg + ".", "success")
+
+    if f.get("action") == "print":
+        return redirect(url_for("finance.invoice_print", inv_id=inv_id))
+    return redirect(url_for("finance.invoice_detail", inv_id=inv_id))

@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Exam', 'الكشف') }} — {{ pet.pet_name }}{% endblock %}
+{% block page_title %}{{ t('Exam', 'الكشف') }} — {{ pet.pet_name }}{% endblock %}
+{% block page_sub %}{{ owner.full_name or '' }}{% if owner.phone %} · {{ owner.phone }}{% endif %}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('visits.exam_pick') }}" class="pf-btn">{{ t('Change client', 'تغيير العميل') }}</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="examForm" action="{{ url_for('visits.exam_submit', pet_id=pet.id) }}">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="action" id="actionField" value="save">
+
+  <div class="pf-card" style="padding:.75rem 1rem;margin-bottom:1rem;display:flex;
+              gap:.5rem;flex-wrap:wrap;align-items:center">
+    <button type="button" class="pf-btn pf-btn-sm" onclick="togglePanel('histPanel')">
+      {{ t('History', 'السجل') }} <span class="pf-muted">({{ history|length }})</span></button>
+    <a class="pf-btn pf-btn-sm" href="{{ url_for('clinical.vaccinations') }}?pet_id={{ pet.id }}">
+      {{ t('Alert / Vaccine', 'تنبيه / تطعيم') }}</a>
+    <a class="pf-btn pf-btn-sm" href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}">
+      {{ t('Files', 'الملفات') }}</a>
+    <a class="pf-btn pf-btn-sm" href="{{ url_for('appointments.appt_new') }}?pet_id={{ pet.id }}">
+      {{ t('Next visit', 'زيارة قادمة') }}</a>
+    <span style="flex:1"></span>
+    <label class="pf-label" style="margin:0">{{ t('Visit date', 'تاريخ الزيارة') }}</label>
+    <input type="date" name="visit_date" value="{{ today }}" class="pf-input" style="width:160px">
+  </div>
+
+  <div id="histPanel" class="pf-card" style="display:none;padding:0;margin-bottom:1rem;overflow-x:auto">
+    {% if history %}
+    <table class="pf-table" style="min-width:640px;margin:0">
+      <thead><tr>
+        <th>{{ t('Date', 'التاريخ') }}</th>
+        <th>{{ t('Symptom or disease', 'العرض أو المرض') }}</th>
+        <th>{{ t('Weight', 'الوزن') }}</th>
+        <th>{{ t('Temp', 'الحرارة') }}</th>
+        <th>{{ t('Doctor', 'الطبيب') }}</th>
+      </tr></thead>
+      <tbody>
+      {% for h in history %}
+        <tr>
+          <td style="white-space:nowrap">
+            <a href="{{ url_for('visits.visit_detail', visit_id=h.id) }}">{{ h.visit_date[:16] }}</a></td>
+          <td>{{ h.chief_complaint or h.symptoms or '—' }}</td>
+          <td>{% if h.weight_kg %}{{ '%.1f'|format(h.weight_kg) }}{% else %}—{% endif %}</td>
+          <td>{% if h.temp_c %}{{ '%.1f'|format(h.temp_c) }}{% else %}—{% endif %}</td>
+          <td>{{ h.doctor_name or '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="pf-muted" style="padding:1.25rem;margin:0">
+      {{ t('No previous visits for this pet.', 'لا توجد زيارات سابقة لهذا الحيوان.') }}</p>
+    {% endif %}
+  </div>
+
+  <div class="exam-grid">
+
+    <!-- ── LEFT: pet, symptom, owner ────────────────────────────── -->
+    <div class="pf-card" style="padding:1rem">
+      <h3 class="pf-section-title">{{ t('Pet', 'الحيوان') }}</h3>
+      <div class="exam-pair">
+        <div><label class="pf-label">{{ t('Name', 'الاسم') }}</label>
+             <input class="pf-input" value="{{ pet.pet_name }}" readonly></div>
+        <div><label class="pf-label">{{ t('Species', 'النوع') }}</label>
+             <input class="pf-input" value="{{ pet.species or '' }}" readonly></div>
+        <div><label class="pf-label">{{ t('Breed', 'السلالة') }}</label>
+             <input class="pf-input" value="{{ pet.breed or '' }}" readonly></div>
+        <div><label class="pf-label">{{ t('Sex', 'الجنس') }}</label>
+             <input class="pf-input" value="{{ pet.sex or '' }}" readonly></div>
+        <div><label class="pf-label">{{ t('Date of birth', 'تاريخ الميلاد') }}</label>
+             <input class="pf-input" value="{{ pet.dob or '' }}" readonly></div>
+        <div></div>
+        <div><label class="pf-label" for="weight_kg">{{ t('Weight (kg)', 'الوزن (كجم)') }}</label>
+             <input id="weight_kg" name="weight_kg" class="pf-input" inputmode="decimal"
+                    value="{{ pet.weight_kg or '' }}"></div>
+        <div><label class="pf-label" for="temp_c">{{ t('Temp (C)', 'الحرارة') }}</label>
+             <input id="temp_c" name="temp_c" class="pf-input" inputmode="decimal"></div>
+      </div>
+
+      <label class="pf-label" for="symptom" style="margin-top:.9rem">
+        {{ t('Symptom or disease', 'العرض أو المرض') }}</label>
+      <textarea id="symptom" name="symptom" class="pf-input" rows="6"
+                style="resize:vertical"></textarea>
+
+      <h3 class="pf-section-title" style="margin-top:1.25rem">{{ t('Owner', 'المالك') }}</h3>
+      <div class="exam-pair">
+        <div><label class="pf-label">{{ t('Name', 'الاسم') }}</label>
+             <input class="pf-input" value="{{ owner.full_name or '' }}" readonly></div>
+        <div><label class="pf-label">{{ t('Phone', 'الهاتف') }}</label>
+             <input class="pf-input" value="{{ owner.phone or '' }}" readonly></div>
+        <div style="grid-column:1/-1"><label class="pf-label">{{ t('Address', 'العنوان') }}</label>
+             <input class="pf-input" value="{{ owner.address or '' }}" readonly></div>
+      </div>
+
+      <label class="pf-label" for="notes" style="margin-top:.9rem">{{ t('Notes', 'ملاحظات') }}</label>
+      <textarea id="notes" name="notes" class="pf-input" rows="2" style="resize:vertical"></textarea>
+    </div>
+
+    <!-- ── MIDDLE: services and the bill ────────────────────────── -->
+    <div class="pf-card" style="padding:1rem;display:flex;flex-direction:column">
+      <label class="pf-label" for="svcPick">{{ t('Add service or item', 'أضف خدمة أو صنف') }}</label>
+      <input id="svcPick" class="pf-input" list="svcList" autocomplete="off"
+             placeholder="{{ t('Type to search, then Enter', 'اكتب للبحث ثم Enter') }}"
+             style="font-size:1.05rem">
+      <datalist id="svcList"></datalist>
+
+      <div style="overflow-x:auto;margin-top:.9rem;flex:1">
+        <table class="pf-table" id="itemsTable" style="min-width:460px;margin:0">
+          <thead><tr>
+            <th>{{ t('Item', 'الصنف') }}</th>
+            <th style="width:110px">{{ t('Price', 'السعر') }}</th>
+            <th style="width:90px">{{ t('Qty', 'الكمية') }}</th>
+            <th style="width:110px">{{ t('Total', 'الإجمالي') }}</th>
+            <th style="width:1%"></th>
+          </tr></thead>
+          <tbody id="itemsBody"></tbody>
+        </table>
+        <p id="emptyItems" class="pf-muted" style="padding:1.25rem;text-align:center">
+          {{ t('No services added yet.', 'لم تتم إضافة خدمات بعد.') }}</p>
+      </div>
+
+      <div style="border-top:2px dashed var(--pf-border,#d0d5dd);margin-top:.9rem;padding-top:.9rem;
+                  display:flex;justify-content:space-between;align-items:baseline">
+        <strong style="font-size:1.15rem">{{ t('Total to pay', 'الإجمالي المطلوب') }}</strong>
+        <strong id="grandTotal" style="font-size:1.6rem">0.00</strong>
+      </div>
+      <div class="pf-muted" style="display:flex;justify-content:space-between;font-size:.9rem">
+        <span>{{ t('Items quantity', 'عدد الأصناف') }}</span><span id="itemCount">0</span>
+      </div>
+    </div>
+
+    <!-- ── RIGHT: the money ─────────────────────────────────────── -->
+    <div class="pf-card" style="padding:1rem">
+      <h3 class="pf-section-title">{{ t('Payment', 'الدفع') }}</h3>
+
+      <label class="pf-label">{{ t('Payment type', 'طريقة الدفع') }}</label>
+      <div style="display:flex;gap:1rem;margin-bottom:.9rem">
+        <label><input type="radio" name="payment_type" value="Cash" checked> {{ t('Cash', 'نقدي') }}</label>
+        <label><input type="radio" name="payment_type" value="VISA"> VISA</label>
+      </div>
+
+      <label class="pf-label">{{ t('Discount', 'الخصم') }}</label>
+      <div style="display:flex;gap:.5rem;margin-bottom:.9rem">
+        <select name="discount_type" id="discType" class="pf-input" style="width:90px">
+          <option value="value">EGP</option>
+          <option value="percent">%</option>
+        </select>
+        <input name="discount_value" id="discValue" class="pf-input" inputmode="decimal"
+               value="" placeholder="0" style="flex:1">
+      </div>
+
+      <label class="pf-label" for="cashReceived">{{ t('Cash received', 'المبلغ المستلم') }}</label>
+      <input id="cashReceived" name="cash_received" class="pf-input" inputmode="decimal"
+             placeholder="0" style="font-size:1.25rem;margin-bottom:.9rem">
+
+      <div class="exam-money"><span>{{ t('Change', 'الباقي') }}</span>
+        <strong id="changeOut">0.00</strong></div>
+      <div class="exam-money"><span>{{ t('Due', 'المتبقي') }}</span>
+        <strong id="dueOut" style="color:var(--pf-danger,#dc2626)">0.00</strong></div>
+
+      <div style="display:flex;flex-direction:column;gap:.6rem;margin-top:1.25rem">
+        <button type="submit" id="btnSave" data-action="save"
+                class="pf-btn pf-btn-primary" style="padding:.8rem">
+          {{ t('Save visit', 'حفظ الكشف') }}</button>
+        <button type="submit" id="btnPrint" data-action="print"
+                class="pf-btn" style="padding:.8rem">
+          {{ t('Save and print', 'حفظ وطباعة') }}</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<style>
+.exam-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(320px,1.4fr) minmax(220px,.8fr);
+           gap:1rem;align-items:start}
+.exam-pair{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.exam-money{display:flex;justify-content:space-between;padding:.4rem 0;font-size:1.05rem}
+@media (max-width:1100px){.exam-grid{grid-template-columns:1fr}}
+</style>
+
+<script>
+(function () {
+  var SERVICES = {{ services | tojson }};
+  var body = document.getElementById('itemsBody');
+  var pick = document.getElementById('svcPick');
+  var list = document.getElementById('svcList');
+
+  SERVICES.forEach(function (s) {
+    var o = document.createElement('option');
+    o.value = s.name;
+    o.label = Number(s.standard_price || 0).toFixed(2);
+    list.appendChild(o);
+  });
+
+  function money(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+  function num(el) { var v = parseFloat((el.value || '').replace(/,/g, '')); return isFinite(v) ? v : 0; }
+
+  function cell(row, child) { var td = document.createElement('td'); td.appendChild(child); row.appendChild(td); return td; }
+
+  function addItem(name, price, id) {
+    var row = document.createElement('tr');
+
+    var nameCell = document.createElement('td');
+    nameCell.textContent = name;
+    var hidden = document.createElement('input');
+    hidden.type = 'hidden'; hidden.name = 'item_name[]'; hidden.value = name;
+    nameCell.appendChild(hidden);
+    var hid = document.createElement('input');
+    hid.type = 'hidden'; hid.name = 'item_id[]'; hid.value = id == null ? '' : String(id);
+    nameCell.appendChild(hid);
+    row.appendChild(nameCell);
+
+    var p = document.createElement('input');
+    p.className = 'pf-input'; p.name = 'item_price[]'; p.inputMode = 'decimal';
+    p.value = money(price); p.addEventListener('input', recompute);
+    cell(row, p);
+
+    var q = document.createElement('input');
+    q.className = 'pf-input'; q.name = 'item_qty[]'; q.inputMode = 'decimal';
+    q.value = '1'; q.addEventListener('input', recompute);
+    cell(row, q);
+
+    var lineTotal = document.createElement('strong');
+    lineTotal.textContent = money(price);
+    cell(row, lineTotal);
+    row._total = lineTotal; row._price = p; row._qty = q;
+
+    var x = document.createElement('button');
+    x.type = 'button'; x.className = 'pf-btn pf-btn-sm'; x.textContent = '×';
+    x.setAttribute('aria-label', 'Remove');
+    x.addEventListener('click', function () { row.remove(); recompute(); });
+    cell(row, x);
+
+    body.appendChild(row);
+    recompute();
+  }
+
+  function recompute() {
+    var subtotal = 0, count = 0;
+    Array.prototype.forEach.call(body.rows, function (row) {
+      var line = num(row._price) * num(row._qty);
+      if (!(line > 0)) line = 0;
+      row._total.textContent = money(line);
+      subtotal += line;
+      count += num(row._qty);
+    });
+
+    var dv = num(document.getElementById('discValue'));
+    if (dv < 0) dv = 0;
+    var disc = document.getElementById('discType').value === 'percent'
+      ? subtotal * dv / 100 : dv;
+    if (disc > subtotal) disc = subtotal;
+    var total = subtotal - disc;
+
+    var handed = num(document.getElementById('cashReceived'));
+    document.getElementById('grandTotal').textContent = money(total);
+    document.getElementById('itemCount').textContent = String(count);
+    document.getElementById('changeOut').textContent = money(Math.max(0, handed - total));
+    document.getElementById('dueOut').textContent = money(Math.max(0, total - Math.min(handed, total)));
+    document.getElementById('emptyItems').style.display = body.rows.length ? 'none' : '';
+  }
+
+  pick.addEventListener('change', function () {
+    var typed = (pick.value || '').trim();
+    if (!typed) return;
+    var hit = null;
+    for (var i = 0; i < SERVICES.length; i++) {
+      if (SERVICES[i].name === typed) { hit = SERVICES[i]; break; }
+    }
+    if (hit) addItem(hit.name, Number(hit.standard_price || 0), hit.id);
+    else addItem(typed, 0, null);
+    pick.value = '';
+    pick.focus();
+  });
+
+  pick.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); pick.dispatchEvent(new Event('change')); }
+  });
+
+  ['discValue', 'discType', 'cashReceived'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', recompute);
+    document.getElementById(id).addEventListener('change', recompute);
+  });
+
+  // Which button was pressed goes in a hidden field, not the button's own
+  // name: a disabled submitter is not serialised, so disabling it to stop
+  // double-clicks would otherwise throw away the choice of save-vs-print.
+  ['btnSave', 'btnPrint'].forEach(function (id) {
+    document.getElementById(id).addEventListener('click', function () {
+      document.getElementById('actionField').value = this.getAttribute('data-action');
+    });
+  });
+
+  // A second click must not create a second visit. The server is idempotent on
+  // the payment; this stops the duplicate visit row.
+  document.getElementById('examForm').addEventListener('submit', function () {
+    setTimeout(function () {
+      document.getElementById('btnSave').disabled = true;
+      document.getElementById('btnPrint').disabled = true;
+    }, 0);
+  });
+
+  window.togglePanel = function (id) {
+    var el = document.getElementById(id);
+    el.style.display = el.style.display === 'none' ? '' : 'none';
+  };
+
+  recompute();
+})();
+</script>
+{% endblock %}
