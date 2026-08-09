@@ -105,6 +105,23 @@ MODULES = [
         "badge":       "Live",
     },
     {
+        # Its own card, not a link buried inside Visits. This is the screen a
+        # vet lives on all day; it earns a place on the dashboard.
+        "id":          "exam",
+        "name":        "Hatem Way — One-Screen Exam",
+        "name_ar":     "طريقة حاتم — كشف بشاشة واحدة",
+        "icon":        "⚡",
+        "description": "Client · Pet · Vitals · Symptom · Services · Cash & change · History — one page, one save",
+        "url_key":     "visits.exam_pick",
+        "url":         "/visits/exam",
+        "legacy":      False,
+        "roles":       ["super_admin","clinic_owner","branch_manager","doctor","nurse","reception"],
+        "status":      "active",
+        "category":    "clinical",
+        "color":       "#e11d48",
+        "badge":       "New",
+    },
+    {
         "id":          "visits",
         "name":        "Visits & Consultations",
         "name_ar":     "الزيارات والاستشارات",

@@ -20,28 +20,55 @@ _seq = itertools.count(1)
 PRICES = [("Examination", 250), ("Deworming cat", 130), ("Antiflea Help", 180)]
 
 
-@pytest.fixture
-def leo(auth_client):
-    """A fresh owner + pet, and the three services, in the shared test DB."""
-    n = next(_seq)
-    phone = "0127284%04d" % n
+OWNER_NAME = "Dr Dina Exam"
+OWNER_PHONE = "01272840000"
+
+
+@pytest.fixture(scope="module")
+def exam_owner():
+    """ONE owner for this whole file, plus the three services.
+
+    Deliberately not one per test. The app database is session-scoped, and
+    several screens list owners as `ORDER BY full_name LIMIT 300` — boarding
+    and grooming among them. Seventeen extra owners pushed an Arabic-named
+    fixture owner in test_services_routes.py off the end of that list and
+    failed two tests in a file with nothing to do with this one. Rows created
+    here are never cleaned up (FKs from payments and the audit log make that
+    its own project), so the fix is to create as few as possible.
+    """
     conn = db.get_db()
-    conn.execute("INSERT INTO owners(full_name, phone) VALUES(?,?)",
-                 ("Dr Dina %d" % n, phone))
-    owner_id = conn.execute("SELECT id FROM owners WHERE phone=?", (phone,)).fetchone()[0]
-    conn.execute("INSERT INTO pets(owner_id, pet_name, species, sex) VALUES(?,?,?,?)",
-                 (owner_id, "Leo%d" % n, "Feline", "M"))
-    pet_id = conn.execute(
-        "SELECT id FROM pets WHERE owner_id=? ORDER BY id DESC LIMIT 1", (owner_id,)).fetchone()[0]
+    row = conn.execute("SELECT id FROM owners WHERE phone=?", (OWNER_PHONE,)).fetchone()
+    if row:
+        owner_id = row[0]
+    else:
+        conn.execute("INSERT INTO owners(full_name, phone) VALUES(?,?)",
+                     (OWNER_NAME, OWNER_PHONE))
+        owner_id = conn.execute(
+            "SELECT id FROM owners WHERE phone=?", (OWNER_PHONE,)).fetchone()[0]
     for name, price in PRICES:
-        exists = conn.execute("SELECT 1 FROM service_catalog WHERE name=?", (name,)).fetchone()
-        if not exists:
+        if not conn.execute("SELECT 1 FROM service_catalog WHERE name=?", (name,)).fetchone():
             conn.execute("INSERT INTO service_catalog(name, standard_price) VALUES(?,?)",
                          (name, price))
     conn.commit()
     conn.close()
-    return {"owner_id": owner_id, "pet_id": pet_id, "phone": phone,
-            "owner_name": "Dr Dina %d" % n, "pet_name": "Leo%d" % n}
+    return owner_id
+
+
+@pytest.fixture
+def leo(auth_client, exam_owner):
+    """A fresh pet under the shared owner — pets are in no capped dropdown."""
+    n = next(_seq)
+    pet_name = "Leo%d" % n
+    conn = db.get_db()
+    conn.execute("INSERT INTO pets(owner_id, pet_name, species, sex) VALUES(?,?,?,?)",
+                 (exam_owner, pet_name, "Feline", "M"))
+    pet_id = conn.execute(
+        "SELECT id FROM pets WHERE owner_id=? ORDER BY id DESC LIMIT 1",
+        (exam_owner,)).fetchone()[0]
+    conn.commit()
+    conn.close()
+    return {"owner_id": exam_owner, "pet_id": pet_id, "phone": OWNER_PHONE,
+            "owner_name": OWNER_NAME, "pet_name": pet_name}
 
 
 def _post(auth_client, pet_id, **over):
@@ -170,9 +197,60 @@ def test_a_pet_that_does_not_exist_redirects_instead_of_500(auth_client):
     assert resp.status_code == 200
 
 
-def test_the_picker_finds_the_client_by_phone(auth_client, leo):
-    resp = auth_client.get("/visits/exam?q=%s" % leo["phone"])
+def test_the_page_opens_with_nothing_loaded(auth_client, leo):
+    """The whole screen is one page: no pet yet, but the catalog is already there."""
+    resp = auth_client.get("/visits/exam")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert leo["owner_name"] in body
-    assert leo["pet_name"] in body
+    assert "Deworming cat" in body, "the service catalog ships with the page"
+    assert "hwSearch" in body, "the client search lives on this page"
+
+
+def test_search_finds_the_client_by_phone_and_returns_their_pets(auth_client, leo):
+    resp = auth_client.get("/visits/exam/api/search?q=%s" % leo["phone"])
+    assert resp.status_code == 200
+    owners = resp.get_json()["owners"]
+    assert any(o["full_name"] == leo["owner_name"] for o in owners)
+    mine = [o for o in owners if o["id"] == leo["owner_id"]][0]
+    assert leo["pet_name"] in [p["pet_name"] for p in mine["pets"]]
+
+
+def test_search_finds_the_client_by_name(auth_client, leo):
+    resp = auth_client.get("/visits/exam/api/search?q=%s" % leo["owner_name"])
+    assert any(o["id"] == leo["owner_id"] for o in resp.get_json()["owners"])
+
+
+def test_a_one_character_search_returns_nothing_rather_than_the_whole_table(auth_client, leo):
+    assert auth_client.get("/visits/exam/api/search?q=a").get_json()["owners"] == []
+    assert auth_client.get("/visits/exam/api/search?q=").get_json()["owners"] == []
+
+
+def test_loading_a_pet_returns_it_with_its_owner_and_history(auth_client, leo):
+    _post(auth_client, leo["pet_id"])          # give it one visit to find
+    resp = auth_client.get("/visits/exam/api/pet/%d" % leo["pet_id"])
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["pet"]["pet_name"] == leo["pet_name"]
+    assert data["owner"]["full_name"] == leo["owner_name"]
+    assert len(data["history"]) >= 1
+    assert "vomiting" in (data["history"][0]["chief_complaint"] or "")
+    assert "services" not in data, "the catalog is already on the page; do not resend it"
+
+
+def test_loading_a_pet_that_does_not_exist_is_404_not_500(auth_client):
+    assert auth_client.get("/visits/exam/api/pet/999999").status_code == 404
+
+
+def test_the_search_and_pet_apis_require_a_login(client, leo):
+    for url in ("/visits/exam/api/search?q=test",
+                "/visits/exam/api/pet/%d" % leo["pet_id"]):
+        resp = client.get(url)
+        assert resp.status_code in (302, 401, 403), \
+            "%s answered %s to an anonymous caller" % (url, resp.status_code)
+
+
+def test_a_deep_link_with_pet_id_lands_on_the_loaded_screen(auth_client, leo):
+    resp = auth_client.get("/visits/exam?pet_id=%d" % leo["pet_id"],
+                           follow_redirects=True)
+    assert resp.status_code == 200
+    assert leo["pet_name"] in resp.get_data(as_text=True)

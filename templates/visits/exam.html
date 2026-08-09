@@ -1,193 +1,281 @@
 {% extends "base.html" %}
-{% block title %}{{ t('Exam', 'الكشف') }} — {{ pet.pet_name }}{% endblock %}
-{% block page_title %}{{ t('Exam', 'الكشف') }} — {{ pet.pet_name }}{% endblock %}
-{% block page_sub %}{{ owner.full_name or '' }}{% if owner.phone %} · {{ owner.phone }}{% endif %}{% endblock %}
+{% block title %}{{ t('Hatem Way', 'طريقة حاتم') }}{% endblock %}
+{% block page_title %}{{ t('Hatem Way — one screen', 'طريقة حاتم — شاشة واحدة') }}{% endblock %}
+{% block page_sub %}{{ t('Client, pet, exam, services, money and history — without leaving this page',
+                          'العميل والحيوان والكشف والخدمات والحساب والسجل — دون مغادرة الصفحة') }}{% endblock %}
 
 {% block topbar_actions %}
-<a href="{{ url_for('visits.exam_pick') }}" class="pf-btn">{{ t('Change client', 'تغيير العميل') }}</a>
+<a href="{{ url_for('visits.visit_new_form') }}" class="pf-btn">{{ t('Long form', 'النموذج الكامل') }}</a>
+<a href="{{ url_for('visits.visits_list') }}" class="pf-btn">{{ t('All visits', 'كل الزيارات') }}</a>
 {% endblock %}
 
 {% block content %}
-<form method="post" id="examForm" action="{{ url_for('visits.exam_submit', pet_id=pet.id) }}">
-  <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-  <input type="hidden" name="action" id="actionField" value="save">
+<div class="hw">
 
-  <div class="pf-card" style="padding:.75rem 1rem;margin-bottom:1rem;display:flex;
-              gap:.5rem;flex-wrap:wrap;align-items:center">
-    <button type="button" class="pf-btn pf-btn-sm" onclick="togglePanel('histPanel')">
-      {{ t('History', 'السجل') }} <span class="pf-muted">({{ history|length }})</span></button>
-    <a class="pf-btn pf-btn-sm" href="{{ url_for('clinical.vaccinations') }}?pet_id={{ pet.id }}">
-      {{ t('Alert / Vaccine', 'تنبيه / تطعيم') }}</a>
-    <a class="pf-btn pf-btn-sm" href="{{ url_for('crm.pet_detail', pet_id=pet.id) }}">
-      {{ t('Files', 'الملفات') }}</a>
-    <a class="pf-btn pf-btn-sm" href="{{ url_for('appointments.appt_new') }}?pet_id={{ pet.id }}">
-      {{ t('Next visit', 'زيارة قادمة') }}</a>
-    <span style="flex:1"></span>
-    <label class="pf-label" style="margin:0">{{ t('Visit date', 'تاريخ الزيارة') }}</label>
-    <input type="date" name="visit_date" value="{{ today }}" class="pf-input" style="width:160px">
+  <!-- ── CLIENT BAR — search without leaving the page ─────────────── -->
+  <div class="pf-card hw-clientbar">
+    <div class="hw-search">
+      <label class="hw-label" for="hwSearch">
+        {{ t('Phone or client name', 'رقم الهاتف أو اسم العميل') }}</label>
+      <input id="hwSearch" class="hw-input hw-input-lg" autocomplete="off"
+             placeholder="{{ t('Type at least 2 characters…', 'اكتب حرفين على الأقل…') }}">
+      <div id="hwResults" class="hw-results" hidden></div>
+    </div>
+    <div id="hwCurrent" class="hw-current" hidden>
+      <div>
+        <span class="hw-chip-label">{{ t('Client', 'العميل') }}</span>
+        <strong id="hwOwnerName">—</strong>
+        <span id="hwOwnerPhone" class="hw-muted"></span>
+      </div>
+      <div>
+        <span class="hw-chip-label">{{ t('Pet', 'الحيوان') }}</span>
+        <strong id="hwPetName">—</strong>
+        <span id="hwPetMeta" class="hw-muted"></span>
+      </div>
+      <div id="hwSiblings" class="hw-siblings"></div>
+    </div>
   </div>
 
-  <div id="histPanel" class="pf-card" style="display:none;padding:0;margin-bottom:1rem;overflow-x:auto">
-    {% if history %}
-    <table class="pf-table" style="min-width:640px;margin:0">
-      <thead><tr>
-        <th>{{ t('Date', 'التاريخ') }}</th>
-        <th>{{ t('Symptom or disease', 'العرض أو المرض') }}</th>
-        <th>{{ t('Weight', 'الوزن') }}</th>
-        <th>{{ t('Temp', 'الحرارة') }}</th>
-        <th>{{ t('Doctor', 'الطبيب') }}</th>
-      </tr></thead>
-      <tbody>
-      {% for h in history %}
-        <tr>
-          <td style="white-space:nowrap">
-            <a href="{{ url_for('visits.visit_detail', visit_id=h.id) }}">{{ h.visit_date[:16] }}</a></td>
-          <td>{{ h.chief_complaint or h.symptoms or '—' }}</td>
-          <td>{% if h.weight_kg %}{{ '%.1f'|format(h.weight_kg) }}{% else %}—{% endif %}</td>
-          <td>{% if h.temp_c %}{{ '%.1f'|format(h.temp_c) }}{% else %}—{% endif %}</td>
-          <td>{{ h.doctor_name or '—' }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="pf-muted" style="padding:1.25rem;margin:0">
-      {{ t('No previous visits for this pet.', 'لا توجد زيارات سابقة لهذا الحيوان.') }}</p>
-    {% endif %}
+  <!-- ── EMPTY STATE ──────────────────────────────────────────────── -->
+  <div id="hwEmpty" class="pf-card hw-empty">
+    <p>{{ t('Search for a client above to begin.', 'ابحث عن عميل بالأعلى للبدء.') }}</p>
+    <a href="{{ url_for('crm.owner_new') }}" class="pf-btn pf-btn-primary">
+      + {{ t('New client', 'عميل جديد') }}</a>
   </div>
 
-  <div class="exam-grid">
+  <!-- ── THE EXAM ─────────────────────────────────────────────────── -->
+  <form method="post" id="hwForm" action="" hidden>
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="action" id="hwAction" value="save">
 
-    <!-- ── LEFT: pet, symptom, owner ────────────────────────────── -->
-    <div class="pf-card" style="padding:1rem">
-      <h3 class="pf-section-title">{{ t('Pet', 'الحيوان') }}</h3>
-      <div class="exam-pair">
-        <div><label class="pf-label">{{ t('Name', 'الاسم') }}</label>
-             <input class="pf-input" value="{{ pet.pet_name }}" readonly></div>
-        <div><label class="pf-label">{{ t('Species', 'النوع') }}</label>
-             <input class="pf-input" value="{{ pet.species or '' }}" readonly></div>
-        <div><label class="pf-label">{{ t('Breed', 'السلالة') }}</label>
-             <input class="pf-input" value="{{ pet.breed or '' }}" readonly></div>
-        <div><label class="pf-label">{{ t('Sex', 'الجنس') }}</label>
-             <input class="pf-input" value="{{ pet.sex or '' }}" readonly></div>
-        <div><label class="pf-label">{{ t('Date of birth', 'تاريخ الميلاد') }}</label>
-             <input class="pf-input" value="{{ pet.dob or '' }}" readonly></div>
-        <div></div>
-        <div><label class="pf-label" for="weight_kg">{{ t('Weight (kg)', 'الوزن (كجم)') }}</label>
-             <input id="weight_kg" name="weight_kg" class="pf-input" inputmode="decimal"
-                    value="{{ pet.weight_kg or '' }}"></div>
-        <div><label class="pf-label" for="temp_c">{{ t('Temp (C)', 'الحرارة') }}</label>
-             <input id="temp_c" name="temp_c" class="pf-input" inputmode="decimal"></div>
-      </div>
+    <div class="hw-grid">
 
-      <label class="pf-label" for="symptom" style="margin-top:.9rem">
-        {{ t('Symptom or disease', 'العرض أو المرض') }}</label>
-      <textarea id="symptom" name="symptom" class="pf-input" rows="6"
-                style="resize:vertical"></textarea>
+      <!-- LEFT: pet, symptom, owner -->
+      <section class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Pet', 'الحيوان') }}</h3>
+        <div class="hw-pairs">
+          <div><label class="hw-label">{{ t('Name', 'الاسم') }}</label>
+               <input class="hw-input" id="fPetName" readonly></div>
+          <div><label class="hw-label">{{ t('Species', 'النوع') }}</label>
+               <input class="hw-input" id="fSpecies" readonly></div>
+          <div><label class="hw-label">{{ t('Breed', 'السلالة') }}</label>
+               <input class="hw-input" id="fBreed" readonly></div>
+          <div><label class="hw-label">{{ t('Sex', 'الجنس') }}</label>
+               <input class="hw-input" id="fSex" readonly></div>
+          <div><label class="hw-label">{{ t('Date of birth', 'تاريخ الميلاد') }}</label>
+               <input class="hw-input" id="fDob" readonly></div>
+          <div><label class="hw-label" for="fVisitDate">{{ t('Visit date', 'تاريخ الزيارة') }}</label>
+               <input type="date" class="hw-input" id="fVisitDate" name="visit_date"
+                      value="{{ today }}"></div>
+          <div><label class="hw-label" for="fWeight">{{ t('Weight (kg)', 'الوزن (كجم)') }}</label>
+               <input class="hw-input hw-input-lg" id="fWeight" name="weight_kg"
+                      inputmode="decimal"></div>
+          <div><label class="hw-label" for="fTemp">{{ t('Temp (C)', 'الحرارة') }}</label>
+               <input class="hw-input hw-input-lg" id="fTemp" name="temp_c"
+                      inputmode="decimal"></div>
+        </div>
 
-      <h3 class="pf-section-title" style="margin-top:1.25rem">{{ t('Owner', 'المالك') }}</h3>
-      <div class="exam-pair">
-        <div><label class="pf-label">{{ t('Name', 'الاسم') }}</label>
-             <input class="pf-input" value="{{ owner.full_name or '' }}" readonly></div>
-        <div><label class="pf-label">{{ t('Phone', 'الهاتف') }}</label>
-             <input class="pf-input" value="{{ owner.phone or '' }}" readonly></div>
-        <div style="grid-column:1/-1"><label class="pf-label">{{ t('Address', 'العنوان') }}</label>
-             <input class="pf-input" value="{{ owner.address or '' }}" readonly></div>
-      </div>
+        <label class="hw-label hw-mt" for="fSymptom">
+          {{ t('Symptom or disease', 'العرض أو المرض') }}</label>
+        <textarea id="fSymptom" name="symptom" class="hw-input hw-area" rows="7"></textarea>
 
-      <label class="pf-label" for="notes" style="margin-top:.9rem">{{ t('Notes', 'ملاحظات') }}</label>
-      <textarea id="notes" name="notes" class="pf-input" rows="2" style="resize:vertical"></textarea>
+        <h3 class="hw-h hw-mt">{{ t('Owner', 'المالك') }}</h3>
+        <div class="hw-pairs">
+          <div><label class="hw-label">{{ t('Name', 'الاسم') }}</label>
+               <input class="hw-input" id="fOwner" readonly></div>
+          <div><label class="hw-label">{{ t('Phone', 'الهاتف') }}</label>
+               <input class="hw-input" id="fPhone" readonly></div>
+          <div class="hw-span2"><label class="hw-label">{{ t('Address', 'العنوان') }}</label>
+               <input class="hw-input" id="fAddress" readonly></div>
+        </div>
+
+        <label class="hw-label hw-mt" for="fNotes">{{ t('Notes', 'ملاحظات') }}</label>
+        <textarea id="fNotes" name="notes" class="hw-input hw-area" rows="2"></textarea>
+      </section>
+
+      <!-- MIDDLE: services and the bill -->
+      <section class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Services and items', 'الخدمات والأصناف') }}</h3>
+        <label class="hw-label" for="hwPick">
+          {{ t('Type to search, then Enter', 'اكتب للبحث ثم Enter') }}</label>
+        <input id="hwPick" class="hw-input hw-input-lg" list="hwSvcList" autocomplete="off">
+        <datalist id="hwSvcList"></datalist>
+
+        <div class="hw-tablewrap">
+          <table class="hw-table" id="hwItems">
+            <thead><tr>
+              <th>{{ t('Item', 'الصنف') }}</th>
+              <th class="hw-w">{{ t('Price', 'السعر') }}</th>
+              <th class="hw-w">{{ t('Qty', 'الكمية') }}</th>
+              <th class="hw-w">{{ t('Total', 'الإجمالي') }}</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="hwItemsBody"></tbody>
+          </table>
+          <p id="hwNoItems" class="hw-muted hw-center">
+            {{ t('No services added yet.', 'لم تتم إضافة خدمات بعد.') }}</p>
+        </div>
+
+        <div class="hw-total">
+          <span>{{ t('Total to pay', 'الإجمالي المطلوب') }}</span>
+          <strong id="hwGrand">0.00</strong>
+        </div>
+        <div class="hw-subline">
+          <span>{{ t('Items quantity', 'عدد الأصناف') }}</span><span id="hwCount">0</span>
+        </div>
+      </section>
+
+      <!-- RIGHT: the money -->
+      <section class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Payment', 'الدفع') }}</h3>
+
+        <label class="hw-label">{{ t('Payment type', 'طريقة الدفع') }}</label>
+        <div class="hw-radios">
+          <label><input type="radio" name="payment_type" value="Cash" checked>
+            {{ t('Cash', 'نقدي') }}</label>
+          <label><input type="radio" name="payment_type" value="VISA"> VISA</label>
+        </div>
+
+        <label class="hw-label hw-mt">{{ t('Discount', 'الخصم') }}</label>
+        <div class="hw-row">
+          <select name="discount_type" id="hwDiscType" class="hw-input hw-narrow">
+            <option value="value">EGP</option>
+            <option value="percent">%</option>
+          </select>
+          <input name="discount_value" id="hwDiscValue" class="hw-input"
+                 inputmode="decimal" placeholder="0">
+        </div>
+
+        <label class="hw-label hw-mt" for="hwCash">
+          {{ t('Cash received', 'المبلغ المستلم') }}</label>
+        <input id="hwCash" name="cash_received" class="hw-input hw-input-xl"
+               inputmode="decimal" placeholder="0">
+
+        <div class="hw-money"><span>{{ t('Change', 'الباقي') }}</span>
+          <strong id="hwChange">0.00</strong></div>
+        <div class="hw-money hw-due"><span>{{ t('Due', 'المتبقي') }}</span>
+          <strong id="hwDue">0.00</strong></div>
+
+        <div class="hw-actions">
+          <button type="submit" id="hwSave" data-action="save" class="pf-btn pf-btn-primary hw-btn-big">
+            {{ t('Save visit', 'حفظ الكشف') }}</button>
+          <button type="submit" id="hwPrint" data-action="print" class="pf-btn hw-btn-big">
+            {{ t('Save and print', 'حفظ وطباعة') }}</button>
+        </div>
+
+        <div class="hw-links">
+          <a id="lnkVaccine" class="pf-btn pf-btn-sm" href="#">{{ t('Alert / Vaccine', 'تنبيه / تطعيم') }}</a>
+          <a id="lnkFiles"   class="pf-btn pf-btn-sm" href="#">{{ t('Files', 'الملفات') }}</a>
+          <a id="lnkNext"    class="pf-btn pf-btn-sm" href="#">{{ t('Next visit', 'زيارة قادمة') }}</a>
+        </div>
+      </section>
     </div>
 
-    <!-- ── MIDDLE: services and the bill ────────────────────────── -->
-    <div class="pf-card" style="padding:1rem;display:flex;flex-direction:column">
-      <label class="pf-label" for="svcPick">{{ t('Add service or item', 'أضف خدمة أو صنف') }}</label>
-      <input id="svcPick" class="pf-input" list="svcList" autocomplete="off"
-             placeholder="{{ t('Type to search, then Enter', 'اكتب للبحث ثم Enter') }}"
-             style="font-size:1.05rem">
-      <datalist id="svcList"></datalist>
-
-      <div style="overflow-x:auto;margin-top:.9rem;flex:1">
-        <table class="pf-table" id="itemsTable" style="min-width:460px;margin:0">
+    <!-- HISTORY — always on the page, never behind a click -->
+    <section class="pf-card hw-history">
+      <h3 class="hw-h">{{ t('History', 'السجل') }}
+        <span class="hw-muted" id="hwHistCount"></span></h3>
+      <div class="hw-tablewrap hw-histscroll">
+        <table class="hw-table">
           <thead><tr>
-            <th>{{ t('Item', 'الصنف') }}</th>
-            <th style="width:110px">{{ t('Price', 'السعر') }}</th>
-            <th style="width:90px">{{ t('Qty', 'الكمية') }}</th>
-            <th style="width:110px">{{ t('Total', 'الإجمالي') }}</th>
-            <th style="width:1%"></th>
+            <th>{{ t('Date', 'التاريخ') }}</th>
+            <th>{{ t('Symptom or disease', 'العرض أو المرض') }}</th>
+            <th class="hw-w">{{ t('Weight', 'الوزن') }}</th>
+            <th class="hw-w">{{ t('Temp', 'الحرارة') }}</th>
+            <th>{{ t('Doctor', 'الطبيب') }}</th>
           </tr></thead>
-          <tbody id="itemsBody"></tbody>
+          <tbody id="hwHistBody"></tbody>
         </table>
-        <p id="emptyItems" class="pf-muted" style="padding:1.25rem;text-align:center">
-          {{ t('No services added yet.', 'لم تتم إضافة خدمات بعد.') }}</p>
+        <p id="hwNoHist" class="hw-muted hw-center">
+          {{ t('No previous visits for this pet.', 'لا توجد زيارات سابقة لهذا الحيوان.') }}</p>
       </div>
-
-      <div style="border-top:2px dashed var(--pf-border,#d0d5dd);margin-top:.9rem;padding-top:.9rem;
-                  display:flex;justify-content:space-between;align-items:baseline">
-        <strong style="font-size:1.15rem">{{ t('Total to pay', 'الإجمالي المطلوب') }}</strong>
-        <strong id="grandTotal" style="font-size:1.6rem">0.00</strong>
-      </div>
-      <div class="pf-muted" style="display:flex;justify-content:space-between;font-size:.9rem">
-        <span>{{ t('Items quantity', 'عدد الأصناف') }}</span><span id="itemCount">0</span>
-      </div>
-    </div>
-
-    <!-- ── RIGHT: the money ─────────────────────────────────────── -->
-    <div class="pf-card" style="padding:1rem">
-      <h3 class="pf-section-title">{{ t('Payment', 'الدفع') }}</h3>
-
-      <label class="pf-label">{{ t('Payment type', 'طريقة الدفع') }}</label>
-      <div style="display:flex;gap:1rem;margin-bottom:.9rem">
-        <label><input type="radio" name="payment_type" value="Cash" checked> {{ t('Cash', 'نقدي') }}</label>
-        <label><input type="radio" name="payment_type" value="VISA"> VISA</label>
-      </div>
-
-      <label class="pf-label">{{ t('Discount', 'الخصم') }}</label>
-      <div style="display:flex;gap:.5rem;margin-bottom:.9rem">
-        <select name="discount_type" id="discType" class="pf-input" style="width:90px">
-          <option value="value">EGP</option>
-          <option value="percent">%</option>
-        </select>
-        <input name="discount_value" id="discValue" class="pf-input" inputmode="decimal"
-               value="" placeholder="0" style="flex:1">
-      </div>
-
-      <label class="pf-label" for="cashReceived">{{ t('Cash received', 'المبلغ المستلم') }}</label>
-      <input id="cashReceived" name="cash_received" class="pf-input" inputmode="decimal"
-             placeholder="0" style="font-size:1.25rem;margin-bottom:.9rem">
-
-      <div class="exam-money"><span>{{ t('Change', 'الباقي') }}</span>
-        <strong id="changeOut">0.00</strong></div>
-      <div class="exam-money"><span>{{ t('Due', 'المتبقي') }}</span>
-        <strong id="dueOut" style="color:var(--pf-danger,#dc2626)">0.00</strong></div>
-
-      <div style="display:flex;flex-direction:column;gap:.6rem;margin-top:1.25rem">
-        <button type="submit" id="btnSave" data-action="save"
-                class="pf-btn pf-btn-primary" style="padding:.8rem">
-          {{ t('Save visit', 'حفظ الكشف') }}</button>
-        <button type="submit" id="btnPrint" data-action="print"
-                class="pf-btn" style="padding:.8rem">
-          {{ t('Save and print', 'حفظ وطباعة') }}</button>
-      </div>
-    </div>
-  </div>
-</form>
+    </section>
+  </form>
+</div>
 
 <style>
-.exam-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(320px,1.4fr) minmax(220px,.8fr);
-           gap:1rem;align-items:start}
-.exam-pair{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-.exam-money{display:flex;justify-content:space-between;padding:.4rem 0;font-size:1.05rem}
-@media (max-width:1100px){.exam-grid{grid-template-columns:1fr}}
+/* Bigger, calmer type than the rest of the app: this screen is read at arm's
+   length across a consulting table, often by someone holding an animal. */
+.hw{font-size:1.02rem}
+.hw-h{font-size:1.05rem;font-weight:700;margin:0 0 .7rem;letter-spacing:.01em;
+      text-transform:uppercase;opacity:.75}
+.hw-label{display:block;font-size:.86rem;font-weight:600;opacity:.72;margin-bottom:.25rem}
+.hw-input{width:100%;padding:.5rem .65rem;font-size:1.02rem;line-height:1.4;
+          border:1px solid var(--pf-border,#d0d5dd);border-radius:8px;
+          background:var(--pf-input-bg,#fff);color:inherit}
+.hw-input:focus{outline:2px solid var(--pf-primary,#0ea5e9);outline-offset:1px}
+.hw-input[readonly]{background:var(--pf-muted-bg,#f4f6f8);opacity:.85}
+.hw-input-lg{font-size:1.15rem;padding:.6rem .7rem}
+.hw-input-xl{font-size:1.5rem;padding:.6rem .7rem;font-weight:600}
+.hw-area{resize:vertical;font-family:inherit}
+.hw-narrow{width:92px;flex:0 0 92px}
+.hw-mt{margin-top:1rem}
+.hw-muted{opacity:.65}
+.hw-center{text-align:center;padding:1.4rem}
+.hw-span2{grid-column:1/-1}
+.hw-row{display:flex;gap:.5rem}
+.hw-radios{display:flex;gap:1.2rem;font-size:1.02rem}
+.hw-pairs{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}
+.hw-pane{padding:1.1rem}
+.hw-grid{display:grid;gap:1rem;align-items:start;
+         grid-template-columns:minmax(300px,1fr) minmax(340px,1.35fr) minmax(240px,.85fr)}
+
+.hw-clientbar{padding:1rem 1.1rem;margin-bottom:1rem;position:relative}
+.hw-search{position:relative;max-width:640px}
+.hw-results{position:absolute;z-index:40;top:100%;left:0;right:0;margin-top:.3rem;
+            max-height:340px;overflow:auto;border:1px solid var(--pf-border,#d0d5dd);
+            border-radius:10px;background:var(--pf-card-bg,#fff);
+            box-shadow:0 12px 32px rgba(0,0,0,.16)}
+.hw-owner{padding:.6rem .8rem;border-bottom:1px solid var(--pf-border,#eceff3)}
+.hw-owner:last-child{border-bottom:0}
+.hw-owner-h{font-weight:700;margin-bottom:.35rem}
+.hw-petbtns{display:flex;gap:.4rem;flex-wrap:wrap}
+.hw-petbtn{padding:.3rem .7rem;font-size:.95rem;border-radius:999px;cursor:pointer;
+           border:1px solid var(--pf-border,#d0d5dd);background:transparent;color:inherit}
+.hw-petbtn:hover{background:var(--pf-primary,#0ea5e9);color:#fff;border-color:transparent}
+.hw-current{display:flex;gap:1.6rem;flex-wrap:wrap;align-items:center;
+            margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--pf-border,#eceff3)}
+.hw-chip-label{font-size:.78rem;text-transform:uppercase;opacity:.6;margin-inline-end:.35rem}
+.hw-siblings{display:flex;gap:.4rem;flex-wrap:wrap}
+.hw-empty{padding:2.4rem;text-align:center}
+
+.hw-tablewrap{overflow-x:auto;margin-top:.8rem}
+.hw-table{width:100%;border-collapse:collapse;font-size:1rem}
+.hw-table th{text-align:start;font-size:.82rem;text-transform:uppercase;opacity:.65;
+             padding:.4rem .5rem;border-bottom:2px solid var(--pf-border,#e4e8ee)}
+.hw-table td{padding:.35rem .5rem;border-bottom:1px solid var(--pf-border,#eef1f5);
+             vertical-align:middle}
+.hw-w{width:104px}
+.hw-histscroll{max-height:280px;overflow-y:auto}
+
+.hw-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:.9rem;
+          padding-top:.8rem;border-top:2px dashed var(--pf-border,#d0d5dd)}
+.hw-total span{font-size:1.1rem;font-weight:700}
+.hw-total strong{font-size:1.9rem;font-weight:800}
+.hw-subline{display:flex;justify-content:space-between;font-size:.9rem;opacity:.65}
+.hw-money{display:flex;justify-content:space-between;align-items:baseline;
+          padding:.45rem 0;font-size:1.05rem}
+.hw-money strong{font-size:1.35rem}
+.hw-due strong{color:var(--pf-danger,#dc2626)}
+.hw-actions{display:flex;flex-direction:column;gap:.55rem;margin-top:1.1rem}
+.hw-btn-big{padding:.85rem;font-size:1.05rem;font-weight:600}
+.hw-links{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:1rem;
+          padding-top:.9rem;border-top:1px solid var(--pf-border,#eef1f5)}
+.hw-history{margin-top:1rem;padding:1.1rem}
+
+@media (max-width:1180px){.hw-grid{grid-template-columns:1fr}}
 </style>
 
 <script>
 (function () {
   var SERVICES = {{ services | tojson }};
-  var body = document.getElementById('itemsBody');
-  var pick = document.getElementById('svcPick');
-  var list = document.getElementById('svcList');
+  var PRELOAD  = {{ {'pet': pet, 'owner': owner, 'history': history} | tojson }};
 
+  var $ = function (id) { return document.getElementById(id); };
+  var form = $('hwForm'), empty = $('hwEmpty'), body = $('hwItemsBody');
+  var current = null;
+
+  var list = $('hwSvcList');
   SERVICES.forEach(function (s) {
     var o = document.createElement('option');
     o.value = s.name;
@@ -197,42 +285,43 @@
 
   function money(n) { return (Math.round(n * 100) / 100).toFixed(2); }
   function num(el) { var v = parseFloat((el.value || '').replace(/,/g, '')); return isFinite(v) ? v : 0; }
+  function txt(v) { return (v === null || v === undefined || v === '') ? '' : String(v); }
 
-  function cell(row, child) { var td = document.createElement('td'); td.appendChild(child); row.appendChild(td); return td; }
-
+  // ── the bill ──────────────────────────────────────────────────────
   function addItem(name, price, id) {
     var row = document.createElement('tr');
 
-    var nameCell = document.createElement('td');
-    nameCell.textContent = name;
-    var hidden = document.createElement('input');
-    hidden.type = 'hidden'; hidden.name = 'item_name[]'; hidden.value = name;
-    nameCell.appendChild(hidden);
-    var hid = document.createElement('input');
-    hid.type = 'hidden'; hid.name = 'item_id[]'; hid.value = id == null ? '' : String(id);
-    nameCell.appendChild(hid);
-    row.appendChild(nameCell);
+    var c1 = document.createElement('td');
+    c1.textContent = name;
+    [['item_name[]', name], ['item_id[]', id == null ? '' : String(id)]].forEach(function (p) {
+      var h = document.createElement('input');
+      h.type = 'hidden'; h.name = p[0]; h.value = p[1];
+      c1.appendChild(h);
+    });
+    row.appendChild(c1);
 
-    var p = document.createElement('input');
-    p.className = 'pf-input'; p.name = 'item_price[]'; p.inputMode = 'decimal';
-    p.value = money(price); p.addEventListener('input', recompute);
-    cell(row, p);
+    function box(name, value) {
+      var td = document.createElement('td');
+      var i = document.createElement('input');
+      i.className = 'hw-input'; i.name = name; i.inputMode = 'decimal'; i.value = value;
+      i.addEventListener('input', recompute);
+      td.appendChild(i); row.appendChild(td);
+      return i;
+    }
+    row._price = box('item_price[]', money(price));
+    row._qty   = box('item_qty[]', '1');
 
-    var q = document.createElement('input');
-    q.className = 'pf-input'; q.name = 'item_qty[]'; q.inputMode = 'decimal';
-    q.value = '1'; q.addEventListener('input', recompute);
-    cell(row, q);
+    var td = document.createElement('td');
+    row._total = document.createElement('strong');
+    row._total.textContent = money(price);
+    td.appendChild(row._total); row.appendChild(td);
 
-    var lineTotal = document.createElement('strong');
-    lineTotal.textContent = money(price);
-    cell(row, lineTotal);
-    row._total = lineTotal; row._price = p; row._qty = q;
-
+    var tdx = document.createElement('td');
     var x = document.createElement('button');
     x.type = 'button'; x.className = 'pf-btn pf-btn-sm'; x.textContent = '×';
     x.setAttribute('aria-label', 'Remove');
     x.addEventListener('click', function () { row.remove(); recompute(); });
-    cell(row, x);
+    tdx.appendChild(x); row.appendChild(tdx);
 
     body.appendChild(row);
     recompute();
@@ -244,25 +333,23 @@
       var line = num(row._price) * num(row._qty);
       if (!(line > 0)) line = 0;
       row._total.textContent = money(line);
-      subtotal += line;
-      count += num(row._qty);
+      subtotal += line; count += num(row._qty);
     });
 
-    var dv = num(document.getElementById('discValue'));
-    if (dv < 0) dv = 0;
-    var disc = document.getElementById('discType').value === 'percent'
-      ? subtotal * dv / 100 : dv;
+    var dv = num($('hwDiscValue')); if (dv < 0) dv = 0;
+    var disc = $('hwDiscType').value === 'percent' ? subtotal * dv / 100 : dv;
     if (disc > subtotal) disc = subtotal;
     var total = subtotal - disc;
+    var handed = num($('hwCash'));
 
-    var handed = num(document.getElementById('cashReceived'));
-    document.getElementById('grandTotal').textContent = money(total);
-    document.getElementById('itemCount').textContent = String(count);
-    document.getElementById('changeOut').textContent = money(Math.max(0, handed - total));
-    document.getElementById('dueOut').textContent = money(Math.max(0, total - Math.min(handed, total)));
-    document.getElementById('emptyItems').style.display = body.rows.length ? 'none' : '';
+    $('hwGrand').textContent  = money(total);
+    $('hwCount').textContent  = String(count);
+    $('hwChange').textContent = money(Math.max(0, handed - total));
+    $('hwDue').textContent    = money(Math.max(0, total - Math.min(handed, total)));
+    $('hwNoItems').style.display = body.rows.length ? 'none' : '';
   }
 
+  var pick = $('hwPick');
   pick.addEventListener('change', function () {
     var typed = (pick.value || '').trim();
     if (!typed) return;
@@ -272,43 +359,146 @@
     }
     if (hit) addItem(hit.name, Number(hit.standard_price || 0), hit.id);
     else addItem(typed, 0, null);
-    pick.value = '';
-    pick.focus();
+    pick.value = ''; pick.focus();
   });
-
   pick.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); pick.dispatchEvent(new Event('change')); }
   });
-
-  ['discValue', 'discType', 'cashReceived'].forEach(function (id) {
-    document.getElementById(id).addEventListener('input', recompute);
-    document.getElementById(id).addEventListener('change', recompute);
+  ['hwDiscValue', 'hwDiscType', 'hwCash'].forEach(function (id) {
+    $(id).addEventListener('input', recompute);
+    $(id).addEventListener('change', recompute);
   });
 
-  // Which button was pressed goes in a hidden field, not the button's own
-  // name: a disabled submitter is not serialised, so disabling it to stop
-  // double-clicks would otherwise throw away the choice of save-vs-print.
-  ['btnSave', 'btnPrint'].forEach(function (id) {
-    document.getElementById(id).addEventListener('click', function () {
-      document.getElementById('actionField').value = this.getAttribute('data-action');
+  // ── loading a pet, without leaving the page ───────────────────────
+  function renderHistory(rows) {
+    var tb = $('hwHistBody');
+    while (tb.firstChild) tb.removeChild(tb.firstChild);
+    (rows || []).forEach(function (h) {
+      var tr = document.createElement('tr');
+      [ (h.visit_date || '').slice(0, 16),
+        h.chief_complaint || h.symptoms || '—',
+        h.weight_kg == null ? '—' : Number(h.weight_kg).toFixed(1),
+        h.temp_c    == null ? '—' : Number(h.temp_c).toFixed(1),
+        h.doctor_name || '—'
+      ].forEach(function (v) {
+        var td = document.createElement('td');
+        td.textContent = v;          // textContent, never innerHTML: this is clinic data
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    $('hwNoHist').style.display = (rows && rows.length) ? 'none' : '';
+    $('hwHistCount').textContent = (rows && rows.length) ? '(' + rows.length + ')' : '';
+  }
+
+  function show(data) {
+    current = data;
+    var p = data.pet || {}, o = data.owner || {};
+    form.action = '/visits/exam/' + p.id;
+    $('fPetName').value = txt(p.pet_name);
+    $('fSpecies').value = txt(p.species);
+    $('fBreed').value   = txt(p.breed);
+    $('fSex').value     = txt(p.sex);
+    $('fDob').value     = txt(p.dob);
+    $('fWeight').value  = txt(p.weight_kg);
+    $('fOwner').value   = txt(o.full_name);
+    $('fPhone').value   = txt(o.phone);
+    $('fAddress').value = txt(o.address);
+
+    $('hwOwnerName').textContent  = txt(o.full_name) || '—';
+    $('hwOwnerPhone').textContent = txt(o.phone);
+    $('hwPetName').textContent    = txt(p.pet_name) || '—';
+    $('hwPetMeta').textContent    = [txt(p.species), txt(p.breed), txt(p.sex)]
+                                      .filter(Boolean).join(' · ');
+    $('lnkVaccine').href = '/clinical/vaccinations?pet_id=' + p.id;
+    $('lnkFiles').href   = '/crm/pets/' + p.id;
+    $('lnkNext').href    = '/appointments/new?pet_id=' + p.id;
+
+    renderHistory(data.history);
+    $('hwCurrent').hidden = false;
+    empty.hidden = true;
+    form.hidden = false;
+    recompute();
+    $('fWeight').focus();
+  }
+
+  function loadPet(petId) {
+    fetch('/visits/exam/api/pet/' + petId, {credentials: 'same-origin'})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) show(d); });
+  }
+
+  // ── client search ─────────────────────────────────────────────────
+  var box = $('hwSearch'), results = $('hwResults'), timer = null;
+
+  function renderResults(owners) {
+    while (results.firstChild) results.removeChild(results.firstChild);
+    if (!owners.length) {
+      var none = document.createElement('div');
+      none.className = 'hw-owner hw-muted';
+      none.textContent = '—';
+      results.appendChild(none);
+      results.hidden = false;
+      return;
+    }
+    owners.forEach(function (o) {
+      var wrap = document.createElement('div');
+      wrap.className = 'hw-owner';
+      var head = document.createElement('div');
+      head.className = 'hw-owner-h';
+      head.textContent = o.full_name + (o.phone ? '  ·  ' + o.phone : '');
+      wrap.appendChild(head);
+
+      var btns = document.createElement('div');
+      btns.className = 'hw-petbtns';
+      (o.pets || []).forEach(function (p) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'hw-petbtn';
+        b.textContent = p.pet_name + (p.species ? ' · ' + p.species : '');
+        b.addEventListener('click', function () {
+          results.hidden = true; box.value = '';
+          loadPet(p.id);
+        });
+        btns.appendChild(b);
+      });
+      if (!(o.pets || []).length) {
+        var no = document.createElement('span');
+        no.className = 'hw-muted';
+        no.textContent = '—';
+        btns.appendChild(no);
+      }
+      wrap.appendChild(btns);
+      results.appendChild(wrap);
+    });
+    results.hidden = false;
+  }
+
+  box.addEventListener('input', function () {
+    var q = box.value.trim();
+    clearTimeout(timer);
+    if (q.length < 2) { results.hidden = true; return; }
+    timer = setTimeout(function () {
+      fetch('/visits/exam/api/search?q=' + encodeURIComponent(q), {credentials: 'same-origin'})
+        .then(function (r) { return r.ok ? r.json() : {owners: []}; })
+        .then(function (d) { renderResults(d.owners || []); });
+    }, 220);
+  });
+  document.addEventListener('click', function (e) {
+    if (!results.contains(e.target) && e.target !== box) results.hidden = true;
+  });
+
+  // ── submit ────────────────────────────────────────────────────────
+  ['hwSave', 'hwPrint'].forEach(function (id) {
+    $(id).addEventListener('click', function () {
+      $('hwAction').value = this.getAttribute('data-action');
     });
   });
-
-  // A second click must not create a second visit. The server is idempotent on
-  // the payment; this stops the duplicate visit row.
-  document.getElementById('examForm').addEventListener('submit', function () {
-    setTimeout(function () {
-      document.getElementById('btnSave').disabled = true;
-      document.getElementById('btnPrint').disabled = true;
-    }, 0);
+  form.addEventListener('submit', function () {
+    setTimeout(function () { $('hwSave').disabled = true; $('hwPrint').disabled = true; }, 0);
   });
 
-  window.togglePanel = function (id) {
-    var el = document.getElementById(id);
-    el.style.display = el.style.display === 'none' ? '' : 'none';
-  };
-
-  recompute();
+  if (PRELOAD.pet && PRELOAD.pet.id) show(PRELOAD);
+  else box.focus();
 })();
 </script>
 {% endblock %}

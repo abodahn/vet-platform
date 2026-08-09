@@ -668,32 +668,30 @@ def visit_print(visit_id):
 # db.add_payment), so there is one money path in the product, not two.
 # ─────────────────────────────────────────────────────────────────────
 
+def _services(conn):
+    return [dict(r) for r in conn.execute(
+        "SELECT id, name, name_ar, category, standard_price FROM service_catalog"
+        " WHERE is_active=1 ORDER BY sort_order, name").fetchall()]
+
+
 @visits_bp.route("/exam")
 @login_required
 def exam_pick():
-    """Client management: find the owner by phone or name, list their pets."""
-    q = (request.args.get("q") or "").strip()
+    """The one screen, with nothing loaded yet.
+
+    Client search happens ON this page through /exam/api/search, so picking a
+    client never costs a navigation — same as the dialog in the Windows system
+    this copies. ?pet_id= is honoured so a link from elsewhere lands loaded.
+    """
+    pet_id = request.args.get("pet_id", type=int)
+    if pet_id:
+        return redirect(url_for("visits.exam_form", pet_id=pet_id))
     conn = get_db()
-    owners, pets = [], []
-    if q:
-        like = "%" + q + "%"
-        owners = [dict(r) for r in conn.execute(
-            "SELECT id, full_name, phone, email, address FROM owners"
-            " WHERE full_name LIKE ? OR phone LIKE ? OR whatsapp_phone LIKE ?"
-            " ORDER BY full_name LIMIT 50", (like, like, like)).fetchall()]
-        if owners:
-            ids = [o["id"] for o in owners]
-            marks = ",".join("?" * len(ids))
-            pets = [dict(r) for r in conn.execute(
-                "SELECT id, owner_id, pet_name, species, breed, sex, dob, weight_kg"
-                " FROM pets WHERE is_active=1 AND owner_id IN (" + marks + ")"
-                " ORDER BY owner_id, pet_name", ids).fetchall()]
+    services = _services(conn)
     conn.close()
-    pets_by_owner = {}
-    for p in pets:
-        pets_by_owner.setdefault(p["owner_id"], []).append(p)
-    return render_template("visits/exam_pick.html", active="visits",
-                           q=q, owners=owners, pets_by_owner=pets_by_owner)
+    return render_template("visits/exam.html", active="visits",
+                           today=date.today().isoformat(),
+                           pet={}, owner={}, history=[], services=services)
 
 
 def _exam_context(conn, pet_id):
@@ -726,6 +724,52 @@ def exam_form(pet_id):
         return redirect(url_for("visits.exam_pick"))
     return render_template("visits/exam.html", active="visits",
                            today=date.today().isoformat(), **ctx)
+
+
+# ── the one page: search, pick and load without ever navigating ──────
+# The Windows system this screen copies opens client management as a DIALOG
+# over the exam, not as another screen. These two endpoints are what let the
+# page do the same: the vet never loses what is already typed.
+
+@visits_bp.route("/exam/api/search")
+@login_required
+def exam_api_search():
+    from flask import jsonify
+    q = (request.args.get("q") or "").strip()
+    if len(q) < 2:
+        return jsonify({"owners": []})
+    like = "%" + q + "%"
+    conn = get_db()
+    owners = [dict(r) for r in conn.execute(
+        "SELECT id, full_name, phone, address FROM owners"
+        " WHERE full_name LIKE ? OR phone LIKE ? OR whatsapp_phone LIKE ?"
+        " ORDER BY full_name LIMIT 25", (like, like, like)).fetchall()]
+    if owners:
+        ids = [o["id"] for o in owners]
+        marks = ",".join("?" * len(ids))
+        pets = [dict(r) for r in conn.execute(
+            "SELECT id, owner_id, pet_name, species, breed, sex, dob, weight_kg"
+            " FROM pets WHERE is_active=1 AND owner_id IN (" + marks + ")"
+            " ORDER BY pet_name", ids).fetchall()]
+        for o in owners:
+            o["pets"] = [p for p in pets if p["owner_id"] == o["id"]]
+    conn.close()
+    return jsonify({"owners": owners})
+
+
+@visits_bp.route("/exam/api/pet/<int:pet_id>")
+@login_required
+def exam_api_pet(pet_id):
+    from flask import jsonify
+    conn = get_db()
+    ctx = _exam_context(conn, pet_id)
+    conn.close()
+    if not ctx:
+        return jsonify({"error": "not found"}), 404
+    # The service catalog is already on the page; sending it again per pet
+    # would triple the payload for data that never changes mid-visit.
+    ctx.pop("services", None)
+    return jsonify(ctx)
 
 
 def _exam_num(form, name, default=0.0):
