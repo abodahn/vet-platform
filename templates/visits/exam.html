@@ -72,6 +72,19 @@
                       value="{{ today }}"></div>
         </div>
 
+        <!-- Who SAW the animal. Without this the visit was stamped with
+             whoever was logged in — so a receptionist booking for Dr Sara put
+             her own name on the medical record. -->
+        <label class="hw-label hw-mt" for="fDoctor">{{ t('Seen by', 'الطبيب المعالج') }}</label>
+        <input id="fDoctor" name="doctor_name" class="hw-input" list="hwDocList"
+               autocomplete="off"
+               value="{{ (session.get('user') or {}).get('full_name', '') }}">
+        <datalist id="hwDocList">
+          {% for d in doctors %}<option value="{{ d }}"></option>{% endfor %}
+        </datalist>
+
+        <p id="hwVitalWarn" class="hw-vitalwarn" hidden></p>
+
         <div id="hwPetNotes" class="hw-notes" hidden></div>
 
         <!-- Identity: read-only, read once. The bar at the top carries the
@@ -144,8 +157,14 @@
         <h3 class="hw-h">{{ t('Services and items', 'الخدمات والأصناف') }}</h3>
         <label class="hw-label" for="hwPick">
           {{ t('Type to search, then Enter', 'اكتب للبحث ثم Enter') }}</label>
-        <input id="hwPick" class="hw-input hw-input-lg" list="hwSvcList" autocomplete="off">
+        <div class="hw-svcwrap">
+          <input id="hwPick" class="hw-input hw-input-lg" autocomplete="off"
+                 placeholder="{{ t('e.g. exam, vacc, shav…', 'مثال: كشف، تطعيم…') }}">
+          <div id="hwSvcMenu" class="hw-results" hidden></div>
+        </div>
         <datalist id="hwSvcList"></datalist>
+
+        <div id="hwQuick" class="hw-quick"></div>
 
         <div class="hw-tablewrap">
           <table class="hw-table" id="hwItems">
@@ -429,6 +448,32 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
 .hw-petbtn.hw-active{background:var(--pf-primary,#0ea5e9);color:#fff;
                      border-color:transparent}
 
+/* Service picker: candidates WITH their prices, so nothing is added blind. */
+.hw-svcwrap{position:relative}
+.hw-svcrow{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;
+           width:100%;padding:.5rem .8rem;border:0;background:transparent;color:inherit;
+           font:inherit;text-align:start;cursor:pointer;
+           border-bottom:1px solid var(--pf-border,#eef1f5)}
+.hw-svcrow:last-child{border-bottom:0}
+.hw-svcrow strong{font-variant-numeric:tabular-nums;white-space:nowrap}
+.hw-svcrow:hover,.hw-svcrow.hw-active{background:var(--pf-primary,#0ea5e9);color:#fff}
+
+/* The same handful of services all day — one tap each. */
+.hw-quick{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.6rem}
+.hw-chip{display:inline-flex;align-items:baseline;gap:.4rem;padding:.32rem .7rem;
+         border:1px solid var(--pf-border,#d0d5dd);border-radius:999px;
+         background:transparent;color:inherit;font:inherit;font-size:.9rem;cursor:pointer}
+.hw-chip:hover{background:var(--pf-primary,#0ea5e9);color:#fff;border-color:transparent}
+.hw-chip-p{opacity:.6;font-size:.82rem;font-variant-numeric:tabular-nums}
+.hw-chip:hover .hw-chip-p{opacity:.9}
+
+/* A vitals value worth a second look — a warning, never a block. */
+.hw-vitalwarn{margin:.5rem 0 0;padding:.4rem .6rem;border-radius:8px;font-size:.9rem;
+              background:#fef3c7;color:#78350f;border:1px solid #fcd34d}
+@media (prefers-color-scheme:dark){
+  .hw-vitalwarn{background:#422006;color:#fde68a;border-color:#a16207}
+}
+
 /* Clickable must LOOK clickable, and must survive a keyboard. */
 .hw-link{color:var(--pf-primary,#0369a1);text-decoration:none;border-bottom:1px solid transparent}
 .hw-link:hover,.hw-link:focus{text-decoration:underline;border-bottom-color:currentColor}
@@ -475,6 +520,8 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     notes:      {{ t('Notes', 'ملاحظات') | tojson }},
     yes:        {{ t('Yes', 'نعم') | tojson }},
     no:         {{ t('No', 'لا') | tojson }},
+    oddWeight:  {{ t('Check the weight', 'راجع الوزن') | tojson }},
+    oddTemp:    {{ t('Check the temperature', 'راجع درجة الحرارة') | tojson }},
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -556,20 +603,106 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
   }
 
   var pick = $('hwPick');
-  pick.addEventListener('change', function () {
+  // ── the service picker ────────────────────────────────────────────
+  // This used to be a bare <datalist>: typing "Basi" and pressing Enter did
+  // NOT match "Basic Bath", it added a free-text line called "Basi" priced at
+  // 0.00. Partial typing is how people actually type, so every one of those
+  // was a service given away for nothing, silently. Now the typed text is
+  // MATCHED, the candidates are shown with their prices, and a genuinely
+  // unknown name lands with its price field focused so it cannot be missed.
+  var menu = $('hwSvcMenu'), svcCursor = -1, matches = [];
+
+  function scoreMatch(q) {
+    q = q.toLowerCase();
+    var starts = [], contains = [];
+    SERVICES.forEach(function (s) {
+      var n = (s.name || '').toLowerCase();
+      var ar = (s.name_ar || '');
+      if (n.indexOf(q) === 0) starts.push(s);
+      else if (n.indexOf(q) > -1 || ar.indexOf(q) > -1) contains.push(s);
+    });
+    return starts.concat(contains).slice(0, 12);
+  }
+
+  function closeMenu() { menu.hidden = true; svcCursor = -1; }
+
+  function renderMenu(q) {
+    matches = q ? scoreMatch(q) : [];
+    while (menu.firstChild) menu.removeChild(menu.firstChild);
+    if (!matches.length) { closeMenu(); return; }
+    matches.forEach(function (s, i) {
+      var row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'hw-svcrow' + (i === 0 ? ' hw-active' : '');
+      var nm = document.createElement('span');
+      nm.textContent = s.name + (s.name_ar ? '  ·  ' + s.name_ar : '');
+      var pr = document.createElement('strong');
+      pr.className = 'hw-num';
+      pr.textContent = money(Number(s.standard_price || 0));
+      row.appendChild(nm); row.appendChild(pr);
+      row.addEventListener('click', function () { choose(s); });
+      menu.appendChild(row);
+    });
+    svcCursor = 0;
+    menu.hidden = false;
+  }
+
+  function choose(s) {
+    addItem(s.name, Number(s.standard_price || 0), s.id);
+    pick.value = ''; closeMenu(); pick.focus();
+  }
+
+  function addFreeText(name) {
+    addItem(name, 0, null);
+    pick.value = ''; closeMenu();
+    // Nobody meant to bill zero. Put the cursor on the price.
+    var last = body.rows[body.rows.length - 1];
+    if (last) { last._price.focus(); last._price.select(); }
+  }
+
+  pick.addEventListener('input', function () { renderMenu(pick.value.trim()); });
+  pick.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (menu.hidden || !matches.length) return;
+      e.preventDefault();
+      svcCursor = (svcCursor + (e.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length;
+      var rows = menu.querySelectorAll('.hw-svcrow');
+      Array.prototype.forEach.call(rows, function (r, i) {
+        r.classList.toggle('hw-active', i === svcCursor);
+      });
+      rows[svcCursor].scrollIntoView({block: 'nearest'});
+      return;
+    }
+    if (e.key === 'Escape') { closeMenu(); return; }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
     var typed = (pick.value || '').trim();
     if (!typed) return;
-    var hit = null;
-    for (var i = 0; i < SERVICES.length; i++) {
-      if (SERVICES[i].name === typed) { hit = SERVICES[i]; break; }
-    }
-    if (hit) addItem(hit.name, Number(hit.standard_price || 0), hit.id);
-    else addItem(typed, 0, null);
-    pick.value = ''; pick.focus();
+    if (matches.length) { choose(matches[svcCursor < 0 ? 0 : svcCursor]); }
+    else { addFreeText(typed); }
   });
-  pick.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); pick.dispatchEvent(new Event('change')); }
+  document.addEventListener('click', function (e) {
+    if (!menu.contains(e.target) && e.target !== pick) closeMenu();
   });
+
+  // The same handful of services all day. One tap each.
+  (function quickAdd() {
+    var host = $('hwQuick');
+    if (!host) return;
+    SERVICES.slice(0, 6).forEach(function (s) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'hw-chip';
+      b.textContent = s.name;
+      var p = document.createElement('span');
+      p.className = 'hw-chip-p';
+      p.textContent = money(Number(s.standard_price || 0));
+      b.appendChild(p);
+      b.addEventListener('click', function () {
+        addItem(s.name, Number(s.standard_price || 0), s.id);
+      });
+      host.appendChild(b);
+    });
+  })();
   ['hwDiscValue', 'hwDiscType', 'hwCash'].forEach(function (id) {
     $(id).addEventListener('input', recompute);
     $(id).addEventListener('change', recompute);
@@ -707,6 +840,8 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     ['fSymptom', 'fTemp', 'fNotes', 'hwCash', 'hwDiscValue', 'hwPick']
       .forEach(function (id) { $(id).value = ''; });
     $('hwDiscType').value = 'value';
+    $('hwVitalWarn').hidden = true;
+    $('hwSvcMenu').hidden = true;
     var cash = document.querySelector('input[name="payment_type"][value="Cash"]');
     if (cash) cash.checked = true;
     while (body.rows.length) body.deleteRow(0);
@@ -919,8 +1054,52 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
       $('hwAction').value = this.getAttribute('data-action');
     });
   });
+  var saving = false;
   form.addEventListener('submit', function () {
+    saving = true;
     setTimeout(function () { $('hwSave').disabled = true; $('hwPrint').disabled = true; }, 0);
+  });
+
+  // Ctrl/Cmd+Enter saves from anywhere on the page.
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !form.hidden) {
+      e.preventDefault();
+      $('hwSave').click();
+    }
+  });
+
+  // Losing a half-finished exam to a stray click or a back button is the kind
+  // of thing that makes a clinic stop trusting the screen.
+  function hasWork() {
+    return !!($('fSymptom').value.trim() || $('fTemp').value.trim() ||
+              $('fNotes').value.trim() || body.rows.length ||
+              $('hwCash').value.trim());
+  }
+  window.addEventListener('beforeunload', function (e) {
+    if (saving || form.hidden || !hasWork()) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
+  // Vitals worth a second look. A WARNING, never a block: an 8-week kitten at
+  // 0.4 kg and a Great Dane at 90 kg are both real, and a screen that argues
+  // with a vet about the animal in front of them gets ignored.
+  function checkVitals() {
+    var msgs = [];
+    if ($('fWeight').value.trim()) {
+      var w = num($('fWeight'));
+      if (w <= 0 || w > 120) msgs.push(L.oddWeight);
+    }
+    if ($('fTemp').value.trim()) {
+      var t = num($('fTemp'));
+      if (t < 30 || t > 45) msgs.push(L.oddTemp);
+    }
+    var el = $('hwVitalWarn');
+    el.textContent = msgs.join('   ·   ');
+    el.hidden = !msgs.length;
+  }
+  ['fWeight', 'fTemp'].forEach(function (id) {
+    $(id).addEventListener('input', checkVitals);
   });
 
   if (PRELOAD.pet && PRELOAD.pet.id) show(PRELOAD);

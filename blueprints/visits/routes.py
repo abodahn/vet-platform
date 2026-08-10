@@ -688,12 +688,13 @@ def exam_pick():
         return redirect(url_for("visits.exam_form", pet_id=pet_id))
     conn = get_db()
     services = _services(conn)
+    doctors = prescribers(conn)
     conn.close()
     return render_template("visits/exam.html", active="visits",
                            today=date.today().isoformat(),
                            pet={}, owner={}, history=[], services=services,
-                           vaccines=[], meds=[], chronic=[], invoices=[],
-                           siblings=[], upcoming=[], outstanding=0.0)
+                           doctors=doctors, vaccines=[], meds=[], chronic=[],
+                           invoices=[], siblings=[], upcoming=[], outstanding=0.0)
 
 
 def _age_text(dob):
@@ -816,8 +817,12 @@ def exam_form(pet_id):
     if not ctx:
         flash("Pet not found.", "danger")
         return redirect(url_for("visits.exam_pick"))
+    conn2 = get_db()
+    doctors = prescribers(conn2)
+    conn2.close()
     return render_template("visits/exam.html", active="visits",
-                           today=date.today().isoformat(), **ctx)
+                           today=date.today().isoformat(),
+                           doctors=doctors, **ctx)
 
 
 # ── the one page: search, pick and load without ever navigating ──────

@@ -485,3 +485,59 @@ def test_the_search_is_keyboard_navigable(auth_client, leo):
     body = auth_client.get("/visits/exam").get_data(as_text=True)
     for key in ("ArrowDown", "ArrowUp", "Enter", "Escape"):
         assert key in body, "%s is not handled in the client search" % key
+
+
+# ── the service picker must never bill a service at zero by accident ─────
+
+
+def test_a_partial_service_name_is_matched_not_billed_at_zero(auth_client, leo):
+    """Typing "Basi" and pressing Enter must add Basic Bath at 200, not "Basi" at 0.
+
+    The old <datalist> only fired on an EXACT match, so partial typing — which
+    is how people type — silently added a free-text line priced 0.00. Every
+    one of those was a service given away.
+    """
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+    assert "function scoreMatch(" in body, "the matcher is gone"
+    assert "function addFreeText(" in body, "the unknown-name path is gone"
+    assert "last._price.focus()" in body, \
+        "an unknown service must land with its price focused, never silently 0"
+    assert "hwSvcMenu" in body, "candidates must be shown with their prices"
+
+
+def test_the_visit_records_who_actually_saw_the_animal(auth_client, leo):
+    """doctor_name came from whoever was logged in, so reception's name went on
+    the medical record when they booked for a vet."""
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+    assert 'name="doctor_name"' in body, "there is no way to say who saw the pet"
+    assert 'id="hwDocList"' in body, "the doctor list is not offered"
+
+    _post(auth_client, leo["pet_id"], doctor_name="Dr. Sara Hassan")
+    conn = db.get_db()
+    visit = conn.execute(
+        "SELECT doctor_name FROM visits WHERE pet_id=? ORDER BY id DESC LIMIT 1",
+        (leo["pet_id"],)).fetchone()
+    conn.close()
+    assert visit["doctor_name"] == "Dr. Sara Hassan", \
+        "the visit was stamped with the wrong person"
+
+
+def test_an_unfinished_exam_is_not_lost_silently(auth_client, leo):
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+    assert "beforeunload" in body, "a half-typed exam can be lost to a stray click"
+    assert "function hasWork()" in body
+
+
+def test_impossible_vitals_warn_but_never_block(auth_client, leo):
+    """A warning, not a refusal — a 0.4 kg kitten and a 90 kg Great Dane are real."""
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+    assert "function checkVitals(" in body
+    assert "hwVitalWarn" in body
+    # and the server still accepts an odd but genuine value
+    _post(auth_client, leo["pet_id"], weight_kg="0.4", temp_c="41.2")
+    conn = db.get_db()
+    v = conn.execute("SELECT weight_kg, temp_c FROM visits WHERE pet_id=?"
+                     " ORDER BY id DESC LIMIT 1", (leo["pet_id"],)).fetchone()
+    conn.close()
+    assert v["weight_kg"] == 0.4 and v["temp_c"] == 41.2, \
+        "the warning must not have become a block"
