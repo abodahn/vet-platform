@@ -57,65 +57,78 @@
 
       <!-- LEFT: pet, symptom, owner -->
       <section class="pf-card hw-pane">
-        <h3 class="hw-h">{{ t('Pet', 'الحيوان') }}</h3>
-        <div class="hw-pairs">
-          <div><label class="hw-label">{{ t('Name', 'الاسم') }}</label>
-               <input class="hw-input" id="fPetName" readonly></div>
-          <div><label class="hw-label">{{ t('Species', 'النوع') }}</label>
-               <input class="hw-input" id="fSpecies" readonly></div>
-          <div><label class="hw-label">{{ t('Breed', 'السلالة') }}</label>
-               <input class="hw-input" id="fBreed" readonly></div>
-          <div><label class="hw-label">{{ t('Sex', 'الجنس') }}</label>
-               <input class="hw-input" id="fSex" readonly></div>
-          <div><label class="hw-label">{{ t('Date of birth', 'تاريخ الميلاد') }}</label>
-               <input class="hw-input" id="fDob" readonly></div>
-          <div><label class="hw-label">{{ t('Age', 'العمر') }}</label>
-               <input class="hw-input" id="fAge" readonly></div>
-          <div><label class="hw-label">{{ t('Colour', 'اللون') }}</label>
-               <input class="hw-input" id="fColor" readonly></div>
-          <div><label class="hw-label">{{ t('Neutered', 'مخصي') }}</label>
-               <input class="hw-input" id="fNeutered" readonly></div>
-          <div><label class="hw-label">{{ t('Microchip', 'الشريحة') }}</label>
-               <input class="hw-input" id="fChip" readonly></div>
-          <div><label class="hw-label">{{ t('Insurance', 'التأمين') }}</label>
-               <input class="hw-input" id="fInsurance" readonly></div>
+        <h3 class="hw-h">{{ t('This visit', 'هذه الزيارة') }}</h3>
+
+        <!-- What the vet types, every single visit. Nothing folds here. -->
+        <div class="hw-vitals">
+          <div><label class="hw-label" for="fWeight">{{ t('Weight (kg)', 'الوزن (كجم)') }}</label>
+               <input class="hw-input hw-input-lg" id="fWeight" name="weight_kg"
+                      inputmode="decimal" placeholder="0.0"></div>
+          <div><label class="hw-label" for="fTemp">{{ t('Temp (C)', 'الحرارة') }}</label>
+               <input class="hw-input hw-input-lg" id="fTemp" name="temp_c"
+                      inputmode="decimal" placeholder="38.5"></div>
           <div><label class="hw-label" for="fVisitDate">{{ t('Visit date', 'تاريخ الزيارة') }}</label>
                <input type="date" class="hw-input" id="fVisitDate" name="visit_date"
                       value="{{ today }}"></div>
-          <div></div>
-          <div><label class="hw-label" for="fWeight">{{ t('Weight (kg)', 'الوزن (كجم)') }}</label>
-               <input class="hw-input hw-input-lg" id="fWeight" name="weight_kg"
-                      inputmode="decimal"></div>
-          <div><label class="hw-label" for="fTemp">{{ t('Temp (C)', 'الحرارة') }}</label>
-               <input class="hw-input hw-input-lg" id="fTemp" name="temp_c"
-                      inputmode="decimal"></div>
         </div>
 
         <div id="hwPetNotes" class="hw-notes" hidden></div>
+
+        <!-- Identity: read-only, read once. The bar at the top carries the
+             name, species and breed already, so this folds by default. -->
+        <details class="hw-fold hw-mt" data-fold="petid">
+          <summary class="hw-h">{{ t('Pet details', 'بيانات الحيوان') }}</summary>
+          <div class="hw-pairs">
+            <div><label class="hw-label">{{ t('Name', 'الاسم') }}</label>
+                 <input class="hw-input" id="fPetName" readonly></div>
+            <div><label class="hw-label">{{ t('Species', 'النوع') }}</label>
+                 <input class="hw-input" id="fSpecies" readonly></div>
+            <div><label class="hw-label">{{ t('Breed', 'السلالة') }}</label>
+                 <input class="hw-input" id="fBreed" readonly></div>
+            <div><label class="hw-label">{{ t('Sex', 'الجنس') }}</label>
+                 <input class="hw-input" id="fSex" readonly></div>
+            <div><label class="hw-label">{{ t('Date of birth', 'تاريخ الميلاد') }}</label>
+                 <input class="hw-input" id="fDob" readonly></div>
+            <div><label class="hw-label">{{ t('Age', 'العمر') }}</label>
+                 <input class="hw-input" id="fAge" readonly></div>
+            <div><label class="hw-label">{{ t('Colour', 'اللون') }}</label>
+                 <input class="hw-input" id="fColor" readonly></div>
+            <div><label class="hw-label">{{ t('Neutered', 'مخصي') }}</label>
+                 <input class="hw-input" id="fNeutered" readonly></div>
+            <div><label class="hw-label">{{ t('Microchip', 'الشريحة') }}</label>
+                 <input class="hw-input" id="fChip" readonly></div>
+            <div><label class="hw-label">{{ t('Insurance', 'التأمين') }}</label>
+                 <input class="hw-input" id="fInsurance" readonly></div>
+          </div>
+        </details>
 
         <label class="hw-label hw-mt" for="fSymptom">
           {{ t('Symptom or disease', 'العرض أو المرض') }}</label>
         <textarea id="fSymptom" name="symptom" class="hw-input hw-area" rows="6"></textarea>
 
-        <h3 class="hw-h hw-mt">{{ t('Owner', 'المالك') }}
-          <span id="fVip" class="hw-badge hw-vip" hidden>VIP</span></h3>
-        <div class="hw-pairs">
-          <div><label class="hw-label">{{ t('Name', 'الاسم') }}</label>
-               <input class="hw-input" id="fOwner" readonly></div>
-          <div><label class="hw-label">{{ t('Phone', 'الهاتف') }}</label>
-               <input class="hw-input" id="fPhone" readonly></div>
-          <div><label class="hw-label">{{ t('WhatsApp', 'واتساب') }}</label>
-               <input class="hw-input" id="fWhats" readonly></div>
-          <div><label class="hw-label">{{ t('Email', 'البريد') }}</label>
-               <input class="hw-input" id="fEmail" readonly></div>
-          <div class="hw-span2"><label class="hw-label">{{ t('Address', 'العنوان') }}</label>
-               <input class="hw-input" id="fAddress" readonly></div>
-          <div><label class="hw-label">{{ t('Preferred doctor', 'الطبيب المفضل') }}</label>
-               <input class="hw-input" id="fPrefDoc" readonly></div>
-          <div><label class="hw-label">{{ t('Contact by', 'وسيلة التواصل') }}</label>
-               <input class="hw-input" id="fPrefContact" readonly></div>
-        </div>
-        <div id="hwOwnerNotes" class="hw-notes" hidden></div>
+        <!-- The bar at the top already shows the client's name and phone.
+             The rest is reference, so it folds away by default. -->
+        <details class="hw-fold hw-mt" data-fold="owner">
+          <summary class="hw-h">{{ t('Owner', 'المالك') }}
+            <span id="fVip" class="hw-badge hw-vip" hidden>VIP</span></summary>
+          <div class="hw-pairs">
+            <div><label class="hw-label">{{ t('Name', 'الاسم') }}</label>
+                 <input class="hw-input" id="fOwner" readonly></div>
+            <div><label class="hw-label">{{ t('Phone', 'الهاتف') }}</label>
+                 <input class="hw-input" id="fPhone" readonly></div>
+            <div><label class="hw-label">{{ t('WhatsApp', 'واتساب') }}</label>
+                 <input class="hw-input" id="fWhats" readonly></div>
+            <div><label class="hw-label">{{ t('Email', 'البريد') }}</label>
+                 <input class="hw-input" id="fEmail" readonly></div>
+            <div class="hw-span2"><label class="hw-label">{{ t('Address', 'العنوان') }}</label>
+                 <input class="hw-input" id="fAddress" readonly></div>
+            <div><label class="hw-label">{{ t('Preferred doctor', 'الطبيب المفضل') }}</label>
+                 <input class="hw-input" id="fPrefDoc" readonly></div>
+            <div><label class="hw-label">{{ t('Contact by', 'وسيلة التواصل') }}</label>
+                 <input class="hw-input" id="fPrefContact" readonly></div>
+          </div>
+          <div id="hwOwnerNotes" class="hw-notes" hidden></div>
+        </details>
 
         <div id="hwSiblingsBox" class="hw-sibbox" hidden>
           <label class="hw-label">{{ t('Other pets of this client', 'حيوانات أخرى لنفس العميل') }}</label>
@@ -159,7 +172,7 @@
       </section>
 
       <!-- RIGHT: the money -->
-      <section class="pf-card hw-pane">
+      <section class="pf-card hw-pane hw-money-pane">
         <h3 class="hw-h">{{ t('Payment', 'الدفع') }}</h3>
 
         <label class="hw-label">{{ t('Payment type', 'طريقة الدفع') }}</label>
@@ -207,9 +220,9 @@
     <!-- DETAIL PANELS — all on the page, nothing behind a click -->
     <div class="hw-detail">
 
-      <section class="pf-card hw-pane">
-        <h3 class="hw-h">{{ t('History', 'السجل') }}
-          <span class="hw-muted" id="hwHistCount"></span></h3>
+      <details class="pf-card hw-pane hw-fold" data-fold="hist" open>
+        <summary class="hw-h">{{ t('History', 'السجل') }}
+          <span class="hw-muted" id="hwHistCount"></span></summary>
         <div class="hw-tablewrap hw-scroll">
           <table class="hw-table">
             <thead><tr>
@@ -224,11 +237,11 @@
           <p id="hwNoHist" class="hw-muted hw-center">
             {{ t('No previous visits.', 'لا توجد زيارات سابقة.') }}</p>
         </div>
-      </section>
+      </details>
 
-      <section class="pf-card hw-pane">
-        <h3 class="hw-h">{{ t('Vaccinations', 'التطعيمات') }}
-          <span class="hw-muted" id="hwVaxCount"></span></h3>
+      <details class="pf-card hw-pane hw-fold" data-fold="vax">
+        <summary class="hw-h">{{ t('Vaccinations', 'التطعيمات') }}
+          <span class="hw-muted" id="hwVaxCount"></span></summary>
         <div class="hw-tablewrap hw-scroll">
           <table class="hw-table">
             <thead><tr>
@@ -241,11 +254,11 @@
           <p id="hwNoVax" class="hw-muted hw-center">
             {{ t('No vaccinations recorded.', 'لا توجد تطعيمات مسجلة.') }}</p>
         </div>
-      </section>
+      </details>
 
-      <section class="pf-card hw-pane">
-        <h3 class="hw-h">{{ t('Medications', 'الأدوية') }}
-          <span class="hw-muted" id="hwMedCount"></span></h3>
+      <details class="pf-card hw-pane hw-fold" data-fold="med">
+        <summary class="hw-h">{{ t('Medications', 'الأدوية') }}
+          <span class="hw-muted" id="hwMedCount"></span></summary>
         <div class="hw-tablewrap hw-scroll">
           <table class="hw-table">
             <thead><tr>
@@ -259,11 +272,11 @@
           <p id="hwNoMed" class="hw-muted hw-center">
             {{ t('No medications recorded.', 'لا توجد أدوية مسجلة.') }}</p>
         </div>
-      </section>
+      </details>
 
-      <section class="pf-card hw-pane">
-        <h3 class="hw-h">{{ t('Diagnoses', 'التشخيصات') }}
-          <span class="hw-muted" id="hwDxCount"></span></h3>
+      <details class="pf-card hw-pane hw-fold" data-fold="dx">
+        <summary class="hw-h">{{ t('Diagnoses', 'التشخيصات') }}
+          <span class="hw-muted" id="hwDxCount"></span></summary>
         <div class="hw-tablewrap hw-scroll">
           <table class="hw-table">
             <thead><tr>
@@ -276,11 +289,11 @@
           <p id="hwNoDx" class="hw-muted hw-center">
             {{ t('No diagnoses recorded.', 'لا توجد تشخيصات مسجلة.') }}</p>
         </div>
-      </section>
+      </details>
 
-      <section class="pf-card hw-pane hw-span-all">
-        <h3 class="hw-h">{{ t("This client's invoices", 'فواتير العميل') }}
-          <span class="hw-muted" id="hwInvCount"></span></h3>
+      <details class="pf-card hw-pane hw-fold hw-span-all" data-fold="inv">
+        <summary class="hw-h">{{ t("This client's invoices", 'فواتير العميل') }}
+          <span class="hw-muted" id="hwInvCount"></span></summary>
         <div class="hw-tablewrap hw-scroll">
           <table class="hw-table">
             <thead><tr>
@@ -296,7 +309,7 @@
           <p id="hwNoInv" class="hw-muted hw-center">
             {{ t('No invoices for this client.', 'لا توجد فواتير لهذا العميل.') }}</p>
         </div>
-      </section>
+      </details>
     </div>
   </form>
 </div>
@@ -381,6 +394,40 @@
 .hw-detail{display:grid;gap:1rem;margin-top:1rem;
            grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
 .hw-span-all{grid-column:1/-1}
+
+/* Vitals: the three boxes typed on every visit, side by side, never folded. */
+.hw-vitals{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:.65rem}
+@media (max-width:520px){.hw-vitals{grid-template-columns:1fr 1fr}}
+
+/* Folds — native <details>, so keyboard and find-in-page work for free. */
+.hw-fold>summary{cursor:pointer;list-style:none;display:flex;align-items:center;
+                 gap:.45rem;padding:.15rem 0;user-select:none}
+.hw-fold>summary::-webkit-details-marker{display:none}
+.hw-fold>summary::before{content:"▸";font-size:.85em;opacity:.55;
+                         transition:transform .15s ease;display:inline-block}
+.hw-fold[open]>summary::before{transform:rotate(90deg)}
+.hw-fold>summary:hover{opacity:.85}
+.hw-fold>summary:focus-visible{outline:2px solid var(--pf-primary,#0ea5e9);
+                               outline-offset:2px;border-radius:4px}
+details.hw-pane{padding:1.1rem}
+details.hw-pane>summary{margin-bottom:0}
+details.hw-pane[open]>summary{margin-bottom:.7rem}
+
+/* Money column follows you down the page — Save is never scrolled away. */
+@media (min-width:1181px){
+  .hw-grid>.hw-money-pane{position:sticky;top:1rem;max-height:calc(100vh - 2rem);
+                          overflow-y:auto}
+}
+/* Numbers line up on the decimal, so a wrong figure looks wrong. */
+.hw-table td:nth-child(n+2) input,.hw-num{text-align:end;font-variant-numeric:tabular-nums}
+.hw-total strong,.hw-money strong,#hwGrand{font-variant-numeric:tabular-nums}
+
+/* Loading, so a slow pet fetch is not a dead screen. */
+.hw-busy{opacity:.5;pointer-events:none;transition:opacity .12s}
+
+/* Keyboard selection in the client search. */
+.hw-petbtn.hw-active{background:var(--pf-primary,#0ea5e9);color:#fff;
+                     border-color:transparent}
 
 /* Clickable must LOOK clickable, and must survive a keyboard. */
 .hw-link{color:var(--pf-primary,#0369a1);text-decoration:none;border-bottom:1px solid transparent}
@@ -652,7 +699,24 @@
     el.hidden = false;
   }
 
+  // Everything a human typed for the PREVIOUS animal. Switching pets on this
+  // screen is one click — the sibling chips exist for exactly that — and
+  // without this the symptom, the services and the money you entered for the
+  // cat stayed on screen when you loaded the dog, and saved against the dog.
+  function resetForm() {
+    ['fSymptom', 'fTemp', 'fNotes', 'hwCash', 'hwDiscValue', 'hwPick']
+      .forEach(function (id) { $(id).value = ''; });
+    $('hwDiscType').value = 'value';
+    var cash = document.querySelector('input[name="payment_type"][value="Cash"]');
+    if (cash) cash.checked = true;
+    while (body.rows.length) body.deleteRow(0);
+    recompute();
+  }
+
   function show(data) {
+    var switching = current && current.pet && data.pet &&
+                    current.pet.id !== data.pet.id;
+    if (switching || !current) resetForm();
     current = data;
     var p = data.pet || {}, o = data.owner || {};
     form.action = '/visits/exam/' + p.id;
@@ -738,10 +802,30 @@
   }
 
   function loadPet(petId) {
+    form.classList.add('hw-busy');
     fetch('/visits/exam/api/pet/' + petId, {credentials: 'same-origin'})
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d) show(d); });
+      .then(function (d) { if (d) show(d); })
+      .catch(function () {})
+      .then(function () { form.classList.remove('hw-busy'); });
   }
+
+  // Which panels a person keeps open is a preference, not a page state — a
+  // vet who never looks at Medications should not close it forty times a day.
+  (function rememberFolds() {
+    var KEY = 'hw-folds';
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+    var folds = document.querySelectorAll('details[data-fold]');
+    Array.prototype.forEach.call(folds, function (d) {
+      var k = d.getAttribute('data-fold');
+      if (Object.prototype.hasOwnProperty.call(saved, k)) d.open = !!saved[k];
+      d.addEventListener('toggle', function () {
+        saved[k] = d.open;
+        try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+      });
+    });
+  })();
 
   // ── client search ─────────────────────────────────────────────────
   var box = $('hwSearch'), results = $('hwResults'), timer = null;
@@ -786,6 +870,7 @@
       results.appendChild(wrap);
     });
     results.hidden = false;
+    cursor = -1;
   }
 
   box.addEventListener('input', function () {
@@ -795,9 +880,35 @@
     timer = setTimeout(function () {
       fetch('/visits/exam/api/search?q=' + encodeURIComponent(q), {credentials: 'same-origin'})
         .then(function (r) { return r.ok ? r.json() : {owners: []}; })
-        .then(function (d) { renderResults(d.owners || []); });
+        .then(function (d) { renderResults(d.owners || []); })
+        .catch(function () {});
     }, 220);
   });
+
+  // Arrow keys and Enter, so the whole find-a-client flow is typeable: a
+  // receptionist with a phone in one hand and a cat in the other is not
+  // reaching for a mouse.
+  var cursor = -1;
+  function pets() { return results.querySelectorAll('.hw-petbtn'); }
+  function highlight(i) {
+    var list = pets();
+    if (!list.length) return;
+    cursor = (i + list.length) % list.length;
+    Array.prototype.forEach.call(list, function (b, n) {
+      b.classList.toggle('hw-active', n === cursor);
+    });
+    list[cursor].scrollIntoView({block: 'nearest'});
+  }
+  box.addEventListener('keydown', function (e) {
+    if (results.hidden) return;
+    if (e.key === 'ArrowDown')      { e.preventDefault(); highlight(cursor + 1); }
+    else if (e.key === 'ArrowUp')   { e.preventDefault(); highlight(cursor - 1); }
+    else if (e.key === 'Enter')     {
+      var list = pets();
+      if (list.length) { e.preventDefault(); list[cursor < 0 ? 0 : cursor].click(); }
+    } else if (e.key === 'Escape')  { results.hidden = true; cursor = -1; }
+  });
+
   document.addEventListener('click', function (e) {
     if (!results.contains(e.target) && e.target !== box) results.hidden = true;
   });

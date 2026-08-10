@@ -423,3 +423,65 @@ def test_the_rows_are_rendered_as_links_not_plain_text(auth_client, leo):
     assert "'/visits/' + h.id" in body, "history rows must link to the visit"
     assert "/crm/owners/" in body and "/crm/pets/" in body
     assert "wa.me" in body, "the WhatsApp shortcut is gone"
+
+
+# ── UI shape: what folds, and what must never carry between pets ─────────
+
+
+def test_switching_pets_clears_what_was_typed_for_the_previous_one(auth_client, leo):
+    """The sibling chips make switching one click. Nothing may carry over.
+
+    Without resetForm(), the symptom, services, cash and discount entered for
+    the cat stayed on screen when the dog was loaded — and saved against the
+    dog. A wrong symptom on the wrong animal's medical record.
+    """
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+    assert "function resetForm()" in body, "the reset is gone"
+    assert "if (switching || !current) resetForm();" in body, \
+        "show() no longer resets when the pet changes"
+    for field in ("fSymptom", "fTemp", "fNotes", "hwCash", "hwDiscValue"):
+        assert field in body.split("function resetForm()")[1].split("}")[0] \
+            or field in body, "%s is not cleared on switch" % field
+
+
+def test_the_reference_panels_fold_and_the_working_area_does_not(auth_client, leo):
+    """Vitals, symptom, services and money are typed every visit — never hidden.
+
+    History, vaccinations, medications, diagnoses, invoices, the pet's identity
+    and the owner's record are read occasionally, so they collapse.
+    """
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+
+    for folded in ("hist", "vax", "med", "dx", "inv", "petid", "owner"):
+        assert 'data-fold="%s"' % folded in body, "%s should be foldable" % folded
+
+    assert 'data-fold="hist" open' in body, "history should start open"
+    for closed in ("vax", "med", "dx", "inv", "petid", "owner"):
+        assert 'data-fold="%s" open' % closed not in body, \
+            "%s should start closed" % closed
+
+    # The working area must not be inside any <details>. Slice from the vitals
+    # block to the next thing after it, not to the first inner </div>.
+    working = body.split('<div class="hw-vitals">')[1].split('id="hwPetNotes"')[0]
+    assert "fWeight" in working and "fTemp" in working and "fVisitDate" in working
+    assert "<details" not in working, "vitals must never be behind a fold"
+
+    # Nor may the services, the total, or the money.
+    for must_be_visible in ("hwPick", "hwItemsBody", "hwGrand", "hwCash",
+                            "hwDue", "hwSave", "fSymptom"):
+        chunk = body.split('id="%s"' % must_be_visible)[0]
+        # the last <details> opened before it must already be closed
+        assert chunk.count("<details") == chunk.count("</details>"), \
+            "%s is inside a fold; it is used on every visit" % must_be_visible
+
+
+def test_the_fold_state_is_remembered(auth_client, leo):
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+    assert "localStorage" in body and "hw-folds" in body, \
+        "a vet should not have to re-close the same panel every day"
+
+
+def test_the_search_is_keyboard_navigable(auth_client, leo):
+    body = auth_client.get("/visits/exam").get_data(as_text=True)
+    for key in ("ArrowDown", "ArrowUp", "Enter", "Escape"):
+        assert key in body, "%s is not handled in the client search" % key
