@@ -114,3 +114,33 @@ def test_healthz_reports_the_clinic_not_the_deployment(client, two_dirs, monkeyp
     body = client.get("/healthz").get_json()
     assert "backup" not in (body.get("degraded") or []), \
         "the probe still reports the deployment's stale archive"
+
+
+# ── unrelated to backups, but the same shape: reading the clock twice ────
+
+
+def test_boarding_checkout_reads_the_clock_once(monkeypatch):
+    """A checkout crossing midnight must not bill an extra night.
+
+    blueprints/boarding/routes.py stamped actual_checkout from one date.today()
+    and counted nights from another. Between the two calls the day can roll
+    over — which it did, in a long test run — leaving the booking dated
+    yesterday and billed against today: one extra night, at the exact hour
+    nobody is checking.
+    """
+    import ast
+    import inspect
+
+    from blueprints.boarding import routes as boarding
+
+    # Count real calls in the parsed function, not occurrences in the text —
+    # the comment explaining this very fix mentions date.today() twice.
+    tree = ast.parse(inspect.getsource(boarding.checkout))
+    calls = sum(
+        1 for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute) and n.func.attr == "today"
+    )
+    assert calls == 1, (
+        "checkout() calls date.today() %d times; it must read the clock once "
+        "and reuse it, or a midnight checkout bills an extra night" % calls)

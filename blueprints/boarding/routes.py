@@ -115,9 +115,10 @@ def bookings_list():
 @login_required
 def booking_new_form():
     conn = get_db()
-    owners = conn.execute(
-        "SELECT id, full_name, phone FROM owners ORDER BY full_name LIMIT 300"
-    ).fetchall()
+    # Owners are not rendered into the page — the dropdown searches the server
+    # (crm.owner_search_json). A capped list here made every client past the
+    # cap unselectable, with nothing on screen to say so.
+    owners = []
     rooms = conn.execute(
         """SELECT id, name AS room_number, room_type, price_per_night AS daily_rate
            FROM boarding_rooms WHERE is_active = 1 ORDER BY name"""
@@ -252,7 +253,13 @@ def checkin(booking_id):
 def checkout(booking_id):
     """Check out a pet, calculate the bill, and auto-create an invoice."""
     conn = get_db()
-    today = date.today().isoformat()
+    # ONE reading of the clock for the whole checkout. This used to call
+    # date.today() again when counting nights, so a checkout that crossed
+    # midnight between the two calls stamped actual_checkout with yesterday
+    # and billed against today — one extra night on the client's invoice, at
+    # the exact hour a clinic is least likely to be checking.
+    today_d = date.today()
+    today = today_d.isoformat()
 
     booking = conn.execute("""
         SELECT bb.id, bb.owner_id, bb.pet_id, bb.invoice_id,
@@ -268,7 +275,7 @@ def checkout(booking_id):
         # Calculate nights stayed
         try:
             checkin_dt = date.fromisoformat(str(booking["check_in"])[:10])
-            nights     = max((date.today() - checkin_dt).days, 1)
+            nights     = max((today_d - checkin_dt).days, 1)
         except Exception:
             nights = 1
 
