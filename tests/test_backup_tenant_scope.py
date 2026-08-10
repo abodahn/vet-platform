@@ -144,3 +144,64 @@ def test_boarding_checkout_reads_the_clock_once(monkeypatch):
     assert calls == 1, (
         "checkout() calls date.today() %d times; it must read the clock once "
         "and reuse it, or a midnight checkout bills an extra night" % calls)
+
+
+# ── the restore path is the one that destroys data ───────────────────────
+
+
+def test_every_backup_handler_is_tenant_scoped():
+    """Archive names are timestamps, so they COLLIDE across clinic directories.
+
+    Every clinic backs up at 02:00, so platform_backup_20260809_020000.dump
+    exists under several clinics. An unscoped restore resolves the name the
+    user clicked — from THIS clinic's list — against whatever directory the
+    module happens to point at, and writes that dump over this clinic's
+    database. Listing scoped but restoring unscoped is worse than neither.
+    """
+    import ast
+    import inspect
+
+    from blueprints.system import routes as sysroutes
+
+    HANDLERS = ["backup", "backup_run", "backup_verify", "backup_download",
+                "backup_upload", "backup_restore", "monitor"]
+    unscoped = []
+    for name in HANDLERS:
+        fn = getattr(sysroutes, name, None)
+        if fn is None:
+            continue
+        src = inspect.getsource(fn)
+        tree = ast.parse(src)
+        touches_backup = any(
+            isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
+            and n.value.id == "bk"
+            and n.attr in {"run_backup", "restore_backup", "verify_backup",
+                           "accept_upload", "list_backups", "get_latest_backup",
+                           "health", "check_and_notify", "resolve_archive"}
+            for n in ast.walk(tree))
+        if not touches_backup:
+            continue
+        scoped = "for_current_clinic" in src
+        if not scoped:
+            unscoped.append(name)
+    assert not unscoped, (
+        "these handlers touch backups without for_current_clinic(), so they "
+        "act on the deployment database instead of the clinic's: %s"
+        % ", ".join(unscoped))
+
+
+def test_archive_names_really_do_collide_between_clinics(tmp_path, monkeypatch):
+    """The premise of the finding above, made concrete."""
+    from datetime import datetime
+    root = tmp_path / "backups"
+    monkeypatch.setattr(bk, "_backup_dir", str(root))
+    when = datetime(2026, 8, 9, 2, 0, 0)
+    a = _archive(root, when)                  # the deployment's 02:00 backup
+    b = _archive(root / SLUG, when)           # a clinic's 02:00 backup
+    assert a.name == b.name, "names must collide for this to be dangerous"
+
+    # Unscoped, the clinic's filename resolves into the deployment directory.
+    assert bk.resolve_archive(a.name) == str(a.resolve())
+    with bk.for_clinic(SLUG, db_path="", pg_dsn=""):
+        assert bk.resolve_archive(a.name) == str(b.resolve()), \
+            "scoped, the same name must resolve to the CLINIC's archive"

@@ -193,7 +193,11 @@ def monitor():
 
     # Second place a stale backup gets noticed — the monitor page is opened far
     # more often than the backup page, and this is the whole point of T3.
-    backup_health = bk.check_and_notify()
+    # This clinic's backup, not the deployment's — the monitor page is opened
+    # far more often than the backup page, so it is where a stale backup is
+    # actually noticed, and it has to be reporting the right database.
+    with bk.for_current_clinic():
+        backup_health = bk.check_and_notify()
     latest_backup = backup_health.get("latest")
 
     return render_template(
@@ -414,6 +418,13 @@ def settings():
 def _archive_or_abort(filename):
     """Resolve a URL-supplied backup name, or refuse outright.
 
+    CALL THIS INSIDE `with bk.for_current_clinic():` — it resolves against the
+    module's current backup directory, so unscoped it looks in the deployment's
+    directory while the page listed the clinic's. Archive names are timestamps
+    (platform_backup_YYYYMMDD_HHMMSS.dump) and every clinic backs up at 02:00,
+    so the names collide across directories: an unscoped restore could open a
+    DIFFERENT clinic's dump of the same minute and write it over this one.
+
     Refusal is a 4xx, never a flash-and-redirect: a redirect reads as "wrong
     file" when the caller is a person and as "keep probing" when it is not.
     400 = the name could not have come from us (traversal, wrong extension);
@@ -466,7 +477,8 @@ def backup():
 @system_bp.route("/backup/run", methods=["POST"])
 @role_required("super_admin", "clinic_owner", "support_admin")
 def backup_run():
-    result = bk.run_backup()
+    with bk.for_current_clinic():
+        result = bk.run_backup()
     if result.get("success"):
         _audit_backup("manual_backup",
                       f"Manual backup: {result.get('filename')} ({result.get('size_kb')} KB)")
@@ -484,8 +496,9 @@ def backup_run():
 @role_required("super_admin", "clinic_owner", "support_admin")
 def backup_verify(filename):
     """Check a backup is readable — without restoring it."""
-    _archive_or_abort(filename)
-    result = bk.verify_backup(filename)
+    with bk.for_current_clinic():
+        _archive_or_abort(filename)
+        result = bk.verify_backup(filename)
     if result.get("success"):
         flash(f"{filename} is readable and complete.", "success")
     else:
@@ -497,7 +510,8 @@ def backup_verify(filename):
 @role_required("super_admin", "clinic_owner")
 def backup_download(filename):
     """Download a backup, e.g. onto a USB stick."""
-    path = _archive_or_abort(filename)
+    with bk.for_current_clinic():
+        path = _archive_or_abort(filename)
     _audit_backup("backup_download", f"Downloaded: {os.path.basename(path)}")
     return send_file(path, as_attachment=True,
                      download_name=os.path.basename(path))
@@ -511,7 +525,8 @@ def backup_upload():
     if not fileobj or not fileobj.filename:
         flash("Choose a backup file first.", "warning")
         return redirect(url_for("system.backup"))
-    result = bk.accept_upload(fileobj, fileobj.filename)
+    with bk.for_current_clinic():
+        result = bk.accept_upload(fileobj, fileobj.filename)
     if result["success"]:
         _audit_backup("backup_upload", f"Uploaded: {result['filename']}")
         flash(result["message"], "success")
@@ -528,12 +543,12 @@ def backup_restore(filename):
     Typing the filename is the confirmation: a modal a tired owner can click
     through at 22:00 is not one.
     """
-    _archive_or_abort(filename)
-    if (request.form.get("confirm_filename") or "").strip() != filename:
-        flash("Restore cancelled — the filename you typed did not match.", "warning")
-        return redirect(url_for("system.backup"))
-
-    result = bk.restore_backup(filename)
+    with bk.for_current_clinic():
+        _archive_or_abort(filename)
+        if (request.form.get("confirm_filename") or "").strip() != filename:
+            flash("Restore cancelled — the filename you typed did not match.", "warning")
+            return redirect(url_for("system.backup"))
+        result = bk.restore_backup(filename)
 
     if result.get("skipped"):
         flash(result["message"], "warning")
