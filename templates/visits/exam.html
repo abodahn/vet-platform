@@ -46,7 +46,7 @@
   </div>
 
   <!-- ── THE EXAM ─────────────────────────────────────────────────── -->
-  <form method="post" id="hwForm" action="" hidden>
+  <form method="post" id="hwForm" action="" enctype="multipart/form-data" hidden>
     <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="action" id="hwAction" value="save">
 
@@ -171,7 +171,8 @@
             <thead><tr>
               <th>{{ t('Item', 'الصنف') }}</th>
               <th class="hw-w">{{ t('Price', 'السعر') }}</th>
-              <th class="hw-w">{{ t('Qty', 'الكمية') }}</th>
+              <th class="hw-wq">{{ t('Qty', 'الكمية') }}</th>
+              <th class="hw-wq">{{ t('Disc %', 'خصم %') }}</th>
               <th class="hw-w">{{ t('Total', 'الإجمالي') }}</th>
               <th></th>
             </tr></thead>
@@ -234,6 +235,44 @@
           <a id="lnkNext"    class="pf-btn pf-btn-sm" href="#">{{ t('Next visit', 'زيارة قادمة') }}</a>
         </div>
       </section>
+    </div>
+
+    <!-- WRITTEN WITH THE VISIT, not in another module -->
+    <div class="hw-detail">
+
+      <details class="pf-card hw-pane hw-fold" data-fold="rx">
+        <summary class="hw-h">{{ t('Prescription', 'الروشتة') }}
+          <span class="hw-muted" id="hwRxCount"></span></summary>
+        <div class="hw-tablewrap">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('Medication', 'الدواء') }}</th>
+              <th class="hw-wq">{{ t('Dose', 'الجرعة') }}</th>
+              <th class="hw-wq">{{ t('Frequency', 'التكرار') }}</th>
+              <th class="hw-wq">{{ t('Duration', 'المدة') }}</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="hwRxBody"></tbody>
+          </table>
+        </div>
+        <button type="button" id="hwRxAdd" class="pf-btn pf-btn-sm hw-mt">
+          + {{ t('Add medication', 'أضف دواء') }}</button>
+        <datalist id="hwMedList">
+          {% for m in meds_list %}<option value="{{ m }}"></option>{% endfor %}
+        </datalist>
+      </details>
+
+      <details class="pf-card hw-pane hw-fold" data-fold="file">
+        <summary class="hw-h">{{ t('Attach a photo or file', 'إرفاق صورة أو ملف') }}
+          <span class="hw-muted" id="hwFileName"></span></summary>
+        <label class="hw-label hw-mt" for="hwFile">
+          {{ t('Wound photo, X-ray, lab sheet — saved with this visit',
+                'صورة جرح أو أشعة أو تحليل — تُحفظ مع هذه الزيارة') }}</label>
+        <input type="file" id="hwFile" name="attachment" class="hw-input"
+               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx">
+        <label class="hw-label hw-mt" for="hwFileCaption">{{ t('Caption', 'وصف') }}</label>
+        <input id="hwFileCaption" name="attachment_caption" class="hw-input">
+      </details>
     </div>
 
     <!-- DETAIL PANELS — all on the page, nothing behind a click -->
@@ -386,6 +425,7 @@
 .hw-table td{padding:.35rem .5rem;border-bottom:1px solid var(--pf-border,#eef1f5);
              vertical-align:middle}
 .hw-w{width:104px}
+.hw-wq{width:88px}
 .hw-scroll{max-height:260px;overflow-y:auto}
 
 /* Alerts: the things nobody should have to click to discover. */
@@ -563,6 +603,10 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     }
     row._price = box('item_price[]', money(price));
     row._qty   = box('item_qty[]', '1');
+    // Per line, because a clinic discounts ONE service far more often than the
+    // whole bill — the loyal client who gets the consultation free but pays
+    // full price for the medicine.
+    row._disc  = box('item_discount[]', '');
 
     var td = document.createElement('td');
     row._total = document.createElement('strong');
@@ -585,6 +629,11 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     Array.prototype.forEach.call(body.rows, function (row) {
       var line = num(row._price) * num(row._qty);
       if (!(line > 0)) line = 0;
+      // Same clamp the server applies: 0..100. A 150% line discount would pay
+      // the client to take the service.
+      var d = num(row._disc);
+      if (d < 0) d = 0; if (d > 100) d = 100;
+      line = line - line * d / 100;
       row._total.textContent = money(line);
       subtotal += line; count += num(row._qty);
     });
@@ -610,6 +659,7 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
   // was a service given away for nothing, silently. Now the typed text is
   // MATCHED, the candidates are shown with their prices, and a genuinely
   // unknown name lands with its price field focused so it cannot be missed.
+  var ME = {{ ((session.get('user') or {}).get('full_name', '')) | tojson }};
   var menu = $('hwSvcMenu'), svcCursor = -1, matches = [];
 
   function scoreMatch(q) {
@@ -683,6 +733,50 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
   });
   document.addEventListener('click', function (e) {
     if (!menu.contains(e.target) && e.target !== pick) closeMenu();
+  });
+
+  // ── prescription rows ─────────────────────────────────────────────
+  function rxRow(focus) {
+    var tr = document.createElement('tr');
+    function cell(name, list, wide) {
+      var td = document.createElement('td');
+      var i = document.createElement('input');
+      i.className = 'hw-input'; i.name = name;
+      if (list) i.setAttribute('list', list);
+      i.addEventListener('input', rxCount);
+      td.appendChild(i); tr.appendChild(td);
+      return i;
+    }
+    var med = cell('rx_name[]', 'hwMedList');
+    cell('rx_dosage[]');
+    cell('rx_frequency[]');
+    cell('rx_duration[]');
+
+    var tdx = document.createElement('td');
+    var x = document.createElement('button');
+    x.type = 'button'; x.className = 'pf-btn pf-btn-sm'; x.textContent = '×';
+    x.setAttribute('aria-label', 'Remove');
+    x.addEventListener('click', function () { tr.remove(); rxCount(); });
+    tdx.appendChild(x); tr.appendChild(tdx);
+
+    $('hwRxBody').appendChild(tr);
+    if (focus) med.focus();
+    rxCount();
+  }
+  function rxCount() {
+    var n = 0;
+    Array.prototype.forEach.call($('hwRxBody').rows, function (r) {
+      if ((r.cells[0].querySelector('input').value || '').trim()) n++;
+    });
+    $('hwRxCount').textContent = n ? '(' + n + ')' : '';
+  }
+  $('hwRxAdd').addEventListener('click', function () { rxRow(true); });
+
+  // Show the chosen filename in the summary, so a collapsed panel still says
+  // a file is attached.
+  $('hwFile').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    $('hwFileName').textContent = f ? '· ' + f.name : '';
   });
 
   // The same handful of services all day. One tap each.
@@ -842,6 +936,11 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     $('hwDiscType').value = 'value';
     $('hwVitalWarn').hidden = true;
     $('hwSvcMenu').hidden = true;
+    var rxb = $('hwRxBody');
+    while (rxb.rows.length) rxb.deleteRow(0);
+    rxCount();
+    $('hwFile').value = ''; $('hwFileName').textContent = '';
+    $('hwFileCaption').value = '';
     var cash = document.querySelector('input[name="payment_type"][value="Cash"]');
     if (cash) cash.checked = true;
     while (body.rows.length) body.deleteRow(0);
@@ -875,6 +974,10 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     $('fPrefDoc').value     = txt(o.preferred_doctor);
     $('fPrefContact').value = txt(o.preferred_contact);
     $('fVip').hidden        = !o.vip_flag;
+    // The client who always asks for Dr Sara should not have reception's
+    // name typed over hers on every visit.
+    if (o.preferred_doctor) $('fDoctor').value = o.preferred_doctor;
+    else $('fDoctor').value = ME;
 
     renderNotes('hwPetNotes', L.notes, p.notes);
     renderNotes('hwOwnerNotes', L.notes, o.notes);
@@ -1073,7 +1176,8 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
   function hasWork() {
     return !!($('fSymptom').value.trim() || $('fTemp').value.trim() ||
               $('fNotes').value.trim() || body.rows.length ||
-              $('hwCash').value.trim());
+              $('hwCash').value.trim() || ($('hwFile').files || []).length ||
+              $('hwRxBody').rows.length);
   }
   window.addEventListener('beforeunload', function (e) {
     if (saving || form.hidden || !hasWork()) return;

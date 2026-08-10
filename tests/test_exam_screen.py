@@ -541,3 +541,140 @@ def test_impossible_vitals_warn_but_never_block(auth_client, leo):
     conn.close()
     assert v["weight_kg"] == 0.4 and v["temp_c"] == 41.2, \
         "the warning must not have become a block"
+
+
+# ── written with the visit, not in another module ────────────────────────
+
+
+def test_a_per_line_discount_comes_off_that_line_only(auth_client, leo):
+    """A clinic discounts ONE service far more often than the whole bill —
+    the loyal client whose consultation is free but who pays for the medicine."""
+    _post(auth_client, leo["pet_id"],
+          **{"item_discount[]": ["100", "0", "0"], "cash_received": "0"})
+    inv = _invoice(leo["pet_id"])
+    conn = db.get_db()
+    lines = conn.execute(
+        "SELECT description, discount, total FROM invoice_lines"
+        " WHERE invoice_id=? ORDER BY id", (inv["id"],)).fetchall()
+    conn.close()
+    assert round(lines[0]["total"], 2) == 0.00, "the free line still charged"
+    assert round(lines[0]["discount"], 2) == 100.00
+    assert round(lines[1]["total"], 2) == 130.00, "the other lines moved"
+    assert round(lines[2]["total"], 2) == 180.00
+    assert round(inv["total"], 2) == 310.00
+
+
+def test_a_line_discount_over_100_cannot_pay_the_client(auth_client, leo):
+    _post(auth_client, leo["pet_id"],
+          **{"item_discount[]": ["500", "0", "0"], "cash_received": "0"})
+    inv = _invoice(leo["pet_id"])
+    conn = db.get_db()
+    first = conn.execute(
+        "SELECT total FROM invoice_lines WHERE invoice_id=? ORDER BY id LIMIT 1",
+        (inv["id"],)).fetchone()
+    conn.close()
+    assert first["total"] >= 0, "a line went negative: %r" % first["total"]
+    assert round(inv["total"], 2) == 310.00
+
+
+def test_a_prescription_is_written_with_the_visit(auth_client, leo):
+    _post(auth_client, leo["pet_id"], doctor_name="Dr. Sara Hassan",
+          **{"rx_name[]": ["Amoxicillin", "", "Meloxicam"],
+             "rx_dosage[]": ["50 mg", "", "0.1 mg/kg"],
+             "rx_frequency[]": ["twice daily", "", "once daily"],
+             "rx_duration[]": ["7 days", "", "3 days"],
+             "rx_instructions[]": ["with food", "", ""]})
+    conn = db.get_db()
+    visit = conn.execute("SELECT id FROM visits WHERE pet_id=? ORDER BY id DESC LIMIT 1",
+                         (leo["pet_id"],)).fetchone()
+    rx = conn.execute("SELECT * FROM prescriptions WHERE visit_id=?",
+                      (visit["id"],)).fetchone()
+    assert rx is not None, "no prescription was written"
+    assert rx["prescribed_by"] == "Dr. Sara Hassan", \
+        "the prescriber must be the vet named on the visit, not the logged-in user"
+    items = conn.execute(
+        "SELECT * FROM prescription_items WHERE prescription_id=? ORDER BY id",
+        (rx["id"],)).fetchall()
+    conn.close()
+    assert len(items) == 2, "the blank row should not become a medication"
+    assert items[0]["medication_name"] == "Amoxicillin"
+    assert items[0]["dosage"] == "50 mg"
+    assert items[0]["frequency"] == "twice daily"
+    assert items[1]["medication_name"] == "Meloxicam"
+
+
+def test_no_prescription_rows_writes_no_prescription(auth_client, leo):
+    _post(auth_client, leo["pet_id"])
+    conn = db.get_db()
+    visit = conn.execute("SELECT id FROM visits WHERE pet_id=? ORDER BY id DESC LIMIT 1",
+                         (leo["pet_id"],)).fetchone()
+    rx = conn.execute("SELECT id FROM prescriptions WHERE visit_id=?",
+                      (visit["id"],)).fetchone()
+    conn.close()
+    assert rx is None, "an empty prescription block should write nothing"
+
+
+def test_a_photo_is_attached_to_the_visit(auth_client, leo):
+    import io as _io
+    png = (b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)      # real magic bytes
+    form = {
+        "visit_date": "2026-08-08", "weight_kg": "4", "temp_c": "38.5",
+        "symptom": "wound on left flank",
+        "item_name[]": ["Examination"], "item_price[]": ["250"],
+        "item_qty[]": ["1"], "item_id[]": [""], "item_discount[]": [""],
+        "cash_received": "250", "payment_type": "Cash",
+        "discount_type": "value", "discount_value": "", "action": "save",
+        "attachment_caption": "left flank",
+        "_csrf_token": get_csrf(auth_client),
+        "attachment": (_io.BytesIO(png), "wound.png"),
+    }
+    resp = auth_client.post("/visits/exam/%d" % leo["pet_id"], data=form,
+                            content_type="multipart/form-data",
+                            follow_redirects=True)
+    assert resp.status_code == 200
+    conn = db.get_db()
+    visit = conn.execute("SELECT id FROM visits WHERE pet_id=? ORDER BY id DESC LIMIT 1",
+                         (leo["pet_id"],)).fetchone()
+    att = conn.execute(
+        "SELECT * FROM attachments WHERE entity_type='visit' AND entity_id=?",
+        (visit["id"],)).fetchone()
+    conn.close()
+    assert att is not None, "the photo did not reach the visit"
+    assert att["original_name"] == "wound.png"
+    assert att["caption"] == "left flank"
+    assert att["mime_type"] == "image/png"
+
+
+def test_a_disguised_file_is_refused_but_the_visit_still_saves(auth_client, leo):
+    """The uploads validator checks magic bytes. A .png that is not a PNG must
+    be refused — and refusing it must not lose the exam or the money."""
+    import io as _io
+    form = {
+        "visit_date": "2026-08-08", "symptom": "test",
+        "item_name[]": ["Examination"], "item_price[]": ["250"],
+        "item_qty[]": ["1"], "item_id[]": [""], "item_discount[]": [""],
+        "cash_received": "250", "payment_type": "Cash",
+        "discount_type": "value", "discount_value": "", "action": "save",
+        "_csrf_token": get_csrf(auth_client),
+        "attachment": (_io.BytesIO(b"<?php echo 1; ?>"), "evil.png"),
+    }
+    resp = auth_client.post("/visits/exam/%d" % leo["pet_id"], data=form,
+                            content_type="multipart/form-data",
+                            follow_redirects=True)
+    assert resp.status_code == 200
+    conn = db.get_db()
+    visit = conn.execute("SELECT id FROM visits WHERE pet_id=? ORDER BY id DESC LIMIT 1",
+                         (leo["pet_id"],)).fetchone()
+    att = conn.execute(
+        "SELECT id FROM attachments WHERE entity_type='visit' AND entity_id=?",
+        (visit["id"],)).fetchone()
+    conn.close()
+    assert att is None, "a disguised file was stored"
+    assert visit is not None, "the visit was lost because a file was rejected"
+    assert _invoice(leo["pet_id"]) is not None, "the money was lost too"
+
+
+def test_seen_by_follows_the_clients_preferred_doctor(auth_client, leo):
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+    assert "if (o.preferred_doctor) $('fDoctor').value = o.preferred_doctor;" in body, \
+        "the client who always asks for Dr Sara gets reception's name instead"

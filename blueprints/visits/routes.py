@@ -1,9 +1,13 @@
+import logging
+
 from flask import render_template, request, redirect, url_for, flash, session
 from . import visits_bp
 from blueprints.auth.routes import login_required
 from models.database import get_db
 import models.database as db
 from datetime import date
+
+logger = logging.getLogger(__name__)
 
 
 @visits_bp.route("/")
@@ -674,6 +678,16 @@ def _services(conn):
         " WHERE is_active=1 ORDER BY sort_order, name").fetchall()]
 
 
+def _medications(conn):
+    """What a vet can prescribe. Missing table is not fatal to the screen."""
+    try:
+        return [r[0] for r in conn.execute(
+            "SELECT name FROM items WHERE is_medication=1 AND is_active=1"
+            " ORDER BY name LIMIT 400").fetchall()]
+    except Exception:
+        return []
+
+
 @visits_bp.route("/exam")
 @login_required
 def exam_pick():
@@ -689,11 +703,13 @@ def exam_pick():
     conn = get_db()
     services = _services(conn)
     doctors = prescribers(conn)
+    meds_list = _medications(conn)
     conn.close()
     return render_template("visits/exam.html", active="visits",
                            today=date.today().isoformat(),
                            pet={}, owner={}, history=[], services=services,
-                           doctors=doctors, vaccines=[], meds=[], chronic=[],
+                           doctors=doctors, meds_list=meds_list,
+                           vaccines=[], meds=[], chronic=[],
                            invoices=[], siblings=[], upcoming=[], outstanding=0.0)
 
 
@@ -819,10 +835,11 @@ def exam_form(pet_id):
         return redirect(url_for("visits.exam_pick"))
     conn2 = get_db()
     doctors = prescribers(conn2)
+    meds_list = _medications(conn2)
     conn2.close()
     return render_template("visits/exam.html", active="visits",
                            today=date.today().isoformat(),
-                           doctors=doctors, **ctx)
+                           doctors=doctors, meds_list=meds_list, **ctx)
 
 
 # ── the one page: search, pick and load without ever navigating ──────
@@ -920,13 +937,62 @@ def exam_submit(pet_id):
         conn.execute("UPDATE pets SET weight_kg=?, updated_at=datetime('now')"
                      " WHERE id=?", (weight, pet_id))
         conn.commit()
+
+    # ── the prescription ─────────────────────────────────────────────
+    # Billing a medication and writing its dosage used to be two different
+    # screens, so either the vet opened another module or the owner went home
+    # with a box and no instructions. prescribed_by is the doctor NAMED on
+    # this visit, not whoever is logged in — reception books for the vet.
+    rx_rows = []
+    for i, med in enumerate(f.getlist("rx_name[]")):
+        med = (med or "").strip()
+        if not med:
+            continue
+
+        def _at(key, idx=i):
+            vals = f.getlist(key)
+            return (vals[idx] or "").strip() if idx < len(vals) else ""
+
+        rx_rows.append((med, _at("rx_dosage[]"), _at("rx_frequency[]"),
+                        _at("rx_duration[]"), _at("rx_instructions[]")))
+    if rx_rows:
+        try:
+            cur = conn.execute(
+                "INSERT INTO prescriptions(visit_id, pet_id, owner_id,"
+                " prescribed_by, status, notes) VALUES(?,?,?,?,?,?)",
+                (visit_id, pet_id, owner_id, doctor, "Active", ""))
+            rx_id = cur.lastrowid
+            for med, dose, freq, dur, instr in rx_rows:
+                conn.execute(
+                    "INSERT INTO prescription_items(prescription_id,"
+                    " medication_name, dosage, frequency, duration, instructions)"
+                    " VALUES(?,?,?,?,?,?)",
+                    (rx_id, med, dose, freq, dur, instr))
+            conn.commit()
+        except Exception:
+            # A prescription that fails to write must not lose the visit that
+            # is already saved, nor the money about to be taken.
+            logger.exception("prescription not saved for visit %s", visit_id)
     conn.close()
+
+    # ── the attachment ───────────────────────────────────────────────
+    # Through the uploads blueprint's own validator, so the magic-byte check
+    # and the extension whitelist are the ones that already exist.
+    up = request.files.get("attachment")
+    if up and up.filename:
+        from blueprints.uploads.routes import save_attachment
+        res = save_attachment(up, "visit", visit_id, category="visit",
+                              caption=(f.get("attachment_caption") or "").strip(),
+                              username=user.get("username", ""))
+        if not res.get("ok"):
+            flash("Photo not attached: %s." % res.get("error", "unknown"), "warning")
 
     # ── the bill ─────────────────────────────────────────────────────
     names  = f.getlist("item_name[]")
     prices = f.getlist("item_price[]")
     qtys   = f.getlist("item_qty[]")
     ids    = f.getlist("item_id[]")
+    discs  = f.getlist("item_discount[]")
     lines = []
     for i, name in enumerate(names):
         name = (name or "").strip()
@@ -948,10 +1014,19 @@ def exam_submit(pet_id):
             item_id = int(ids[i]) if i < len(ids) and ids[i] else None
         except ValueError:
             item_id = None
+        # A per-line discount is a PERCENTAGE, matching invoice_lines.discount
+        # and what finance/invoice_new already writes. Clamped to 0..100: a
+        # 150% line discount would pay the client to take the service.
+        try:
+            disc = float((discs[i] or "0").replace(",", "")) if i < len(discs) else 0.0
+        except ValueError:
+            disc = 0.0
+        disc = max(0.0, min(disc, 100.0))
+        gross = qty * price
         lines.append({"line_type": "service", "item_id": item_id,
                       "description": name, "quantity": qty,
-                      "unit_price": price, "discount": 0.0,
-                      "total": round(qty * price, 2)})
+                      "unit_price": price, "discount": disc,
+                      "total": round(gross - gross * disc / 100.0, 2)})
 
     if not lines:
         flash("Visit saved. No services were billed.", "success")

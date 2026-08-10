@@ -26,6 +26,17 @@ ALLOWED_EXTENSIONS = {
 # Allowed entity_type values — validated against this whitelist to prevent path traversal
 ALLOWED_ENTITY_TYPES = frozenset(["pet", "visit", "staff", "supplier", "invoice", "lab"])
 
+# ext -> the MIME its magic bytes must agree with. Module scope so both the
+# route and save_attachment() check against the same table.
+_EXT_MIME_MAP = {
+    "jpg": "image/jpeg", "jpeg": "image/jpeg",
+    "png": "image/png", "gif": "image/gif", "webp": "image/webp",
+    "pdf": "application/pdf",
+    # Office docs are zip-based (PK header)
+    "docx": "application/zip", "xlsx": "application/zip",
+    "doc": None, "xls": None,  # legacy binary — no reliable magic-byte check
+}
+
 # Magic-byte signatures for MIME validation (no python-magic required)
 _MAGIC = {
     b"\xff\xd8\xff":       "image/jpeg",
@@ -76,65 +87,40 @@ def _can_access(entity_type: str) -> bool:
     return role in allowed or role == "super_admin"
 
 
-@uploads_bp.route("/upload", methods=["POST"])
-@login_required
-def upload():
-    entity_type = request.form.get("entity_type", "")
-    entity_id   = request.form.get("entity_id", "")
-    category    = request.form.get("category", "general")
-    caption     = request.form.get("caption", "")
+# ── the one place a file is validated and stored ─────────────────────────
+# Extracted so callers OUTSIDE this blueprint (the exam screen attaches a photo
+# as part of saving a visit) go through the same magic-byte check, the same
+# extension whitelist and the same UUID naming. A second copy of a security
+# control is a second copy to forget to fix.
 
-    # Validate entity_type against whitelist — prevents path traversal
+def save_attachment(f, entity_type, entity_id, category="general", caption="",
+                    username=""):
+    """Validate and store one uploaded file. Returns {'ok':bool,'error':str,'id':int}."""
     if entity_type not in ALLOWED_ENTITY_TYPES:
-        logger.warning(
-            f"Upload blocked: invalid entity_type={entity_type!r} "
-            f"from user={session.get('user',{}).get('username')}"
-        )
-        return jsonify({"error": "Invalid entity type"}), 400
-
-    if not _can_access(entity_type):
-        return jsonify({"error": "Access denied"}), 403
-
-    if "file" not in request.files:
-        flash("No file selected.", "error")
-        return redirect(request.referrer or "/")
-
-    f = request.files["file"]
-    if not f.filename:
-        flash("No file selected.", "error")
-        return redirect(request.referrer or "/")
-
+        return {"ok": False, "error": "Invalid entity type"}
+    if not f or not getattr(f, "filename", ""):
+        return {"ok": False, "error": "No file selected"}
     if not _allowed_file(f.filename):
-        flash("File type not allowed.", "error")
-        return redirect(request.referrer or "/")
+        return {"ok": False, "error": "File type not allowed"}
 
-    # Validate file header bytes — do not trust browser-provided content_type
     detected_mime = _validate_mime_from_bytes(f.stream)
     ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
-    # Map ext → acceptable MIME families
-    _EXT_MIME_MAP = {
-        "jpg": "image/jpeg", "jpeg": "image/jpeg",
-        "png": "image/png", "gif": "image/gif", "webp": "image/webp",
-        "pdf": "application/pdf",
-        # Office docs are zip-based (PK header)
-        "docx": "application/zip", "xlsx": "application/zip",
-        "doc": None, "xls": None,  # legacy binary — no reliable magic-byte check
-    }
     expected_mime = _EXT_MIME_MAP.get(ext)
-    if expected_mime and detected_mime and detected_mime != expected_mime:
-        logger.warning(
-            f"Upload MIME mismatch: ext={ext}, detected={detected_mime}, "
-            f"user={session.get('user',{}).get('username')}"
-        )
-        flash("File content does not match its extension. Upload rejected.", "error")
-        return redirect(request.referrer or "/")
+    # The content must MATCH what the extension claims — not merely fail to
+    # contradict it. _validate_mime_from_bytes returns None for anything it
+    # does not recognise, and the old guard required a truthy detected_mime
+    # before comparing, so every unrecognised file passed: a .png containing
+    # "<?php ... ?>" was accepted and stored. Only doc/xls map to None here,
+    # because legacy binary Office files have no reliable magic bytes.
+    if expected_mime and detected_mime != expected_mime:
+        logger.warning("Upload rejected: ext=%s expected=%s detected=%s user=%s",
+                       ext, expected_mime, detected_mime, username)
+        return {"ok": False,
+                "error": "File content does not match its extension"}
 
-    # Generate a safe UUID-based stored filename — no path separators possible
-    stored_name = f"{uuid.uuid4().hex}.{ext}"
-    # Paranoia check: stored_name must not contain directory separators
+    stored_name = "%s.%s" % (uuid.uuid4().hex, ext)
     if os.sep in stored_name or "/" in stored_name or "\\" in stored_name:
-        logger.error(f"Stored filename contained path separator: {stored_name!r}")
-        return jsonify({"error": "Invalid filename generated"}), 500
+        return {"ok": False, "error": "Invalid filename generated"}
 
     folder = os.path.join(_upload_path(), entity_type)
     os.makedirs(folder, exist_ok=True)
@@ -142,14 +128,8 @@ def upload():
     f.save(filepath)
     size = os.path.getsize(filepath)
 
-    # Determine MIME for DB record — prefer detected, fall back to guess
-    final_mime = (
-        detected_mime
-        or mimetypes.guess_type(f.filename)[0]
-        or "application/octet-stream"
-    )
-
-    # Record in DB — use cur.lastrowid for PostgreSQL compatibility (not last_insert_rowid())
+    final_mime = (detected_mime or mimetypes.guess_type(f.filename)[0]
+                  or "application/octet-stream")
     conn = get_db()
     try:
         with conn:
@@ -157,19 +137,38 @@ def upload():
                 """INSERT INTO attachments(entity_type,entity_id,filename,original_name,
                    mime_type,size_bytes,category,caption,uploaded_by)
                    VALUES(?,?,?,?,?,?,?,?,?)""",
-                (entity_type, entity_id, stored_name,
-                 secure_filename(f.filename),
-                 final_mime,
-                 size, category, caption, session["user"]["username"]))
+                (entity_type, entity_id, stored_name, secure_filename(f.filename),
+                 final_mime, size, category, caption, username))
             att_id = cur.lastrowid
     finally:
         conn.close()
 
-    log_audit(username=session["user"]["username"], role=session["user"]["role"],
-              action="file_upload", module="uploads",
+    log_audit(username=username, role="", action="file_upload", module="uploads",
               entity_type=entity_type, entity_id=str(att_id),
-              details=f"Uploaded {f.filename} for {entity_type}:{entity_id}")
+              details="Uploaded %s for %s:%s" % (f.filename, entity_type, entity_id))
+    return {"ok": True, "error": "", "id": att_id}
 
+
+@uploads_bp.route("/upload", methods=["POST"])
+@login_required
+def upload():
+    entity_type = request.form.get("entity_type", "")
+    entity_id   = request.form.get("entity_id", "")
+
+    if entity_type not in ALLOWED_ENTITY_TYPES:
+        logger.warning("Upload blocked: invalid entity_type=%r from user=%s",
+                       entity_type, session.get("user", {}).get("username"))
+        return jsonify({"error": "Invalid entity type"}), 400
+    if not _can_access(entity_type):
+        return jsonify({"error": "Access denied"}), 403
+
+    result = save_attachment(
+        request.files.get("file"), entity_type, entity_id,
+        category=request.form.get("category", "general"),
+        caption=request.form.get("caption", ""),
+        username=session["user"]["username"])
+    if not result["ok"]:
+        flash(result["error"] + ".", "error")
     return redirect(request.referrer or "/")
 
 
