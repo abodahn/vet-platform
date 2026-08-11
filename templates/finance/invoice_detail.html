@@ -208,6 +208,7 @@
         </p>
         <form method="post" action="{{ url_for('finance.invoice_apply_credit', inv_id=invoice.id) }}">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="idem" value="{{ credit_nonce }}">
           <div class="form-group">
             <label class="form-label">{{ t('Apply amount', 'المبلغ المستخدم') }}</label>
             <input type="number" name="amount" class="form-control" step="0.01" min="0.01"
@@ -233,6 +234,7 @@
       <div class="side-card-body">
         <form method="post" action="{{ url_for('finance.invoice_pay', inv_id=invoice.id) }}">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="idem" value="{{ pay_nonce }}">
           <div class="form-group">
             <label class="form-label">{{ t('Amount (EGP)', 'المبلغ (جنيه)') }} *</label>
             <input type="number" name="amount" class="form-control" step="0.01" min="0.01"

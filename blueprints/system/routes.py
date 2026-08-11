@@ -750,7 +750,15 @@ def sync_resolve_conflict(conflict_id):
             entity_id=conflict_id,
             details=f"Resolved sync conflict — kept: {keep}",
         )
-        flash(f"Conflict resolved. Kept: {keep} version.", "success")
+        # Not "Kept: local version." — nothing pushes the device's copy back
+        # over the server record, and saying otherwise is how a clinic loses
+        # data believing it was saved. Say what actually happened.
+        if str(keep).strip().lower() == "local":
+            flash("Conflict closed, marked KEPT LOCAL. The server record is "
+                  "unchanged; the device's version is stored on the conflict "
+                  "for you to copy across by hand.", "warning")
+        else:
+            flash("Conflict resolved — the server version is kept.", "success")
     except Exception as e:
         flash(f"Error resolving conflict: {e}", "danger")
     return redirect(url_for("system.sync_dashboard"))
@@ -856,6 +864,24 @@ def role_edit(role_id):
     if not display_name:
         flash("Display name is required.", "danger")
         return redirect(url_for("system.roles_list"))
+    # A role with NO permissions cannot be saved.
+    #
+    # '[]' is stored by roles that were never configured, and the permission
+    # loader treats it as "no data — fall back to the built-in role", because
+    # every role shipped that way and treating it as "deny all" would lock a
+    # live clinic out on the first restart after an upgrade.
+    #
+    # The consequence was that unticking every box WIDENED the role: a nurse
+    # emptied of permissions fell back to the built-in list and gained Finance,
+    # Accounting and Inventory, while the screen said "Role updated
+    # successfully". Refusing to save the empty case is what removes the
+    # ambiguity — the loader can keep its safe fallback, and nobody can create
+    # the state that made it wrong.
+    if not [p for p in permissions if (p or "").strip()]:
+        flash("A role must grant at least one module. To stop this role being "
+              "used at all, move its staff to another role and delete it.",
+              "danger")
+        return redirect(url_for("system.roles_list"))
     try:
         # WORKED EXAMPLE of field-level auditing (models/audit.py).
         #
@@ -898,6 +924,23 @@ def role_assign():
     role    = request.form.get("role", "").strip()
     if not user_id or not role:
         flash("User and role are required.", "danger")
+        return redirect(url_for("system.roles_list"))
+    # The role has to EXIST. A hardcoded dropdown offered "staff", which is not
+    # a role anywhere in this system — assigning it left the user on a name
+    # that resolved to nothing. That used to fall open to every module; it now
+    # denies, which locks the person out instead. Neither is what the
+    # administrator meant, so refuse at the point of assignment.
+    known = set(db.DEFAULT_ROLE_PERMISSIONS)
+    conn = db.get_db()
+    try:
+        known.update(r[0] for r in conn.execute("SELECT name FROM roles").fetchall())
+    except Exception:
+        pass
+    finally:
+        conn.close()
+    if role not in known:
+        flash("There is no role called %r. Pick one that exists, or create it "
+              "first." % role, "danger")
         return redirect(url_for("system.roles_list"))
     try:
         db.assign_user_role(user_id, role)

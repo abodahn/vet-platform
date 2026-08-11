@@ -6,6 +6,7 @@ from flask import (
     render_template, request, redirect, url_for,
     session, flash, abort, send_file,
 )
+import uuid
 from datetime import date, timedelta
 from . import finance_bp
 import logging
@@ -16,6 +17,42 @@ from models import money, payments
 logger = logging.getLogger(__name__)
 from blueprints.auth.routes import login_required, role_required
 from models.excel_export import make_workbook
+
+
+def _idem(nonce, what, inv_id):
+    """Idempotency key from the form's nonce, scoped to this invoice.
+
+    A missing nonce (an old cached page, a script) falls back to a fresh UUID,
+    which is the previous behaviour: no dedup, but never a WRONG dedup across
+    two different invoices.
+    """
+    n = (nonce or "").strip()[:64]
+    if not n:
+        return "%s-%s-%s" % (what, inv_id, uuid.uuid4().hex)
+    return "%s-%s-%s" % (what, inv_id, n)
+
+
+def _num(raw, default=0.0):
+    """A money or quantity box a tired person typed into. Never raises.
+
+    Every one of these used to be a bare float(), so clearing a Qty box — or
+    typing "1,200" with the thousands separator an Egyptian keyboard puts
+    there — returned a 500 and threw away the whole invoice the user had just
+    entered. Twelve call sites across New Invoice, Edit Invoice and New
+    Estimate, all with the same shape.
+    """
+    if raw is None:
+        return default
+    s = str(raw).strip().replace(",", "")
+    # Arabic-Indic digits: a clinic in Cairo types ٥٠٠ and meant 500.
+    s = s.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789"))
+    if not s:
+        return default
+    try:
+        v = float(s)
+    except ValueError:
+        return default
+    return v if v == v and v not in (float("inf"), float("-inf")) else default
 
 # ─────────────────────────────────────────────
 # LOYALTY POINTS HELPER
@@ -90,8 +127,12 @@ def dashboard():
         "finance/dashboard.html",
         active="finance",
         page_title="Finance Dashboard",
-        today_revenue=today_summary["revenue"],
-        month_revenue=month_summary["revenue"],
+        # "Today's Revenue" is a till question, so it is money that ARRIVED
+        # today — including on invoices raised last week. It used to be the
+        # accrual figure, so a day on which the clinic took 120 EGP against an
+        # older invoice displayed 0 and nothing reconciled.
+        today_revenue=today_summary["collected"],
+        month_revenue=month_summary["collected"],
         outstanding=outstanding,
         paid_count_today=paid_count_today,
         recent_invoices=recent_invoices,
@@ -166,9 +207,9 @@ def invoices_list():
 @login_required
 def invoice_new():
     conn = db.get_db()
-    owners = [dict(r) for r in conn.execute(
-        "SELECT id, full_name, phone FROM owners ORDER BY full_name LIMIT 500"
-    ).fetchall()]
+    # The owner box searches the server (crm.owner_search_json). It used to
+    # render the first 500 owners, so client 501 could not be invoiced at all.
+    owners = []
     pets = [dict(r) for r in conn.execute(
         "SELECT id, owner_id, pet_name, species FROM pets WHERE is_active=1 ORDER BY pet_name"
     ).fetchall()]
@@ -198,9 +239,15 @@ def invoice_new():
         for i, desc in enumerate(descriptions):
             if not desc.strip():
                 continue
-            qty  = float(qtys[i] if i < len(qtys) else 1) or 1
-            up   = float(unit_prices[i] if i < len(unit_prices) else 0) or 0
-            disc = float(discounts[i] if i < len(discounts) else 0) or 0
+            qty  = _num(qtys[i] if i < len(qtys) else 1, 1.0)
+            up   = _num(unit_prices[i] if i < len(unit_prices) else 0, 0.0)
+            disc = _num(discounts[i] if i < len(discounts) else 0, 0.0)
+            # A quantity of 0 is a typo, not a free item, and billing it as 1
+            # charged for a line the screen showed as 0.00. A negative price or
+            # a discount over 100% would pay the client to take the service.
+            if qty <= 0 or up < 0:
+                continue
+            disc = max(0.0, min(disc, 100.0))
             disc_amt = up * qty * disc / 100
             total = round(qty * up - disc_amt, 2)
             ltype = line_types[i] if i < len(line_types) else "service"
@@ -232,8 +279,8 @@ def invoice_new():
             "issue_date":     f.get("issue_date") or date.today().isoformat(),
             "due_date":       f.get("due_date", "").strip() or None,
             "discount_type":  f.get("discount_type", "value"),
-            "discount_value": float(f.get("discount_value") or 0),
-            "tax_rate":       float(f.get("tax_rate") or 0),
+            "discount_value": _num(f.get("discount_value")),
+            "tax_rate":       _num(f.get("tax_rate")),
             "notes":          f.get("notes", "").strip(),
             "created_by":     session["user"].get("full_name", ""),
         }
@@ -303,6 +350,14 @@ def invoice_detail(inv_id):
         # Offer held credit here, where the money is actually being settled --
         # a balance nobody is shown at the till may as well not exist.
         credit_balance=db.owner_credit_balance(invoice["owner_id"]),
+        # One nonce per rendered form. A double-clicked Record Payment posts
+        # the SAME nonce, so models/payments returns the existing intent
+        # instead of taking the money twice — the idempotency this codebase
+        # already implements and never supplied a key for. A second, genuine
+        # payment arrives from a fresh page with a fresh nonce, so it is not
+        # blocked.
+        pay_nonce=uuid.uuid4().hex,
+        credit_nonce=uuid.uuid4().hex,
     )
 
 
@@ -340,6 +395,10 @@ def invoice_pay(inv_id):
             method=method,
             reference=reference,
             received_by=session["user"].get("full_name", ""),
+            # Supplied at last. Without it every click minted a fresh
+            # auto-<uuid> key, so a double-clicked button was two payments and
+            # the client was charged twice.
+            idempotency_key=_idem(request.form.get("idem"), "pay", inv_id),
         )
         # Award loyalty points (1 point per 10 EGP)
         try:
@@ -375,13 +434,19 @@ def invoice_edit(inv_id):
     invoice = db.get_invoice(inv_id)
     if not invoice:
         abort(404)
-    if invoice["status"] == "Paid":
-        flash("Paid invoices cannot be edited. Issue a credit note instead.", "warning")
+    # 'Cancelled' used to fall straight through this check, so a voided invoice
+    # could be edited back to life at any amount while its credit note stayed
+    # on the books — the void and the invoice both counted.
+    if invoice["status"] in ("Paid", "Cancelled"):
+        flash("%s invoices cannot be edited. Issue a credit note instead."
+              % invoice["status"], "warning")
         return redirect(url_for("finance.invoice_detail", inv_id=inv_id))
 
     conn = db.get_db()
+    # Only the invoice's own owner is rendered, so the edit form keeps its
+    # selection; anyone else is found by typing (crm.owner_search_json).
     owners = [dict(r) for r in conn.execute(
-        "SELECT id, full_name, phone FROM owners ORDER BY full_name LIMIT 500"
+        "SELECT id, full_name, phone FROM owners WHERE id=?", (invoice["owner_id"],)
     ).fetchall()]
     pets = [dict(r) for r in conn.execute(
         "SELECT id, owner_id, pet_name FROM pets WHERE is_active=1 ORDER BY pet_name"
@@ -399,9 +464,15 @@ def invoice_edit(inv_id):
         for i, desc in enumerate(descriptions):
             if not desc.strip():
                 continue
-            qty  = float(qtys[i] if i < len(qtys) else 1) or 1
-            up   = float(unit_prices[i] if i < len(unit_prices) else 0) or 0
-            disc = float(discounts[i] if i < len(discounts) else 0) or 0
+            qty  = _num(qtys[i] if i < len(qtys) else 1, 1.0)
+            up   = _num(unit_prices[i] if i < len(unit_prices) else 0, 0.0)
+            disc = _num(discounts[i] if i < len(discounts) else 0, 0.0)
+            # A quantity of 0 is a typo, not a free item, and billing it as 1
+            # charged for a line the screen showed as 0.00. A negative price or
+            # a discount over 100% would pay the client to take the service.
+            if qty <= 0 or up < 0:
+                continue
+            disc = max(0.0, min(disc, 100.0))
             disc_amt = up * qty * disc / 100
             total = round(qty * up - disc_amt, 2)
             ltype = line_types[i] if i < len(line_types) else "service"
@@ -416,14 +487,25 @@ def invoice_edit(inv_id):
             conn.close()
             return redirect(url_for("finance.invoice_edit", inv_id=inv_id))
 
-        discount_value = float(f.get("discount_value") or 0)
-        tax_rate       = float(f.get("tax_rate") or 0)
+        discount_value = _num(f.get("discount_value"))
+        tax_rate       = _num(f.get("tax_rate"))
         subtotal       = sum(l["total"] for l in lines)
         discount_type  = f.get("discount_type", "value")
         discount_amt   = discount_value if discount_type == "value" else round(subtotal * discount_value / 100, 2)
         tax_amount     = round((subtotal - discount_amt) * tax_rate / 100, 2)
         total          = round(subtotal - discount_amt + tax_amount, 2)
         paid_amount    = float(invoice.get("paid_amount") or 0)
+        # Editing an invoice BELOW what the client has already handed over is a
+        # refund, not an edit. It used to store a negative due_amount and mark
+        # the invoice "Paid", so the money owed back to the client existed
+        # nowhere on the screen and nowhere in the totals.
+        if round(total, 2) < round(paid_amount, 2):
+            flash("This invoice already has %.2f paid against it. Lowering it to "
+                  "%.2f would owe the client %.2f — issue a credit note or a "
+                  "refund instead."
+                  % (paid_amount, total, paid_amount - total), "danger")
+            conn.close()
+            return redirect(url_for("finance.invoice_edit", inv_id=inv_id))
         due_amount     = round(total - paid_amount, 2)
         status         = "Paid" if due_amount <= 0 else ("Partial" if paid_amount > 0 else "Unpaid")
 
@@ -484,11 +566,28 @@ def invoice_credit_note(inv_id):
     if not invoice:
         abort(404)
     reason = request.form.get("reason", "Credit note").strip() or "Credit note"
-    amount, _err = money.form_amount(
+    amount, err = money.form_amount(
         request.form.get("amount") or invoice.get("paid_amount")
         or invoice.get("total") or 0, "amount")
+    # The parse error used to be discarded, so "12,34x" became 0 and the user
+    # was told the amount must be positive — the wrong reason for the failure.
+    if err:
+        flash(err, "danger")
+        return redirect(url_for("finance.invoice_detail", inv_id=inv_id))
     if amount <= 0:
         flash("Credit note amount must be greater than zero.", "danger")
+        return redirect(url_for("finance.invoice_detail", inv_id=inv_id))
+
+    inv_total = float(invoice.get("total") or 0)
+    if invoice.get("status") == "Cancelled":
+        flash("This invoice is already cancelled. It cannot be credited again.",
+              "warning")
+        return redirect(url_for("finance.invoice_detail", inv_id=inv_id))
+    # A credit note may not exceed what was invoiced. Unbounded, a second click
+    # or a mistyped figure credited more than the clinic ever charged.
+    if amount > inv_total:
+        flash("A credit note cannot exceed the invoice total of %.2f." % inv_total,
+              "danger")
         return redirect(url_for("finance.invoice_detail", inv_id=inv_id))
     try:
         conn = db.get_db()
@@ -515,10 +614,30 @@ def invoice_credit_note(inv_id):
             "total":       -abs(amount),
         }]
         credit_id = db.create_invoice(credit_data, credit_lines)
-        # Mark original as Cancelled if full credit
-        if abs(amount) >= (invoice.get("total") or 0):
-            conn.execute("UPDATE invoices SET status='Cancelled' WHERE id=?", (inv_id,))
-            conn.commit()
+
+        # A credit note is not a receivable. create_invoice() sets
+        # due_amount = total, which here is NEGATIVE, and Outstanding sums
+        # due_amount over Unpaid/Partial — so the credit note pulled its own
+        # value out of Outstanding, and cancelling the original pulled the same
+        # value out again. One 12,345.67 void moved Outstanding by 24,692.
+        # Settling the note at zero leaves exactly one movement.
+        conn.execute(
+            "UPDATE invoices SET due_amount=0, paid_amount=0, status='Paid'"
+            " WHERE id=?", (credit_id,))
+
+        if abs(amount) >= inv_total:
+            conn.execute("UPDATE invoices SET status='Cancelled', due_amount=0"
+                         " WHERE id=?", (inv_id,))
+        else:
+            # A PARTIAL credit used to do nothing at all to the original, so
+            # the client was still chased for the full amount.
+            paid = float(invoice.get("paid_amount") or 0)
+            new_due = round(max(0.0, inv_total - amount - paid), 2)
+            new_status = ("Paid" if new_due <= 0
+                          else ("Partial" if paid > 0 else "Unpaid"))
+            conn.execute("UPDATE invoices SET due_amount=?, status=? WHERE id=?",
+                         (new_due, new_status, inv_id))
+        conn.commit()
         conn.close()
         db.log_audit(
             username=session["user"]["username"],
@@ -858,8 +977,8 @@ def reports_export_xlsx():
 
 def _estimate_form_ctx(page_title="New Estimate"):
     conn = db.get_db()
-    owners = [dict(r) for r in conn.execute(
-        "SELECT id, full_name, phone FROM owners ORDER BY full_name LIMIT 500").fetchall()]
+    # Owner box searches the server (crm.owner_search_json), no rendered slice.
+    owners = []
     pets = [dict(r) for r in conn.execute(
         "SELECT id, owner_id, pet_name, species FROM pets WHERE is_active=1 "
         "ORDER BY pet_name").fetchall()]
@@ -904,9 +1023,12 @@ def estimate_new():
     for i, desc in enumerate(descriptions):
         if not desc.strip():
             continue
-        qty  = float(qtys[i] if i < len(qtys) else 1) or 1
-        up   = float(unit_prices[i] if i < len(unit_prices) else 0) or 0
-        disc = float(discounts[i] if i < len(discounts) else 0) or 0
+        qty  = _num(qtys[i] if i < len(qtys) else 1, 1.0)
+        up   = _num(unit_prices[i] if i < len(unit_prices) else 0, 0.0)
+        disc = _num(discounts[i] if i < len(discounts) else 0, 0.0)
+        if qty <= 0 or up < 0:
+            continue
+        disc = max(0.0, min(disc, 100.0))
         lines.append({
             "line_type":   line_types[i] if i < len(line_types) else "service",
             "description": desc.strip(),
@@ -929,8 +1051,8 @@ def estimate_new():
             "issue_date":     f.get("issue_date") or date.today().isoformat(),
             "valid_until":    f.get("valid_until", "").strip() or None,
             "discount_type":  f.get("discount_type", "value"),
-            "discount_value": float(f.get("discount_value") or 0),
-            "tax_rate":       float(f.get("tax_rate") or 0),
+            "discount_value": _num(f.get("discount_value")),
+            "tax_rate":       _num(f.get("tax_rate")),
             "notes":          f.get("notes", "").strip(),
             "created_by":     session["user"].get("full_name", ""),
         }, lines)

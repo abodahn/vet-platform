@@ -112,7 +112,20 @@ def _permission_denied():
         return None
     granted = _role_permissions(role)
     if granted is None:
-        return None
+        # No row in `roles`. For a BUILT-IN role that just means the table has
+        # not been seeded yet, and falling back to the hardcoded list is right.
+        #
+        # For anything else it means the role does not exist — it was deleted
+        # from the Roles screen while staff still held it, or it was never real
+        # ("staff" was offered in a hardcoded dropdown and matched nothing).
+        # Falling back then meant an UNKNOWN role was allowed EVERYWHERE: the
+        # way to give a nurse the clinic's money screens was to delete her
+        # role. Unknown now denies.
+        if role in db.DEFAULT_ROLE_PERMISSIONS:
+            return None
+        logger.warning("unknown role %r denied %s — no row in roles and not a "
+                       "built-in", role, request.path)
+        granted = frozenset()
     if has_permission(key, role):
         return None
     flash("You don't have permission to access this page.", "danger")
@@ -235,6 +248,20 @@ def _role_permissions(role: str):
                     if isinstance(p, str) and p.strip()
                 )
                 # An empty list carries no information — fall back, don't deny.
+                #
+                # This looks like the "unticking every permission WIDENS the
+                # role" bug, and it is where that bug surfaces, but it is NOT
+                # where it should be fixed. Every role shipped with '[]', so if
+                # empty meant deny, the first restart after an upgrade would
+                # lock a live clinic out of its own system —
+                # test_a_role_with_no_permission_data_keeps_working exists
+                # because that nearly happened.
+                #
+                # '[]' is therefore ambiguous: never-configured, or
+                # deliberately-emptied. Rather than guess, the roles screen now
+                # REFUSES to save a role with no permissions at all (see
+                # system.role_edit), so the deliberate case cannot be created
+                # and the ambiguity never arises.
                 perms = keys or None
             else:
                 logger.warning(

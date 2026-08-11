@@ -3702,17 +3702,38 @@ def apply_credit(owner_id: int, invoice_id: int, amount: float,
     if amount > due:
         raise ValueError(f"this invoice only owes {due:.2f}")
 
+    if (inv.get("status") or "") == "Cancelled":
+        raise ValueError("this invoice is cancelled — credit cannot be applied to it")
+
     conn = get_db()
     with conn:
-        conn.execute(
+        cur = conn.execute(
             "INSERT INTO owner_credits(owner_id,amount,kind,invoice_id,method,note,created_by)"
             " VALUES(?,?,'applied',?,'Credit',?,?)",
             (owner_id, -amount, invoice_id,
              f"Applied to invoice {inv.get('invoice_number','')}", created_by))
+        credit_row_id = cur.lastrowid
     conn.close()
 
-    add_payment(invoice_id, owner_id, amount, method="Credit",
-                reference="account credit", received_by=created_by)
+    # The deduction above is already committed. If the payment then fails —
+    # add_payment() validates again and can raise — the client's money has been
+    # taken off their account and put nowhere: the deposit is destroyed and the
+    # screen shows a 500. Put it back before re-raising.
+    try:
+        add_payment(invoice_id, owner_id, amount, method="Credit",
+                    reference="account credit", received_by=created_by)
+    except Exception:
+        conn = get_db()
+        try:
+            with conn:
+                conn.execute("DELETE FROM owner_credits WHERE id=?", (credit_row_id,))
+        except Exception:
+            logger.error("COULD NOT REVERSE credit row %s for owner %s after a "
+                         "failed payment on invoice %s — %.2f is missing from "
+                         "their account", credit_row_id, owner_id, invoice_id, amount)
+        finally:
+            conn.close()
+        raise
 
 
 def refund_credit(owner_id: int, amount: float, note: str = "",
@@ -3767,9 +3788,30 @@ def get_finance_summary(date_from: str = "", date_to: str = "") -> dict:
     today = date.today().isoformat()
     df = date_from or today
     dt = date_to   or today
+    # TWO different questions, and conflating them was the bug.
+    #
+    #   revenue   — accrual: what was INVOICED in this window and has been
+    #               paid. A closed month's P&L must not move afterwards, and
+    #               every figure on a historical report has to be derivable
+    #               from the rows in that window.
+    #   collected — cash: what actually ARRIVED at the till in this window,
+    #               whenever the invoice was raised.
+    #
+    # The dashboard's "Today's Revenue" was showing `revenue`, so 120 EGP taken
+    # today against last week's invoice appeared as 0 and the till never
+    # reconciled with the screen. That screen wants `collected`; the P&L wants
+    # `revenue`. Returning both means neither has to lie.
     revenue = conn.execute(
-        "SELECT COALESCE(SUM(paid_amount),0) FROM invoices WHERE issue_date BETWEEN ? AND ? AND status IN ('Paid','Partial')",
+        "SELECT COALESCE(SUM(paid_amount),0) FROM invoices"
+        " WHERE issue_date BETWEEN ? AND ? AND status IN ('Paid','Partial')",
         (df, dt)).fetchone()[0]
+    try:
+        collected = conn.execute(
+            "SELECT COALESCE(SUM(amount),0) FROM payments"
+            " WHERE DATE(received_at) BETWEEN ? AND ?", (df, dt)).fetchone()[0]
+    except Exception:
+        # An install predating the payments ledger has nothing better to offer.
+        collected = revenue
     invoiced = conn.execute(
         "SELECT COALESCE(SUM(total),0) FROM invoices WHERE issue_date BETWEEN ? AND ? AND status!='Cancelled'",
         (df, dt)).fetchone()[0]
@@ -3784,6 +3826,9 @@ def get_finance_summary(date_from: str = "", date_to: str = "") -> dict:
     conn.close()
     return {
         "revenue": float(revenue or 0),
+        # Money that actually arrived in this window. Use this for anything a
+        # human would reconcile against the cash drawer.
+        "collected": float(collected or 0),
         "invoiced": float(invoiced or 0),
         "outstanding": float(outstanding or 0),
         "expenses": float(expenses or 0),
@@ -3817,11 +3862,34 @@ def get_dashboard_stats() -> dict:
 def get_revenue_by_day(days: int = 30) -> list:
     conn = get_db()
     since = (date.today() - timedelta(days=days)).isoformat()
+    # Accrual, matching get_finance_summary()['revenue'] and the P&L this chart
+    # sits beside. For money-at-the-till use get_cash_by_day().
     rows = conn.execute(
         "SELECT issue_date d, COALESCE(SUM(paid_amount),0) revenue FROM invoices"
-        " WHERE issue_date >= ? AND status IN ('Paid','Partial') GROUP BY issue_date ORDER BY d", (since,)).fetchall()
+        " WHERE issue_date >= ? AND status IN ('Paid','Partial')"
+        " GROUP BY issue_date ORDER BY d", (since,)).fetchall()
     conn.close()
     return [{"date": r["d"], "revenue": float(r["revenue"])} for r in rows]
+
+def get_cash_by_day(days: int = 30) -> list:
+    """Money that ARRIVED on each day, from the payments ledger.
+
+    The cash-basis twin of get_revenue_by_day(). A spike here is a day the
+    clinic actually took money, which is the question anyone reconciling a
+    till is asking.
+    """
+    conn = get_db()
+    since = (date.today() - timedelta(days=days)).isoformat()
+    try:
+        rows = conn.execute(
+            "SELECT DATE(received_at) d, COALESCE(SUM(amount),0) revenue"
+            " FROM payments WHERE DATE(received_at) >= ?"
+            " GROUP BY DATE(received_at) ORDER BY d", (since,)).fetchall()
+    except Exception:
+        rows = []
+    conn.close()
+    return [{"date": r["d"], "revenue": float(r["revenue"])} for r in rows]
+
 
 def get_top_services(limit: int = 10) -> list:
     conn = get_db()
@@ -4227,7 +4295,38 @@ def update_role(role_id: int, display_name: str, display_name_ar: str, permissio
         )
 
 
+def role_holders(role_id: int) -> list:
+    """Active usernames still assigned to this role."""
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT name FROM roles WHERE id=?", (role_id,)).fetchone()
+        if not row:
+            return []
+        return [r[0] for r in conn.execute(
+            "SELECT username FROM users WHERE role=? AND is_active=1"
+            " ORDER BY username", (row[0],)).fetchall()]
+    finally:
+        conn.close()
+
+
 def delete_role(role_id: int) -> None:
+    """Delete a role. REFUSES while staff still hold it.
+
+    It used to be a bare DELETE that never touched `users`, leaving those
+    people on a role name that no longer resolved. The permission check then
+    fell open on an unknown role, so deleting a role SILENTLY PROMOTED
+    everyone who held it — a nurse gained Finance, Accounting and Inventory,
+    and the screen said "Role deleted."
+
+    The fall-open is fixed too, so the failure mode today would be the
+    opposite: those people locked out of everything. Neither is acceptable
+    silently, so this refuses and names who is in the way.
+    """
+    holders = role_holders(role_id)
+    if holders:
+        raise ValueError(
+            "%d staff member(s) still hold this role: %s. Move them to another "
+            "role first." % (len(holders), ", ".join(holders[:10])))
     conn = get_db()
     with conn:
         conn.execute("DELETE FROM roles WHERE id=?", (role_id,))

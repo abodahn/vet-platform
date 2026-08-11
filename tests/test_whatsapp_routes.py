@@ -552,7 +552,7 @@ def test_campaign_new_reports_upstream_failure_without_redirecting(client, wa_do
 
 
 def test_campaign_new_is_role_gated(client, wa):
-    _login(client, role="veterinarian")
+    _login(client, role="doctor")
     r = _post(client, "/whatsapp/campaigns/new", {"default_message": "sneaky"},
               follow=False)
     assert r.status_code == 302
@@ -658,22 +658,35 @@ def test_campaign_schedule_carries_the_date_and_ids(client, wa):
 ])
 def test_campaign_writes_are_role_gated(client, wa, url, method):
     """A vet must not be able to blast the clinic's whole client list."""
-    _login(client, role="veterinarian")
+    _login(client, role="doctor")
     r = _jpost(client, url, {}, method=method)
     assert r.status_code == 302, f"{method} {url} was not role-gated"
     assert wa == [], f"{method} {url} reached Wapilot despite being denied"
 
 
-def test_campaign_bulk_message_writes_are_reachable_by_any_logged_in_user(client, wa):
-    """Pinned as-is, and flagged: this is looser than its sibling routes.
+def test_campaign_bulk_message_writes_need_the_whatsapp_module(client, wa):
+    """Still flagged as looser than its siblings — but the module gate holds.
 
     /api/campaigns/<cid>/messages POST and DELETE mutate a live campaign's
     recipient list but carry only @login_required, while create/finish/copy/
-    schedule on the same campaign require branch_manager or above. This test
-    documents the current behaviour so a deliberate tightening shows up as a
-    failing test rather than as a silent authorisation change.
+    schedule on the same campaign require branch_manager or above. That gap is
+    real and unchanged.
+
+    This test used to assert the routes were reachable by "any logged in user"
+    and it signed in as role "veterinarian" — which is not a role this system
+    has. An unknown role fell OPEN to every module, so the test passed for the
+    wrong reason and documented a hole as a feature. `doctor` is the real role
+    and does NOT hold the whatsapp module, so it is now correctly refused;
+    reception does hold it and gets through.
     """
-    _login(client, role="veterinarian")
+    _login(client, role="doctor")
+    r = _jpost(client, "/whatsapp/api/campaigns/c1/messages",
+               {"messages": [{"phone": "2010", "text": "hi"}]})
+    assert r.status_code in (302, 403), \
+        "a doctor has no whatsapp grant and must not edit a campaign"
+
+    wa.clear()
+    _login(client, role="reception")
     r = _jpost(client, "/whatsapp/api/campaigns/c1/messages",
                {"messages": [{"phone": "2010", "text": "hi"}]})
     assert r.status_code == 200
@@ -826,7 +839,7 @@ def test_template_delete_is_role_gated(client, app, template):
 
 
 def test_template_write_routes_reject_a_veterinarian(client, app):
-    _login(client, role="veterinarian")
+    _login(client, role="doctor")
     name = f"{MARK}-vet-made"
     r = _post(client, "/whatsapp/templates/new",
               {"name": name, "template_text": "x"}, follow=False)
@@ -1071,7 +1084,7 @@ def test_wa_settings_post_persists_both_categories(client, app):
 
 
 def test_wa_settings_is_role_gated(client, app):
-    _login(client, role="veterinarian")
+    _login(client, role="doctor")
     r = _post(client, "/whatsapp/settings", {"wapilot_token": "vet-token"},
               follow=False)
     assert r.status_code == 302
@@ -1376,7 +1389,7 @@ def test_reminder_trigger_runs_the_job(client, app, monkeypatch, due_work):
 
 
 def test_reminder_trigger_is_role_gated(client, app, monkeypatch, due_work):
-    _login(client, role="veterinarian")
+    _login(client, role="doctor")
     monkeypatch.delenv("WAPILOT_TOKEN", raising=False)
     before = _rows(app, "SELECT COUNT(*) c FROM whatsapp_log")[0]["c"]
     r = _post(client, "/whatsapp/reminder-admin/trigger", {}, follow=False)

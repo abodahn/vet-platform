@@ -156,14 +156,30 @@ def mark_conflict(queue_id: str, local_payload: dict, server_payload: dict,
 
 def resolve_conflict(conflict_id: str, resolved_by: str,
                      keep: str = "server") -> None:
-    """Mark conflict resolved. keep='server'|'local'."""
+    """Mark a conflict resolved, recording WHICH side was kept.
+
+    `keep` was accepted, documented as 'server'|'local', and then never used:
+    the body wrote a single 'MANUAL_RESOLVED' and nothing else. So choosing
+    "Keep Local" discarded the device's version and the screen said "Conflict
+    resolved. Kept: local version." — which was not true, and left no trace of
+    what had been thrown away.
+
+    The choice is now recorded in resolution_status, so the two outcomes are
+    distinguishable afterwards and the local payload stays on the row either
+    way. Applying the local payload back over the server record is NOT done
+    here: that is a per-entity write this module has no safe generic path for,
+    and silently guessing at it would be a worse version of the same bug.
+    Callers must tell the user that "keep local" preserves the device's copy
+    for review rather than pushing it.
+    """
+    side = "LOCAL" if str(keep or "").strip().lower() == "local" else "SERVER"
     ts = datetime.utcnow().isoformat(timespec="milliseconds")
     conn = db.get_db()
     conn.execute(
         """UPDATE sync_conflicts
-           SET resolution_status='MANUAL_RESOLVED', resolved_by=?, resolved_at=?
+           SET resolution_status=?, resolved_by=?, resolved_at=?
            WHERE id=?""",
-        (resolved_by, ts, conflict_id),
+        ("MANUAL_RESOLVED_" + side, resolved_by, ts, conflict_id),
     )
     conn.commit()
     conn.close()

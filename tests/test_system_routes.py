@@ -554,10 +554,17 @@ def test_role_delete_removes_the_row(app, admin, temp_role):
         assert _scalar("SELECT COUNT(*) FROM roles WHERE id=?", (rid,)) == 0
 
 
-def test_deleting_a_role_does_not_revoke_it_from_its_users(app, admin, temp_role):
-    """KNOWN GAP, pinned. users.role is a free-text string with no foreign key,
-    so deleting the role row leaves every holder with an orphan role — and
-    role_delete does not check for holders first."""
+def test_a_role_still_held_by_staff_cannot_be_deleted(app, admin, temp_role):
+    """WAS a pinned known gap; now closed.
+
+    users.role is free text with no foreign key, so deleting the role row left
+    every holder on an orphan role. The permission check then fell OPEN on an
+    unknown role, which meant deleting a role silently promoted everyone who
+    held it — a nurse gained Finance, Accounting and Inventory. The fall-open
+    is fixed, so the same delete would now lock those people out instead.
+    Neither outcome is acceptable silently, so the delete is refused while
+    anyone still holds the role.
+    """
     with app.app_context():
         rid = db.create_role(temp_role, "Held", "", ["patients"], "#000000")
         uid = _exec("INSERT INTO users (username, password_hash, full_name, role)"
@@ -566,8 +573,16 @@ def test_deleting_a_role_does_not_revoke_it_from_its_users(app, admin, temp_role
     try:
         _post(admin, f"/system/roles/{rid}/delete", follow_redirects=True)
         with app.app_context():
-            assert _scalar("SELECT COUNT(*) FROM roles WHERE id=?", (rid,)) == 0
+            assert _scalar("SELECT COUNT(*) FROM roles WHERE id=?", (rid,)) == 1, \
+                "the role was deleted while staff still held it"
             assert _scalar("SELECT role FROM users WHERE id=?", (uid,)) == temp_role
+
+            # Move the holder off, and it deletes cleanly.
+            _exec("UPDATE users SET role='nurse' WHERE id=?", (uid,))
+        _post(admin, f"/system/roles/{rid}/delete", follow_redirects=True)
+        with app.app_context():
+            assert _scalar("SELECT COUNT(*) FROM roles WHERE id=?", (rid,)) == 0, \
+                "an unheld role could not be deleted"
     finally:
         with app.app_context():
             _exec("DELETE FROM users WHERE id=?", (uid,))
@@ -705,12 +720,18 @@ def test_resolving_a_conflict_marks_it_and_records_who_did_it(app, admin, confli
     body = _text(_post(admin,
                        f"/system/sync/conflicts/{conflict['conflict_id']}/resolve",
                        {"keep": "local"}, follow_redirects=True))
-    assert "Conflict resolved" in body
+    # "keep": "local" — and nothing in this system pushes the device's copy
+    # back over the server record, so the page must NOT claim it kept the local
+    # version. It used to say exactly that.
+    assert "Conflict" in body
+    assert "KEPT LOCAL" in body, \
+        "the page no longer says which side was actually kept"
     with app.app_context():
         row = db.get_db().execute("SELECT * FROM sync_conflicts WHERE id=?",
                                   (conflict["conflict_id"],)).fetchone()
-        assert row["resolution_status"] == "MANUAL_RESOLVED", (
-            "the page said resolved but the row is still PENDING")
+        assert row["resolution_status"] == "MANUAL_RESOLVED_LOCAL", (
+            "which side was kept is not recorded, so nobody can tell "
+            "afterwards what happened to the device's data")
         assert row["resolved_by"]
         assert row["resolved_at"]
         assert _scalar("SELECT COUNT(*) FROM audit_log"

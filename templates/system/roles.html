@@ -224,7 +224,9 @@
   <div class="cat-label">{{ t('System &amp; IT', 'النظام وتقنية المعلومات') }}</div>
   {{ role_row('hr',            'HR',            system_role_colors['hr'],            system_role_perms['hr'],            user_counts.get('hr',0),            True) }}
   {{ role_row('support_admin', 'Support Admin',  system_role_colors['support_admin'], system_role_perms['support_admin'], user_counts.get('support_admin',0), True) }}
-  {{ role_row('staff',         'Staff',          system_role_colors['staff'],         system_role_perms['staff'],         user_counts.get('staff',0),         True) }}
+  {# 'staff' was listed here as if it were a role. It is not one: it is in
+     no permission table, so assigning it left the user on a name that
+     resolved to nothing — which used to fall open to every module. #}
 </div>
 
 {# CUSTOM ROLES #}
@@ -259,7 +261,7 @@
     <select id="sa-role" class="form-control" style="max-width:190px" onchange="saFilter()">
       <option value="">{{ t('All roles', 'جميع الأدوار') }}</option>
       {% for k in ['super_admin','clinic_owner','branch_manager','doctor','nurse',
-                   'reception','pharmacist','groomer','hr','support_admin','staff'] %}
+                   'reception','pharmacist','groomer','hr','support_admin'] %}
       <option value="{{ k }}">{{ k }}</option>
       {% endfor %}
       {% for r in roles %}
@@ -469,7 +471,7 @@ var _SA_PER   = 25;
 
 var _roleOpts = (function(){
   var sys = ['super_admin','clinic_owner','branch_manager','doctor','nurse',
-             'reception','pharmacist','groomer','hr','support_admin','staff'];
+             'reception','pharmacist','groomer','hr','support_admin'];
   var opts = sys.map(function(r){ return '<option value="'+r+'">'+r+'</option>'; }).join('');
   var cKeys   = {{ roles | map(attribute='name')         | list | tojson }};
   var cLabels = {{ roles | map(attribute='display_name') | list | tojson }};
