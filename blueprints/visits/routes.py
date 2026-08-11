@@ -888,6 +888,96 @@ def exam_api_pet(pet_id):
     return jsonify(ctx)
 
 
+@visits_bp.route("/exam/api/client", methods=["POST"])
+@login_required
+def exam_api_client():
+    """Create a client and their first pet, without leaving the exam.
+
+    The walk-in is the case this whole screen exists for, and it was the one
+    case it could not handle: the empty state linked away to CRM, which threw
+    away anything already typed and put the receptionist three screens from
+    the animal in front of her.
+    """
+    from flask import jsonify
+    f = request.get_json(silent=True) or {}
+    name = (f.get("full_name") or "").strip()
+    phone = (f.get("phone") or "").strip()
+    pet_name = (f.get("pet_name") or "").strip()
+    if not name:
+        return jsonify({"error": "A client name is required."}), 400
+    if not pet_name:
+        return jsonify({"error": "A pet name is required."}), 400
+
+    conn = get_db()
+    try:
+        # Same phone, same client. A busy front desk types the same person in
+        # twice a week otherwise, and the pet history splits across both.
+        existing = None
+        if phone:
+            existing = conn.execute(
+                "SELECT id FROM owners WHERE phone=? OR whatsapp_phone=?",
+                (phone, phone)).fetchone()
+        if existing:
+            owner_id = existing[0]
+        else:
+            cur = conn.execute(
+                "INSERT INTO owners(full_name, phone, whatsapp_phone, address,"
+                " created_by) VALUES(?,?,?,?,?)",
+                (name, phone, phone, (f.get("address") or "").strip(),
+                 (session.get("user") or {}).get("full_name", "")))
+            owner_id = cur.lastrowid
+        cur = conn.execute(
+            "INSERT INTO pets(owner_id, pet_name, species, breed, sex, dob)"
+            " VALUES(?,?,?,?,?,?)",
+            (owner_id, pet_name, (f.get("species") or "").strip(),
+             (f.get("breed") or "").strip(), (f.get("sex") or "Unknown").strip(),
+             (f.get("dob") or "").strip() or None))
+        pet_id = cur.lastrowid
+        conn.commit()
+    except Exception:
+        logger.exception("could not create client/pet from the exam screen")
+        conn.close()
+        return jsonify({"error": "Could not save. Check the details and retry."}), 500
+
+    ctx = _exam_context(conn, pet_id)
+    conn.close()
+    if not ctx:
+        return jsonify({"error": "Saved, but could not load the pet."}), 500
+    ctx.pop("services", None)
+    return jsonify(ctx)
+
+
+@visits_bp.route("/exam/api/pet", methods=["POST"])
+@login_required
+def exam_api_add_pet():
+    """Add another pet to the client already on screen."""
+    from flask import jsonify
+    f = request.get_json(silent=True) or {}
+    owner_id = f.get("owner_id")
+    pet_name = (f.get("pet_name") or "").strip()
+    if not owner_id or not pet_name:
+        return jsonify({"error": "A pet name is required."}), 400
+    conn = get_db()
+    owner = conn.execute("SELECT id FROM owners WHERE id=?", (owner_id,)).fetchone()
+    if not owner:
+        conn.close()
+        return jsonify({"error": "Client not found."}), 404
+    cur = conn.execute(
+        "INSERT INTO pets(owner_id, pet_name, species, breed, sex, dob)"
+        " VALUES(?,?,?,?,?,?)",
+        (owner_id, pet_name, (f.get("species") or "").strip(),
+         (f.get("breed") or "").strip(), (f.get("sex") or "Unknown").strip(),
+         (f.get("dob") or "").strip() or None))
+    pet_id = cur.lastrowid
+    conn.commit()
+    ctx = _exam_context(conn, pet_id)
+    conn.close()
+    if not ctx:
+        return jsonify({"error": "Saved, but could not load the pet."}), 500
+    ctx.pop("services", None)
+    return jsonify(ctx)
+
+
 def _exam_num(form, name, default=0.0):
     """A money/vitals box a tired person typed into. Never raises."""
     raw = (form.get(name) or "").strip()
@@ -937,6 +1027,70 @@ def exam_submit(pet_id):
         conn.execute("UPDATE pets SET weight_kg=?, updated_at=datetime('now')"
                      " WHERE id=?", (weight, pet_id))
         conn.commit()
+
+    # ── the diagnosis ────────────────────────────────────────────────
+    # A symptom is what the owner reports; a diagnosis is what the vet
+    # concluded. Recording only the first leaves the medical record with no
+    # findings, and the History panel on this very screen has a Diagnoses
+    # column that nothing here could ever fill.
+    diagnosis = (f.get("diagnosis") or "").strip()
+    if diagnosis:
+        try:
+            conn.execute(
+                "INSERT INTO diagnoses(visit_id, pet_id, diagnosis, severity,"
+                " is_chronic, created_by) VALUES(?,?,?,?,?,?)",
+                (visit_id, pet_id, diagnosis,
+                 (f.get("severity") or "").strip() or None,
+                 1 if f.get("is_chronic") else 0,
+                 user.get("full_name", "")))
+            conn.commit()
+        except Exception:
+            logger.exception("diagnosis not saved for visit %s", visit_id)
+
+    # ── vaccinations given today ─────────────────────────────────────
+    # Billing "Rabies vaccine" as a service and RECORDING it are different
+    # things. Only the second updates the pet's vaccine history and sets
+    # next_due_at — which is what the reminder job reads. Without this a clinic
+    # could vaccinate an animal, charge for it, and never remind the owner.
+    for i, vname in enumerate(f.getlist("vax_name[]")):
+        vname = (vname or "").strip()
+        if not vname:
+            continue
+
+        def _vat(key, idx=i):
+            vals = f.getlist(key)
+            return (vals[idx] or "").strip() if idx < len(vals) else ""
+
+        try:
+            conn.execute(
+                "INSERT INTO vaccinations(pet_id, visit_id, vaccine_name,"
+                " vaccine_brand, batch_number, administered_by, administered_at,"
+                " next_due_at) VALUES(?,?,?,?,?,?,?,?)",
+                (pet_id, visit_id, vname, _vat("vax_brand[]"),
+                 _vat("vax_batch[]"), doctor, visit_date,
+                 _vat("vax_next_due[]") or None))
+            conn.commit()
+        except Exception:
+            logger.exception("vaccination not saved for visit %s", visit_id)
+
+    # ── the follow-up ────────────────────────────────────────────────
+    followup = (f.get("followup_date") or "").strip()
+    if followup:
+        try:
+            conn.execute(
+                "INSERT INTO appointments(owner_id, pet_id, doctor_name,"
+                " appointment_type, status, appt_date, appt_start, reason,"
+                " created_by) VALUES(?,?,?,?,?,?,?,?,?)",
+                (owner_id, pet_id, doctor, "Follow-up", "Scheduled", followup,
+                 # appt_start is NOT NULL. Passing None silently lost every
+                 # follow-up booked without a time — which is most of them,
+                 # because the vet picks "in a week", not "in a week at 10:15".
+                 (f.get("followup_time") or "").strip() or "09:00",
+                 "Follow-up for: %s" % (diagnosis or symptom or "visit"),
+                 user.get("full_name", "")))
+            conn.commit()
+        except Exception:
+            logger.exception("follow-up not booked for visit %s", visit_id)
 
     # ── the prescription ─────────────────────────────────────────────
     # Billing a medication and writing its dosage used to be two different

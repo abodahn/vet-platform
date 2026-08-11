@@ -15,6 +15,13 @@ from models import database as db
 
 from conftest import get_csrf
 
+
+def _csrf_hdr(auth_client):
+    """JSON posts send the token as a header — models/security accepts
+    X-CSRF-Token, which is what the page uses."""
+    return {"X-CSRF-Token": get_csrf(auth_client)}
+
+
 _seq = itertools.count(1)
 
 PRICES = [("Examination", 250), ("Deworming cat", 130), ("Antiflea Help", 180)]
@@ -678,3 +685,120 @@ def test_seen_by_follows_the_clients_preferred_doctor(auth_client, leo):
     body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
     assert "if (o.preferred_doctor) $('fDoctor').value = o.preferred_doctor;" in body, \
         "the client who always asks for Dr Sara gets reception's name instead"
+
+
+# ── the complete clinical visit, in one save ─────────────────────────────
+
+
+def test_a_walk_in_becomes_a_client_a_pet_and_a_loaded_exam(auth_client):
+    """The case this screen exists for, and the one it could not do.
+
+    The empty state used to link away to CRM, which threw away anything
+    already typed and put the receptionist three screens from the animal.
+    """
+    resp = auth_client.post("/visits/exam/api/client",
+                             headers=_csrf_hdr(auth_client), json={
+        "full_name": "Walk In Owner", "phone": "01555000111",
+        "pet_name": "Bosy", "species": "Feline", "sex": "F"})
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:200]
+    d = resp.get_json()
+    assert d["owner"]["full_name"] == "Walk In Owner"
+    assert d["pet"]["pet_name"] == "Bosy"
+    assert d["pet"]["species"] == "Feline"
+    assert d["pet"]["id"] and d["owner"]["id"]
+    assert "history" in d and "vaccines" in d, "the exam context is not loaded"
+
+
+def test_the_same_phone_does_not_create_a_second_client(auth_client):
+    """A busy front desk types the same person in twice a week; the pet history
+    must not split across two records."""
+    a = auth_client.post("/visits/exam/api/client",
+                             headers=_csrf_hdr(auth_client), json={
+        "full_name": "Repeat Client", "phone": "01555000222",
+        "pet_name": "First"}).get_json()
+    b = auth_client.post("/visits/exam/api/client",
+                             headers=_csrf_hdr(auth_client), json={
+        "full_name": "Repeat Client Typo", "phone": "01555000222",
+        "pet_name": "Second"}).get_json()
+    assert a["owner"]["id"] == b["owner"]["id"], "the client was duplicated"
+    assert a["pet"]["id"] != b["pet"]["id"]
+
+
+def test_a_client_or_pet_with_no_name_is_refused(auth_client):
+    for payload in ({"full_name": "", "pet_name": "X"},
+                    {"full_name": "X", "pet_name": ""}):
+        r = auth_client.post("/visits/exam/api/client",
+                             headers=_csrf_hdr(auth_client), json=payload)
+        assert r.status_code == 400
+        assert "required" in (r.get_json().get("error") or "").lower()
+
+
+def test_another_pet_can_be_added_to_the_client_on_screen(auth_client, leo):
+    r = auth_client.post("/visits/exam/api/pet",
+                          headers=_csrf_hdr(auth_client), json={
+        "owner_id": leo["owner_id"], "pet_name": "Second Pet", "species": "Canine"})
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["pet"]["pet_name"] == "Second Pet"
+    assert d["owner"]["id"] == leo["owner_id"]
+
+
+def test_one_save_records_diagnosis_vaccination_and_follow_up(auth_client, leo):
+    """A vet's visit is not just a bill. Each of these was a separate module."""
+    _post(auth_client, leo["pet_id"],
+          doctor_name="Dr. Sara Hassan",
+          diagnosis="Upper respiratory infection", severity="Moderate",
+          is_chronic="",
+          followup_date="2026-09-01", followup_time="",
+          **{"vax_name[]": ["Rabies", ""], "vax_brand[]": ["Nobivac", ""],
+             "vax_batch[]": ["B-42", ""], "vax_next_due[]": ["2027-08-11", ""]})
+
+    conn = db.get_db()
+    visit = conn.execute("SELECT id FROM visits WHERE pet_id=? ORDER BY id DESC"
+                         " LIMIT 1", (leo["pet_id"],)).fetchone()
+    dx = conn.execute("SELECT * FROM diagnoses WHERE visit_id=?",
+                      (visit["id"],)).fetchone()
+    vax = conn.execute("SELECT * FROM vaccinations WHERE visit_id=?",
+                       (visit["id"],)).fetchall()
+    appt = conn.execute("SELECT * FROM appointments WHERE pet_id=?"
+                        " ORDER BY id DESC LIMIT 1", (leo["pet_id"],)).fetchone()
+    conn.close()
+
+    assert dx is not None, "no diagnosis was recorded"
+    assert dx["diagnosis"] == "Upper respiratory infection"
+    assert dx["severity"] == "Moderate"
+
+    assert len(vax) == 1, "the blank vaccination row should not be saved"
+    assert vax[0]["vaccine_name"] == "Rabies"
+    assert vax[0]["batch_number"] == "B-42"
+    assert vax[0]["next_due_at"] == "2027-08-11", \
+        "next_due_at is what the reminder job reads — without it nobody is reminded"
+    assert vax[0]["administered_by"] == "Dr. Sara Hassan"
+
+    assert appt is not None, "the follow-up was not booked"
+    assert appt["appt_date"] == "2026-09-01"
+    assert appt["appt_start"], "appt_start is NOT NULL; a timeless follow-up was lost"
+    assert appt["appointment_type"] == "Follow-up"
+
+
+def test_a_follow_up_with_no_time_is_still_booked(auth_client, leo):
+    """appt_start is NOT NULL, and the vet picks "in a week", not "10:15"."""
+    _post(auth_client, leo["pet_id"], followup_date="2026-09-15")
+    conn = db.get_db()
+    appt = conn.execute("SELECT appt_start FROM appointments WHERE pet_id=?"
+                        " AND appt_date='2026-09-15'", (leo["pet_id"],)).fetchone()
+    conn.close()
+    assert appt is not None, "a follow-up without a time was silently lost"
+    assert appt["appt_start"] == "09:00"
+
+
+def test_nothing_extra_is_written_when_the_fields_are_empty(auth_client, leo):
+    _post(auth_client, leo["pet_id"])
+    conn = db.get_db()
+    visit = conn.execute("SELECT id FROM visits WHERE pet_id=? ORDER BY id DESC"
+                         " LIMIT 1", (leo["pet_id"],)).fetchone()
+    assert conn.execute("SELECT COUNT(*) FROM diagnoses WHERE visit_id=?",
+                        (visit["id"],)).fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM vaccinations WHERE visit_id=?",
+                        (visit["id"],)).fetchone()[0] == 0
+    conn.close()

@@ -41,8 +41,49 @@
   <!-- ── EMPTY STATE ──────────────────────────────────────────────── -->
   <div id="hwEmpty" class="pf-card hw-empty">
     <p>{{ t('Search for a client above to begin.', 'ابحث عن عميل بالأعلى للبدء.') }}</p>
-    <a href="{{ url_for('crm.owner_new') }}" class="pf-btn pf-btn-primary">
-      + {{ t('New client', 'عميل جديد') }}</a>
+    <button type="button" id="hwNewClientBtn" class="pf-btn pf-btn-primary">
+      + {{ t('New client walked in', 'عميل جديد') }}</button>
+  </div>
+
+  <!-- ── WALK-IN: client + first pet, without leaving this page ────── -->
+  <!-- This used to link away to CRM, which threw away anything already typed
+       and put the receptionist three screens from the animal in front of her.
+       The walk-in is the case this whole screen exists for. -->
+  <div id="hwNewClient" class="pf-card hw-newclient" hidden>
+    <h3 class="hw-h">{{ t('New client and pet', 'عميل وحيوان جديد') }}</h3>
+    <div class="hw-pairs">
+      <div><label class="hw-label" for="ncName">{{ t('Client name', 'اسم العميل') }} *</label>
+           <input id="ncName" class="hw-input hw-input-lg"></div>
+      <div><label class="hw-label" for="ncPhone">{{ t('Phone', 'الهاتف') }}</label>
+           <input id="ncPhone" class="hw-input hw-input-lg" inputmode="tel"></div>
+      <div class="hw-span2"><label class="hw-label" for="ncAddress">{{ t('Address', 'العنوان') }}</label>
+           <input id="ncAddress" class="hw-input"></div>
+      <div><label class="hw-label" for="ncPet">{{ t('Pet name', 'اسم الحيوان') }} *</label>
+           <input id="ncPet" class="hw-input hw-input-lg"></div>
+      <div><label class="hw-label" for="ncSpecies">{{ t('Species', 'النوع') }}</label>
+           <input id="ncSpecies" class="hw-input" list="hwSpeciesList">
+           <datalist id="hwSpeciesList">
+             <option value="Canine"></option><option value="Feline"></option>
+             <option value="Avian"></option><option value="Rabbit"></option>
+             <option value="Reptile"></option>
+           </datalist></div>
+      <div><label class="hw-label" for="ncBreed">{{ t('Breed', 'السلالة') }}</label>
+           <input id="ncBreed" class="hw-input"></div>
+      <div><label class="hw-label" for="ncSex">{{ t('Sex', 'الجنس') }}</label>
+           <select id="ncSex" class="hw-input">
+             <option value="Unknown">—</option>
+             <option value="M">{{ t('Male', 'ذكر') }}</option>
+             <option value="F">{{ t('Female', 'أنثى') }}</option>
+           </select></div>
+      <div><label class="hw-label" for="ncDob">{{ t('Date of birth', 'تاريخ الميلاد') }}</label>
+           <input type="date" id="ncDob" class="hw-input"></div>
+    </div>
+    <p id="hwNcError" class="hw-vitalwarn" hidden></p>
+    <div class="hw-row hw-mt">
+      <button type="button" id="hwNcSave" class="pf-btn pf-btn-primary">
+        {{ t('Save and start the exam', 'حفظ وبدء الكشف') }}</button>
+      <button type="button" id="hwNcCancel" class="pf-btn">{{ t('Cancel', 'إلغاء') }}</button>
+    </div>
   </div>
 
   <!-- ── THE EXAM ─────────────────────────────────────────────────── -->
@@ -117,7 +158,26 @@
 
         <label class="hw-label hw-mt" for="fSymptom">
           {{ t('Symptom or disease', 'العرض أو المرض') }}</label>
-        <textarea id="fSymptom" name="symptom" class="hw-input hw-area" rows="6"></textarea>
+        <textarea id="fSymptom" name="symptom" class="hw-input hw-area" rows="5"></textarea>
+
+        <!-- What the OWNER reports is the symptom. What the VET concluded is
+             the diagnosis. Only recording the first left the medical record
+             with no findings — and the History panel on this screen has a
+             Diagnoses column that nothing here could fill. -->
+        <label class="hw-label hw-mt" for="fDiagnosis">
+          {{ t('Diagnosis', 'التشخيص') }}</label>
+        <input id="fDiagnosis" name="diagnosis" class="hw-input" autocomplete="off">
+        <div class="hw-row hw-mt">
+          <select name="severity" id="fSeverity" class="hw-input">
+            <option value="">{{ t('Severity…', 'الشدة…') }}</option>
+            <option value="Mild">{{ t('Mild', 'خفيف') }}</option>
+            <option value="Moderate">{{ t('Moderate', 'متوسط') }}</option>
+            <option value="Severe">{{ t('Severe', 'شديد') }}</option>
+          </select>
+          <label class="hw-check">
+            <input type="checkbox" name="is_chronic" id="fChronic" value="1">
+            {{ t('Chronic', 'مزمن') }}</label>
+        </div>
 
         <!-- The bar at the top already shows the client's name and phone.
              The rest is reference, so it folds away by default. -->
@@ -260,6 +320,44 @@
         <datalist id="hwMedList">
           {% for m in meds_list %}<option value="{{ m }}"></option>{% endfor %}
         </datalist>
+      </details>
+
+      <details class="pf-card hw-pane hw-fold" data-fold="vax-given">
+        <summary class="hw-h">{{ t('Vaccination given today', 'تطعيم أُعطي اليوم') }}
+          <span class="hw-muted" id="hwVaxGivenCount"></span></summary>
+        <p class="hw-muted hw-small">
+          {{ t('Billing a vaccine and recording it are different. Only this sets the next due date the reminder uses.',
+                'فوترة التطعيم غير تسجيله. هذا وحده يحدد موعد الجرعة القادمة الذي يعتمد عليه التذكير.') }}</p>
+        <div class="hw-tablewrap">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('Vaccine', 'التطعيم') }}</th>
+              <th class="hw-wq">{{ t('Brand', 'الماركة') }}</th>
+              <th class="hw-wq">{{ t('Batch', 'التشغيلة') }}</th>
+              <th class="hw-w">{{ t('Next due', 'الموعد القادم') }}</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="hwVaxGivenBody"></tbody>
+          </table>
+        </div>
+        <button type="button" id="hwVaxAdd" class="pf-btn pf-btn-sm hw-mt">
+          + {{ t('Record a vaccination', 'سجّل تطعيم') }}</button>
+      </details>
+
+      <details class="pf-card hw-pane hw-fold" data-fold="followup">
+        <summary class="hw-h">{{ t('Book the follow-up', 'حجز المتابعة') }}
+          <span class="hw-muted" id="hwFollowLabel"></span></summary>
+        <div class="hw-row hw-mt">
+          <div style="flex:1">
+            <label class="hw-label" for="fFollowDate">{{ t('Date', 'التاريخ') }}</label>
+            <input type="date" id="fFollowDate" name="followup_date" class="hw-input">
+          </div>
+          <div style="width:130px">
+            <label class="hw-label" for="fFollowTime">{{ t('Time', 'الوقت') }}</label>
+            <input type="time" id="fFollowTime" name="followup_time" class="hw-input">
+          </div>
+        </div>
+        <div class="hw-quick hw-mt" id="hwFollowQuick"></div>
       </details>
 
       <details class="pf-card hw-pane hw-fold" data-fold="file">
@@ -426,6 +524,9 @@
              vertical-align:middle}
 .hw-w{width:104px}
 .hw-wq{width:88px}
+.hw-check{display:flex;align-items:center;gap:.4rem;white-space:nowrap}
+.hw-small{font-size:.88rem;margin:.35rem 0 0}
+.hw-newclient{padding:1.25rem;margin-bottom:1rem}
 .hw-scroll{max-height:260px;overflow-y:auto}
 
 /* Alerts: the things nobody should have to click to discover. */
@@ -562,6 +663,11 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     no:         {{ t('No', 'لا') | tojson }},
     oddWeight:  {{ t('Check the weight', 'راجع الوزن') | tojson }},
     oddTemp:    {{ t('Check the temperature', 'راجع درجة الحرارة') | tojson }},
+    needNameAndPet: {{ t('A client name and a pet name are required.', 'اسم العميل واسم الحيوان مطلوبان.') | tojson }},
+    couldNotSave:   {{ t('Could not save. Check the details and retry.', 'تعذر الحفظ. راجع البيانات وحاول مرة أخرى.') | tojson }},
+    oneWeek:  {{ t('1 week', 'أسبوع') | tojson }},
+    twoWeeks: {{ t('2 weeks', 'أسبوعان') | tojson }},
+    oneMonth: {{ t('1 month', 'شهر') | tojson }},
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -734,6 +840,122 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
   document.addEventListener('click', function (e) {
     if (!menu.contains(e.target) && e.target !== pick) closeMenu();
   });
+
+  // ── the walk-in ───────────────────────────────────────────────────
+  function ncShow(on) {
+    $('hwNewClient').hidden = !on;
+    $('hwEmpty').hidden = on || !form.hidden ? true : false;
+    $('hwNcError').hidden = true;
+    if (on) $('ncName').focus();
+  }
+  $('hwNewClientBtn').addEventListener('click', function () { ncShow(true); });
+  $('hwNcCancel').addEventListener('click', function () {
+    ncShow(false);
+    if (form.hidden) $('hwEmpty').hidden = false;
+  });
+  $('hwNcSave').addEventListener('click', function () {
+    var payload = {
+      full_name: $('ncName').value.trim(), phone: $('ncPhone').value.trim(),
+      address: $('ncAddress').value.trim(), pet_name: $('ncPet').value.trim(),
+      species: $('ncSpecies').value.trim(), breed: $('ncBreed').value.trim(),
+      sex: $('ncSex').value, dob: $('ncDob').value,
+    };
+    if (!payload.full_name || !payload.pet_name) {
+      $('hwNcError').textContent = L.needNameAndPet;
+      $('hwNcError').hidden = false;
+      return;
+    }
+    $('hwNcSave').disabled = true;
+    fetch('/visits/exam/api/client', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('[name="_csrf_token"]').value},
+      body: JSON.stringify(payload),
+    }).then(function (r) { return r.json().then(function (d) { return [r.ok, d]; }); })
+      .then(function (pair) {
+        $('hwNcSave').disabled = false;
+        if (!pair[0]) {
+          $('hwNcError').textContent = pair[1].error || L.couldNotSave;
+          $('hwNcError').hidden = false;
+          return;
+        }
+        ncShow(false);
+        ['ncName','ncPhone','ncAddress','ncPet','ncSpecies','ncBreed','ncDob']
+          .forEach(function (id) { $(id).value = ''; });
+        show(pair[1]);
+      }).catch(function () {
+        $('hwNcSave').disabled = false;
+        $('hwNcError').textContent = L.couldNotSave;
+        $('hwNcError').hidden = false;
+      });
+  });
+
+  // ── vaccinations given today ──────────────────────────────────────
+  function vaxRow(focus) {
+    var tr = document.createElement('tr');
+    function cell(name, type) {
+      var td = document.createElement('td');
+      var i = document.createElement('input');
+      i.className = 'hw-input'; i.name = name;
+      if (type) i.type = type;
+      i.addEventListener('input', vaxCount);
+      td.appendChild(i); tr.appendChild(td);
+      return i;
+    }
+    var v = cell('vax_name[]');
+    cell('vax_brand[]');
+    cell('vax_batch[]');
+    var due = cell('vax_next_due[]', 'date');
+    // A year is the usual interval, and a date already filled is one less
+    // thing to forget — the reminder job reads exactly this field.
+    var d = new Date($('fVisitDate').value || Date.now());
+    if (!isNaN(d)) {
+      d.setFullYear(d.getFullYear() + 1);
+      due.value = d.toISOString().slice(0, 10);
+    }
+
+    var tdx = document.createElement('td');
+    var x = document.createElement('button');
+    x.type = 'button'; x.className = 'pf-btn pf-btn-sm'; x.textContent = '×';
+    x.setAttribute('aria-label', 'Remove');
+    x.addEventListener('click', function () { tr.remove(); vaxCount(); });
+    tdx.appendChild(x); tr.appendChild(tdx);
+
+    $('hwVaxGivenBody').appendChild(tr);
+    if (focus) v.focus();
+    vaxCount();
+  }
+  function vaxCount() {
+    var n = 0;
+    Array.prototype.forEach.call($('hwVaxGivenBody').rows, function (r) {
+      if ((r.cells[0].querySelector('input').value || '').trim()) n++;
+    });
+    $('hwVaxGivenCount').textContent = n ? '(' + n + ')' : '';
+  }
+  $('hwVaxAdd').addEventListener('click', function () { vaxRow(true); });
+
+  // ── the follow-up ─────────────────────────────────────────────────
+  (function followQuick() {
+    var host = $('hwFollowQuick');
+    [[7, L.oneWeek], [14, L.twoWeeks], [30, L.oneMonth]].forEach(function (p) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'hw-chip';
+      b.textContent = p[1];
+      b.addEventListener('click', function () {
+        var d = new Date($('fVisitDate').value || Date.now());
+        if (isNaN(d)) d = new Date();
+        d.setDate(d.getDate() + p[0]);
+        $('fFollowDate').value = d.toISOString().slice(0, 10);
+        followLabel();
+      });
+      host.appendChild(b);
+    });
+  })();
+  function followLabel() {
+    $('hwFollowLabel').textContent = $('fFollowDate').value
+      ? '· ' + $('fFollowDate').value : '';
+  }
+  $('fFollowDate').addEventListener('change', followLabel);
 
   // ── prescription rows ─────────────────────────────────────────────
   function rxRow(focus) {
@@ -940,6 +1162,13 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     while (rxb.rows.length) rxb.deleteRow(0);
     rxCount();
     $('hwFile').value = ''; $('hwFileName').textContent = '';
+    $('fDiagnosis').value = ''; $('fSeverity').value = '';
+    $('fChronic').checked = false;
+    $('fFollowDate').value = ''; $('fFollowTime').value = '';
+    $('hwFollowLabel').textContent = '';
+    var vb = $('hwVaxGivenBody');
+    while (vb.rows.length) vb.deleteRow(0);
+    vaxCount();
     $('hwFileCaption').value = '';
     var cash = document.querySelector('input[name="payment_type"][value="Cash"]');
     if (cash) cash.checked = true;
@@ -1177,7 +1406,8 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     return !!($('fSymptom').value.trim() || $('fTemp').value.trim() ||
               $('fNotes').value.trim() || body.rows.length ||
               $('hwCash').value.trim() || ($('hwFile').files || []).length ||
-              $('hwRxBody').rows.length);
+              $('hwRxBody').rows.length || $('fDiagnosis').value.trim() ||
+              $('hwVaxGivenBody').rows.length);
   }
   window.addEventListener('beforeunload', function (e) {
     if (saving || form.hidden || !hasWork()) return;
