@@ -204,29 +204,51 @@ def test_owner_search_finds_the_arabic_name_it_stored(app, auth_client):
 
 # ═══ duplicate owners ═════════════════════════════════════════════════════════
 
-def test_duplicate_phone_creates_a_second_owner_and_both_survive(app, auth_client):
-    """Phone is the only reliable key in this domain and the routes do not
-    enforce it. That is tolerable — families share a number — but only if the
-    second create never overwrites the first, and both are findable."""
+def test_a_second_client_cannot_take_a_mobile_that_is_already_used(app, auth_client):
+    """One mobile, one client — the owner asked for this deliberately.
+
+    This test used to assert the OPPOSITE: that a re-used number quietly made
+    a second record, on the reasoning that families share a phone. In practice
+    that is how one household's pets ended up split across several records
+    nobody could reconcile, so the rule is now uniqueness and a shared
+    household is ONE client with several animals.
+
+    The refusal has to be a message, never a 500 — a front desk hits this
+    constantly — and it has to name who holds the number so the desk can open
+    them instead of inventing a variant spelling.
+    """
     phone = "01000000806"
     with app.app_context():
         _post(auth_client, "/crm/owners/new",
               {"full_name": "أول عميل", "phone": phone, "notes": "the original"})
-        _post(auth_client, "/crm/owners/new",
-              {"full_name": "ثاني عميل", "phone": phone, "notes": "the duplicate"})
-        both = _rows("SELECT * FROM owners WHERE phone=? ORDER BY id", (phone,))
+        r = _post(auth_client, "/crm/owners/new",
+                  {"full_name": "ثاني عميل", "phone": phone, "notes": "the duplicate"})
+        rows = _rows("SELECT * FROM owners WHERE phone=? ORDER BY id", (phone,))
 
-    assert len(both) == 2, "expected two rows for a re-used phone number"
-    assert both[0]["full_name"] == "أول عميل"
-    assert both[0]["notes"] == "the original", \
-        "the second create overwrote the first owner's record"
-    assert both[1]["full_name"] == "ثاني عميل"
+    assert r.status_code == 200, "the refusal must not be a crash"
+    assert len(rows) == 1, "a duplicate mobile created a second client"
+    assert rows[0]["full_name"] == "أول عميل"
+    assert rows[0]["notes"] == "the original", "the first record was overwritten"
 
-    # and the desk can actually see the collision
+    body = r.get_data(as_text=True)
+    assert "أول عميل" in body, "the refusal does not say who already has the number"
+
+
+def test_duplicates_that_already_exist_stay_findable(app, auth_client):
+    """The rule applies to new writes. Records already in the database keep
+    their numbers — a constraint added over them would fail at startup — so
+    both must still surface when somebody searches that number."""
+    phone = "01000000899"
     with app.app_context():
+        conn = db.get_db()
+        for name in ("قديم واحد", "قديم اتنين"):
+            conn.execute("INSERT INTO owners(full_name, phone) VALUES(?,?)",
+                         (name, phone))
+        conn.commit()
+        conn.close()
         hits = db.list_owners(search=phone)
-    assert len([h for h in hits if h["phone"] == phone]) == 2, \
-        "searching the shared phone number does not surface both owners"
+
+    assert len([h for h in hits if h["phone"] == phone]) == 2,         "searching a shared number does not surface both legacy records"
 
 
 def test_owner_without_a_name_is_rejected(app, auth_client):
@@ -660,11 +682,47 @@ def test_adjust_on_missing_owner_is_not_a_500(auth_client):
     assert resp.status_code == 200
 
 
+# ═══ owner search — what every owner dropdown in the app now runs on ══════════
+
+def _search(client, q):
+    payload = client.get("/crm/owners/search-json",
+                         query_string={"q": q}).get_json()
+    return {o["id"] for o in payload["owners"]}
+
+
+def test_owner_search_reaches_a_client_that_no_dropdown_would_have_rendered(app,
+                                                                           auth_client):
+    """Position in the table must not decide who is selectable.
+
+    The dropdowns this replaces rendered `ORDER BY full_name LIMIT 200..500`.
+    The owner below is created last and sorts last, so under the old scheme it
+    was the first client to disappear; the search has to find it anyway.
+    """
+    with app.app_context():
+        oid = _mk_owner("Zzz Search Target", "01099887766")
+    assert oid in _search(auth_client, "Zzz Search Target")
+
+
+def test_owner_search_matches_phone_and_arabic_names(app, auth_client):
+    with app.app_context():
+        oid = _mk_owner(AR_NAME + " سيرش", "01234500099")
+    assert oid in _search(auth_client, "01234500099"), "phone search found nothing"
+    assert oid in _search(auth_client, AR_NAME + " سيرش"), "Arabic name search found nothing"
+
+
+def test_owner_search_ignores_a_query_too_short_to_narrow_anything(auth_client):
+    """One character would return an arbitrary 25 owners and read as 'no match'."""
+    assert auth_client.get("/crm/owners/search-json",
+                           query_string={"q": "a"}).get_json() == {"owners": []}
+    assert auth_client.get("/crm/owners/search-json").get_json() == {"owners": []}
+
+
 # ═══ auth ═════════════════════════════════════════════════════════════════════
 
 @pytest.mark.parametrize("url", [
     "/crm/owners/1/edit",
     "/crm/owners/1/pets-json",
+    "/crm/owners/search-json",
     "/crm/pets/1/edit",
     "/crm/pets/1/history.pdf",
 ])

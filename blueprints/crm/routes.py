@@ -265,7 +265,18 @@ def owner_new():
             return render_template("crm/owner_form.html", owner=data, is_edit=False,
                                    active="crm", page_title="New Owner")
 
-        owner_id = db.create_owner(data)
+        # A refused mobile is a normal thing to happen at a front desk, not a
+        # crash. Name who already has it and link straight to them — the person
+        # typing almost always meant that client.
+        try:
+            owner_id = db.create_owner(data)
+        except db.DuplicatePhone as dup:
+            flash("%s Open %s instead, or use a different number."
+                  % (str(dup), dup.owner_name or "that client"), "danger")
+            return render_template("crm/owner_form.html", owner=data, is_edit=False,
+                                   active="crm", page_title="New Owner",
+                                   duplicate_owner_id=dup.owner_id,
+                                   duplicate_owner_name=dup.owner_name)
 
         # Save arabic fields inline (not in helper)
         conn = get_db()
@@ -523,6 +534,26 @@ def owner_pets_json(owner_id):
     return jsonify({"pets": [dict(p) for p in pets]})
 
 
+@crm_bp.route("/owners/search-json")
+@login_required
+def owner_search_json():
+    """Type-to-search behind every owner dropdown in the app.
+
+    The dropdowns used to render a capped slice of the table (LIMIT 200-500),
+    so once a clinic passed the cap its newer clients were simply unselectable
+    — no error, no sign anything was missing. The search here runs against the
+    WHOLE table and returns the first 25 matches, so what is reachable is not
+    decided by how many owners the clinic has.
+    """
+    q = (request.args.get("q") or "").strip()
+    if len(q) < 2:
+        return jsonify({"owners": []})
+    return jsonify({"owners": [
+        {"id": o["id"], "full_name": o["full_name"], "phone": o["phone"]}
+        for o in db.list_owners(search=q, limit=25)
+    ]})
+
+
 # ─────────────────────────────────────────────────────────────
 # OWNERS — EDIT
 # ─────────────────────────────────────────────────────────────
@@ -554,7 +585,16 @@ def owner_edit(owner_id):
                                    is_edit=True, active="crm",
                                    page_title=f"Edit — {owner['full_name']}")
 
-        db.update_owner(owner_id, data)
+        try:
+            db.update_owner(owner_id, data)
+        except db.DuplicatePhone as dup:
+            flash("%s Open %s instead, or use a different number."
+                  % (str(dup), dup.owner_name or "that client"), "danger")
+            return render_template("crm/owner_form.html", owner={**owner, **data},
+                                   is_edit=True, active="crm",
+                                   page_title=f"Edit — {owner['full_name']}",
+                                   duplicate_owner_id=dup.owner_id,
+                                   duplicate_owner_name=dup.owner_name)
 
         # Update arabic fields
         full_name_ar = request.form.get("full_name_ar", "").strip()
