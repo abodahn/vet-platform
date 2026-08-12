@@ -488,6 +488,15 @@ def _coerce_date(val):
 
 
 def _save_staff_fields(f, conn, user_id=None):
+    # Both New Staff and Edit Staff come through here, so the guard goes here
+    # too rather than on each route. This form writes users.role from a plain
+    # <select> with no server-side check of who was allowed to pick what — an
+    # HR officer could open their own profile, choose "super_admin", and own
+    # the system.
+    from blueprints.auth.routes import guard_role_change
+    guard_role_change(conn, user_id, f.get("role", ""),
+                      1 if f.get("is_active") else 0)
+
     full_name         = f.get("full_name", "").strip()
     full_name_ar      = f.get("full_name_ar", "").strip()
     email             = f.get("email", "").strip()

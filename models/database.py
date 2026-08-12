@@ -1527,7 +1527,7 @@ CREATE TABLE IF NOT EXISTS batches (
     expiry_date    TEXT,
     quantity       REAL DEFAULT 0.0,
     unit_cost      REAL DEFAULT 0.0,
-    received_at    TEXT DEFAULT (datetime('now')),
+    received_at    TEXT DEFAULT (datetime('now','localtime')),
     received_by    TEXT,
     notes          TEXT,
     FOREIGN KEY (item_id)      REFERENCES items(id),
@@ -1705,7 +1705,7 @@ CREATE TABLE IF NOT EXISTS payments (
     reference      TEXT,
     notes          TEXT,
     received_by    TEXT,
-    received_at    TEXT DEFAULT (datetime('now')),
+    received_at    TEXT DEFAULT (datetime('now','localtime')),
     FOREIGN KEY (invoice_id) REFERENCES invoices(id),
     FOREIGN KEY (owner_id)   REFERENCES owners(id)
 );

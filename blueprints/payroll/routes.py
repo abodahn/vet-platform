@@ -673,6 +673,11 @@ def salary_payslip(sid):
 def api_attendance_summary(uid, year, month):
     if not _may_see_salary({"user_id": uid}):
         return jsonify({"error": "forbidden"}), 403
+    # month/year come from the URL. calendar.monthrange raises IllegalMonthError
+    # on anything outside 1..12, which reached the client as a 500 and a stack
+    # trace from a URL anybody can type.
+    if not (1 <= month <= 12) or not (1900 <= year <= 2200):
+        return jsonify({"error": "bad period"}), 400
     conn = db.get_db()
     summary = _get_attendance_summary(conn, uid, year, month)
     conn.close()

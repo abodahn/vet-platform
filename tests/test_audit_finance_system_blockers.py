@@ -146,7 +146,7 @@ def test_a_role_still_held_by_staff_cannot_be_deleted(app):
 # ═══════════════════════════════════════════════════════════════════════
 
 @pytest.fixture
-def owner_id():
+def owner_id(app):
     conn = db.get_db()
     row = conn.execute("SELECT id FROM owners ORDER BY id LIMIT 1").fetchone()
     if row:
@@ -507,3 +507,41 @@ def test_keeping_the_local_version_is_recorded_and_not_misreported(app):
         "which side was kept is still not recorded (%r)" % row["resolution_status"]
     assert "device version" in row["local_payload"], \
         "the device's copy was discarded, so it cannot be recovered by hand"
+
+
+def test_the_payment_ledger_is_stamped_in_the_clinics_local_time(owner_id):
+    """Money taken now must land on today's till, whatever UTC thinks.
+
+    payments.received_at defaulted to SQLite's datetime('now'), which is UTC,
+    while every date this app compares against — issue_date, date.today(), the
+    daily closing window — is the clinic's LOCAL date. In Cairo (UTC+3) every
+    payment taken after 21:00 was filed under yesterday, so three hours of each
+    evening's takings never appeared in Today's Revenue and the drawer never
+    reconciled. Found because a test written for a different bug failed at
+    21:45 local.
+    """
+    from datetime import date as _date
+    inv_id = _make_invoice(owner_id, 77.0)
+    db.add_payment(inv_id, owner_id, 77.0, method="Cash", received_by="test",
+                   idempotency_key="localtime-%d" % inv_id)
+
+    conn = db.get_db()
+    stamped = conn.execute(
+        "SELECT received_at FROM payments WHERE invoice_id=?", (inv_id,)).fetchone()[0]
+    conn.close()
+    assert stamped[:10] == _date.today().isoformat(), (
+        "the ledger says %s but the clinic's today is %s — an evening's takings "
+        "would be filed under the wrong day"
+        % (stamped[:10], _date.today().isoformat()))
+
+
+def test_money_taken_now_appears_in_todays_till(owner_id):
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    before = db.get_finance_summary(date_from=today, date_to=today)["collected"]
+    inv_id = _make_invoice(owner_id, 55.0)
+    db.add_payment(inv_id, owner_id, 55.0, method="Cash", received_by="test",
+                   idempotency_key="till-%d" % inv_id)
+    after = db.get_finance_summary(date_from=today, date_to=today)["collected"]
+    assert round(after - before, 2) == 55.00, \
+        "55 taken now moved today's till by %.2f" % (after - before)

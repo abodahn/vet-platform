@@ -279,6 +279,129 @@ def _role_permissions(role: str):
     return perms
 
 
+# ─────────────────────────────────────────────────────────────────────────
+#  WHO MAY GRANT WHAT
+#
+#  The staff form writes users.role straight from a <select>. Nothing checked
+#  that the person doing the writing was entitled to hand out what they were
+#  handing out, so an HR officer could open their OWN profile, pick
+#  "super_admin", and own the system. Reproduced before this existed.
+#
+#  Rank, not a permission key: this is about seniority, and a permission set
+#  cannot express "may create somebody like me but not somebody above me".
+# ─────────────────────────────────────────────────────────────────────────
+
+ROLE_RANK = {
+    "super_admin":    100,
+    "clinic_owner":    90,
+    "support_admin":   80,
+    "branch_manager":  70,
+    "hr":              60,
+    "finance":         60,
+    "auditor":         50,
+    # Everyone who does the clinical or front-desk work. None of them manages
+    # anybody, so none of them grants anything.
+    "doctor":          10,
+    "nurse":           10,
+    "reception":       10,
+    "pharmacist":      10,
+    "inventory_mgr":   10,
+    "groomer":         10,
+    "boarding_staff":  10,
+}
+
+
+def role_rank(role: str) -> int:
+    """Seniority of `role`. Unknown roles rank 0 — they grant nothing."""
+    return ROLE_RANK.get((role or "").strip(), 0)
+
+
+# Managing people is a capability of its own, not a by-product of seniority.
+# Rank alone said a nurse (10) could grant doctor (10) — same rank, so the
+# comparison passed. A nurse manages nobody.
+ROLE_GRANTERS = frozenset({"super_admin", "clinic_owner", "support_admin",
+                           "branch_manager", "hr"})
+
+
+def may_grant_role(actor_role: str, target_role: str) -> bool:
+    """True if `actor_role` is entitled to put somebody on `target_role`."""
+    actor, target = (actor_role or "").strip(), (target_role or "").strip()
+    # ONLY a super_admin creates a super_admin. A clinic owner runs a clinic;
+    # the system-wide role is not theirs to hand out, and letting them mint it
+    # makes every other rule here bypassable in one step.
+    if target == "super_admin":
+        return actor == "super_admin"
+    if actor == "super_admin":
+        return True
+    if actor not in ROLE_GRANTERS:
+        return False
+    return role_rank(actor) >= role_rank(target) > 0
+
+
+class RoleChangeRefused(PermissionError):
+    """Raised instead of silently writing a role somebody may not grant."""
+
+
+def guard_role_change(conn, target_user_id, new_role, new_active=1):
+    """Refuse an unsafe write to users.role / users.is_active.
+
+    Called by every path that writes them. Four rules, each of which was a
+    real hole:
+
+      1. the role has to EXIST — "wizard" was accepted and then resolved to
+         nothing, which used to mean access to everything;
+      2. you may not grant above your own rank, and only a super_admin makes
+         a super_admin;
+      3. you may not change your OWN role, at any rank — self-promotion is
+         the whole attack, and a genuine promotion is somebody else's to make;
+      4. the last active super_admin may not be demoted or switched off, by
+         anyone including themselves. With none left there is no way back in.
+    """
+    actor = session.get("user") or {}
+    actor_role = actor.get("role", "")
+    actor_id = actor.get("id")
+    new_role = (new_role or "").strip()
+
+    known = set(ROLE_RANK) | set(db.DEFAULT_ROLE_PERMISSIONS)
+    try:
+        known.update(r[0] for r in conn.execute("SELECT name FROM roles").fetchall())
+    except Exception:
+        pass
+    if new_role and new_role not in known:
+        raise RoleChangeRefused("There is no role called %r." % new_role)
+
+    row = None
+    if target_user_id:
+        row = conn.execute(
+            "SELECT id, role, is_active FROM users WHERE id=?",
+            (target_user_id,)).fetchone()
+    current_role = row["role"] if row else None
+
+    is_self = bool(actor_id and target_user_id and int(actor_id) == int(target_user_id))
+    if is_self:
+        if new_role and current_role and new_role != current_role:
+            raise RoleChangeRefused(
+                "You cannot change your own role. Ask another administrator.")
+        if not new_active:
+            raise RoleChangeRefused("You cannot deactivate your own account.")
+
+    if new_role and new_role != current_role and not may_grant_role(actor_role, new_role):
+        raise RoleChangeRefused(
+            "Your role (%s) cannot grant %s." % (actor_role or "none", new_role))
+
+    # The last way in.
+    if row and current_role == "super_admin" and row["is_active"]:
+        losing_admin = (new_role and new_role != "super_admin") or (not new_active)
+        if losing_admin:
+            others = conn.execute(
+                "SELECT COUNT(*) FROM users WHERE role='super_admin'"
+                " AND is_active=1 AND id!=?", (target_user_id,)).fetchone()[0]
+            if not others:
+                raise RoleChangeRefused(
+                    "This is the last active super admin. Promote somebody else "
+                    "first, or nobody will be able to get back in.")
+
+
 def has_permission(permission: str, role: str = None) -> bool:
     """True if `role` (default: the logged-in user's) grants `permission`.
 

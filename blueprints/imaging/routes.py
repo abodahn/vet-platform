@@ -10,7 +10,7 @@ import base64
 import uuid
 import io
 from datetime import datetime
-from flask import (current_app, render_template, request, jsonify,
+from flask import (current_app, render_template, request, jsonify, abort,
                    redirect, url_for, flash, session, send_from_directory)
 from werkzeug.utils import secure_filename
 
@@ -220,6 +220,11 @@ def pet_studies(pet_id):
         pet, studies = {}, []
     finally:
         conn.close()
+    # A pet that does not exist left `pet` as {} and the template then read
+    # pet.pet_name off it — UndefinedError, a 500 and a stack trace, on a URL
+    # anybody can type. 404 is the honest answer.
+    if not pet:
+        abort(404)
     return render_template("imaging/pet_studies.html",
                            pet=pet, studies=studies, active="clinical",
                            page_title=f"Imaging — {pet.get('pet_name','Pet')}")

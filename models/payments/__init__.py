@@ -260,8 +260,8 @@ def refund(intent_id: int, amount=None, actor: str = "", reason: str = "") -> di
             conn.execute(
                 "INSERT INTO payments"
                 "(invoice_id, owner_id, amount, method, channel, reference,"
-                " notes, received_by)"
-                " VALUES(?,?,?,?,?,?,?,?)",
+                " notes, received_by, received_at)"
+                " VALUES(?,?,?,?,?,?,?,?,datetime('now','localtime'))",
                 (intent["invoice_id"], intent["owner_id"], str(-amt),
                  f"Refund ({intent['gateway']})", intent["gateway"],
                  result.get("gateway_ref", ""), reason or "Refund", actor))
@@ -396,11 +396,22 @@ def _succeed(intent_id: int, gateway_ref: str, actor: str) -> dict:
                          (gateway_ref, intent_id))
             # THE LEDGER ROW. This is what add_payment never wrote, and why the
             # system could say an invoice was paid but not by whom or how.
+            # received_at is stamped in LOCAL time, explicitly.
+            #
+            # The column default is datetime('now'), which SQLite evaluates in
+            # UTC, while every date this app compares against — issue_date,
+            # date.today(), the daily closing window — is the clinic's local
+            # date. In Cairo (UTC+3) that put every payment taken after 21:00
+            # onto YESTERDAY's till, so three hours of each evening's takings
+            # never appeared in "Today's Revenue" and the drawer never
+            # reconciled. Passing it explicitly also fixes existing databases,
+            # whose baked-in column default cannot be changed by editing the
+            # schema.
             conn.execute(
                 "INSERT INTO payments"
                 "(invoice_id, owner_id, amount, method, channel, reference,"
-                " notes, received_by)"
-                " VALUES(?,?,?,?,?,?,?,?)",
+                " notes, received_by, received_at)"
+                " VALUES(?,?,?,?,?,?,?,?,datetime('now','localtime'))",
                 (intent["invoice_id"], intent["owner_id"], intent["amount"],
                  get(intent["gateway"]).label, intent["gateway"], gateway_ref,
                  "", actor))

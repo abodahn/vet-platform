@@ -942,6 +942,21 @@ def role_assign():
         flash("There is no role called %r. Pick one that exists, or create it "
               "first." % role, "danger")
         return redirect(url_for("system.roles_list"))
+    # The same guard the staff form uses: this route writes users.role too, and
+    # a rule enforced on one of two writers is not enforced.
+    from blueprints.auth.routes import guard_role_change, RoleChangeRefused
+    conn = db.get_db()
+    try:
+        guard_role_change(conn, user_id, role, 1)
+    except RoleChangeRefused as e:
+        conn.close()
+        flash(str(e), "danger")
+        return redirect(url_for("system.roles_list"))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
     try:
         db.assign_user_role(user_id, role)
         db.log_audit(username=session["user"]["username"], role=session["user"]["role"],
