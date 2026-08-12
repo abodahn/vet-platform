@@ -91,6 +91,7 @@
         <td>
           <div class="action-group">
             <form method="post" action="{{ url_for('whatsapp.mark_reminder_sent', rid=r.id) }}" style="display:inline;">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
               <button type="submit" class="btn-mark" title="{{ t('Mark as sent without sending WhatsApp', 'تعليم كمرسلة بدون إرسال واتساب') }}">
                 {{ t('✓ Mark Sent', '✓ تعليم كمرسلة') }}
               </button>
@@ -120,6 +121,7 @@
   <div class="send-modal-box">
     <div class="send-modal-title">{{ t('📱 Send WhatsApp Message', '📱 إرسال رسالة واتساب') }}</div>
     <form method="post" action="{{ url_for('whatsapp.send_message') }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <label>{{ t('Phone Number', 'رقم الهاتف') }}</label>
       <input type="tel" name="phone" id="modal-phone" required placeholder="+20 10 xxxx xxxx">
       <input type="hidden" name="owner_id" id="modal-owner-id">

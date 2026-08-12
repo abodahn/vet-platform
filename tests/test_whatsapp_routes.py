@@ -1117,7 +1117,36 @@ def test_lookup_endpoints(client, wa):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @pytest.fixture
-def due_work(app, clinic):
+def _wa_disconnect(app):
+    """Genuinely unconfigured: no token in the environment AND none saved.
+
+    These tests used to express "not connected" by clearing $WAPILOT_TOKEN
+    alone, because that was the only place the scheduler ever looked. That was
+    the bug — the token saved in WhatsApp → Settings could not reach the
+    nightly job. Now that the job reads the settings the UI writes, "not
+    connected" has to mean both, or an earlier test's saved token makes these
+    dial out for real: one send measured at 535 SECONDS against an
+    unreachable endpoint.
+    """
+    with app.app_context():
+        conn = db.get_db()
+        conn.execute("DELETE FROM settings WHERE category='wapilot'")
+        # ...and put the three reminder switches back to their default of ON.
+        #
+        # /whatsapp/settings writes "0" for any checkbox ABSENT from the form —
+        # correct HTML behaviour — so test_wa_settings_post_persists_both_
+        # categories, which posts only the token fields, switches all three
+        # reminder types OFF for every test that follows it in this shared
+        # session database. Before the switches were wired the scheduler
+        # ignored them and nothing noticed; now they work, and the leftover
+        # "0" silently disabled twelve later tests.
+        conn.execute("DELETE FROM settings WHERE key LIKE 'reminder_%'")
+        conn.commit()
+        conn.close()
+
+
+@pytest.fixture
+def due_work(app, clinic, _wa_disconnect):
     """One appointment tomorrow, one vaccine due today, one overdue invoice.
 
     Everything a full reminder run should pick up, for the same owner, whose

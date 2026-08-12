@@ -65,7 +65,30 @@ def _mark_sent(conn, run_type: str, entity_id: int, entity_type: str):
 
 
 def _send_whatsapp(conn, phone: str, message: str, owner_id=None, template_name=""):
-    """Insert into whatsapp_log (stub — real API token set via WAPILOT_TOKEN env var)."""
+    """Send one reminder.
+
+    KNOWN GAP, verified and deliberately NOT changed here — see
+    docs/AUDIT_FINDINGS.md and the note below.
+
+    This reads only $WAPILOT_TOKEN and POSTs to a hardcoded endpoint, while the
+    Send screen (blueprints/whatsapp/routes._client) reads wapilot_token AND
+    wapilot_instance_id from the settings table and posts through
+    WapilotClient to a different URL with a different payload shape. So a
+    clinic that connects WhatsApp in the UI gets a working Send screen and a
+    nightly job that still logs "Not Configured" for every reminder.
+
+    That is real and it is the reason scheduled reminders have never been
+    deliverable. It is not fixed in this commit because making the job read the
+    settings changes what "configured" MEANS for the whole module, and the 104
+    tests in test_whatsapp_routes.py encode the old contract — they express
+    "not connected" by clearing the env var alone. Landing it properly means
+    updating that contract deliberately, plus a per-run failure cap: one send
+    against an unreachable host was measured at 535 SECONDS, so a run over 200
+    clients would block the scheduler for hours.
+
+    The switches, the message templates and the overdue amount ARE fixed in
+    this commit; they are independent of which transport is used.
+    """
     import os, json
     status = "Pending"
     error = ""
@@ -106,8 +129,54 @@ def _send_whatsapp(conn, phone: str, message: str, owner_id=None, template_name=
     return status
 
 
+def _wa_setting(conn, key, default=""):
+    """One saved WhatsApp setting, or `default`.
+
+    The three switches and the three message boxes on WhatsApp → Settings were
+    WRITE-ONLY: wa_settings() persisted reminder_appt_enabled,
+    reminder_vaccine_enabled, reminder_invoice_enabled and the matching _msg
+    templates, and this module read none of them. Turning appointment
+    reminders off did not stop them, and editing the message changed nothing —
+    the hardcoded English text below went out either way. A switch that does
+    nothing is worse than no switch, because somebody trusts it.
+    """
+    try:
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    except Exception:
+        return default
+    if not row or row[0] is None or row[0] == "":
+        return default
+    return row[0]
+
+
+def _enabled(conn, key) -> bool:
+    """A reminder type is ON unless it was explicitly switched off."""
+    return str(_wa_setting(conn, key, "1")).strip() not in ("0", "false", "no", "off")
+
+
+def _render(template, fallback, **fields):
+    """Fill {owner}/{pet}/{date}… in a clinic's own message.
+
+    A bad placeholder in text somebody typed must not stop the reminder going
+    out, so an unknown field falls back to the built-in wording rather than
+    raising inside the nightly job.
+    """
+    text = (template or "").strip()
+    if not text:
+        return fallback
+    try:
+        return text.format(**fields)
+    except (KeyError, IndexError, ValueError):
+        logger.warning("reminder template has an unknown placeholder — "
+                       "using the built-in wording instead")
+        return fallback
+
+
 def _appointment_reminders(conn) -> int:
     """Remind owners of appointments scheduled for tomorrow."""
+    if not _enabled(conn, "reminder_appt_enabled"):
+        logger.info("appointment reminders are switched off in Settings")
+        return 0
     tomorrow = (date.today() + timedelta(days=1)).isoformat()
     appts = conn.execute("""
         SELECT a.id, a.appt_date, a.appt_start, a.appointment_type,
@@ -124,12 +193,16 @@ def _appointment_reminders(conn) -> int:
     for a in appts:
         if _already_sent(conn, "appt_reminder", a["id"], "appointment"):
             continue
-        msg = (
+        built_in = (
             f"Dear {a['full_name']},\n"
             f"Reminder: {a['pet_name']} has a {a['appointment_type']} appointment tomorrow "
             f"({a['appt_date']} at {a['appt_start'] or 'TBD'}).\n"
             f"Please arrive 10 minutes early. Reply CONFIRM to confirm."
         )
+        msg = _render(_wa_setting(conn, "reminder_appt_msg"), built_in,
+                      owner=a["full_name"], pet=a["pet_name"],
+                      date=a["appt_date"], time=a["appt_start"] or "TBD",
+                      type=a["appointment_type"])
         status = _send_whatsapp(conn, a["whatsapp_phone"], msg,
                                 owner_id=a["owner_id"], template_name="appt_reminder")
         _mark_sent(conn, "appt_reminder", a["id"], "appointment")
@@ -140,6 +213,9 @@ def _appointment_reminders(conn) -> int:
 
 def _vaccine_reminders(conn) -> int:
     """Remind owners of vaccines due today or overdue by up to 7 days."""
+    if not _enabled(conn, "reminder_vaccine_enabled"):
+        logger.info("vaccine reminders are switched off in Settings")
+        return 0
     today = date.today().isoformat()
     week_ago = (date.today() - timedelta(days=7)).isoformat()
     vaccines = conn.execute("""
@@ -158,12 +234,15 @@ def _vaccine_reminders(conn) -> int:
         if _already_sent(conn, "vaccine_reminder", v["id"], "vaccination"):
             continue
         overdue = v["next_due_at"] < today
-        msg = (
+        built_in = (
             f"Dear {v['full_name']},\n"
             f"{'OVERDUE: ' if overdue else ''}{v['pet_name']} is {'overdue for' if overdue else 'due for'} "
             f"the {v['vaccine_name']} vaccine (due: {v['next_due_at']}).\n"
             f"Please book an appointment at your earliest convenience."
         )
+        msg = _render(_wa_setting(conn, "reminder_vaccine_msg"), built_in,
+                      owner=v["full_name"], pet=v["pet_name"],
+                      vaccine=v["vaccine_name"], date=v["next_due_at"])
         status = _send_whatsapp(conn, v["whatsapp_phone"], msg,
                                 owner_id=v["owner_id"], template_name="vaccine_reminder")
         _mark_sent(conn, "vaccine_reminder", v["id"], "vaccination")
@@ -174,10 +253,13 @@ def _vaccine_reminders(conn) -> int:
 
 def _invoice_reminders(conn) -> int:
     """Remind owners of invoices overdue by 3+ days."""
+    if not _enabled(conn, "reminder_invoice_enabled"):
+        logger.info("invoice reminders are switched off in Settings")
+        return 0
     today = date.today().isoformat()
     three_days_ago = (date.today() - timedelta(days=3)).isoformat()
     invoices = conn.execute("""
-        SELECT inv.id, inv.invoice_number, inv.total, inv.due_date,
+        SELECT inv.id, inv.invoice_number, inv.total, inv.due_amount, inv.due_date,
                o.id owner_id, o.full_name, o.whatsapp_phone
         FROM invoices inv
         JOIN owners o ON o.id = inv.owner_id
@@ -190,11 +272,22 @@ def _invoice_reminders(conn) -> int:
     for inv in invoices:
         if _already_sent(conn, "invoice_reminder", inv["id"], "invoice"):
             continue
-        msg = (
+        # What is still OWED, not what was invoiced. This quoted inv['total'],
+        # so a client who had already paid most of a large invoice was chased
+        # for the whole amount — the clinic looked like it had lost the
+        # payment, and the client rang up to argue rather than to pay.
+        owed = float(inv["due_amount"] if inv["due_amount"] is not None
+                     else inv["total"] or 0)
+        built_in = (
             f"Dear {inv['full_name']},\n"
-            f"Invoice #{inv['invoice_number']} for {inv['total']:.2f} was due on {inv['due_date']} and remains unpaid.\n"
+            f"Invoice #{inv['invoice_number']} has {owed:.2f} outstanding "
+            f"(due {inv['due_date']}).\n"
             f"Please contact us to settle your balance. Thank you."
         )
+        msg = _render(_wa_setting(conn, "reminder_invoice_msg"), built_in,
+                      owner=inv["full_name"], invoice=inv["invoice_number"],
+                      amount="%.2f" % owed, date=inv["due_date"],
+                      total="%.2f" % float(inv["total"] or 0))
         status = _send_whatsapp(conn, inv["whatsapp_phone"], msg,
                                 owner_id=inv["owner_id"], template_name="invoice_reminder")
         _mark_sent(conn, "invoice_reminder", inv["id"], "invoice")
