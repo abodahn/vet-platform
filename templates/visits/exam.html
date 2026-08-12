@@ -94,6 +94,45 @@
     <!-- Things that must be seen before anyone touches the animal or the till -->
     <div id="hwAlerts" class="hw-alerts"></div>
 
+    <!-- ── TABS ─────────────────────────────────────────────────────
+         Everything about this client and every animal they own, without
+         leaving the page or scrolling past what you are not looking for.
+         Counters and badges live on the tab itself, so "does this client owe
+         anything?" is answered before you click. -->
+    <nav class="hw-tabs" id="hwTabs" role="tablist">
+      <button type="button" class="hw-tab is-on" data-tab="visit" role="tab">
+        <span class="hw-tab-i">🩺</span><span>{{ t('Visit', 'الكشف') }}</span></button>
+      <button type="button" class="hw-tab" data-tab="pets" role="tab">
+        <span class="hw-tab-i">🐾</span><span>{{ t('Pets', 'الحيوانات') }}</span>
+        <span class="hw-badge-n" data-count="pets"></span></button>
+      <button type="button" class="hw-tab" data-tab="owner" role="tab">
+        <span class="hw-tab-i">👤</span><span>{{ t('Owner', 'المالك') }}</span></button>
+      <button type="button" class="hw-tab" data-tab="planned" role="tab">
+        <span class="hw-tab-i">📅</span><span>{{ t('Planned', 'المواعيد') }}</span>
+        <span class="hw-badge-n hw-b-info" data-count="upcoming"></span></button>
+      <button type="button" class="hw-tab" data-tab="history" role="tab">
+        <span class="hw-tab-i">🕘</span><span>{{ t('History', 'السجل') }}</span>
+        <span class="hw-badge-n" data-count="visits"></span></button>
+      <button type="button" class="hw-tab" data-tab="medical" role="tab">
+        <span class="hw-tab-i">💊</span><span>{{ t('Medical', 'طبي') }}</span>
+        <span class="hw-badge-n hw-b-warn" data-count="overdue_vaccines"></span></button>
+      <button type="button" class="hw-tab" data-tab="invoices" role="tab">
+        <span class="hw-tab-i">🧾</span><span>{{ t('Invoices', 'الفواتير') }}</span>
+        <span class="hw-badge-n hw-b-danger" data-count="unpaid"></span></button>
+      <button type="button" class="hw-tab" data-tab="payments" role="tab">
+        <span class="hw-tab-i">💰</span><span>{{ t('Payments', 'المدفوعات') }}</span>
+        <span class="hw-badge-n" data-count="payments"></span></button>
+      <button type="button" class="hw-tab" data-tab="reminders" role="tab">
+        <span class="hw-tab-i">🔔</span><span>{{ t('Reminders', 'التذكيرات') }}</span>
+        <span class="hw-badge-n" data-count="reminders"></span></button>
+      <button type="button" class="hw-tab" data-tab="docs" role="tab">
+        <span class="hw-tab-i">📎</span><span>{{ t('Documents', 'الملفات') }}</span>
+        <span class="hw-badge-n" data-count="documents"></span></button>
+      <button type="button" class="hw-tab" data-tab="notes" role="tab">
+        <span class="hw-tab-i">📝</span><span>{{ t('Notes', 'ملاحظات') }}</span></button>
+    </nav>
+
+    <section class="hw-panel is-on" data-panel="visit">
     <div class="hw-grid">
 
       <!-- LEFT: pet, symptom, owner -->
@@ -373,9 +412,10 @@
       </details>
     </div>
 
-    <!-- DETAIL PANELS — all on the page, nothing behind a click -->
-    <div class="hw-detail">
+    </section>
 
+    <section class="hw-panel" data-panel="history">
+      <div class="hw-detail">
       <details class="pf-card hw-pane hw-fold" data-fold="hist" open>
         <summary class="hw-h">{{ t('History', 'السجل') }}
           <span class="hw-muted" id="hwHistCount"></span></summary>
@@ -394,8 +434,12 @@
             {{ t('No previous visits.', 'لا توجد زيارات سابقة.') }}</p>
         </div>
       </details>
+      </div>
+    </section>
 
-      <details class="pf-card hw-pane hw-fold" data-fold="vax">
+    <section class="hw-panel" data-panel="medical">
+      <div class="hw-detail">
+      <details class="pf-card hw-pane hw-fold" data-fold="vax" open>
         <summary class="hw-h">{{ t('Vaccinations', 'التطعيمات') }}
           <span class="hw-muted" id="hwVaxCount"></span></summary>
         <div class="hw-tablewrap hw-scroll">
@@ -411,8 +455,7 @@
             {{ t('No vaccinations recorded.', 'لا توجد تطعيمات مسجلة.') }}</p>
         </div>
       </details>
-
-      <details class="pf-card hw-pane hw-fold" data-fold="med">
+      <details class="pf-card hw-pane hw-fold" data-fold="med" open>
         <summary class="hw-h">{{ t('Medications', 'الأدوية') }}
           <span class="hw-muted" id="hwMedCount"></span></summary>
         <div class="hw-tablewrap hw-scroll">
@@ -429,8 +472,7 @@
             {{ t('No medications recorded.', 'لا توجد أدوية مسجلة.') }}</p>
         </div>
       </details>
-
-      <details class="pf-card hw-pane hw-fold" data-fold="dx">
+      <details class="pf-card hw-pane hw-fold" data-fold="dx" open>
         <summary class="hw-h">{{ t('Diagnoses', 'التشخيصات') }}
           <span class="hw-muted" id="hwDxCount"></span></summary>
         <div class="hw-tablewrap hw-scroll">
@@ -446,8 +488,12 @@
             {{ t('No diagnoses recorded.', 'لا توجد تشخيصات مسجلة.') }}</p>
         </div>
       </details>
+      </div>
+    </section>
 
-      <details class="pf-card hw-pane hw-fold hw-span-all" data-fold="inv">
+    <section class="hw-panel" data-panel="invoices">
+      <div class="hw-detail">
+      <details class="pf-card hw-pane hw-fold hw-span-all" data-fold="inv" open>
         <summary class="hw-h">{{ t("This client's invoices", 'فواتير العميل') }}
           <span class="hw-muted" id="hwInvCount"></span></summary>
         <div class="hw-tablewrap hw-scroll">
@@ -466,8 +512,214 @@
             {{ t('No invoices for this client.', 'لا توجد فواتير لهذا العميل.') }}</p>
         </div>
       </details>
-    </div>
+      </div>
+    </section>
+
+    <!-- ── PETS ──────────────────────────────────────────────────── -->
+    <section class="hw-panel" data-panel="pets">
+      <div class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Every pet this client owns', 'كل حيوانات هذا العميل') }}</h3>
+        <div id="hwPetCards" class="hw-cards"></div>
+        <details class="hw-fold hw-mt" data-fold="addpet">
+          <summary class="hw-h">+ {{ t('Add another pet', 'أضف حيوان آخر') }}</summary>
+          <div class="hw-pairs hw-mt">
+            <div><label class="hw-label" for="apName">{{ t('Pet name', 'اسم الحيوان') }} *</label>
+                 <input id="apName" class="hw-input hw-input-lg"></div>
+            <div><label class="hw-label" for="apSpecies">{{ t('Species', 'النوع') }}</label>
+                 <input id="apSpecies" class="hw-input" list="hwSpeciesList"></div>
+            <div><label class="hw-label" for="apBreed">{{ t('Breed', 'السلالة') }}</label>
+                 <input id="apBreed" class="hw-input"></div>
+            <div><label class="hw-label" for="apSex">{{ t('Sex', 'الجنس') }}</label>
+                 <select id="apSex" class="hw-input">
+                   <option value="Unknown">—</option>
+                   <option value="M">{{ t('Male', 'ذكر') }}</option>
+                   <option value="F">{{ t('Female', 'أنثى') }}</option>
+                 </select></div>
+            <div><label class="hw-label" for="apDob">{{ t('Date of birth', 'تاريخ الميلاد') }}</label>
+                 <input type="date" id="apDob" class="hw-input"></div>
+          </div>
+          <p id="hwApError" class="hw-vitalwarn" hidden></p>
+          <button type="button" id="hwApSave" class="pf-btn pf-btn-primary hw-mt">
+            {{ t('Add pet and open it', 'أضف الحيوان وافتحه') }}</button>
+        </details>
+      </div>
+    </section>
+
+    <!-- ── OWNER ─────────────────────────────────────────────────── -->
+    <section class="hw-panel" data-panel="owner">
+      <div class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Client details', 'بيانات العميل') }}
+          <span id="fVip2" class="hw-badge hw-vip" hidden>VIP</span></h3>
+        <div class="hw-pairs">
+          <div><label class="hw-label">{{ t('Name', 'الاسم') }}</label>
+               <input class="hw-input" id="oName" readonly></div>
+          <div><label class="hw-label">{{ t('Phone', 'الهاتف') }}</label>
+               <input class="hw-input" id="oPhone" readonly></div>
+          <div><label class="hw-label">{{ t('WhatsApp', 'واتساب') }}</label>
+               <input class="hw-input" id="oWhats" readonly></div>
+          <div><label class="hw-label">{{ t('Email', 'البريد') }}</label>
+               <input class="hw-input" id="oEmail" readonly></div>
+          <div class="hw-span2"><label class="hw-label">{{ t('Address', 'العنوان') }}</label>
+               <input class="hw-input" id="oAddress" readonly></div>
+          <div><label class="hw-label">{{ t('Preferred doctor', 'الطبيب المفضل') }}</label>
+               <input class="hw-input" id="oPrefDoc" readonly></div>
+          <div><label class="hw-label">{{ t('Contact by', 'وسيلة التواصل') }}</label>
+               <input class="hw-input" id="oPrefContact" readonly></div>
+          <div><label class="hw-label">{{ t('Outstanding', 'المديونية') }}</label>
+               <input class="hw-input hw-num" id="oOutstanding" readonly></div>
+          <div><label class="hw-label">{{ t('Loyalty points', 'نقاط الولاء') }}</label>
+               <input class="hw-input hw-num" id="oLoyalty" readonly></div>
+        </div>
+        <div class="hw-links hw-mt">
+          <a id="oEdit" class="pf-btn pf-btn-sm" href="#">{{ t('Edit client', 'تعديل العميل') }}</a>
+          <a id="oWaLink" class="pf-btn pf-btn-sm" href="#" target="_blank" rel="noopener">WhatsApp</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PLANNED VISITS ────────────────────────────────────────── -->
+    <section class="hw-panel" data-panel="planned">
+      <div class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Upcoming visits and planned actions', 'الزيارات والمواعيد القادمة') }}
+          <span class="hw-muted" id="hwPlannedCount"></span></h3>
+        <div class="hw-tablewrap hw-scroll">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('Date', 'التاريخ') }}</th>
+              <th class="hw-wq">{{ t('Time', 'الوقت') }}</th>
+              <th>{{ t('Pet', 'الحيوان') }}</th>
+              <th>{{ t('Type', 'النوع') }}</th>
+              <th>{{ t('Doctor', 'الطبيب') }}</th>
+              <th>{{ t('Status', 'الحالة') }}</th>
+            </tr></thead>
+            <tbody id="hwPlannedBody"></tbody>
+          </table>
+          <p id="hwNoPlanned" class="hw-muted hw-center">
+            {{ t('Nothing booked.', 'لا توجد مواعيد.') }}</p>
+        </div>
+        <div class="hw-links hw-mt">
+          <a id="lnkBook" class="pf-btn pf-btn-sm pf-btn-primary" href="#">
+            + {{ t('Book an appointment', 'حجز موعد') }}</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PAYMENTS ──────────────────────────────────────────────── -->
+    <section class="hw-panel" data-panel="payments">
+      <div class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Money received', 'المبالغ المحصلة') }}
+          <span class="hw-muted" id="hwPayCount"></span></h3>
+        <div class="hw-tablewrap hw-scroll">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('Date', 'التاريخ') }}</th>
+              <th>{{ t('Invoice', 'الفاتورة') }}</th>
+              <th class="hw-w">{{ t('Amount', 'المبلغ') }}</th>
+              <th>{{ t('Method', 'الطريقة') }}</th>
+              <th>{{ t('Received by', 'استلمها') }}</th>
+            </tr></thead>
+            <tbody id="hwPayBody"></tbody>
+          </table>
+          <p id="hwNoPay" class="hw-muted hw-center">
+            {{ t('No payments recorded.', 'لا توجد مدفوعات.') }}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── REMINDERS ─────────────────────────────────────────────── -->
+    <section class="hw-panel" data-panel="reminders">
+      <div class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Messages sent to this client', 'الرسائل المرسلة للعميل') }}
+          <span class="hw-muted" id="hwRemCount"></span></h3>
+        <div class="hw-tablewrap hw-scroll">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('Date', 'التاريخ') }}</th>
+              <th>{{ t('Type', 'النوع') }}</th>
+              <th>{{ t('Message', 'الرسالة') }}</th>
+              <th>{{ t('Status', 'الحالة') }}</th>
+            </tr></thead>
+            <tbody id="hwRemBody"></tbody>
+          </table>
+          <p id="hwNoRem" class="hw-muted hw-center">
+            {{ t('Nothing has been sent yet.', 'لم يتم إرسال أي رسالة.') }}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── DOCUMENTS ─────────────────────────────────────────────── -->
+    <section class="hw-panel" data-panel="docs">
+      <div class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Files and photos', 'الملفات والصور') }}
+          <span class="hw-muted" id="hwDocCount"></span></h3>
+        <div class="hw-tablewrap hw-scroll">
+          <table class="hw-table">
+            <thead><tr>
+              <th>{{ t('File', 'الملف') }}</th>
+              <th>{{ t('Caption', 'الوصف') }}</th>
+              <th>{{ t('Added', 'أُضيف') }}</th>
+              <th>{{ t('By', 'بواسطة') }}</th>
+            </tr></thead>
+            <tbody id="hwDocBody"></tbody>
+          </table>
+          <p id="hwNoDoc" class="hw-muted hw-center">
+            {{ t('No files yet. Attach one on the Visit tab.',
+                  'لا توجد ملفات. أرفق ملفاً من تبويب الكشف.') }}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── NOTES ─────────────────────────────────────────────────── -->
+    <section class="hw-panel" data-panel="notes">
+      <div class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Client note', 'ملاحظة العميل') }}</h3>
+        <p class="hw-muted hw-small">
+          {{ t('Shown on every visit for this client.', 'تظهر في كل زيارة لهذا العميل.') }}</p>
+        <div id="hwOwnerNoteBox" class="hw-notes hw-mt"></div>
+        <h3 class="hw-h hw-mt">{{ t('Pet note', 'ملاحظة الحيوان') }}</h3>
+        <div id="hwPetNoteBox" class="hw-notes"></div>
+      </div>
+    </section>
   </form>
+</div>
+
+<!-- ── PAYMENT MODAL ───────────────────────────────────────────────
+     Take the money where the invoice is, and get out of the way: one click
+     on Paid settles it, the dialog closes, and the row updates in place. It
+     used to mean leaving this screen for Finance and finding your way back. -->
+<div id="hwPayModal" class="hw-modal" hidden>
+  <div class="hw-modal-card">
+    <h3 class="hw-h" id="hwPayTitle">{{ t('Record payment', 'تسجيل دفعة') }}</h3>
+    <div class="hw-payrow"><span>{{ t('Invoice', 'الفاتورة') }}</span>
+      <strong id="hwPayInv">—</strong></div>
+    <div class="hw-payrow"><span>{{ t('Total', 'الإجمالي') }}</span>
+      <strong id="hwPayTotal" class="hw-num">0.00</strong></div>
+    <div class="hw-payrow"><span>{{ t('Already paid', 'المدفوع') }}</span>
+      <strong id="hwPayPaid" class="hw-num">0.00</strong></div>
+    <div class="hw-payrow hw-due"><span>{{ t('Still owed', 'المتبقي') }}</span>
+      <strong id="hwPayDue" class="hw-num">0.00</strong></div>
+
+    <label class="hw-label hw-mt" for="hwPayAmount">{{ t('Amount received', 'المبلغ المستلم') }}</label>
+    <input id="hwPayAmount" class="hw-input hw-input-xl" inputmode="decimal">
+    <div class="hw-quick hw-mt">
+      <button type="button" class="hw-chip" id="hwPayFull">
+        {{ t('Pay it all', 'سداد كامل') }}</button>
+    </div>
+
+    <label class="hw-label hw-mt">{{ t('Method', 'الطريقة') }}</label>
+    <div class="hw-radios">
+      <label><input type="radio" name="hwPayMethod" value="Cash" checked> {{ t('Cash', 'نقدي') }}</label>
+      <label><input type="radio" name="hwPayMethod" value="Visa"> VISA</label>
+      <label><input type="radio" name="hwPayMethod" value="Instapay"> Instapay</label>
+    </div>
+
+    <p id="hwPayError" class="hw-vitalwarn" hidden></p>
+    <div class="hw-actions">
+      <button type="button" id="hwPayConfirm" class="pf-btn pf-btn-primary hw-btn-big">
+        {{ t('Paid', 'تم الدفع') }}</button>
+      <button type="button" id="hwPayCancel" class="pf-btn">{{ t('Cancel', 'إلغاء') }}</button>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -589,6 +841,73 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
 .hw-petbtn.hw-active{background:var(--pf-primary,#0ea5e9);color:#fff;
                      border-color:transparent}
 
+/* ── TABS ──────────────────────────────────────────────────────────
+   Eleven destinations have to fit without becoming a wall of text, so the
+   icon carries the recognition and the label confirms it. */
+.hw-tabs{display:flex;gap:.3rem;overflow-x:auto;margin-bottom:1rem;
+         padding-bottom:.25rem;scrollbar-width:thin}
+.hw-tab{display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap;
+        padding:.5rem .85rem;border:1px solid var(--pf-border,#d0d5dd);
+        border-radius:10px;background:transparent;color:inherit;font:inherit;
+        font-size:.94rem;cursor:pointer;transition:background .12s,color .12s}
+.hw-tab:hover{background:var(--pf-hover-bg,#eef4fb)}
+.hw-tab.is-on{background:var(--pf-primary,#0ea5e9);color:#fff;
+              border-color:transparent;font-weight:600}
+.hw-tab:focus-visible{outline:2px solid var(--pf-primary,#0ea5e9);outline-offset:2px}
+.hw-tab-i{font-size:1.1rem;line-height:1}
+.hw-badge-n{min-width:1.35rem;padding:0 .35rem;border-radius:999px;
+            font-size:.75rem;font-weight:700;text-align:center;
+            background:var(--pf-muted-bg,#e6eaf0);color:inherit}
+.hw-tab.is-on .hw-badge-n{background:rgba(255,255,255,.28);color:#fff}
+.hw-badge-n[hidden]{display:none}
+.hw-b-danger{background:#dc2626;color:#fff}
+.hw-b-warn{background:#f59e0b;color:#111}
+.hw-b-info{background:#0ea5e9;color:#fff}
+.hw-tab.is-on .hw-b-danger,.hw-tab.is-on .hw-b-warn,.hw-tab.is-on .hw-b-info{
+  background:rgba(255,255,255,.9);color:#111}
+
+.hw-panel{display:none}
+.hw-panel.is-on{display:block}
+
+/* Pet cards: one tap to switch animal, with what matters on the face. */
+.hw-cards{display:grid;gap:.7rem;margin-top:.4rem;
+          grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.hw-petcard{text-align:start;padding:.8rem .9rem;border-radius:12px;cursor:pointer;
+            border:1px solid var(--pf-border,#d0d5dd);background:transparent;
+            color:inherit;font:inherit;transition:border-color .12s,background .12s}
+.hw-petcard:hover{background:var(--pf-hover-bg,#eef4fb)}
+.hw-petcard.is-current{border-color:var(--pf-primary,#0ea5e9);border-width:2px}
+.hw-petcard b{display:block;font-size:1.05rem;margin-bottom:.15rem}
+.hw-petcard span{font-size:.9rem;opacity:.7}
+.hw-pettags{display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.45rem}
+.hw-tag{font-size:.72rem;padding:.1rem .45rem;border-radius:999px;
+        background:var(--pf-muted-bg,#eef1f5)}
+.hw-tag-danger{background:#fee2e2;color:#7f1d1d}
+.hw-tag-warn{background:#fef3c7;color:#78350f}
+
+/* Payment modal. */
+.hw-modal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;
+          justify-content:center;padding:1rem;background:rgba(15,23,42,.55)}
+.hw-modal[hidden]{display:none}
+.hw-modal-card{width:100%;max-width:440px;max-height:92vh;overflow-y:auto;
+               padding:1.4rem;border-radius:16px;
+               background:var(--pf-card-bg,#fff);color:inherit;
+               box-shadow:0 24px 64px rgba(0,0,0,.35)}
+.hw-payrow{display:flex;justify-content:space-between;align-items:baseline;
+           padding:.35rem 0;font-size:1.02rem}
+.hw-payrow strong{font-variant-numeric:tabular-nums}
+.hw-payrow.hw-due strong{color:var(--pf-danger,#dc2626);font-size:1.3rem}
+.hw-paybtn{padding:.28rem .7rem;font-size:.86rem}
+.hw-st{font-size:.75rem;padding:.12rem .5rem;border-radius:999px;font-weight:600}
+.hw-st-paid{background:#dcfce7;color:#14532d}
+.hw-st-part{background:#fef3c7;color:#78350f}
+.hw-st-unpaid{background:#fee2e2;color:#7f1d1d}
+@media (prefers-color-scheme:dark){
+  .hw-st-paid{background:#052e16;color:#bbf7d0}
+  .hw-st-part{background:#422006;color:#fde68a}
+  .hw-st-unpaid{background:#450a0a;color:#fecaca}
+}
+
 /* Service picker: candidates WITH their prices, so nothing is added blind. */
 .hw-svcwrap{position:relative}
 .hw-svcrow{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;
@@ -668,6 +987,9 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     oneWeek:  {{ t('1 week', 'أسبوع') | tojson }},
     twoWeeks: {{ t('2 weeks', 'أسبوعان') | tojson }},
     oneMonth: {{ t('1 month', 'شهر') | tojson }},
+    pay:          {{ t('Pay', 'دفع') | tojson }},
+    amountNeeded: {{ t('Enter an amount greater than zero.', 'أدخل مبلغاً أكبر من صفر.') | tojson }},
+    needPetName:  {{ t('A pet name is required.', 'اسم الحيوان مطلوب.') | tojson }},
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -1213,6 +1535,10 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     renderAlerts(data);
     renderSiblings(data.siblings);
 
+    // Everything else about this client, for the other ten tabs.
+    if (o.id) loadOwner360(o.id);
+    renderNotes('hwPetNoteBox', L.notes, p.notes);
+
     fillTable('hwVaxBody', 'hwNoVax', 'hwVaxCount', data.vaccines, function (v) {
       return [v.vaccine_name, day(v.administered_at),
               {text: day(v.next_due_at), cls: v.overdue ? 'hw-od' : ''}];
@@ -1233,11 +1559,8 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
       return [c.diagnosis, c.severity, day(c.created_at)];
     }, function (c) { return c.visit_id ? '/visits/' + c.visit_id : null; });
 
-    fillTable('hwInvBody', 'hwNoInv', 'hwInvCount', data.invoices, function (i) {
-      return [i.invoice_number, day(i.issue_date), d2(i.total), d2(i.paid_amount),
-              {text: d2(i.due_amount), cls: Number(i.due_amount) > 0 ? 'hw-od' : ''},
-              i.status];
-    }, function (i) { return '/finance/invoices/' + i.id; });
+    // Invoices are rendered by renderOwner360 -> renderInvoices,
+    // which adds the inline Pay button. Nothing to do here.
 
     var wa = (txt(o.whatsapp_phone) || txt(o.phone)).replace(/[^\d]/g, '');
     $('hwOwnerName').textContent  = txt(o.full_name) || '—';
@@ -1434,6 +1757,292 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
   }
   ['fWeight', 'fTemp'].forEach(function (id) {
     $(id).addEventListener('input', checkVitals);
+  });
+
+  // ── tabs ──────────────────────────────────────────────────────────
+  var TABS = $('hwTabs');
+  function showTab(name) {
+    Array.prototype.forEach.call(TABS.querySelectorAll('.hw-tab'), function (b) {
+      b.classList.toggle('is-on', b.dataset.tab === name);
+      b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false');
+    });
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.hw-panel'), function (p) {
+        p.classList.toggle('is-on', p.dataset.panel === name);
+      });
+    try { localStorage.setItem('hw-tab', name); } catch (e) {}
+  }
+  TABS.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('.hw-tab') : null;
+    if (b) showTab(b.dataset.tab);
+  });
+
+  // ── the 360 view ──────────────────────────────────────────────────
+  var OWNER360 = null;
+
+  function setBadge(key, value, hideWhenZero) {
+    Array.prototype.forEach.call(
+      TABS.querySelectorAll('[data-count="' + key + '"]'), function (el) {
+        el.textContent = value ? String(value) : '';
+        el.hidden = hideWhenZero ? !value : !value;
+      });
+  }
+
+  function renderOwner360(d) {
+    OWNER360 = d;
+    var o = d.owner || {}, b = d.badges || {};
+
+    ['pets', 'visits', 'upcoming', 'payments', 'reminders', 'documents']
+      .forEach(function (k) { setBadge(k, b[k], true); });
+    setBadge('unpaid', b.unpaid, true);
+    setBadge('overdue_vaccines', b.overdue_vaccines, true);
+
+    // Owner tab
+    $('oName').value = txt(o.full_name);
+    $('oPhone').value = txt(o.phone);
+    $('oWhats').value = txt(o.whatsapp_phone);
+    $('oEmail').value = txt(o.email);
+    $('oAddress').value = txt(o.address);
+    $('oPrefDoc').value = txt(o.preferred_doctor);
+    $('oPrefContact').value = txt(o.preferred_contact);
+    $('oOutstanding').value = money(Number(b.outstanding || 0));
+    $('oLoyalty').value = txt(o.loyalty_balance) || '0';
+    $('fVip2').hidden = !o.vip_flag;
+    $('oEdit').href = '/crm/owners/' + o.id;
+    var wa = (txt(o.whatsapp_phone) || txt(o.phone)).replace(/[^\d]/g, '');
+    $('oWaLink').href = 'https://wa.me/' + (wa.indexOf('0') === 0 ? '2' + wa : wa);
+    $('lnkBook').href = '/appointments/new?owner_id=' + o.id;
+
+    renderNotes('hwOwnerNoteBox', L.notes, o.notes);
+
+    // Pets tab — one tap to switch animal
+    var host = $('hwPetCards');
+    while (host.firstChild) host.removeChild(host.firstChild);
+    (d.pets || []).forEach(function (p) {
+      var card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'hw-petcard' +
+        (current && current.pet && current.pet.id === p.id ? ' is-current' : '');
+      var nm = document.createElement('b');
+      nm.textContent = p.pet_name;
+      var meta = document.createElement('span');
+      meta.textContent = [p.species, p.breed, p.sex, p.age_text]
+        .filter(Boolean).join(' · ');
+      card.appendChild(nm); card.appendChild(meta);
+
+      var tags = document.createElement('div');
+      tags.className = 'hw-pettags';
+      if (p.allergies) tags.appendChild(tag(L.allergies, 'hw-tag-danger'));
+      if (p.chronic_conditions) tags.appendChild(tag(L.chronic, 'hw-tag-danger'));
+      var od = (d.vaccines || []).filter(function (v) {
+        return v.pet_id === p.id && v.overdue; }).length;
+      if (od) tags.appendChild(tag(L.overdueVax, 'hw-tag-warn'));
+      if (p.weight_kg) tags.appendChild(tag(Number(p.weight_kg).toFixed(1) + ' kg', ''));
+      card.appendChild(tags);
+
+      card.addEventListener('click', function () { loadPet(p.id); showTab('visit'); });
+      host.appendChild(card);
+    });
+
+    // Planned visits
+    fillTable('hwPlannedBody', 'hwNoPlanned', 'hwPlannedCount', d.upcoming,
+      function (a) {
+        return [day(a.appt_date), a.appt_start, a.pet_name,
+                a.appointment_type, a.doctor_name, a.status];
+      }, function (a) { return a.id ? '/appointments/' + a.id : null; });
+
+    // Payments
+    fillTable('hwPayBody', 'hwNoPay', 'hwPayCount', d.payments, function (p) {
+      return [day(p.received_at), p.invoice_number,
+              {text: d2(p.amount), cls: 'hw-num'}, p.method, p.received_by];
+    }, function (p) { return p.invoice_id ? '/finance/invoices/' + p.invoice_id : null; });
+
+    // Reminders
+    fillTable('hwRemBody', 'hwNoRem', 'hwRemCount', d.reminders, function (r) {
+      return [day(r.sent_at), r.template_name,
+              (r.message || '').slice(0, 60), r.status];
+    });
+
+    // Documents
+    fillTable('hwDocBody', 'hwNoDoc', 'hwDocCount', d.documents, function (f) {
+      return [f.original_name, f.caption, day(f.uploaded_at), f.uploaded_by];
+    }, function (f) { return '/uploads/file/' + f.id; });
+
+    // Invoices — with a Pay button per row
+    renderInvoices(d.invoices || []);
+  }
+
+  function tag(text, cls) {
+    var s = document.createElement('span');
+    s.className = 'hw-tag ' + (cls || '');
+    s.textContent = text;
+    return s;
+  }
+
+  function loadOwner360(ownerId) {
+    if (!ownerId) return;
+    fetch('/visits/exam/api/owner/' + ownerId, {credentials: 'same-origin'})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) renderOwner360(d); })
+      .catch(function () {});
+  }
+
+  // ── invoices with an inline Pay ───────────────────────────────────
+  function statusPill(st) {
+    var cls = st === 'Paid' ? 'hw-st-paid'
+            : st === 'Partial' ? 'hw-st-part' : 'hw-st-unpaid';
+    var s = document.createElement('span');
+    s.className = 'hw-st ' + cls;
+    s.textContent = st || '—';
+    return s;
+  }
+
+  function renderInvoices(list) {
+    var tb = $('hwInvBody');
+    while (tb.firstChild) tb.removeChild(tb.firstChild);
+    list.forEach(function (i) {
+      var tr = document.createElement('tr');
+      function cell(node) {
+        var td = document.createElement('td');
+        if (typeof node === 'string') td.textContent = node;
+        else td.appendChild(node);
+        tr.appendChild(td);
+        return td;
+      }
+      var a = document.createElement('a');
+      a.href = '/finance/invoices/' + i.id;
+      a.className = 'hw-link';
+      a.textContent = i.invoice_number || ('#' + i.id);
+      cell(a);
+      cell(day(i.issue_date));
+      cell(d2(i.total)).className = 'hw-num';
+      cell(d2(i.paid_amount)).className = 'hw-num';
+      var dueCell = cell(d2(i.due_amount));
+      dueCell.className = 'hw-num' + (Number(i.due_amount) > 0 ? ' hw-od' : '');
+      cell(statusPill(i.status));
+
+      var td = document.createElement('td');
+      if (Number(i.due_amount) > 0) {
+        var pay = document.createElement('button');
+        pay.type = 'button';
+        pay.className = 'pf-btn pf-btn-primary pf-btn-sm hw-paybtn';
+        pay.textContent = L.pay;
+        pay.addEventListener('click', function () { openPay(i); });
+        td.appendChild(pay);
+      }
+      tr.appendChild(td);
+      tb.appendChild(tr);
+    });
+    $('hwNoInv').style.display = list.length ? 'none' : '';
+    $('hwInvCount').textContent = list.length ? '(' + list.length + ')' : '';
+  }
+
+  // ── the payment modal ─────────────────────────────────────────────
+  var payInvoice = null;
+  function openPay(inv) {
+    payInvoice = inv;
+    $('hwPayInv').textContent = inv.invoice_number || ('#' + inv.id);
+    $('hwPayTotal').textContent = d2(inv.total);
+    $('hwPayPaid').textContent = d2(inv.paid_amount);
+    $('hwPayDue').textContent = d2(inv.due_amount);
+    $('hwPayAmount').value = money(Number(inv.due_amount || 0));
+    $('hwPayError').hidden = true;
+    $('hwPayConfirm').disabled = false;
+    $('hwPayModal').hidden = false;
+    $('hwPayAmount').focus();
+    $('hwPayAmount').select();
+  }
+  function closePay() { $('hwPayModal').hidden = true; payInvoice = null; }
+
+  $('hwPayCancel').addEventListener('click', closePay);
+  $('hwPayFull').addEventListener('click', function () {
+    if (payInvoice) {
+      $('hwPayAmount').value = money(Number(payInvoice.due_amount || 0));
+      $('hwPayAmount').focus();
+    }
+  });
+  $('hwPayModal').addEventListener('click', function (e) {
+    if (e.target === $('hwPayModal')) closePay();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !$('hwPayModal').hidden) closePay();
+  });
+
+  $('hwPayConfirm').addEventListener('click', function () {
+    if (!payInvoice) return;
+    var amount = num($('hwPayAmount'));
+    if (!(amount > 0)) {
+      $('hwPayError').textContent = L.amountNeeded;
+      $('hwPayError').hidden = false;
+      return;
+    }
+    var method = (document.querySelector('input[name="hwPayMethod"]:checked') || {}).value || 'Cash';
+    var body = new URLSearchParams();
+    body.append('amount', String(amount));
+    body.append('method', method);
+    // One nonce per opening of this dialog: a double-clicked Paid is ONE
+    // payment, which is the same guarantee the Finance screen now has.
+    body.append('idem', 'hw-' + payInvoice.id + '-' + payNonce);
+    body.append('_csrf_token', document.querySelector('[name="_csrf_token"]').value);
+
+    $('hwPayConfirm').disabled = true;
+    fetch('/finance/invoices/' + payInvoice.id + '/pay', {
+      method: 'POST', credentials: 'same-origin', body: body,
+    }).then(function () {
+      // Close first — the money is taken, and the person at the counter is
+      // already talking to the next client. The list refreshes behind it.
+      payNonce = Math.random().toString(36).slice(2);
+      var ownerId = (OWNER360 && OWNER360.owner && OWNER360.owner.id)
+                  || (current && current.owner && current.owner.id);
+      closePay();
+      loadOwner360(ownerId);
+      showTab('invoices');
+    }).catch(function () {
+      $('hwPayConfirm').disabled = false;
+      $('hwPayError').textContent = L.couldNotSave;
+      $('hwPayError').hidden = false;
+    });
+  });
+  var payNonce = Math.random().toString(36).slice(2);
+
+  // ── add a pet from the Pets tab ───────────────────────────────────
+  $('hwApSave').addEventListener('click', function () {
+    var ownerId = (OWNER360 && OWNER360.owner && OWNER360.owner.id)
+                || (current && current.owner && current.owner.id);
+    var name = $('apName').value.trim();
+    if (!ownerId || !name) {
+      $('hwApError').textContent = L.needPetName;
+      $('hwApError').hidden = false;
+      return;
+    }
+    $('hwApSave').disabled = true;
+    fetch('/visits/exam/api/pet', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('[name="_csrf_token"]').value},
+      body: JSON.stringify({owner_id: ownerId, pet_name: name,
+                            species: $('apSpecies').value.trim(),
+                            breed: $('apBreed').value.trim(),
+                            sex: $('apSex').value, dob: $('apDob').value}),
+    }).then(function (r) { return r.json().then(function (d) { return [r.ok, d]; }); })
+      .then(function (pair) {
+        $('hwApSave').disabled = false;
+        if (!pair[0]) {
+          $('hwApError').textContent = pair[1].error || L.couldNotSave;
+          $('hwApError').hidden = false;
+          return;
+        }
+        ['apName', 'apSpecies', 'apBreed', 'apDob'].forEach(function (id) {
+          $(id).value = '';
+        });
+        $('hwApError').hidden = true;
+        show(pair[1]);
+        showTab('visit');
+      }).catch(function () {
+        $('hwApSave').disabled = false;
+        $('hwApError').textContent = L.couldNotSave;
+        $('hwApError').hidden = false;
+      });
   });
 
   if (PRELOAD.pet && PRELOAD.pet.id) show(PRELOAD);

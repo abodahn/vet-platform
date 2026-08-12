@@ -888,6 +888,130 @@ def exam_api_pet(pet_id):
     return jsonify(ctx)
 
 
+def _owner_360(conn, owner_id):
+    """Everything about a client and ALL their animals, in one read.
+
+    The tabs are a VIEW of this, not eleven separate fetches: a receptionist
+    switching tabs with a client at the counter should never wait, and eleven
+    round trips on a 3G phone is exactly the wait this screen exists to avoid.
+    """
+    def rows(sql, args=()):
+        try:
+            return [dict(r) for r in conn.execute(sql, args).fetchall()]
+        except Exception:
+            return []
+
+    today = date.today().isoformat()
+    pets = rows("SELECT * FROM pets WHERE owner_id=? AND is_active=1"
+                " ORDER BY pet_name", (owner_id,))
+    for p in pets:
+        p["age_text"] = _age_text(p.get("dob"))
+    pet_ids = [p["id"] for p in pets] or [0]
+    marks = ",".join("?" * len(pet_ids))
+
+    visits = rows(
+        "SELECT v.id, v.pet_id, v.visit_date, v.visit_type, v.status,"
+        " v.chief_complaint, v.symptoms, v.weight_kg, v.temp_c, v.doctor_name,"
+        " p.pet_name FROM visits v LEFT JOIN pets p ON p.id=v.pet_id"
+        " WHERE v.owner_id=? ORDER BY v.visit_date DESC LIMIT 200", (owner_id,))
+
+    upcoming = rows(
+        "SELECT a.id, a.pet_id, a.appt_date, a.appt_start, a.appointment_type,"
+        " a.status, a.doctor_name, a.reason, p.pet_name FROM appointments a"
+        " LEFT JOIN pets p ON p.id=a.pet_id WHERE a.owner_id=? AND a.appt_date>=?"
+        " AND a.status NOT IN ('Cancelled','Completed','No-Show')"
+        " ORDER BY a.appt_date, a.appt_start LIMIT 50", (owner_id, today))
+
+    invoices = rows(
+        "SELECT id, invoice_number, issue_date, total, paid_amount, due_amount,"
+        " status, pet_id FROM invoices WHERE owner_id=? AND status!='Cancelled'"
+        " ORDER BY issue_date DESC, id DESC LIMIT 100", (owner_id,))
+
+    payments = rows(
+        "SELECT p.id, p.invoice_id, p.amount, p.method, p.received_at,"
+        " p.received_by, i.invoice_number FROM payments p"
+        " LEFT JOIN invoices i ON i.id=p.invoice_id"
+        " WHERE p.owner_id=? ORDER BY p.received_at DESC LIMIT 100", (owner_id,))
+
+    vaccines = rows(
+        "SELECT id, pet_id, visit_id, vaccine_name, vaccine_brand,"
+        " administered_at, next_due_at, administered_by FROM vaccinations"
+        " WHERE pet_id IN (" + marks + ")"
+        " ORDER BY COALESCE(next_due_at,'') DESC LIMIT 100", pet_ids)
+    for v in vaccines:
+        due = (v.get("next_due_at") or "")[:10]
+        v["overdue"] = bool(due and due < today)
+
+    diagnoses = rows(
+        "SELECT id, pet_id, visit_id, diagnosis, severity, is_chronic, created_at"
+        " FROM diagnoses WHERE pet_id IN (" + marks + ")"
+        " ORDER BY created_at DESC LIMIT 100", pet_ids)
+
+    meds = rows(
+        "SELECT p.id AS prescription_id, p.pet_id, p.visit_id, p.status,"
+        " p.created_at, pi.medication_name, pi.dosage, pi.frequency, pi.duration"
+        " FROM prescriptions p JOIN prescription_items pi"
+        " ON pi.prescription_id=p.id WHERE p.pet_id IN (" + marks + ")"
+        " ORDER BY p.created_at DESC LIMIT 100", pet_ids)
+
+    docs = rows(
+        "SELECT id, entity_type, entity_id, original_name, mime_type,"
+        " size_bytes, caption, uploaded_by, uploaded_at FROM attachments"
+        " WHERE (entity_type='pet' AND entity_id IN (" + marks + "))"
+        "    OR (entity_type='visit' AND entity_id IN ("
+        + ",".join("?" * len(visits or [0])) + "))"
+        " ORDER BY uploaded_at DESC LIMIT 100",
+        pet_ids + ([v["id"] for v in visits] or [0]))
+
+    reminders = rows(
+        "SELECT id, phone, message, template_name, status, sent_at"
+        " FROM whatsapp_log WHERE owner_id=? ORDER BY id DESC LIMIT 50",
+        (owner_id,))
+
+    outstanding = round(sum(float(i.get("due_amount") or 0)
+                            for i in invoices
+                            if i.get("status") in ("Unpaid", "Partial")), 2)
+    overdue_vax = [v for v in vaccines if v.get("overdue")]
+
+    return {
+        "pets": pets, "visits": visits, "upcoming": upcoming,
+        "invoices": invoices, "payments": payments, "vaccines": vaccines,
+        "diagnoses": diagnoses, "meds": meds, "documents": docs,
+        "reminders": reminders,
+        "badges": {
+            "pets": len(pets),
+            "visits": len(visits),
+            "upcoming": len(upcoming),
+            "invoices": len(invoices),
+            "unpaid": len([i for i in invoices
+                           if i.get("status") in ("Unpaid", "Partial")]),
+            "outstanding": outstanding,
+            "payments": len(payments),
+            "vaccines": len(vaccines),
+            "overdue_vaccines": len(overdue_vax),
+            "documents": len(docs),
+            "reminders": len(reminders),
+            "chronic": len([d for d in diagnoses if d.get("is_chronic")]),
+        },
+    }
+
+
+@visits_bp.route("/exam/api/owner/<int:owner_id>")
+@login_required
+def exam_api_owner(owner_id):
+    """The 360 view: this client and every animal they own."""
+    from flask import jsonify
+    conn = get_db()
+    owner = conn.execute("SELECT * FROM owners WHERE id=?", (owner_id,)).fetchone()
+    if not owner:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    data = _owner_360(conn, owner_id)
+    conn.close()
+    data["owner"] = dict(owner)
+    return jsonify(data)
+
+
 @visits_bp.route("/exam/api/client", methods=["POST"])
 @login_required
 def exam_api_client():
@@ -912,13 +1036,12 @@ def exam_api_client():
     try:
         # Same phone, same client. A busy front desk types the same person in
         # twice a week otherwise, and the pet history splits across both.
-        existing = None
-        if phone:
-            existing = conn.execute(
-                "SELECT id FROM owners WHERE phone=? OR whatsapp_phone=?",
-                (phone, phone)).fetchone()
+        #
+        # Compared NORMALISED, so "0100 123 4567", "+201001234567" and
+        # "٠١٠٠١٢٣٤٥٦٧" all find the same person instead of creating three.
+        existing = db.owner_by_phone(phone) if phone else None
         if existing:
-            owner_id = existing[0]
+            owner_id = existing["id"]
         else:
             cur = conn.execute(
                 "INSERT INTO owners(full_name, phone, whatsapp_phone, address,"

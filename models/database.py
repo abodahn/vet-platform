@@ -2985,7 +2985,79 @@ def get_owner(owner_id: int) -> Optional[dict]:
     conn.close()
     return dict(row) if row else None
 
+class DuplicatePhone(ValueError):
+    """Raised when a mobile number already belongs to another client.
+
+    Carries the existing client so the caller can offer to OPEN them rather
+    than just refusing — the person at the desk almost always meant that one.
+    """
+
+    def __init__(self, message, owner_id=None, owner_name=""):
+        super().__init__(message)
+        self.owner_id = owner_id
+        self.owner_name = owner_name
+
+
+def normalise_phone(phone: str) -> str:
+    """A comparable form of an Egyptian mobile.
+
+    The same number is typed a dozen ways at a front desk — "0100 123 4567",
+    "+201001234567", "0100-123-4567", "٠١٠٠١٢٣٤٥٦٧" — and every variant used to
+    create a NEW client, splitting one family's pets across several records.
+    Only digits are kept, Arabic-Indic digits are folded to ASCII, and the
+    Egyptian country code is dropped so 0100… and +20100… compare equal.
+    """
+    if not phone:
+        return ""
+    s = str(phone).translate(str.maketrans(
+        "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789"))
+    digits = "".join(ch for ch in s if ch.isdigit())
+    if digits.startswith("0020"):
+        digits = digits[4:]
+    elif digits.startswith("20") and len(digits) > 10:
+        digits = digits[2:]
+    return digits.lstrip("0")
+
+
+def owner_by_phone(phone: str, exclude_id=None):
+    """The client already holding this number, comparing normalised forms."""
+    key = normalise_phone(phone)
+    if not key:
+        return None
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, full_name, phone, whatsapp_phone FROM owners").fetchall()
+    finally:
+        conn.close()
+    for r in rows:
+        if exclude_id and r["id"] == exclude_id:
+            continue
+        if key in (normalise_phone(r["phone"]), normalise_phone(r["whatsapp_phone"])):
+            return dict(r)
+    return None
+
+
+def assert_phone_is_free(phone: str, exclude_id=None) -> None:
+    """Refuse a mobile that already belongs to somebody else.
+
+    Enforced HERE rather than with a UNIQUE index, because a real database
+    already contains duplicates — this one has 15 groups — and a constraint
+    added over them fails at startup and takes the clinic down. The rule
+    applies to every new write; the existing pairs are reported by
+    scripts/find_duplicate_owners.py so they can be merged deliberately.
+    """
+    if not normalise_phone(phone):
+        return
+    existing = owner_by_phone(phone, exclude_id=exclude_id)
+    if existing:
+        raise DuplicatePhone(
+            "%s already uses this mobile number." % (existing["full_name"] or "Another client"),
+            owner_id=existing["id"], owner_name=existing["full_name"] or "")
+
+
 def create_owner(data: dict) -> int:
+    assert_phone_is_free(data.get("phone") or data.get("whatsapp_phone"))
     conn = get_db()
     with conn:
         cur = conn.execute(
@@ -3001,6 +3073,8 @@ def create_owner(data: dict) -> int:
     return oid
 
 def update_owner(owner_id: int, data: dict) -> None:
+    assert_phone_is_free(data.get("phone") or data.get("whatsapp_phone"),
+                         exclude_id=owner_id)
     conn = get_db()
     with conn:
         conn.execute(

@@ -462,10 +462,18 @@ def test_the_reference_panels_fold_and_the_working_area_does_not(auth_client, le
     for folded in ("hist", "vax", "med", "dx", "inv", "petid", "owner"):
         assert 'data-fold="%s"' % folded in body, "%s should be foldable" % folded
 
-    assert 'data-fold="hist" open' in body, "history should start open"
-    for closed in ("vax", "med", "dx", "inv", "petid", "owner"):
+    # The reference tables now live INSIDE their own tab, so the tab is what
+    # collapses them — a panel nobody has opened is not on screen at all, and
+    # making the user expand a fold as well would be two clicks for one thing.
+    # Only the folds still sitting inside the Visit panel start closed.
+    for closed in ("petid", "owner"):
         assert 'data-fold="%s" open' % closed not in body, \
-            "%s should start closed" % closed
+            "%s is inside the Visit panel and should start closed" % closed
+    for in_a_tab in ("hist", "vax", "med", "dx", "inv"):
+        assert 'data-fold="%s"' % in_a_tab in body, "%s is gone" % in_a_tab
+        panel_of = body.split('data-fold="%s"' % in_a_tab)[0]
+        assert panel_of.count('<section class="hw-panel') > 1, \
+            "%s is no longer inside a tab panel" % in_a_tab
 
     # The working area must not be inside any <details>. Slice from the vitals
     # block to the next thing after it, not to the first inner </div>.
@@ -802,3 +810,134 @@ def test_nothing_extra_is_written_when_the_fields_are_empty(auth_client, leo):
     assert conn.execute("SELECT COUNT(*) FROM vaccinations WHERE visit_id=?",
                         (visit["id"],)).fetchone()[0] == 0
     conn.close()
+
+
+# ── the 360 view: one client, every animal, eleven tabs ──────────────────
+
+
+def test_one_mobile_number_belongs_to_one_client(app):
+    """A front desk types the same person in twice a week, and the family's
+    pets end up split across two records nobody can reconcile."""
+    conn = db.get_db()
+    conn.execute("DELETE FROM owners WHERE phone='01555777001'")
+    conn.execute("INSERT INTO owners(full_name, phone) VALUES('Unique One','01555777001')")
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(db.DuplicatePhone) as e:
+        db.create_owner({"full_name": "Someone Else", "phone": "01555777001"})
+    assert e.value.owner_name == "Unique One", "the refusal should name who has it"
+    assert e.value.owner_id, "the caller needs the id to offer 'open that client'"
+
+
+@pytest.mark.parametrize("typed", [
+    "0100 123 4599", "+20100 123 4599", "0100-123-4599",
+    "00201001234599", "٠١٠٠١٢٣٤٥٩٩",
+])
+def test_the_same_number_typed_any_way_is_the_same_client(app, typed):
+    """Egyptian numbers arrive in a dozen shapes; each one used to make a new
+    client."""
+    conn = db.get_db()
+    conn.execute("DELETE FROM owners WHERE phone='01001234599'")
+    conn.execute("INSERT INTO owners(full_name, phone) VALUES('Canonical','01001234599')")
+    conn.commit()
+    conn.close()
+    assert db.owner_by_phone(typed), "%r did not match the stored number" % typed
+
+
+def test_a_client_may_keep_their_own_number_when_edited(app):
+    conn = db.get_db()
+    conn.execute("DELETE FROM owners WHERE phone='01555777002'")
+    conn.execute("INSERT INTO owners(full_name, phone) VALUES('Keeps Own','01555777002')")
+    oid = conn.execute("SELECT id FROM owners WHERE phone='01555777002'").fetchone()[0]
+    conn.commit()
+    conn.close()
+    db.update_owner(oid, {"full_name": "Keeps Own Renamed", "phone": "01555777002"})
+    conn = db.get_db()
+    name = conn.execute("SELECT full_name FROM owners WHERE id=?", (oid,)).fetchone()[0]
+    conn.close()
+    assert name == "Keeps Own Renamed", "editing a client blocked on their own number"
+
+
+def test_the_360_endpoint_returns_every_tab_in_one_call(auth_client, leo):
+    """Eleven round trips with a client at the counter is the wait this screen
+    exists to remove."""
+    _post(auth_client, leo["pet_id"], diagnosis="Otitis",
+          followup_date="2026-09-20")
+    d = auth_client.get("/visits/exam/api/owner/%d" % leo["owner_id"]).get_json()
+
+    for key in ("owner", "pets", "visits", "upcoming", "invoices", "payments",
+                "vaccines", "diagnoses", "meds", "documents", "reminders",
+                "badges"):
+        assert key in d, "the 360 payload is missing %s" % key
+
+    assert d["owner"]["id"] == leo["owner_id"]
+    assert any(p["pet_name"] == leo["pet_name"] for p in d["pets"])
+    assert d["badges"]["pets"] >= 1
+    assert d["badges"]["visits"] >= 1
+    assert any(a["appt_date"] == "2026-09-20" for a in d["upcoming"]), \
+        "the planned visit is not in the 360"
+    assert any(x["diagnosis"] == "Otitis" for x in d["diagnoses"])
+
+
+def test_the_360_covers_every_pet_the_client_owns(auth_client, leo):
+    """"Without navigating through multiple screens" means ALL their animals."""
+    auth_client.post("/visits/exam/api/pet", headers=_csrf_hdr(auth_client),
+                     json={"owner_id": leo["owner_id"], "pet_name": "Second360"})
+    d = auth_client.get("/visits/exam/api/owner/%d" % leo["owner_id"]).get_json()
+    names = [p["pet_name"] for p in d["pets"]]
+    assert leo["pet_name"] in names and "Second360" in names
+    assert d["badges"]["pets"] == len(names)
+
+
+def test_the_badges_count_what_needs_attention(auth_client, leo):
+    """Unpaid invoices and overdue vaccines are the two a clinic acts on."""
+    _post(auth_client, leo["pet_id"], cash_received="0")      # leaves it unpaid
+    conn = db.get_db()
+    visit = conn.execute("SELECT id FROM visits WHERE pet_id=? ORDER BY id DESC"
+                         " LIMIT 1", (leo["pet_id"],)).fetchone()[0]
+    conn.execute("INSERT INTO vaccinations(pet_id, visit_id, vaccine_name,"
+                 " administered_at, next_due_at) VALUES(?,?,?,?,?)",
+                 (leo["pet_id"], visit, "Rabies", "2020-01-01", "2020-02-01"))
+    conn.commit()
+    conn.close()
+
+    b = auth_client.get("/visits/exam/api/owner/%d"
+                        % leo["owner_id"]).get_json()["badges"]
+    assert b["unpaid"] >= 1, "an unpaid invoice is not counted"
+    assert b["outstanding"] > 0, "the amount owed is not surfaced"
+    assert b["overdue_vaccines"] >= 1, "an overdue vaccine is not counted"
+
+
+def test_the_screen_renders_eleven_tabs_and_the_payment_modal(auth_client, leo):
+    body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
+    for tab in ("visit", "pets", "owner", "planned", "history", "medical",
+                "invoices", "payments", "reminders", "docs", "notes"):
+        assert 'data-tab="%s"' % tab in body, "the %s tab is missing" % tab
+        assert 'data-panel="%s"' % tab in body, "the %s panel is missing" % tab
+    assert "hwPayModal" in body, "there is no payment dialog"
+    assert 'id="hwPayConfirm"' in body
+
+
+def test_paying_from_the_screen_settles_the_invoice(auth_client, leo):
+    """One click on Paid completes it — the dialog then closes itself."""
+    _post(auth_client, leo["pet_id"], cash_received="0")
+    inv = _invoice(leo["pet_id"])
+    assert inv["status"] in ("Unpaid", "Partial")
+
+    auth_client.post("/finance/invoices/%d/pay" % inv["id"],
+                     data={"amount": str(inv["due_amount"]), "method": "Cash",
+                           "idem": "hw-%d-once" % inv["id"],
+                           "_csrf_token": get_csrf(auth_client)},
+                     follow_redirects=True)
+    after = _invoice(leo["pet_id"])
+    assert after["status"] == "Paid"
+    assert round(after["due_amount"], 2) == 0.00
+
+    # and a double-click cannot take it twice
+    auth_client.post("/finance/invoices/%d/pay" % inv["id"],
+                     data={"amount": str(inv["total"]), "method": "Cash",
+                           "idem": "hw-%d-once" % inv["id"],
+                           "_csrf_token": get_csrf(auth_client)},
+                     follow_redirects=True)
+    assert round(_invoice(leo["pet_id"])["paid_amount"], 2) == round(after["paid_amount"], 2)
