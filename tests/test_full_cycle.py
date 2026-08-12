@@ -66,7 +66,7 @@ def test_full_clinic_cycle(app, client, vet):
     #    main differentiator, and the place encoding bugs surface.
     r = _post(client, "/crm/owners/new", {
         "full_name": "Mahmoud Salah", "full_name_ar": "محمود صلاح",
-        "phone": "01012345678", "whatsapp_phone": "01012345678",
+        "phone": "01095000001", "whatsapp_phone": "01095000001",
         "email": "m.salah@example.com", "address": "Nasr City, Cairo",
         "preferred_contact": "WhatsApp",
     })
@@ -76,7 +76,7 @@ def test_full_clinic_cycle(app, client, vet):
         conn = db.get_db()
         owner = conn.execute(
             "SELECT * FROM owners WHERE phone=? ORDER BY id DESC LIMIT 1",
-            ("01012345678",)).fetchone()
+            ("01095000001",)).fetchone()
         conn.close()
     assert owner, "owner was not written"
     assert owner["full_name_ar"] == "محمود صلاح", "Arabic name did not round-trip"

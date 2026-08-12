@@ -443,7 +443,7 @@ class TestXSSPrevention:
             "/crm/owners/new",
             data={
                 "full_name": payload,
-                "phone": "01099999999",
+                "phone": "01097000001",
                 "_csrf_token": token,
             },
             follow_redirects=True,
@@ -530,7 +530,7 @@ class TestInputValidation:
         long_str = "A" * 10_000
         resp = client.post(
             "/crm/owners/new",
-            data={"full_name": long_str, "phone": "01000000000",
+            data={"full_name": long_str, "phone": "01097000002",
                   "_csrf_token": token},
             follow_redirects=True,
         )
@@ -541,7 +541,7 @@ class TestInputValidation:
         token = _login(client)
         resp = client.post(
             "/crm/owners/new",
-            data={"full_name": "Null\x00Byte", "phone": "01000000000",
+            data={"full_name": "Null\x00Byte", "phone": "01097000003",
                   "_csrf_token": token},
             follow_redirects=True,
         )
@@ -552,7 +552,7 @@ class TestInputValidation:
         token = _login(client)
         resp = client.post(
             "/crm/owners/new",
-            data={"full_name": "محمد العربي", "phone": "01000000000",
+            data={"full_name": "محمد العربي", "phone": "01097000004",
                   "_csrf_token": token},
             follow_redirects=True,
         )

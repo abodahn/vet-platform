@@ -83,14 +83,14 @@ def test_the_page_requires_login(client):
 
 def test_owner_search_finds_by_name_and_phone(client, vet, app):
     _post(client, "/crm/owners/new", {
-        "full_name": "Workflow Search Owner", "phone": "01099887766",
-        "whatsapp_phone": "01099887766"})
+        "full_name": "Workflow Search Owner", "phone": "01096000001",
+        "whatsapp_phone": "01096000001"})
 
     by_name = client.get("/workflow/api/owners?q=Workflow Search").get_json()
     assert any(o["full_name"] == "Workflow Search Owner" for o in by_name)
 
-    by_phone = client.get("/workflow/api/owners?q=01099887766").get_json()
-    assert any(o["phone"] == "01099887766" for o in by_phone), \
+    by_phone = client.get("/workflow/api/owners?q=01096000001").get_json()
+    assert any(o["phone"] == "01096000001" for o in by_phone), \
         "searching by phone found nothing — reception searches by phone"
 
 
