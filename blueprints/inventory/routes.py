@@ -9,6 +9,7 @@ from flask import (
 from datetime import date
 from . import inventory_bp
 import models.database as db
+import models.money as money
 from blueprints.auth.routes import login_required, role_required
 
 
@@ -406,10 +407,17 @@ def batch_new():
         wid = f.get("warehouse_id", type=int) or 1
         batch_number   = f.get("batch_number", "").strip()
         expiry_date    = f.get("expiry_date", "").strip() or None
-        quantity       = float(f.get("quantity") or 0)
-        unit_cost      = float(f.get("unit_cost") or 0)
+        # form_amount reports a bad number instead of coercing it to 0. On a
+        # stock receipt that distinction is the whole point: "1O0" units read as
+        # zero would book the delivery as nothing and nobody would know why the
+        # shelf count is short.
+        quantity,  q_err = money.form_amount(f.get("quantity"), "quantity")
+        unit_cost, c_err = money.form_amount(f.get("unit_cost"), "unit cost")
         received_by    = session["user"].get("full_name", "")
 
+        if q_err or c_err:
+            flash(q_err or c_err, "danger")
+            return redirect(request.referrer or url_for("inventory.batch_new", item_id=iid))
         if not iid or quantity <= 0:
             flash("Item and positive quantity are required.", "danger")
             return redirect(request.referrer or url_for("inventory.items_list"))
@@ -452,6 +460,10 @@ def batch_new():
         item=item,
         item_id=item_id,
         warehouses=warehouses,
+        # Nobody at a counter knows an item's numeric id. Without a preselected
+        # item the form used to ask them to type one; now it lists what the
+        # clinic actually stocks.
+        items=[] if item else db.list_items(limit=1000),
         today=date.today().isoformat(),
     )
 

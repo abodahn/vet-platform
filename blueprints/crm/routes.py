@@ -273,10 +273,15 @@ def owner_new():
         except db.DuplicatePhone as dup:
             flash("%s Open %s instead, or use a different number."
                   % (str(dup), dup.owner_name or "that client"), "danger")
+            # 409, not 200. A browser renders the body either way, so the person
+            # at the form sees no difference — but a script posting here could
+            # not tell a refusal from a success while this returned 200, and the
+            # New Visit wizard swallowed it, then carried on under the OTHER
+            # client's name. A refusal has to be legible to both callers.
             return render_template("crm/owner_form.html", owner=data, is_edit=False,
                                    active="crm", page_title="New Owner",
                                    duplicate_owner_id=dup.owner_id,
-                                   duplicate_owner_name=dup.owner_name)
+                                   duplicate_owner_name=dup.owner_name), 409
 
         # Save arabic fields inline (not in helper)
         conn = get_db()
@@ -594,7 +599,7 @@ def owner_edit(owner_id):
                                    is_edit=True, active="crm",
                                    page_title=f"Edit — {owner['full_name']}",
                                    duplicate_owner_id=dup.owner_id,
-                                   duplicate_owner_name=dup.owner_name)
+                                   duplicate_owner_name=dup.owner_name), 409
 
         # Update arabic fields
         full_name_ar = request.form.get("full_name_ar", "").strip()

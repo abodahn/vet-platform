@@ -20,7 +20,7 @@
     <a href="{{ url_for('payroll.salary_new') }}" class="pf-btn pf-btn-primary">{{ t('+ New Salary', '+ راتب جديد') }}</a>
     <a href="{{ url_for('payroll.salary_grades') }}" class="pf-btn pf-btn-secondary">{{ t('⚙ Grades', '⚙ الدرجات') }}</a>
     <form method="post" action="{{ url_for('payroll.bulk_generate') }}" style="display:inline">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="year" value="{{ year }}">
       <input type="hidden" name="month" value="{{ month }}">
       <button type="submit" class="pf-btn pf-btn-secondary"

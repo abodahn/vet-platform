@@ -74,7 +74,7 @@
       <div style="padding:16px">
         <h3 style="margin:0 0 12px;font-size:1rem">{{ t('Approve Salary', 'اعتماد الراتب') }}</h3>
         <form method="post" action="{{ url_for('payroll.salary_approve', sid=salary.id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="pf-btn pf-btn-primary" style="width:100%">{{ t('✅ Approve', '✅ اعتماد') }}</button>
         </form>
       </div>
@@ -86,7 +86,7 @@
       <div style="padding:16px">
         <h3 style="margin:0 0 12px;font-size:1rem">{{ t('Mark as Paid', 'تعليم كمدفوع') }}</h3>
         <form method="post" action="{{ url_for('payroll.salary_pay', sid=salary.id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
           <select name="payment_method" class="pf-input" style="margin-bottom:8px">
             {% for m in ['Bank Transfer','Cash','Cheque','Wallet'] %}
             <option>{{ m }}</option>

@@ -863,12 +863,42 @@
     if (!name || !phone) { showError("{{ t('A name and a phone number are required.', 'الاسم ورقم الهاتف مطلوبان.') }}"); return; }
     setBusy(ev.target, true);
     try {
+      // Look before creating. /crm/owners/new refuses a mobile that already
+      // belongs to somebody by re-rendering the form — which is HTTP 200, so
+      // `!res.ok` never fired and the refusal was swallowed. The wizard then
+      // re-found "the owner with this phone", got the OTHER client, and carried
+      // on under their name with nothing said. Asking first makes the answer
+      // unambiguous and tells the user whose file it is.
+      const already = await getJSON("/workflow/api/owners?q=" + encodeURIComponent(phone));
+      const held = (already || []).find((o) => (o.phone || "") === phone);
+      if (held) {
+        showError("{{ t('This mobile number already belongs to', 'رقم الهاتف هذا مسجل بالفعل باسم') }} "
+                  + held.full_name
+                  + ". {{ t('Opening that client — one mobile number, one client file.', 'سيتم فتح ملف هذا العميل — رقم واحد لكل عميل.') }}");
+        selectOwner(held);
+        return;
+      }
       const res = await postForm("/crm/owners/new", {
         full_name: name, full_name_ar: $("o_full_name_ar").value.trim(),
         phone: phone, whatsapp_phone: $("o_whatsapp_phone").value.trim() || phone,
         email: $("o_email").value.trim(), address: $("o_address").value.trim(),
         preferred_contact: "WhatsApp",
       });
+      // 409 = the number is held by somebody the exact-match check above did
+      // not catch, because the server compares normalised forms ("+2010…",
+      // "٠١٠…" and "0100 123" are one number to it and three strings here).
+      // Open that client rather than reporting a failure the user cannot act on.
+      if (res.status === 409) {
+        const rows = await getJSON("/workflow/api/owners?q=" + encodeURIComponent(phone));
+        const owner = (rows || [])[0];
+        if (owner) {
+          showError("{{ t('This mobile number already belongs to', 'رقم الهاتف هذا مسجل بالفعل باسم') }} "
+                    + owner.full_name
+                    + ". {{ t('Opening that client — one mobile number, one client file.', 'سيتم فتح ملف هذا العميل — رقم واحد لكل عميل.') }}");
+          selectOwner(owner);
+          return;
+        }
+      }
       if (!res.ok) throw new Error("HTTP " + res.status);
       // Re-find by phone rather than parsing an id out of the HTML.
       const rows = await getJSON("/workflow/api/owners?q=" + encodeURIComponent(phone));

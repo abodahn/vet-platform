@@ -116,6 +116,31 @@ def create_app(cfg=None) -> Flask:
         admin_pass=app.config.get("SEED_ADMIN_PASS", "1234"),
     )
 
+    # Every registered clinic gets the schema too, not just the default database.
+    #
+    # A tenant's database was built ONCE, by provisioning. init_db above runs
+    # against the default database only, so every table added after a clinic was
+    # created simply did not exist for that clinic: the code shipped, the dev box
+    # was fine, and the live clinic 500'd on the first query that touched the new
+    # table. init_db is idempotent — CREATE TABLE IF NOT EXISTS throughout, and
+    # every seed is guarded by a row count or INSERT OR IGNORE — so re-running it
+    # per tenant is a migration, not a reset.
+    #
+    # One clinic failing must not stop the others booting, so each is caught
+    # separately and logged loudly rather than raised.
+    for _t in tenancy.all_tenants():
+        _slug = _t.get("slug")
+        try:
+            with tenancy.use(_slug):
+                db.init_db(
+                    admin_user=app.config.get("SEED_ADMIN_USER", "admin"),
+                    admin_pass=app.config.get("SEED_ADMIN_PASS", "1234"),
+                )
+        except Exception:
+            logger.exception(
+                "schema migration failed for clinic %s — it may be missing "
+                "tables added in this release", _slug)
+
     @app.errorhandler(tenancy.UnknownTenant)
     def _unknown_tenant(exc):
         # Explicitly NOT a fall-through to the default database: serving one

@@ -64,63 +64,99 @@ def _mark_sent(conn, run_type: str, entity_id: int, entity_type: str):
         )
 
 
-def _send_whatsapp(conn, phone: str, message: str, owner_id=None, template_name=""):
-    """Send one reminder.
+# After this many sends fail in a row, the run gives up on the rest.
+#
+# One send against an unreachable host was measured at 535 SECONDS. Without a
+# cap, a clinic with 200 clients and a dead WhatsApp instance would keep the
+# scheduler thread busy for most of a day, and the following morning's run
+# would still be queued behind it. Five failures is enough to tell "this one
+# number is bad" from "the transport is down".
+_MAX_CONSECUTIVE_FAILURES = 5
 
-    KNOWN GAP, verified and deliberately NOT changed here — see
-    docs/AUDIT_FINDINGS.md and the note below.
 
-    This reads only $WAPILOT_TOKEN and POSTs to a hardcoded endpoint, while the
-    Send screen (blueprints/whatsapp/routes._client) reads wapilot_token AND
-    wapilot_instance_id from the settings table and posts through
-    WapilotClient to a different URL with a different payload shape. So a
-    clinic that connects WhatsApp in the UI gets a working Send screen and a
-    nightly job that still logs "Not Configured" for every reminder.
+class _Sender:
+    """The transport for one reminder run, plus its failure budget.
 
-    That is real and it is the reason scheduled reminders have never been
-    deliverable. It is not fixed in this commit because making the job read the
-    settings changes what "configured" MEANS for the whole module, and the 104
-    tests in test_whatsapp_routes.py encode the old contract — they express
-    "not connected" by clearing the env var alone. Landing it properly means
-    updating that contract deliberately, plus a per-run failure cap: one send
-    against an unreachable host was measured at 535 SECONDS, so a run over 200
-    clients would block the scheduler for hours.
-
-    The switches, the message templates and the overdue amount ARE fixed in
-    this commit; they are independent of which transport is used.
+    Built ONCE per run and passed down, rather than resolved per message: the
+    settings lookup is a query, and doing it 200 times per night is pure waste.
+    It is passed explicitly rather than held in a module global — the globals in
+    models.backup and models.tenancy are exactly how this codebase has ended up
+    pointing at the wrong clinic before.
     """
-    import os, json
-    status = "Pending"
-    error = ""
-    token = os.environ.get("WAPILOT_TOKEN", "")
-    if token:
-        try:
-            import urllib.request
-            payload = json.dumps({"phone": phone, "message": message}).encode()
-            req = urllib.request.Request(
-                "https://api.wapilot.io/send",
-                data=payload,
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                status = "Sent" if resp.status == 200 else "Failed"
-        except Exception as e:
-            status = "Failed"
-            error = str(e)
-    else:
+
+    def __init__(self, client, reason: str = ""):
+        self.client = client          # None when WhatsApp is not connected
+        self.reason = reason          # why, in words a clinic can act on
+        self.failures = 0
+        self.gave_up = False
+
+
+def _make_sender(conn) -> _Sender:
+    """Resolve the same credentials the Send screen uses.
+
+    The job used to read $WAPILOT_TOKEN alone and POST {"phone","message"} with
+    a Bearer header to https://api.wapilot.io/send, while every working manual
+    button posts {"chat_id","text"} with a `token` header to
+    https://api.wapilot.net/api/v2/{instance}/send-message. Different host,
+    path, auth scheme and payload — so a clinic that connected WhatsApp the
+    only documented way (scan the QR, save the token in Settings) got a working
+    Send Center and a nightly job that logged "Not Configured" for every single
+    reminder. There was no configuration under which a scheduled reminder was
+    deliverable.
+
+    Reads through the CALLER'S connection. blueprints.whatsapp.routes._client
+    opens and closes its own, and closing it mid-run took the job's transaction
+    with it — every reminder then produced no log row at all.
+    """
+    import os
+    from .wapilot import WapilotClient
+
+    rows = {r["key"]: r["value"] for r in conn.execute(
+        "SELECT key, value FROM settings WHERE category='wapilot'").fetchall()}
+    token = (rows.get("wapilot_token") or os.environ.get("WAPILOT_TOKEN", "")).strip()
+    iid = (rows.get("wapilot_instance_id")
+           or os.environ.get("WAPILOT_INSTANCE", "")).strip()
+
+    if not token or not iid:
+        missing = "token" if not token else "instance ID"
+        return _Sender(None, "WhatsApp is not connected — no API %s is set. "
+                             "Connect it under WhatsApp → Settings." % missing)
+    return _Sender(WapilotClient(token, iid))
+
+
+def _send_whatsapp(conn, phone: str, message: str, owner_id=None,
+                   template_name="", sender=None):
+    """Send one reminder through the same transport as the Send screen."""
+    if sender is None:
+        sender = _make_sender(conn)
+
+    if sender.client is None:
         # NEVER report "Sent" for a message that was never transmitted. This
         # previously logged stub-mode sends as Sent, so a clinic saw a green
         # column of reminders that had not left the building — and then blamed
         # clients for not turning up. A reminder system that lies about
         # delivery is worse than having none.
-        status = "Not Configured"
-        error = ("WhatsApp is not connected — no API token is set. "
-                 "Connect it under WhatsApp → Settings.")
-        logger.warning(
-            "WhatsApp reminder NOT sent to %s (%s): no token configured",
-            phone, template_name or "reminder",
-        )
+        status, error = "Not Configured", sender.reason
+        logger.warning("WhatsApp reminder NOT sent to %s (%s): %s",
+                       phone, template_name or "reminder", sender.reason)
+    elif sender.gave_up:
+        status = "Not Sent"
+        error = ("Skipped: %d sends in a row failed, so the rest of this run "
+                 "was abandoned rather than left retrying a dead connection."
+                 % _MAX_CONSECUTIVE_FAILURES)
+    else:
+        # chat_id, not phone: the v2 API addresses a conversation.
+        _resp, err = sender.client.send_message(str(phone or "").strip(), message)
+        if err:
+            status, error = "Failed", err
+            sender.failures += 1
+            if sender.failures >= _MAX_CONSECUTIVE_FAILURES:
+                sender.gave_up = True
+                logger.error("WhatsApp run abandoned after %d consecutive "
+                             "failures; last error: %s", sender.failures, err)
+        else:
+            status, error = "Sent", ""
+            sender.failures = 0
 
     conn.execute(
         "INSERT INTO whatsapp_log(owner_id, phone, message, template_name, status, error, sent_at) VALUES(?,?,?,?,?,?,datetime('now'))",
@@ -172,7 +208,7 @@ def _render(template, fallback, **fields):
         return fallback
 
 
-def _appointment_reminders(conn) -> int:
+def _appointment_reminders(conn, sender=None) -> int:
     """Remind owners of appointments scheduled for tomorrow."""
     if not _enabled(conn, "reminder_appt_enabled"):
         logger.info("appointment reminders are switched off in Settings")
@@ -204,14 +240,15 @@ def _appointment_reminders(conn) -> int:
                       date=a["appt_date"], time=a["appt_start"] or "TBD",
                       type=a["appointment_type"])
         status = _send_whatsapp(conn, a["whatsapp_phone"], msg,
-                                owner_id=a["owner_id"], template_name="appt_reminder")
+                                owner_id=a["owner_id"], template_name="appt_reminder",
+                                sender=sender)
         _mark_sent(conn, "appt_reminder", a["id"], "appointment")
         if status in ("Sent", "Pending"):
             sent += 1
     return sent
 
 
-def _vaccine_reminders(conn) -> int:
+def _vaccine_reminders(conn, sender=None) -> int:
     """Remind owners of vaccines due today or overdue by up to 7 days."""
     if not _enabled(conn, "reminder_vaccine_enabled"):
         logger.info("vaccine reminders are switched off in Settings")
@@ -244,14 +281,15 @@ def _vaccine_reminders(conn) -> int:
                       owner=v["full_name"], pet=v["pet_name"],
                       vaccine=v["vaccine_name"], date=v["next_due_at"])
         status = _send_whatsapp(conn, v["whatsapp_phone"], msg,
-                                owner_id=v["owner_id"], template_name="vaccine_reminder")
+                                owner_id=v["owner_id"], template_name="vaccine_reminder",
+                                sender=sender)
         _mark_sent(conn, "vaccine_reminder", v["id"], "vaccination")
         if status in ("Sent", "Pending"):
             sent += 1
     return sent
 
 
-def _invoice_reminders(conn) -> int:
+def _invoice_reminders(conn, sender=None) -> int:
     """Remind owners of invoices overdue by 3+ days."""
     if not _enabled(conn, "reminder_invoice_enabled"):
         logger.info("invoice reminders are switched off in Settings")
@@ -289,7 +327,8 @@ def _invoice_reminders(conn) -> int:
                       amount="%.2f" % owed, date=inv["due_date"],
                       total="%.2f" % float(inv["total"] or 0))
         status = _send_whatsapp(conn, inv["whatsapp_phone"], msg,
-                                owner_id=inv["owner_id"], template_name="invoice_reminder")
+                                owner_id=inv["owner_id"], template_name="invoice_reminder",
+                                sender=sender)
         _mark_sent(conn, "invoice_reminder", inv["id"], "invoice")
         if status in ("Sent", "Pending"):
             sent += 1
@@ -301,9 +340,14 @@ def run_reminder_jobs():
     conn = get_db()
     try:
         with conn:
-            appts = _appointment_reminders(conn)
-            vaccines = _vaccine_reminders(conn)
-            invoices = _invoice_reminders(conn)
+            # One transport for the whole run, so the failure budget is shared:
+            # if the instance is down, the appointment job discovers it and the
+            # vaccine and invoice jobs do not each spend five more timeouts
+            # rediscovering the same thing.
+            sender = _make_sender(conn)
+            appts = _appointment_reminders(conn, sender)
+            vaccines = _vaccine_reminders(conn, sender)
+            invoices = _invoice_reminders(conn, sender)
         conn.commit()
         logger.info(f"Reminder run: {appts} appt, {vaccines} vaccine, {invoices} invoice reminders sent")
         log_audit(

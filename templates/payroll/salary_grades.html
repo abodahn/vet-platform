@@ -13,12 +13,17 @@
 
 <div class="pf-card" style="max-width:900px;margin:0 auto">
   <form method="post">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {# _csrf_token, not csrf_token: validate_csrf reads the underscored name, so
+       the old field contributed nothing and this form only saved because
+       platform.js injects the real one into every POST. One disabled script and
+       every payroll form would have 400'd. #}
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
     <div class="pf-table-wrapper">
       <table class="pf-table">
         <thead><tr>
           <th>{{ t('Role', 'الدور') }}</th>
           <th>{{ t('Basic Salary (EGP/month)', 'الراتب الأساسي (جنيه/شهر)') }}</th>
+          <th>{{ t('Allowances (EGP/month)', 'البدلات (جنيه/شهر)') }}</th>
           <th>{{ t('Overtime Rate (EGP/hour)', 'سعر الساعة الإضافية (جنيه/ساعة)') }}</th>
           <th>{{ t('Notes', 'ملاحظات') }}</th>
         </tr></thead>
@@ -28,6 +33,7 @@
           <tr>
             <td><span class="pf-badge">{{ role }}</span></td>
             <td><input type="number" step="0.01" name="basic_{{ role }}" class="pf-input" style="width:140px" value="{{ g.basic_salary or 0 }}"></td>
+            <td><input type="number" step="0.01" name="allow_{{ role }}" class="pf-input" style="width:140px" value="{{ g.allowances or 0 }}"></td>
             <td><input type="number" step="0.01" name="ot_{{ role }}" class="pf-input" style="width:120px" value="{{ g.overtime_rate or 0 }}"></td>
             <td><input type="text" name="notes_{{ role }}" class="pf-input" value="{{ g.notes or '' }}" placeholder="{{ t('optional', 'اختياري') }}"></td>
           </tr>

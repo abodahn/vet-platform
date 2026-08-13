@@ -2394,6 +2394,36 @@ CREATE TABLE IF NOT EXISTS devices (
 );
 CREATE INDEX IF NOT EXISTS idx_dev_device ON devices(device_id);
 CREATE INDEX IF NOT EXISTS idx_dev_user   ON devices(user_id);
+
+-- Tasks: "call this owner about the lab result", "chase the unpaid invoice",
+-- "recheck the dressing on Thursday". The clinic owner asked for a Tasks icon
+-- on the exam screen alongside History and Invoices; nothing of the sort
+-- existed anywhere in the platform.
+--
+-- owner_id and pet_id are nullable on purpose: plenty of clinic work ("order
+-- more suture") belongs to nobody in particular, and a task that could only
+-- exist against a client would push people back to paper for the rest.
+CREATE TABLE IF NOT EXISTS tasks (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    title         TEXT NOT NULL,
+    details       TEXT,
+    owner_id      INTEGER,
+    pet_id        INTEGER,
+    visit_id      INTEGER,
+    assigned_to   TEXT,
+    priority      TEXT DEFAULT 'Normal',   -- Low/Normal/High
+    status        TEXT DEFAULT 'Open',     -- Open/Done
+    due_date      TEXT,
+    done_at       TEXT,
+    done_by       TEXT,
+    created_by    TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (owner_id) REFERENCES owners(id)
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_owner  ON tasks(owner_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_assign ON tasks(assigned_to, status);
 """
 
 # ── Seed data ──────────────────────────────────────────────────
@@ -2486,6 +2516,31 @@ def _run_pg_migrations(conn) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_loyalty_owner ON loyalty_points(owner_id)"
     )
+    # Tasks. _SCHEMA declares this with INTEGER PRIMARY KEY AUTOINCREMENT, which
+    # is SQLite-only, so without this the Tasks tab would work on the dev box and
+    # 500 on every real clinic.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id            SERIAL PRIMARY KEY,
+            title         TEXT NOT NULL,
+            details       TEXT,
+            owner_id      INTEGER,
+            pet_id        INTEGER,
+            visit_id      INTEGER,
+            assigned_to   TEXT,
+            priority      TEXT DEFAULT 'Normal',
+            status        TEXT DEFAULT 'Open',
+            due_date      TEXT,
+            done_at       TEXT,
+            done_by       TEXT,
+            created_by    TEXT,
+            created_at    TIMESTAMP DEFAULT NOW(),
+            updated_at    TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_owner  ON tasks(owner_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, due_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assign ON tasks(assigned_to, status)")
     # loyalty_balance column on owners
     _try_stmt(conn, "ALTER TABLE owners ADD COLUMN loyalty_balance INTEGER DEFAULT 0")
 

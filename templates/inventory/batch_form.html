@@ -38,12 +38,23 @@
 
 <div class="form-card">
   <form method="post" action="{{ url_for('inventory.batch_new') }}">
-    <input type="hidden" name="item_id" value="{{ item_id or '' }}">
-
-    {% if not item %}
+    {# Exactly ONE item_id reaches the server. There used to be two — this
+       hidden field, empty, plus the picker below — and request.form.get(type=int)
+       takes the FIRST, so int("") failed and every receipt arriving from the
+       dashboard button was rejected with "Item and positive quantity are
+       required". The two item-scoped entry points passed item_id in the query
+       string and skipped the picker, so the failure looked intermittent. #}
+    {% if item %}
+    <input type="hidden" name="item_id" value="{{ item.id }}">
+    {% else %}
     <div class="form-group">
-      <label class="form-label">{{ t('Item *', 'الصنف *') }}</label>
-      <input class="form-control" name="item_id" type="number" placeholder="{{ t('Item ID', 'رقم الصنف') }}" required>
+      <label class="form-label" for="batchItem">{{ t('Item *', 'الصنف *') }}</label>
+      <select class="form-control" name="item_id" id="batchItem" required>
+        <option value="">{{ t('Choose an item…', 'اختر الصنف…') }}</option>
+        {% for it in items %}
+        <option value="{{ it.id }}">{{ it.name }}{% if it.sku %} · {{ it.sku }}{% endif %}</option>
+        {% endfor %}
+      </select>
     </div>
     {% endif %}
 

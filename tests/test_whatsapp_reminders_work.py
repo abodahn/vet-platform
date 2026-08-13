@@ -8,6 +8,11 @@ a false finding that gets "fixed" wastes the next person's day too.
   TRUE   the three on/off switches and three message boxes were write-only
   TRUE   the overdue-invoice message quoted the invoice TOTAL, not what is owed
   FALSE  "every button on /whatsapp/reminders is dead — no CSRF token"
+
+The first of those was left open at the time, with a test written to fail on
+the day it closed. It is closed now: the job and the Send screen share one
+transport, and a dead connection is abandoned after a handful of failures
+instead of holding the scheduler for hours.
 """
 import pytest
 
@@ -33,21 +38,19 @@ def _clear(*keys):
 
 # ── ONE send path ────────────────────────────────────────────────────────
 
-def test_the_two_send_paths_still_disagree_and_that_is_the_open_gap(app):
-    """VERIFIED, NOT FIXED. Kept so the finding cannot be quietly forgotten.
+def test_the_nightly_job_and_the_send_screen_use_one_transport(app):
+    """The gap that made scheduled reminders undeliverable, now closed.
 
-    The Send screen reads wapilot_token AND wapilot_instance_id from settings
-    and posts through WapilotClient. The nightly job reads only $WAPILOT_TOKEN
-    and posts a different payload to a different hardcoded URL. Connecting
-    WhatsApp in the UI therefore does NOT make scheduled reminders work.
+    This test used to assert the OPPOSITE — that the two paths disagreed — and
+    was written to start failing on the day it was fixed. That day is this one,
+    so it now pins the convergence instead.
 
-    Not fixed in the same commit as the switches because it changes what
-    "configured" means for the whole module, and the 104 tests in
-    test_whatsapp_routes.py encode the old contract. Landing it also needs a
-    per-run failure cap: one send against an unreachable host measured at 535
-    seconds, so a run over 200 clients would block the scheduler for hours.
-
-    When it IS fixed, this test should start failing. That is the point.
+    What was wrong: the job read $WAPILOT_TOKEN alone and POSTed
+    {"phone","message"} with a Bearer header to https://api.wapilot.io/send,
+    while every manual Send button posts {"chat_id","text"} with a `token`
+    header to https://api.wapilot.net/api/v2/{instance}/send-message. A clinic
+    that connected WhatsApp the only documented way got a working Send Center
+    and a nightly job that logged "Not Configured" for every reminder.
     """
     import ast
     import inspect
@@ -56,9 +59,9 @@ def test_the_two_send_paths_still_disagree_and_that_is_the_open_gap(app):
     from blueprints.whatsapp import routes as wa_routes
 
     def _code(fn):
-        # Strip the docstring: the note explaining this gap names the very
-        # identifiers being searched for. Three assertions in this session
-        # matched their own explanation before I stopped writing them that way.
+        # Strip the docstring: the note explaining a gap names the very
+        # identifiers being searched for, and an assertion that matches its own
+        # explanation proves nothing.
         tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
         f = tree.body[0]
         if (f.body and isinstance(f.body[0], ast.Expr)
@@ -66,12 +69,106 @@ def test_the_two_send_paths_still_disagree_and_that_is_the_open_gap(app):
             f.body = f.body[1:]
         return ast.unparse(f)
 
-    job = _code(scheduler._send_whatsapp)
+    job = _code(scheduler._make_sender)
     ui = _code(wa_routes._client)
 
     assert "wapilot_instance_id" in ui, "the Send screen no longer needs an instance id"
-    assert "wapilot_instance_id" not in job,         "the job now reads the instance id — the gap may be closed; update this test"
-    assert "api.wapilot.io/send" in job,         "the job's endpoint changed — the gap may be closed; update this test"
+    assert "wapilot_instance_id" in job, \
+        "the nightly job still ignores the instance id saved in Settings"
+    assert "wapilot_token" in job, \
+        "the nightly job still ignores the token saved in Settings"
+    assert "WapilotClient" in job, \
+        "the job builds its own transport instead of the one the UI uses"
+
+    send = _code(scheduler._send_whatsapp)
+    assert "api.wapilot.io" not in send and "api.wapilot.io" not in job, \
+        "the old hardcoded endpoint is still in the job"
+    assert "urllib" not in send, \
+        "the job still hand-rolls its own HTTP request"
+
+
+def test_a_dead_connection_does_not_burn_the_whole_night(app):
+    """One send against an unreachable host was measured at 535 SECONDS.
+
+    Unbounded, a clinic with 200 clients and a dead instance would hold the
+    scheduler thread for most of a day and the next morning's run would queue
+    behind it.
+    """
+    from blueprints.whatsapp import scheduler
+
+    class _DeadClient:
+        calls = 0
+
+        def send_message(self, chat_id, text, **kw):
+            _DeadClient.calls += 1
+            return {}, "urlopen error [Errno 11001] getaddrinfo failed"
+
+    sender = scheduler._Sender(_DeadClient())
+    conn = db.get_db()
+    try:
+        for _ in range(50):
+            scheduler._send_whatsapp(conn, "01000000001", "hi", sender=sender)
+        conn.commit()
+        # Every call logs a row, and this one makes fifty. The suite shares one
+        # database, so leaving them behind pushed another file's row out of the
+        # control centre's "recent log" window and failed a test that had
+        # nothing to do with this one.
+        conn.execute("DELETE FROM whatsapp_log WHERE phone='01000000001'")
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert sender.gave_up, "the run never gave up on a dead connection"
+    assert _DeadClient.calls <= scheduler._MAX_CONSECUTIVE_FAILURES, \
+        "kept dialling a dead host %d times" % _DeadClient.calls
+
+
+def test_one_bad_number_does_not_abandon_the_run(app):
+    """A single wrong number is not the same as the transport being down."""
+    from blueprints.whatsapp import scheduler
+
+    class _FlakyClient:
+        def __init__(self):
+            self.n = 0
+
+        def send_message(self, chat_id, text, **kw):
+            self.n += 1
+            if self.n == 1:
+                return {}, "HTTP 400: invalid chat_id"
+            return {"ok": True}, ""
+
+    sender = scheduler._Sender(_FlakyClient())
+    conn = db.get_db()
+    try:
+        first = scheduler._send_whatsapp(conn, "bad", "hi", sender=sender)
+        rest = [scheduler._send_whatsapp(conn, "0100000000%d" % i, "hi", sender=sender)
+                for i in range(3)]
+        conn.commit()
+        conn.execute("DELETE FROM whatsapp_log WHERE phone='bad' OR phone LIKE '010000000%'")
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert first == "Failed"
+    assert rest == ["Sent", "Sent", "Sent"], \
+        "one bad number stopped the other reminders: %r" % (rest,)
+    assert not sender.gave_up
+
+
+def test_an_unconnected_clinic_is_never_told_a_reminder_was_sent(app):
+    from blueprints.whatsapp import scheduler
+
+    sender = scheduler._Sender(None, "WhatsApp is not connected — no API token is set.")
+    conn = db.get_db()
+    try:
+        status = scheduler._send_whatsapp(conn, "01000000002", "hi", sender=sender)
+        conn.commit()
+        conn.execute("DELETE FROM whatsapp_log WHERE phone='01000000002'")
+        conn.commit()
+    finally:
+        conn.close()
+    assert status == "Not Configured", \
+        "a message that never left the building was logged as %r" % status
 
 
 def test_an_unconfigured_clinic_is_told_so_and_nothing_is_claimed_sent(app):

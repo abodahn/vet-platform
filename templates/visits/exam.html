@@ -21,6 +21,13 @@
              placeholder="{{ t('Type at least 2 characters…', 'اكتب حرفين على الأقل…') }}">
       <div id="hwResults" class="hw-results" hidden></div>
     </div>
+    {# Two cases at once has always worked — each case is its own URL and the
+       server keeps no "current case" — but nothing said so, which is why it was
+       asked for. This is the missing signpost, not a new capability. #}
+    <a class="hw-second" href="{{ url_for('visits.exam_pick') }}"
+       target="_blank" rel="noopener"
+       title="{{ t('Opens in a new tab so both stay open', 'يفتح في تبويب جديد ليبقى الاثنان مفتوحين') }}">
+      ⧉ {{ t('Second file', 'ملف ثانٍ') }}</a>
     <div id="hwCurrent" class="hw-current" hidden>
       <div>
         <span class="hw-chip-label">{{ t('Client', 'العميل') }}</span>
@@ -128,12 +135,21 @@
       <button type="button" class="hw-tab" data-tab="docs" role="tab">
         <span class="hw-tab-i">📎</span><span>{{ t('Documents', 'الملفات') }}</span>
         <span class="hw-badge-n" data-count="documents"></span></button>
+      <button type="button" class="hw-tab" data-tab="tasks" role="tab">
+        <span class="hw-tab-i">✅</span><span>{{ t('Tasks', 'المهام') }}</span>
+        <span class="hw-badge-n hw-b-warn" data-count="overdue_tasks"></span></button>
       <button type="button" class="hw-tab" data-tab="notes" role="tab">
         <span class="hw-tab-i">📝</span><span>{{ t('Notes', 'ملاحظات') }}</span></button>
     </nav>
 
     <section class="hw-panel is-on" data-panel="visit">
-    <div class="hw-grid">
+    <div class="hw-billbar">
+      <button type="button" id="hwFocus" class="pf-btn pf-btn-ghost hw-focus-btn">
+        <span id="hwFocusLabel">{{ t('Hide billing', 'إخفاء الفاتورة') }}</span>
+        <span class="hw-focus-total" id="hwFocusTotal"></span>
+      </button>
+    </div>
+    <div class="hw-grid" id="hwGrid">
 
       <!-- LEFT: pet, symptom, owner -->
       <section class="pf-card hw-pane">
@@ -197,7 +213,7 @@
 
         <label class="hw-label hw-mt" for="fSymptom">
           {{ t('Symptom or disease', 'العرض أو المرض') }}</label>
-        <textarea id="fSymptom" name="symptom" class="hw-input hw-area" rows="5"></textarea>
+        <textarea id="fSymptom" name="symptom" class="hw-input hw-area" rows="8"></textarea>
 
         <!-- What the OWNER reports is the symptom. What the VET concluded is
              the diagnosis. Only recording the first left the medical record
@@ -252,7 +268,7 @@
       </section>
 
       <!-- MIDDLE: services and the bill -->
-      <section class="pf-card hw-pane">
+      <section class="pf-card hw-pane hw-bill">
         <h3 class="hw-h">{{ t('Services and items', 'الخدمات والأصناف') }}</h3>
         <label class="hw-label" for="hwPick">
           {{ t('Type to search, then Enter', 'اكتب للبحث ثم Enter') }}</label>
@@ -291,7 +307,7 @@
       </section>
 
       <!-- RIGHT: the money -->
-      <section class="pf-card hw-pane hw-money-pane">
+      <section class="pf-card hw-pane hw-money-pane hw-bill">
         <h3 class="hw-h">{{ t('Payment', 'الدفع') }}</h3>
 
         <label class="hw-label">{{ t('Payment type', 'طريقة الدفع') }}</label>
@@ -597,9 +613,52 @@
           <p id="hwNoPlanned" class="hw-muted hw-center">
             {{ t('Nothing booked.', 'لا توجد مواعيد.') }}</p>
         </div>
+        {# Booking happens HERE. These inputs carry no name= on purpose: they
+           sit inside the visit form, and a name would post them with the
+           examination. The button reads them by id and sends its own request. #}
+        <details class="hw-book" id="hwBookFold">
+          <summary class="hw-h">+ {{ t('Book an appointment', 'حجز موعد') }}</summary>
+          <div class="hw-pairs hw-mt">
+            <div>
+              <label class="hw-label" for="bkPet">{{ t('Animal', 'الحيوان') }}</label>
+              <select id="bkPet" class="hw-input"></select>
+            </div>
+            <div>
+              <label class="hw-label" for="bkType">{{ t('Type', 'النوع') }}</label>
+              <select id="bkType" class="hw-input">
+                <option value="Consultation">{{ t('Consultation', 'كشف') }}</option>
+                <option value="Follow-up">{{ t('Follow-up', 'متابعة') }}</option>
+                <option value="Vaccination">{{ t('Vaccination', 'تطعيم') }}</option>
+                <option value="Grooming">{{ t('Grooming', 'تجميل') }}</option>
+                <option value="Surgery">{{ t('Surgery', 'جراحة') }}</option>
+                <option value="Lab">{{ t('Lab', 'تحاليل') }}</option>
+                <option value="Emergency">{{ t('Emergency', 'طوارئ') }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="hw-label" for="bkDate">{{ t('Date', 'التاريخ') }}</label>
+              <input id="bkDate" class="hw-input" type="date">
+            </div>
+            <div>
+              <label class="hw-label" for="bkTime">{{ t('Time', 'الوقت') }}</label>
+              <input id="bkTime" class="hw-input" type="time" value="09:00">
+            </div>
+            <div>
+              <label class="hw-label" for="bkDoctor">{{ t('Doctor', 'الطبيب') }}</label>
+              <input id="bkDoctor" class="hw-input" list="hwDocList" autocomplete="off">
+            </div>
+            <div>
+              <label class="hw-label" for="bkReason">{{ t('Reason', 'السبب') }}</label>
+              <input id="bkReason" class="hw-input" autocomplete="off">
+            </div>
+          </div>
+          <p id="hwBookError" class="hw-err" hidden></p>
+          <button type="button" id="hwBookSave" class="pf-btn pf-btn-primary hw-mt">
+            {{ t('Book it', 'احجز') }}</button>
+        </details>
         <div class="hw-links hw-mt">
-          <a id="lnkBook" class="pf-btn pf-btn-sm pf-btn-primary" href="#">
-            + {{ t('Book an appointment', 'حجز موعد') }}</a>
+          <a id="lnkBook" class="hw-link hw-muted" href="#">
+            {{ t('Open the full calendar', 'فتح التقويم الكامل') }}</a>
         </div>
       </div>
     </section>
@@ -670,6 +729,57 @@
     </section>
 
     <!-- ── NOTES ─────────────────────────────────────────────────── -->
+    <!-- ── TASKS ─────────────────────────────────────────────────────
+         "call this owner about the lab result", "chase the unpaid invoice".
+         Inputs carry no name= — they sit inside the visit form and would
+         otherwise be posted with the examination. -->
+    <section class="hw-panel" data-panel="tasks">
+      <div class="pf-card hw-pane">
+        <h3 class="hw-h">{{ t('Tasks for this client', 'مهام هذا العميل') }}
+          <span class="hw-muted" id="hwTaskCount"></span></h3>
+        <div class="hw-tablewrap hw-scroll">
+          <table class="hw-table">
+            <thead><tr>
+              <th class="hw-wq">{{ t('Done', 'تم') }}</th>
+              <th>{{ t('Task', 'المهمة') }}</th>
+              <th>{{ t('Due', 'الاستحقاق') }}</th>
+              <th>{{ t('For', 'لمن') }}</th>
+              <th>{{ t('Priority', 'الأولوية') }}</th>
+            </tr></thead>
+            <tbody id="hwTaskBody"></tbody>
+          </table>
+          <p id="hwNoTasks" class="hw-muted hw-center">
+            {{ t('Nothing outstanding.', 'لا توجد مهام.') }}</p>
+        </div>
+        <div class="hw-pairs hw-mt">
+          <div>
+            <label class="hw-label" for="tkTitle">{{ t('New task', 'مهمة جديدة') }}</label>
+            <input id="tkTitle" class="hw-input" autocomplete="off"
+                   placeholder="{{ t('e.g. Call about the lab result', 'مثال: الاتصال بخصوص نتيجة التحليل') }}">
+          </div>
+          <div>
+            <label class="hw-label" for="tkDue">{{ t('Due', 'الاستحقاق') }}</label>
+            <input id="tkDue" class="hw-input" type="date">
+          </div>
+          <div>
+            <label class="hw-label" for="tkWho">{{ t('Assign to', 'مسؤول') }}</label>
+            <input id="tkWho" class="hw-input" list="hwDocList" autocomplete="off">
+          </div>
+          <div>
+            <label class="hw-label" for="tkPriority">{{ t('Priority', 'الأولوية') }}</label>
+            <select id="tkPriority" class="hw-input">
+              <option value="Normal">{{ t('Normal', 'عادية') }}</option>
+              <option value="High">{{ t('High', 'عاجلة') }}</option>
+              <option value="Low">{{ t('Low', 'منخفضة') }}</option>
+            </select>
+          </div>
+        </div>
+        <p id="hwTaskError" class="hw-err" hidden></p>
+        <button type="button" id="hwTaskSave" class="pf-btn pf-btn-primary hw-mt">
+          {{ t('Add task', 'أضف المهمة') }}</button>
+      </div>
+    </section>
+
     <section class="hw-panel" data-panel="notes">
       <div class="pf-card hw-pane">
         <h3 class="hw-h">{{ t('Client note', 'ملاحظة العميل') }}</h3>
@@ -746,10 +856,44 @@
 .hw-radios{display:flex;gap:1.2rem;font-size:1.02rem}
 .hw-pairs{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}
 .hw-pane{padding:1.1rem}
+/* The clinical column is the widest one.
+   It used to be 1fr against the billing side's 1.35fr + .85fr — 31% for the
+   examination, 69% for the money, on a screen whose whole purpose is the
+   examination. The vet typed the animal's history into the narrowest column on
+   the page. Now: 44% clinical / 34% services / 22% payment. */
 .hw-grid{display:grid;gap:1rem;align-items:start;
-         grid-template-columns:minmax(300px,1fr) minmax(340px,1.35fr) minmax(240px,.85fr)}
+         grid-template-columns:minmax(340px,1.5fr) minmax(300px,1.15fr) minmax(220px,.75fr)}
+
+/* Charting mode: the vet is writing, not billing. One toggle drops the two
+   billing panes and gives the whole width to the examination; the running total
+   stays in the tab bar so nothing is hidden, only deferred. Remembered per
+   browser like the other folds on this screen. */
+.hw-grid.hw-focus{grid-template-columns:1fr}
+.hw-grid.hw-focus>.hw-bill{display:none}
+/* No patient yet: everything about the visit is meaningless until there is an
+   animal, and a live Save would post a visit with no pet. */
+.hw-nopet .hw-panel[data-panel="visit"],
+.hw-nopet .hw-billbar{display:none}
+.hw-petbtn-add{border-style:dashed;font-weight:600}
+.hw-task-done td{opacity:.55;text-decoration:line-through}
+.hw-task-done td:first-child{text-decoration:none}
+.hw-task-late td:nth-child(3){font-weight:700;color:#b91c1c}
+html[data-theme="dark"] .hw-task-late td:nth-child(3){color:#fca5a5}
+@media (prefers-color-scheme:dark){
+  html:not([data-theme="light"]) .hw-task-late td:nth-child(3){color:#fca5a5}
+}
+.hw-billbar{display:flex;justify-content:flex-end;margin:-.4rem 0 .5rem}
+.hw-focus-btn{white-space:nowrap;font-size:.92rem}
+.hw-focus-total{font-variant-numeric:tabular-nums;font-weight:700;
+                margin-inline-start:.6rem}
+/* Below 1181px the grid is a single column anyway, so hiding billing there
+   would only take the Save button away. */
+@media (max-width:1180px){.hw-billbar{display:none}}
 
 .hw-clientbar{padding:1rem 1.1rem;margin-bottom:1rem;position:relative}
+.hw-second{position:absolute;top:1rem;inset-inline-end:1.1rem;font-size:.88rem;
+           text-decoration:none;opacity:.75;white-space:nowrap}
+.hw-second:hover{opacity:1;text-decoration:underline}
 .hw-search{position:relative;max-width:640px}
 .hw-results{position:absolute;z-index:40;top:100%;left:0;right:0;margin-top:.3rem;
             max-height:340px;overflow:auto;border:1px solid var(--pf-border,#d0d5dd);
@@ -779,7 +923,13 @@
 .hw-check{display:flex;align-items:center;gap:.4rem;white-space:nowrap}
 .hw-small{font-size:.88rem;margin:.35rem 0 0}
 .hw-newclient{padding:1.25rem;margin-bottom:1rem}
-.hw-scroll{max-height:260px;overflow-y:auto}
+/* overscroll-behavior-y stops these nine 260px boxes eating the page scroll.
+   Without it, a wheel gesture that happens to start over any inner table is
+   captured until that table bottoms out, and the page under it does not move —
+   which is the "الاسكرول صعب شوية، مش سلس" complaint. The horizontal equivalent
+   was already fixed in v3.css; the vertical one was never set anywhere. */
+.hw-scroll{max-height:260px;overflow-y:auto;overscroll-behavior-y:contain}
+.hw-results,.hw-modal-card{overscroll-behavior-y:contain}
 
 /* Alerts: the things nobody should have to click to discover. */
 .hw-alerts{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1rem}
@@ -787,14 +937,27 @@
 .hw-alert{display:flex;align-items:baseline;gap:.5rem;padding:.6rem .9rem;
           border-radius:10px;font-size:1.02rem;border:1px solid transparent}
 .hw-alert b{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;opacity:.9}
+/* These followed @media (prefers-color-scheme) only — the OS setting. The app
+   switches theme with [data-theme] on <html> and DEFAULTS TO LIGHT, so pressing
+   Night left these boxes light-on-dark, and a dark OS made them dark-on-light
+   while the rest of the page stayed light. Keyed to the same attribute the rest
+   of the app uses, with the OS query kept for a visitor who never touched the
+   switch. */
 .hw-danger{background:#fee2e2;color:#7f1d1d;border-color:#fca5a5}
 .hw-warn{background:#fef3c7;color:#78350f;border-color:#fcd34d}
 .hw-info{background:#dbeafe;color:#1e3a8a;border-color:#93c5fd}
+.hw-ok{background:#dcfce7;color:#14532d;border-color:#86efac}
 @media (prefers-color-scheme:dark){
-  .hw-danger{background:#450a0a;color:#fecaca;border-color:#991b1b}
-  .hw-warn{background:#422006;color:#fde68a;border-color:#a16207}
-  .hw-info{background:#172554;color:#bfdbfe;border-color:#1d4ed8}
+  html:not([data-theme="light"]) .hw-danger{background:#450a0a;color:#fecaca;border-color:#991b1b}
+  html:not([data-theme="light"]) .hw-warn{background:#422006;color:#fde68a;border-color:#a16207}
+  html:not([data-theme="light"]) .hw-info{background:#172554;color:#bfdbfe;border-color:#1d4ed8}
+  html:not([data-theme="light"]) .hw-ok{background:#052e16;color:#bbf7d0;border-color:#15803d}
 }
+html[data-theme="dark"] .hw-danger{background:#450a0a;color:#fecaca;border-color:#991b1b}
+html[data-theme="dark"] .hw-warn{background:#422006;color:#fde68a;border-color:#a16207}
+html[data-theme="dark"] .hw-info{background:#172554;color:#bfdbfe;border-color:#1d4ed8}
+html[data-theme="dark"] .hw-ok{background:#052e16;color:#bbf7d0;border-color:#15803d}
+.hw-newcase{margin-top:.4rem;align-self:flex-start}
 .hw-badge{display:inline-block;padding:.1rem .5rem;border-radius:999px;
           font-size:.72rem;font-weight:700;vertical-align:middle}
 .hw-vip{background:#fde68a;color:#78350f}
@@ -827,8 +990,12 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
 
 /* Money column follows you down the page — Save is never scrolled away. */
 @media (min-width:1181px){
-  .hw-grid>.hw-money-pane{position:sticky;top:1rem;max-height:calc(100vh - 2rem);
-                          overflow-y:auto}
+  /* 76px clears the 60px sticky topbar. At top:1rem (15px) the pane slid UNDER
+     the bar, which is opaque, so the first rows of the payment column
+     disappeared behind it as you scrolled. */
+  .hw-grid>.hw-money-pane{position:sticky;top:76px;
+                          max-height:calc(100vh - 92px);overflow-y:auto;
+                          overscroll-behavior-y:contain}
 }
 /* Numbers line up on the decimal, so a wrong figure looks wrong. */
 .hw-table td:nth-child(n+2) input,.hw-num{text-align:end;font-variant-numeric:tabular-nums}
@@ -990,6 +1157,24 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     pay:          {{ t('Pay', 'دفع') | tojson }},
     amountNeeded: {{ t('Enter an amount greater than zero.', 'أدخل مبلغاً أكبر من صفر.') | tojson }},
     needPetName:  {{ t('A pet name is required.', 'اسم الحيوان مطلوب.') | tojson }},
+    couldNotOpen: {{ t('Could not open that animal', 'تعذر فتح ملف الحيوان') | tojson }},
+    pickAgain:    {{ t('The form was cleared so nothing is charted against the wrong animal. Pick the pet again.', 'تم مسح النموذج حتى لا تُسجَّل بيانات على حيوان خطأ. اختر الحيوان مرة أخرى.') | tojson }},
+    payFailed:    {{ t('The payment was NOT recorded', 'لم يتم تسجيل الدفعة') | tojson }},
+    payRetry:     {{ t('Nothing was taken. Check the amount and try again.', 'لم يُخصم أي مبلغ. راجع المبلغ وحاول مرة أخرى.') | tojson }},
+    paidFull:     {{ t('Settled in full', 'تم السداد بالكامل') | tojson }},
+    paidPart:     {{ t('Payment recorded', 'تم تسجيل الدفعة') | tojson }},
+    stillOwes:    {{ t('Still owed:', 'المتبقي:') | tojson }},
+    newCase:      {{ t('Start a new case', 'بدء حالة جديدة') | tojson }},
+    needTask:     {{ t('Type what needs doing.', 'اكتب المطلوب عمله.') | tojson }},
+    needDate:     {{ t('Pick a date for the appointment.', 'اختر تاريخاً للموعد.') | tojson }},
+    bookedOk:     {{ t('Appointment booked', 'تم حجز الموعد') | tojson }},
+    firstPet:     {{ t('Add first animal', 'أضف أول حيوان') | tojson }},
+    noAnimals:    {{ t('No animals registered', 'لا يوجد حيوانات مسجلة') | tojson }},
+    addFirstThen: {{ t('Add the animal below and the visit opens on it.', 'أضف الحيوان بالأسفل وسيفتح الكشف عليه مباشرة.') | tojson }},
+    hideBilling:  {{ t('Hide billing', 'إخفاء الفاتورة') | tojson }},
+    showBilling:  {{ t('Show billing', 'إظهار الفاتورة') | tojson }},
+    existingFile: {{ t('This number already has a file', 'هذا الرقم له ملف بالفعل') | tojson }},
+    addedTo:      {{ t('The animal was added to %s — one mobile number, one client file.', 'تمت إضافة الحيوان إلى ملف %s — رقم واحد لكل عميل.') | tojson }},
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -1205,6 +1390,14 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
         ['ncName','ncPhone','ncAddress','ncPet','ncSpecies','ncBreed','ncDob']
           .forEach(function (id) { $(id).value = ''; });
         show(pair[1]);
+        // The number already belonged to somebody, so the animal went into
+        // THEIR file and the name just typed was discarded. Say so — otherwise
+        // the receptionist thinks she created a new client and only finds out
+        // weeks later that the history is filed under another name.
+        if (pair[1].joined_existing) {
+          alert3('hw-warn', L.existingFile,
+                 L.addedTo.replace('%s', pair[1].joined_existing));
+        }
       }).catch(function () {
         $('hwNcSave').disabled = false;
         $('hwNcError').textContent = L.couldNotSave;
@@ -1503,6 +1696,9 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
                     current.pet.id !== data.pet.id;
     if (switching || !current) resetForm();
     current = data;
+    // A pet is loaded, so the visit can be saved again. Without this the Save
+    // button stays withheld from the moment a petless client was opened.
+    form.classList.remove('hw-nopet');
     var p = data.pet || {}, o = data.owner || {};
     form.action = '/visits/exam/' + p.id;
     $('fPetName').value = txt(p.pet_name);
@@ -1591,14 +1787,72 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     $('fWeight').focus();
   }
 
+  // Open a client who has no animals yet, straight onto the Pets tab.
+  // The visit form needs a pet — Save is withheld until there is one, rather
+  // than left live to post a visit with no patient.
+  function openOwnerWithoutPet(o) {
+    current = null;
+    resetForm();
+    form.hidden = false;
+    empty.hidden = true;
+    form.classList.add('hw-nopet');
+    $('hwOwnerName').textContent = o.full_name || '';
+    $('hwCurrent').hidden = false;
+    loadOwner360(o.id);
+    showTab('pets');
+    $('apName').focus();
+    alert3('hw-info', L.noAnimals, L.addFirstThen);
+  }
+
   function loadPet(petId) {
     form.classList.add('hw-busy');
     fetch('/visits/exam/api/pet/' + petId, {credentials: 'same-origin'})
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d) show(d); })
-      .catch(function () {})
+      .then(function (d) {
+        if (d) { show(d); return; }
+        // A swallowed failure here is the dangerous one: the PREVIOUS animal's
+        // chart stays on screen, so the vet examines Lucky and charts Bella.
+        // Clear the form and say so rather than leave a plausible-looking page.
+        resetForm();
+        alert3('hw-danger', L.couldNotOpen, L.pickAgain);
+      })
+      .catch(function () {
+        resetForm();
+        alert3('hw-danger', L.couldNotOpen, L.pickAgain);
+      })
       .then(function () { form.classList.remove('hw-busy'); });
   }
+
+  // Charting mode. The complaint was that billing took two thirds of the
+  // screen; the columns were re-weighted, and this gives the vet the rest of it
+  // for the stretch where they are writing rather than charging. The running
+  // total moves onto the button so the money is deferred, never hidden.
+  (function billingToggle() {
+    var KEY = 'hw-focus', grid = $('hwGrid'), btn = $('hwFocus');
+    if (!grid || !btn) return;
+
+    function paint() {
+      var on = grid.classList.contains('hw-focus');
+      $('hwFocusLabel').textContent = on ? L.showBilling : L.hideBilling;
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      $('hwFocusTotal').textContent = on ? ($('hwGrand').textContent || '') : '';
+    }
+    try {
+      if (localStorage.getItem(KEY) === '1') grid.classList.add('hw-focus');
+    } catch (e) {}
+
+    btn.addEventListener('click', function () {
+      var on = grid.classList.toggle('hw-focus');
+      try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
+      paint();
+    });
+    // Keep the deferred total honest as lines are added or discounted.
+    var grand = $('hwGrand');
+    if (window.MutationObserver && grand) {
+      new MutationObserver(paint).observe(grand, {childList: true, characterData: true, subtree: true});
+    }
+    paint();
+  })();
 
   // Which panels a person keeps open is a preference, not a page state — a
   // vet who never looks at Medications should not close it forty times a day.
@@ -1651,10 +1905,19 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
         btns.appendChild(b);
       });
       if (!(o.pets || []).length) {
-        var no = document.createElement('span');
-        no.className = 'hw-muted';
-        no.textContent = '—';
-        btns.appendChild(no);
+        // A client with no animals used to render a dead "—", and the only way
+        // into the exam screen is a pet id — so the one client who most needs
+        // "add an animal" was the one client who could not reach it. Now the
+        // row is the way in.
+        var add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'hw-petbtn hw-petbtn-add';
+        add.textContent = '+ ' + L.firstPet;
+        add.addEventListener('click', function () {
+          results.hidden = true; box.value = '';
+          openOwnerWithoutPet(o);
+        });
+        btns.appendChild(add);
       }
       wrap.appendChild(btns);
       results.appendChild(wrap);
@@ -1851,6 +2114,24 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
                 a.appointment_type, a.doctor_name, a.status];
       }, function (a) { return a.id ? '/appointments/' + a.id : null; });
 
+    renderTasks(d.tasks || []);
+
+    // The inline booking form's animal list — this client's animals only.
+    var bkPet = $('bkPet');
+    if (bkPet) {
+      var keep = bkPet.value;
+      while (bkPet.options.length) bkPet.remove(0);
+      (d.pets || []).forEach(function (p) {
+        var opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.pet_name + (p.species ? ' · ' + p.species : '');
+        bkPet.appendChild(opt);
+      });
+      // Default to the animal on the table, not the first one alphabetically.
+      var here = current && current.pet && current.pet.id;
+      bkPet.value = keep || (here ? String(here) : (bkPet.options[0] || {}).value || '');
+    }
+
     // Payments
     fillTable('hwPayBody', 'hwNoPay', 'hwPayCount', d.payments, function (p) {
       return [day(p.received_at), p.invoice_number,
@@ -1954,6 +2235,32 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
   }
   function closePay() { $('hwPayModal').hidden = true; payInvoice = null; }
 
+  // Once an invoice is settled the person at the counter is finished with this
+  // client and the next one is already waiting. The New Visit wizard has
+  // offered this for a while; the exam screen used to just close the dialog and
+  // leave the vet on a spent case, with no way back to a blank form but the
+  // browser's address bar.
+  function offerNewCase() {
+    var bar = $('hwAlerts');
+    var a = document.createElement('button');
+    a.type = 'button';
+    a.className = 'pf-btn pf-btn-primary hw-newcase';
+    a.textContent = '+ ' + L.newCase;
+    a.addEventListener('click', function () {
+      // Same-tab reset rather than a page load: the search box is what the
+      // receptionist types into next, and a reload would cost her the focus.
+      window.history.replaceState({}, '', '/visits/exam');
+      resetForm();
+      form.hidden = true;
+      empty.hidden = false;
+      $('hwAlerts').textContent = '';
+      showTab('visit');
+      $('hwSearch').value = '';
+      $('hwSearch').focus();
+    });
+    bar.appendChild(a);
+  }
+
   $('hwPayCancel').addEventListener('click', closePay);
   $('hwPayFull').addEventListener('click', function () {
     if (payInvoice) {
@@ -1985,25 +2292,175 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     body.append('idem', 'hw-' + payInvoice.id + '-' + payNonce);
     body.append('_csrf_token', document.querySelector('[name="_csrf_token"]').value);
 
+    // What was owed BEFORE this payment, so the confirmation can say whether
+    // the invoice is finished or only part-paid.
+    var owedBefore = Number(payInvoice.due_amount || 0);
+
     $('hwPayConfirm').disabled = true;
     fetch('/finance/invoices/' + payInvoice.id + '/pay', {
       method: 'POST', credentials: 'same-origin', body: body,
-    }).then(function () {
+    }).then(function (r) {
+      // fetch only rejects on a NETWORK error — a 403 or a 500 lands here
+      // exactly like a success. Without this check the dialog closed on a
+      // failed payment, the cashier moved to the next client, and the invoice
+      // stayed unpaid with nobody aware.
+      if (!r.ok) { throw new Error('http ' + r.status); }
       // Close first — the money is taken, and the person at the counter is
       // already talking to the next client. The list refreshes behind it.
       payNonce = Math.random().toString(36).slice(2);
       var ownerId = (OWNER360 && OWNER360.owner && OWNER360.owner.id)
                   || (current && current.owner && current.owner.id);
+      var left = Math.round((owedBefore - amount) * 100) / 100;
       closePay();
       loadOwner360(ownerId);
       showTab('invoices');
+      if (left > 0.005) {
+        alert3('hw-warn', L.paidPart, L.stillOwes + ' ' + left.toFixed(2));
+      } else {
+        alert3('hw-ok', L.paidFull, '');
+        offerNewCase();
+      }
     }).catch(function () {
+      // Reached by a network failure AND by the non-OK throw above. The dialog
+      // deliberately STAYS OPEN: the cashier has to see that nothing was taken,
+      // because the client is standing there having just handed over cash.
       $('hwPayConfirm').disabled = false;
-      $('hwPayError').textContent = L.couldNotSave;
+      $('hwPayError').textContent = L.payFailed + ' — ' + L.payRetry;
       $('hwPayError').hidden = false;
     });
   });
   var payNonce = Math.random().toString(36).slice(2);
+
+  // ── tasks ─────────────────────────────────────────────────────────
+  function renderTasks(list) {
+    var tb = $('hwTaskBody');
+    while (tb.rows.length) tb.deleteRow(0);
+    var today = new Date().toISOString().slice(0, 10);
+    var open = 0;
+
+    list.forEach(function (t) {
+      var done = t.status === 'Done';
+      if (!done) open++;
+      var tr = tb.insertRow();
+      if (done) tr.className = 'hw-task-done';
+      else if ((t.due_date || '').slice(0, 10) && t.due_date.slice(0, 10) < today) {
+        tr.className = 'hw-task-late';
+      }
+
+      var cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = done;
+      cb.setAttribute('aria-label', t.title || '');
+      cb.addEventListener('change', function () { setTaskDone(t.id, cb.checked, cb); });
+      tr.insertCell().appendChild(cb);
+
+      // textContent throughout: a task title is free text a person typed.
+      [t.title, day(t.due_date), t.assigned_to, t.priority].forEach(function (v) {
+        var td = tr.insertCell();
+        td.textContent = (v === null || v === undefined || v === '') ? '—' : v;
+      });
+    });
+
+    $('hwNoTasks').hidden = list.length > 0;
+    $('hwTaskCount').textContent = open ? '(' + open + ')' : '';
+  }
+
+  function setTaskDone(id, done, cb) {
+    cb.disabled = true;
+    postTask({id: id, done: done}, function () { cb.disabled = false; });
+  }
+
+  function postTask(payload, always) {
+    var ownerId = (OWNER360 && OWNER360.owner && OWNER360.owner.id)
+                || (current && current.owner && current.owner.id);
+    payload.owner_id = payload.owner_id || ownerId;
+    return fetch('/visits/exam/api/task', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('[name="_csrf_token"]').value},
+      body: JSON.stringify(payload),
+    }).then(function (r) { return r.json().then(function (d) { return [r.ok, d]; }); })
+      .then(function (pair) {
+        if (always) always();
+        if (!pair[0]) {
+          $('hwTaskError').textContent = pair[1].error || L.couldNotSave;
+          $('hwTaskError').hidden = false;
+          // The list on screen no longer matches the database — re-read it
+          // rather than leave a ticked box for a task that never changed.
+          loadOwner360(ownerId);
+          return false;
+        }
+        $('hwTaskError').hidden = true;
+        renderTasks(pair[1].tasks || []);
+        var b = pair[1].badges || {};
+        setBadge('overdue_tasks', b.overdue_tasks, true);
+        return true;
+      }).catch(function () {
+        if (always) always();
+        $('hwTaskError').textContent = L.couldNotSave;
+        $('hwTaskError').hidden = false;
+        loadOwner360(ownerId);
+        return false;
+      });
+  }
+
+  $('hwTaskSave').addEventListener('click', function () {
+    var title = $('tkTitle').value.trim();
+    if (!title) {
+      $('hwTaskError').textContent = L.needTask;
+      $('hwTaskError').hidden = false;
+      return;
+    }
+    $('hwTaskSave').disabled = true;
+    postTask({
+      title: title, due_date: $('tkDue').value,
+      assigned_to: $('tkWho').value.trim(), priority: $('tkPriority').value,
+      pet_id: (current && current.pet && current.pet.id) || null,
+      visit_id: null,
+    }, function () { $('hwTaskSave').disabled = false; }).then(function (ok) {
+      if (ok) { $('tkTitle').value = ''; $('tkDue').value = ''; $('tkTitle').focus(); }
+    });
+  });
+
+  // ── book any appointment, without leaving the screen ──────────────
+  $('hwBookSave').addEventListener('click', function () {
+    var ownerId = (OWNER360 && OWNER360.owner && OWNER360.owner.id)
+                || (current && current.owner && current.owner.id);
+    var when = $('bkDate').value;
+    if (!ownerId || !when) {
+      $('hwBookError').textContent = L.needDate;
+      $('hwBookError').hidden = false;
+      return;
+    }
+    $('hwBookSave').disabled = true;
+    fetch('/visits/exam/api/appointment', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('[name="_csrf_token"]').value},
+      body: JSON.stringify({
+        owner_id: ownerId, pet_id: $('bkPet').value || null,
+        appointment_type: $('bkType').value, appt_date: when,
+        appt_start: $('bkTime').value, doctor_name: $('bkDoctor').value.trim(),
+        reason: $('bkReason').value.trim(),
+      }),
+    }).then(function (r) { return r.json().then(function (d) { return [r.ok, d]; }); })
+      .then(function (pair) {
+        $('hwBookSave').disabled = false;
+        if (!pair[0]) {
+          $('hwBookError').textContent = pair[1].error || L.couldNotSave;
+          $('hwBookError').hidden = false;
+          return;
+        }
+        $('hwBookError').hidden = true;
+        $('bkReason').value = '';
+        $('hwBookFold').open = false;
+        loadOwner360(ownerId);
+        alert3('hw-ok', L.bookedOk, when + ' ' + $('bkTime').value);
+      }).catch(function () {
+        $('hwBookSave').disabled = false;
+        $('hwBookError').textContent = L.couldNotSave;
+        $('hwBookError').hidden = false;
+      });
+  });
 
   // ── add a pet from the Pets tab ───────────────────────────────────
   $('hwApSave').addEventListener('click', function () {

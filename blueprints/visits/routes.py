@@ -139,7 +139,7 @@ def visit_new_submit():
             appt_id,
             owner_id,
             pet_id,
-            user.get("id"),
+            _doctor_id_for(conn, doctor_name, user),
             doctor_name,
             visit_type,
             "Open",
@@ -888,6 +888,36 @@ def exam_api_pet(pet_id):
     return jsonify(ctx)
 
 
+def _doctor_id_for(conn, doctor_name, fallback_user):
+    """The user id of the vet NAMED on this visit.
+
+    doctor_id used to be set to whoever was logged in, unconditionally, while
+    doctor_name held the vet actually typed. Reception books for Dr Sara and
+    the visit was filed under reception. Nothing reads the column yet, so this
+    costs nothing today — and corrupts every per-vet revenue or commission
+    report on the day one is built, retroactively, with no way to reconstruct
+    the truth.
+
+    Returns None when the name matches no active user. NULL is honest: the name
+    is free text with a datalist, so a locum typed by hand genuinely has no id,
+    and recording the receptionist's id would be a lie that reports would
+    believe.
+    """
+    name = (doctor_name or "").strip()
+    if not name:
+        return (fallback_user or {}).get("id")
+    row = conn.execute(
+        "SELECT id FROM users WHERE full_name=? AND is_active=1 LIMIT 1",
+        (name,)).fetchone()
+    if row:
+        return row["id"]
+    # The logged-in user's own name still resolves to them even if the users
+    # row is inactive or renamed — they are demonstrably present.
+    if name == (fallback_user or {}).get("full_name"):
+        return (fallback_user or {}).get("id")
+    return None
+
+
 def _owner_360(conn, owner_id):
     """Everything about a client and ALL their animals, in one read.
 
@@ -968,16 +998,29 @@ def _owner_360(conn, owner_id):
         " FROM whatsapp_log WHERE owner_id=? ORDER BY id DESC LIMIT 50",
         (owner_id,))
 
+    tasks = rows(
+        "SELECT id, title, details, pet_id, assigned_to, priority, status,"
+        " due_date, done_at, done_by, created_by, created_at FROM tasks"
+        " WHERE owner_id=? ORDER BY status='Done', due_date IS NULL, due_date"
+        " LIMIT 100", (owner_id,))
+
     outstanding = round(sum(float(i.get("due_amount") or 0)
                             for i in invoices
                             if i.get("status") in ("Unpaid", "Partial")), 2)
     overdue_vax = [v for v in vaccines if v.get("overdue")]
+    # A task is only worth a badge while it is still open. Comparing the date
+    # as a string is safe because due_date is stored ISO — and it is the LOCAL
+    # date, not datetime('now'), which is UTC and three hours behind Cairo.
+    today = date.today().isoformat()
+    open_tasks = [t for t in tasks if t.get("status") != "Done"]
+    overdue_tasks = [t for t in open_tasks
+                     if (t.get("due_date") or "") and t["due_date"][:10] < today]
 
     return {
         "pets": pets, "visits": visits, "upcoming": upcoming,
         "invoices": invoices, "payments": payments, "vaccines": vaccines,
         "diagnoses": diagnoses, "meds": meds, "documents": docs,
-        "reminders": reminders,
+        "reminders": reminders, "tasks": tasks,
         "badges": {
             "pets": len(pets),
             "visits": len(visits),
@@ -992,6 +1035,8 @@ def _owner_360(conn, owner_id):
             "documents": len(docs),
             "reminders": len(reminders),
             "chronic": len([d for d in diagnoses if d.get("is_chronic")]),
+            "tasks": len(open_tasks),
+            "overdue_tasks": len(overdue_tasks),
         },
     }
 
@@ -1040,8 +1085,15 @@ def exam_api_client():
         # Compared NORMALISED, so "0100 123 4567", "+201001234567" and
         # "٠١٠٠١٢٣٤٥٦٧" all find the same person instead of creating three.
         existing = db.owner_by_phone(phone) if phone else None
+        joined_existing = None
         if existing:
             owner_id = existing["id"]
+            # Attaching to the existing client is right — one household is one
+            # client with several animals. Doing it SILENTLY is not: the name
+            # just typed is discarded, the receptionist believes she made a new
+            # client, and only notices weeks later when the file is under
+            # somebody else's name. Say whose file the animal went into.
+            joined_existing = existing["full_name"] or ""
         else:
             cur = conn.execute(
                 "INSERT INTO owners(full_name, phone, whatsapp_phone, address,"
@@ -1067,7 +1119,139 @@ def exam_api_client():
     if not ctx:
         return jsonify({"error": "Saved, but could not load the pet."}), 500
     ctx.pop("services", None)
+    ctx["joined_existing"] = joined_existing
     return jsonify(ctx)
+
+
+@visits_bp.route("/exam/api/task", methods=["POST"])
+@login_required
+def exam_api_task():
+    """Create a task, or tick one off, from the exam screen.
+
+    "أدوس على أيقونة أعمل مهمة" — the fourth icon he named, alongside History,
+    Invoices and Attachments. There was no tasks table, route or screen anywhere
+    in the platform, so "call this owner about the lab result" lived on paper.
+    """
+    from flask import jsonify
+    f = request.get_json(silent=True) or {}
+    user = session.get("user") or {}
+    me = user.get("full_name", "")
+
+    conn = get_db()
+    try:
+        task_id = f.get("id")
+        if task_id:
+            # Toggling done. Only the status moves here; editing the text is a
+            # separate action so a mis-tap cannot rewrite somebody's note.
+            row = conn.execute("SELECT owner_id, status FROM tasks WHERE id=?",
+                               (task_id,)).fetchone()
+            if not row:
+                conn.close()
+                return jsonify({"error": "Unknown task."}), 404
+            done = bool(f.get("done"))
+            conn.execute(
+                "UPDATE tasks SET status=?, done_at=?, done_by=?,"
+                " updated_at=datetime('now') WHERE id=?",
+                ("Done" if done else "Open",
+                 date.today().isoformat() if done else None,
+                 me if done else None, task_id))
+            conn.commit()
+            owner_id = row["owner_id"]
+        else:
+            title = (f.get("title") or "").strip()
+            if not title:
+                conn.close()
+                return jsonify({"error": "A task needs a title."}), 400
+            owner_id = f.get("owner_id") or None
+            pet_id = f.get("pet_id") or None
+            if pet_id and owner_id:
+                owns = conn.execute("SELECT 1 FROM pets WHERE id=? AND owner_id=?",
+                                    (pet_id, owner_id)).fetchone()
+                if not owns:
+                    conn.close()
+                    return jsonify({"error": "That animal is not registered to this client."}), 400
+            conn.execute(
+                "INSERT INTO tasks(title, details, owner_id, pet_id, visit_id,"
+                " assigned_to, priority, status, due_date, created_by)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (title, (f.get("details") or "").strip(), owner_id, pet_id,
+                 f.get("visit_id") or None,
+                 (f.get("assigned_to") or "").strip() or me,
+                 (f.get("priority") or "Normal").strip(), "Open",
+                 (f.get("due_date") or "").strip() or None, me))
+            conn.commit()
+    except Exception:
+        logger.exception("task not saved")
+        conn.close()
+        return jsonify({"error": "Could not save the task."}), 500
+
+    if not owner_id:
+        conn.close()
+        return jsonify({"ok": True, "tasks": [], "badges": {}})
+    data = _owner_360(conn, owner_id)
+    conn.close()
+    return jsonify({"ok": True, "tasks": data.get("tasks", []),
+                    "badges": data.get("badges", {})})
+
+
+@visits_bp.route("/exam/api/appointment", methods=["POST"])
+@login_required
+def exam_api_appointment():
+    """Book any appointment without leaving the exam screen.
+
+    Booking the FOLLOW-UP already worked inline, but everything else — the
+    grooming slot the owner asks about while paying, the surgery date, a visit
+    for the other animal — was a link to /appointments/new. That leaves the
+    screen, which is the one thing this screen exists not to do, and it throws
+    away whatever is half-typed into the visit.
+    """
+    from flask import jsonify
+    f = request.get_json(silent=True) or {}
+    owner_id = f.get("owner_id")
+    pet_id = f.get("pet_id")
+    appt_date = (f.get("appt_date") or "").strip()
+    if not owner_id or not appt_date:
+        return jsonify({"error": "A client and a date are required."}), 400
+
+    user = session.get("user") or {}
+    conn = get_db()
+    try:
+        owner = conn.execute("SELECT id FROM owners WHERE id=?", (owner_id,)).fetchone()
+        if not owner:
+            conn.close()
+            return jsonify({"error": "Unknown client."}), 404
+        # The pet must belong to this client. Without the check a hand-edited
+        # request could book somebody else's animal into this owner's slot.
+        if pet_id:
+            owns = conn.execute("SELECT 1 FROM pets WHERE id=? AND owner_id=?",
+                                (pet_id, owner_id)).fetchone()
+            if not owns:
+                conn.close()
+                return jsonify({"error": "That animal is not registered to this client."}), 400
+
+        conn.execute(
+            "INSERT INTO appointments(owner_id, pet_id, doctor_name,"
+            " appointment_type, status, appt_date, appt_start, reason,"
+            " created_by) VALUES(?,?,?,?,?,?,?,?,?)",
+            (owner_id, pet_id or None,
+             (f.get("doctor_name") or "").strip() or user.get("full_name", ""),
+             (f.get("appointment_type") or "").strip() or "Consultation",
+             "Scheduled", appt_date,
+             # Same NOT NULL column that silently swallowed follow-ups booked
+             # without a time.
+             (f.get("appt_start") or "").strip() or "09:00",
+             (f.get("reason") or "").strip(),
+             user.get("full_name", "")))
+        conn.commit()
+    except Exception:
+        logger.exception("inline appointment not booked for owner %s", owner_id)
+        conn.close()
+        return jsonify({"error": "Could not book. Check the details and retry."}), 500
+
+    data = _owner_360(conn, owner_id)
+    conn.close()
+    return jsonify({"ok": True, "upcoming": data.get("upcoming", []),
+                    "badges": data.get("badges", {})})
 
 
 @visits_bp.route("/exam/api/pet", methods=["POST"])
@@ -1139,7 +1323,7 @@ def exam_submit(pet_id):
            visit_type, status, chief_complaint, symptoms, weight_kg, temp_c,
            notes, created_by)
            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (owner_id, pet_id, user.get("id"), doctor, visit_date,
+        (owner_id, pet_id, _doctor_id_for(conn, doctor, user), doctor, visit_date,
          "Consultation", "Completed", symptom, symptom, weight, temp,
          (f.get("notes") or "").strip(), user.get("id")))
     conn.commit()

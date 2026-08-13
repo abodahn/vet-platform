@@ -65,11 +65,19 @@ def _ensure_tables():
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             role          VARCHAR(60) UNIQUE NOT NULL,
             basic_salary  NUMERIC(12,2) NOT NULL DEFAULT 0,
+            allowances    NUMERIC(12,2) NOT NULL DEFAULT 0,
             overtime_rate NUMERIC(8,2)  NOT NULL DEFAULT 0,
             notes         TEXT,
             created_at    TEXT DEFAULT (datetime('now'))
         )
     """)
+    # Existing installs predate the allowances column. ADD COLUMN is not
+    # idempotent on either engine, so the failure is swallowed — the same
+    # pattern the SOAP columns use in models.database.
+    try:
+        conn.execute("ALTER TABLE salary_grades ADD COLUMN allowances NUMERIC(12,2) NOT NULL DEFAULT 0")
+    except Exception:
+        pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS salaries (
             id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -571,6 +579,12 @@ def bulk_generate():
         g    = grades.get(s["role"], {})
         basic = float(g.get("basic_salary", 0))
         ot_r  = float(g.get("overtime_rate", 0))
+        # The standing allowance for this role — housing, transport, whatever
+        # the clinic pays everyone in the grade. This was hardcoded to 0 here
+        # because salary_grades had nowhere to define one, so the flow an owner
+        # with 20 staff actually uses produced 20 wrong payslips and each had
+        # to be opened and corrected by hand.
+        allow = float(g.get("allowances", 0) or 0)
 
         # Auto-pull from attendance
         att  = _get_attendance_summary(conn, s["id"], year, month)
@@ -579,14 +593,14 @@ def bulk_generate():
             (att["absent_days"] / att["working_days"]) * basic, 2
         ) if att["working_days"] > 0 else 0.0
 
-        gross, net = _calc_gross_net(basic, 0, ot_h, ot_r, 0, abs_d, 0)
+        gross, net = _calc_gross_net(basic, allow, ot_h, ot_r, 0, abs_d, 0)
         try:
             conn.execute("""
                 INSERT INTO salaries
-                  (user_id,period_year,period_month,basic_salary,overtime_hours,
+                  (user_id,period_year,period_month,basic_salary,allowances,overtime_hours,
                    overtime_rate,absence_deduction,gross,net,status,notes,created_by)
-                VALUES (?,?,?,?,?,?,?,?,?,'Draft',?,?)
-            """, (s["id"], year, month, basic, ot_h, ot_r, abs_d, gross, net,
+                VALUES (?,?,?,?,?,?,?,?,?,?,'Draft',?,?)
+            """, (s["id"], year, month, basic, allow, ot_h, ot_r, abs_d, gross, net,
                   f"Auto: {att['absent_days']} absent, {ot_h}h OT",
                   session["user"]["id"]))
             created += 1
@@ -608,16 +622,18 @@ def salary_grades():
     if request.method == "POST":
         for role in _ROLES:
             basic, _ = money.form_amount(request.form.get(f"basic_{role}"), "basic salary")
+            allow, _ = money.form_amount(request.form.get(f"allow_{role}"), "allowances")
             ot_r, _  = money.form_amount(request.form.get(f"ot_{role}"), "overtime rate")
             notes = request.form.get(f"notes_{role}", "")
             conn.execute("""
-                INSERT INTO salary_grades (role, basic_salary, overtime_rate, notes)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO salary_grades (role, basic_salary, allowances, overtime_rate, notes)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT (role) DO UPDATE
                   SET basic_salary=EXCLUDED.basic_salary,
+                      allowances=EXCLUDED.allowances,
                       overtime_rate=EXCLUDED.overtime_rate,
                       notes=EXCLUDED.notes
-            """, (role, basic, ot_r, notes))
+            """, (role, basic, allow, ot_r, notes))
         conn.commit()
         conn.close()
         flash("Salary grades saved.", "success")

@@ -5,6 +5,13 @@
 
 {% block topbar_actions %}
 {% if is_manager %}
+{# A clinic arrives with its price list in a spreadsheet. One form per service
+   meant 200 forms before it could quote a single correct figure — and until it
+   does, the prices on screen are the seeded defaults, not theirs. #}
+<a class="pf-btn" href="{{ url_for('catalog.export_csv') }}">
+  ⬇ {{ t('Download list', 'تنزيل القائمة') }}</a>
+<button class="pf-btn" onclick="openModal('modal-import')">
+  ⬆ {{ t('Load price list', 'تحميل قائمة الأسعار') }}</button>
 <button class="pf-btn pf-btn-primary" onclick="openModal('modal-svc')">+ Add Service</button>
 {% endif %}
 {% endblock %}
@@ -175,6 +182,40 @@
       <div class="pf-modal-footer">
         <button type="button" class="pf-btn pf-btn-secondary" onclick="closeModal('modal-svc')">{{ t('Cancel', 'إلغاء') }}</button>
         <button type="submit" class="pf-btn pf-btn-primary">{{ t('Save Service', 'حفظ الخدمة') }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="modal-import" class="pf-modal-overlay" style="display:none" onclick="if(event.target===this)closeModal('modal-import')">
+  <div class="pf-modal" style="max-width:560px;width:95%">
+    <div class="pf-modal-header">
+      <h3>{{ t('Load your price list', 'تحميل قائمة الأسعار') }}</h3>
+      <button class="pf-icon-btn" onclick="closeModal('modal-import')">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('catalog.import_csv') }}"
+          enctype="multipart/form-data">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <div class="pf-modal-body">
+        <p style="margin:0 0 12px">
+          {{ t('A CSV with a "name" column. Everything else is optional.',
+                'ملف CSV به عمود "name". باقي الأعمدة اختيارية.') }}
+        </p>
+        <p style="margin:0 0 12px;opacity:.8;font-size:14px">
+          {{ t('A service that already exists is updated, matched on its code, or on its name when there is no code. Nothing is ever deleted.',
+                'الخدمة الموجودة يتم تحديثها — بالكود، أو بالاسم إن لم يكن هناك كود. لا يتم حذف أي شيء.') }}
+        </p>
+        <p style="margin:0 0 12px;opacity:.8;font-size:14px">
+          {{ t('To change prices in bulk: download the list, edit it in Excel, load it back.',
+                'لتعديل الأسعار دفعة واحدة: نزّل القائمة، عدّلها في Excel، ثم حمّلها مرة أخرى.') }}
+        </p>
+        <input type="file" name="file" accept=".csv,text/csv" class="pf-input" required>
+      </div>
+      <div class="pf-modal-footer">
+        <a class="pf-btn pf-btn-secondary" href="{{ url_for('catalog.export_csv') }}">
+          {{ t('Download current list', 'تنزيل القائمة الحالية') }}</a>
+        <button type="submit" class="pf-btn pf-btn-primary">
+          {{ t('Load it', 'تحميل') }}</button>
       </div>
     </form>
   </div>

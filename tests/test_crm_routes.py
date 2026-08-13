@@ -225,7 +225,12 @@ def test_a_second_client_cannot_take_a_mobile_that_is_already_used(app, auth_cli
                   {"full_name": "ثاني عميل", "phone": phone, "notes": "the duplicate"})
         rows = _rows("SELECT * FROM owners WHERE phone=? ORDER BY id", (phone,))
 
-    assert r.status_code == 200, "the refusal must not be a crash"
+    # 409, not 500 and not 200: the front desk sees a rendered page either way,
+    # but a script posting here has to be able to tell a refusal from a success.
+    # While this was 200 the New Visit wizard read the refusal as a save and
+    # carried on under the other client's name.
+    assert r.status_code == 409, "the refusal must be a message a caller can read"
+    assert r.status_code < 500, "the refusal must not be a crash"
     assert len(rows) == 1, "a duplicate mobile created a second client"
     assert rows[0]["full_name"] == "أول عميل"
     assert rows[0]["notes"] == "the original", "the first record was overwritten"
