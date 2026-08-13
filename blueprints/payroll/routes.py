@@ -71,13 +71,17 @@ def _ensure_tables():
             created_at    TEXT DEFAULT (datetime('now'))
         )
     """)
-    # Existing installs predate the allowances column. ADD COLUMN is not
-    # idempotent on either engine, so the failure is swallowed — the same
-    # pattern the SOAP columns use in models.database.
-    try:
-        conn.execute("ALTER TABLE salary_grades ADD COLUMN allowances NUMERIC(12,2) NOT NULL DEFAULT 0")
-    except Exception:
-        pass
+    # Existing installs predate the allowances column, and ADD COLUMN is not
+    # idempotent on either engine.
+    #
+    # _try_stmt, NOT a bare try/except. On PostgreSQL a failed statement poisons
+    # the whole transaction, so swallowing the exception is not enough — every
+    # statement after it fails too, and the connection is already unusable by
+    # the time anything notices. That is exactly what happened: this hook runs
+    # BEFORE the auth check, so /payroll/* returned 500 to everyone, logged in
+    # or not, on the second and every subsequent boot. _try_stmt takes the
+    # SAVEPOINT path on PG and a plain execute on SQLite.
+    db._try_stmt(conn, "ALTER TABLE salary_grades ADD COLUMN allowances NUMERIC(12,2) NOT NULL DEFAULT 0")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS salaries (
             id                INTEGER PRIMARY KEY AUTOINCREMENT,

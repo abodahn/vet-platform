@@ -116,6 +116,55 @@ def test_the_grades_screen_can_set_it(auth_client, app):
     assert row and float(row["allowances"]) == 750, "the allowance did not save"
 
 
+def test_the_grades_page_survives_repeated_boots(auth_client, app):
+    """_ensure_tables runs on EVERY payroll request, and it re-runs an ALTER
+    that is expected to fail once applied.
+
+    A bare try/except is not enough on PostgreSQL: a failed statement poisons
+    the surrounding transaction, so everything after it fails too and the
+    connection is unusable before anything notices. Because this hook runs
+    BEFORE the auth check, /payroll/* then returned 500 to everyone, logged in
+    or not. Caught in production on the deploy that introduced it; this is the
+    test that should have caught it first.
+
+    On SQLite the failure is harmless, so this exercises the shape — the
+    statement runs many times and the page must keep working — rather than the
+    engine-specific symptom.
+    """
+    from blueprints.payroll.routes import _ensure_tables
+    import blueprints.payroll.routes as payroll
+
+    for _ in range(3):
+        # Clear the memo so the DDL genuinely re-runs, the way a fresh process
+        # or a second tenant does.
+        payroll._payroll_ready = None
+        with app.app_context():
+            _ensure_tables()
+        assert auth_client.get("/payroll/grades").status_code == 200, \
+            "the grades page broke after re-running the idempotent migration"
+
+
+def test_the_allowances_migration_uses_the_savepoint_helper():
+    """Named explicitly, because the failure only shows on PostgreSQL and the
+    test suite runs on SQLite — the exact gap that let this reach production."""
+    import ast
+    import inspect
+    import textwrap
+    from blueprints.payroll import routes as payroll
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(payroll._ensure_tables)))
+    fn = tree.body[0]
+    if (fn.body and isinstance(fn.body[0], ast.Expr)
+            and isinstance(fn.body[0].value, ast.Constant)):
+        fn.body = fn.body[1:]
+    src = ast.unparse(fn)
+
+    assert "ALTER TABLE salary_grades" in src, "the allowances migration is gone"
+    assert "_try_stmt" in src, \
+        "the ALTER does not use _try_stmt — on PostgreSQL its failure aborts " \
+        "the transaction and every payroll page 500s"
+
+
 def test_payroll_forms_use_the_csrf_field_the_validator_reads():
     """These carried name="csrf_token"; validate_csrf reads _csrf_token.
 
