@@ -161,7 +161,10 @@ def test_checkin_creates_my_own_record(app, nurse, monkeypatch):
     # passed in the morning and failed after 08:15. Pinning the shift keeps the
     # status assertion meaningful instead of weakening it to "either".
     import blueprints.attendance.routes as att
-    monkeypatch.setattr(att, "default_shift", lambda conn: {
+    # default_shift now takes the employee and the date — it resolves each
+    # person's OWN shift through staff_shifts instead of returning whichever
+    # shift happened to have the lowest id.
+    monkeypatch.setattr(att, "default_shift", lambda conn, user_id=None, on_date=None: {
         "start_time": datetime.now().strftime("%H:%M"),
         "end_time": "23:59",
         "break_minutes": 0,
@@ -225,12 +228,28 @@ def test_checkout_without_checkin_writes_nothing(app, colleague):
 
 
 def test_hours_calculation_handles_a_night_shift(app):
-    """22:00 -> 06:00 with a 60-minute break is 7 hours, not a negative number."""
+    """22:00 -> 06:00 with a 60-minute break is 7 hours, not a negative number.
+
+    The wrap is now something the CALLER declares, because from two times alone
+    it cannot be told apart from a typo: 09:00 -> 07:00 is a 22-hour day if you
+    assume a wrap, and a mistyped 17:00 if you do not. It used to always assume
+    the wrap, so a corrected record could store 21.98 hours and payroll paid
+    fourteen hours of overtime on it.
+    """
     from blueprints.attendance.routes import _calc_hours
-    assert _calc_hours("22:00", "06:00", 60) == 7.0
+    assert _calc_hours("22:00", "06:00", 60, overnight=True) == 7.0
     assert _calc_hours("09:00", "17:00", 0) == 8.0
     assert _calc_hours("09:00", "17:30", 30) == 8.0
     assert _calc_hours("", "17:00", 0) == 0.0
+
+
+def test_a_backwards_day_shift_is_zero_not_twenty_two_hours(app):
+    """The typo that used to become overtime."""
+    from blueprints.attendance.routes import _calc_hours
+    assert _calc_hours("09:00", "07:00", 0) == 0.0, \
+        "a day shift ending before it starts was read as an overnight wrap"
+    assert _calc_hours("09:00", "07:00", 0, overnight=True) == 22.0, \
+        "a real night shift must still wrap when the caller says so"
 
 
 def test_manager_may_check_a_staff_member_in(app, owner, colleague):
@@ -499,7 +518,15 @@ def test_balance_set_writes_and_computes_remaining(app, boss, colleague, leave_t
     assert float(row["allocated"]) == 21
     assert float(row["used"]) == 4
     assert float(row["pending"]) == 2
-    assert float(row["remaining"]) == 15, "remaining must be allocated - used - pending"
+    # allocated - used, NOT minus pending.
+    #
+    # This asserted 15 (21-4-2) and that was the bug. Availability is computed
+    # elsewhere as `remaining - pending`, so subtracting pending here counts the
+    # reservation twice. The damage lands later: leave_approve takes the days
+    # off `remaining` AND clears them from `pending`, so once the pending
+    # request is approved the employee is permanently down twice what they took.
+    assert float(row["remaining"]) == 17, \
+        "remaining must be allocated - used; pending is subtracted at read time"
 
 
 def test_balance_set_replaces_rather_than_duplicates(app, boss, colleague, leave_type):
@@ -618,8 +645,13 @@ def _make_leave(app, user, leave_type, start, end, reason="AttTest leave"):
 
 
 def test_leave_new_writes_the_request_and_counts_business_days(app, nurse, leave_type):
-    # 2026-04-13 (Mon) .. 2026-04-17 (Fri) is five business days.
-    req = _make_leave(app, nurse, leave_type, "2026-04-13", "2026-04-17")
+    # Sun 2026-04-12 .. Thu 2026-04-16 is five working days.
+    #
+    # This used to say Mon 13 .. Fri 17, because the counter hardcoded the
+    # Monday-to-Friday week. In Egypt the weekend is Friday and Saturday, so
+    # that range is four working days and one day off — which is exactly the
+    # bug that had every employee marked absent on Fridays and docked for it.
+    req = _make_leave(app, nurse, leave_type, "2026-04-12", "2026-04-16")
     assert req is not None, "leaves/new returned 200 but wrote no request"
     assert req["status"] == "Pending"
     assert float(req["days_requested"]) == 5, "business days were miscounted"
@@ -631,8 +663,9 @@ def test_leave_new_writes_the_request_and_counts_business_days(app, nurse, leave
 def test_leave_new_skips_weekends_and_holidays(app, nurse, leave_type, boss):
     _post(boss, "/attendance/holidays/save",
           {"name": "AttTest Mid-week Holiday", "holiday_date": "2026-04-22"})
-    # 2026-04-20 (Mon) .. 2026-04-26 (Sun): 5 weekdays, minus one holiday = 4.
-    req = _make_leave(app, nurse, leave_type, "2026-04-20", "2026-04-26")
+    # Sun 2026-04-19 .. Sat 2026-04-25: five working days (Sun-Thu), minus
+    # the Wednesday holiday = 4.
+    req = _make_leave(app, nurse, leave_type, "2026-04-19", "2026-04-25")
     assert float(req["days_requested"]) == 4, \
         "a public holiday inside the range was still charged as leave"
 
@@ -661,7 +694,8 @@ def test_leave_new_reserves_pending_balance(app, boss, nurse, leave_type):
         "user_id": nurse["id"], "leave_type_id": leave_type["id"],
         "year": "2026", "allocated": "21", "used": "0", "pending": "0",
     })
-    _make_leave(app, nurse, leave_type, "2026-06-08", "2026-06-12")   # 5 business days
+    # Sun 2026-06-07 .. Thu 2026-06-11: five working days on the Egyptian week.
+    _make_leave(app, nurse, leave_type, "2026-06-07", "2026-06-11")
     bal = _one(app, "SELECT * FROM leave_balances WHERE user_id=? AND leave_type_id=? "
                     "AND year=?", (nurse["id"], leave_type["id"], 2026))
     assert float(bal["pending"]) == 5, "the request did not reserve pending balance"

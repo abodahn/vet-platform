@@ -29,6 +29,10 @@
       </div>
     </div>
     <form method="POST">
+      {# Two managers correcting the same day is the collision that costs money.
+         If this stamp has moved by the time Save is pressed, the other person's
+         correction is already in and this one is refused. #}
+      <input type="hidden" name="_seen_updated_at" value="{{ rec.updated_at or '' }}">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div class="pf-form-group">
           <label class="pf-form-label">{{ t('Check In Time', 'وقت الدخول') }}</label>

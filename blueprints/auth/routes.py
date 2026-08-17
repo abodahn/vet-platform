@@ -851,3 +851,190 @@ def two_factor_admin_reset(user_id):
     flash(f"Two-factor authentication reset for {target['username']}. "
           "They can log in with their password and enrol again.", "success")
     return redirect(url_for("auth.two_factor_admin"))
+
+
+# ─────────────────────────────────────────────
+# THE SHARED DESK — up to five people signed in on one PC
+#
+# A clinic has one machine at reception. The vet needs it, then the nurse, then
+# the owner wants to look at the day's takings. Logging out and back in each
+# time is slow enough that in practice nobody does it: everyone works under
+# whichever account happens to be open. That is how "recorded by", "seen by",
+# the audit log and every per-vet report end up naming the wrong person, and it
+# is invisible afterwards because the records look perfectly ordinary.
+#
+# So: up to five accounts stay signed in, and switching between them is one
+# click with no password. session["user"] stays exactly what it was — the
+# ACTIVE user — so all 406 routes and every permission check are untouched.
+#
+# The trade is deliberate and worth stating plainly: anyone standing at that PC
+# can act as any of the five without a password. That is the point of the
+# feature, it is how a shared till works, and it is why adding an account needs
+# the real password, why an account with 2FA is refused, why every switch is
+# written to the audit log, and why the top bar always shows who is active.
+# ─────────────────────────────────────────────
+
+MAX_DESK_USERS = 5
+
+
+def _desk() -> list:
+    """The accounts signed in at this PC, most recently used first."""
+    return session.get("desk") or []
+
+
+def _desk_put(user: dict) -> None:
+    """Add or refresh an account on the desk, keeping it to MAX_DESK_USERS."""
+    desk = [u for u in _desk() if u.get("id") != user.get("id")]
+    desk.insert(0, user)
+    session["desk"] = desk[:MAX_DESK_USERS]
+    session.modified = True
+
+
+def _desk_page(error=None, username=""):
+    return render_template("auth/desk_add.html", error=error, username=username,
+                           desk=_desk(), max_users=MAX_DESK_USERS,
+                           active="", page_title="Add a user to this PC")
+
+
+@auth_bp.route("/desk/add", methods=["GET", "POST"])
+@login_required
+def desk_add():
+    """Sign a second (third, fourth, fifth) person in without dropping the first.
+
+    Full authentication, not a shortcut: the same credential check, rate limit
+    and lockout as /auth/login. The convenience is in SWITCHING, never in
+    getting onto the desk.
+    """
+    if request.method != "POST":
+        return _desk_page()
+
+    ip = sec.get_real_ip(request)
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+
+    if len(_desk()) >= MAX_DESK_USERS:
+        return _desk_page(
+            "This PC already has %d people signed in. Sign one off first."
+            % MAX_DESK_USERS, username)
+
+    locked, wait_secs = sec.is_rate_limited(ip, username)
+    if locked:
+        return _desk_page(
+            "Too many failed attempts. Try again in %d minute(s)."
+            % (wait_secs // 60), username)
+
+    user_row = db.verify_credentials(username, password)
+    if not user_row:
+        sec.record_failed_login(ip, username)
+        db.log_audit(username=username, role="", action="desk_add_failed",
+                     module="auth",
+                     details="failed to add '%s' to the shared desk" % username,
+                     ip=ip, user_agent=request.headers.get("User-Agent", ""))
+        return _desk_page("Invalid username or password.", username)
+
+    # An account with 2FA cannot join a passwordless switcher. The whole point
+    # of a second factor is that possession is re-proved; a one-click switch
+    # would hand it to whoever happens to be standing there.
+    try:
+        if sec.totp_required(user_row["id"]):
+            return _desk_page(
+                "This account uses two-factor authentication, so it cannot be "
+                "added to a shared PC. Sign in to it directly instead.", username)
+    except sec.TOTPUnavailable as exc:
+        return _desk_page(str(exc), username)
+
+    sec.clear_rate_limit(ip, username)
+    db.touch_last_login(user_row["id"])
+    added = {k: v for k, v in dict(user_row).items() if k not in _SESSION_STRIP}
+
+    # The person already signed in goes on the desk too, so the switcher always
+    # lists everyone who can be switched to — including whoever started.
+    current = session.get("user") or {}
+    if current and not any(u.get("id") == current.get("id") for u in _desk()):
+        _desk_put(current)
+    _desk_put(added)
+    # _desk_put puts the newcomer first, but the ACTIVE user does not change:
+    # adding somebody must never silently hand them the screen.
+    session["user"] = current or added
+
+    db.log_audit(username=added.get("username", ""),
+                 role=added.get("role", ""), action="desk_add", module="auth",
+                 details="added to the shared desk by %s"
+                         % (current.get("username") or "?"),
+                 ip=ip, user_agent=request.headers.get("User-Agent", ""))
+    flash("%s is now signed in on this PC."
+          % (added.get("full_name") or added.get("username")), "success")
+    return redirect(url_for("launcher.index"))
+
+
+@auth_bp.route("/desk/switch/<int:user_id>", methods=["POST"])
+@login_required
+def desk_switch(user_id):
+    """Become one of the accounts already signed in here. No password.
+
+    The stored copy is NOT trusted for anything except "this person
+    authenticated at this PC". Role, active flag and clinic are re-read from the
+    database on every switch, so deactivating an account or changing its role
+    takes effect at once instead of being frozen into a cookie that can sit on a
+    reception machine for weeks.
+    """
+    ip = sec.get_real_ip(request)
+    current = session.get("user") or {}
+    if not any(u.get("id") == user_id for u in _desk()):
+        flash("That user is not signed in on this PC.", "error")
+        return redirect(url_for("launcher.index"))
+
+    row = db.get_user_by_id(user_id)
+    row = dict(row) if row else None
+    if not row or not row.get("is_active"):
+        session["desk"] = [u for u in _desk() if u.get("id") != user_id]
+        session.modified = True
+        flash("That account is no longer active. It has been removed from this PC.",
+              "warning")
+        return redirect(url_for("launcher.index"))
+
+    fresh = {k: v for k, v in row.items() if k not in _SESSION_STRIP}
+    session["user"] = fresh
+    _desk_put(fresh)
+    sec.touch_session()
+
+    db.log_audit(username=fresh.get("username", ""), role=fresh.get("role", ""),
+                 action="desk_switch", module="auth",
+                 details="took over a shared PC from %s"
+                         % (current.get("username") or "?"),
+                 ip=ip, user_agent=request.headers.get("User-Agent", ""))
+    return redirect(url_for("launcher.index"))
+
+
+@auth_bp.route("/desk/remove/<int:user_id>", methods=["POST"])
+@login_required
+def desk_remove(user_id):
+    """Sign one person off this PC, leaving the others signed in."""
+    current = session.get("user") or {}
+    remaining = [u for u in _desk() if u.get("id") != user_id]
+    session["desk"] = remaining
+    session.modified = True
+
+    db.log_audit(username=current.get("username", ""),
+                 role=current.get("role", ""), action="desk_remove",
+                 module="auth",
+                 details="signed user %s off the shared desk" % user_id,
+                 ip=sec.get_real_ip(request))
+
+    # Signing off the ACTIVE user means somebody else takes over — and if nobody
+    # else is here it is a full logout. A session with no user must never exist.
+    if current.get("id") == user_id:
+        if not remaining:
+            session.clear()
+            flash("Signed out.", "info")
+            return redirect(url_for("auth.login"))
+        row = db.get_user_by_id(remaining[0]["id"])
+        if row:
+            session["user"] = {k: v for k, v in dict(row).items()
+                               if k not in _SESSION_STRIP}
+        else:
+            session.clear()
+            return redirect(url_for("auth.login"))
+
+    flash("Signed off this PC.", "info")
+    return redirect(url_for("launcher.index"))

@@ -7,6 +7,7 @@ from flask import render_template, request, redirect, url_for, flash, session, j
 from . import crm_bp
 from blueprints.auth.routes import login_required
 import models.database as db
+import models.concurrency as concurrency
 from models.database import get_db, _try_stmt
 from datetime import date, datetime
 
@@ -589,6 +590,23 @@ def owner_edit(owner_id):
             return render_template("crm/owner_form.html", owner={**owner, **data},
                                    is_edit=True, active="crm",
                                    page_title=f"Edit — {owner['full_name']}")
+
+        # Somebody else may have saved this client while this form was open —
+        # far more likely now that one PC can hold five signed-in accounts.
+        # Without this the second save silently discards the first, with
+        # nothing on screen and nothing in the record to show it happened.
+        try:
+            conn = get_db()
+            try:
+                concurrency.guard(conn, "owners", owner_id,
+                                  request.form.get("_seen_updated_at"))
+            finally:
+                conn.close()
+        except concurrency.StaleRecord as clash:
+            flash(str(clash), "danger")
+            return render_template("crm/owner_form.html", owner={**owner, **data},
+                                   is_edit=True, active="crm",
+                                   page_title=f"Edit — {owner['full_name']}"), 409
 
         try:
             db.update_owner(owner_id, data)

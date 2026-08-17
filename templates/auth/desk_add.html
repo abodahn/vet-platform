@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Add a user to this PC', 'إضافة مستخدم لهذا الجهاز') }}{% endblock %}
+{% block page_title %}{{ t('Add a user to this PC', 'إضافة مستخدم لهذا الجهاز') }}{% endblock %}
+{% block page_sub %}{{ t('Up to five people can stay signed in here and switch in one click.',
+                          'حتى خمسة أشخاص يمكنهم البقاء مسجلين هنا والتبديل بضغطة واحدة.') }}{% endblock %}
+
+{% block content %}
+<div class="pf-card" style="max-width:520px;padding:20px">
+
+  {% if desk %}
+  <div style="margin-bottom:18px">
+    <div class="pf-label" style="margin-bottom:8px">
+      {{ t('Signed in on this PC', 'مسجلون على هذا الجهاز') }}
+      <span style="opacity:.7">({{ desk|length }}/{{ max_users }})</span>
+    </div>
+    {% for u in desk %}
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
+                border:1px solid var(--cl-border);border-radius:6px;margin-bottom:6px">
+      <span style="flex:1">
+        <strong>{{ u.full_name or u.username }}</strong>
+        <span class="pf-badge" style="margin-inline-start:6px">{{ u.role }}</span>
+        {% if session['user'] and u.id == session['user'].id %}
+        <span style="opacity:.7;font-size:12px">
+          — {{ t('using this screen now', 'يستخدم الشاشة الآن') }}</span>
+        {% endif %}
+      </span>
+      <form method="post" action="{{ url_for('auth.desk_remove', user_id=u.id) }}"
+            style="margin:0">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <button class="pf-btn pf-btn-sm" type="submit">
+          {{ t('Sign off', 'تسجيل خروج') }}</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="pf-alert pf-alert-danger" style="margin-bottom:14px">{{ error }}</div>
+  {% endif %}
+
+  {% if desk|length >= max_users %}
+    <p>{{ t('This PC is full. Sign someone off to add another person.',
+             'هذا الجهاز ممتلئ. سجّل خروج أحدهم لإضافة شخص آخر.') }}</p>
+  {% else %}
+  <form method="post">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <div class="pf-form-group">
+      <label class="pf-form-label" for="deskUser">{{ t('Username', 'اسم المستخدم') }}</label>
+      <input class="pf-form-control" id="deskUser" name="username" autocomplete="off"
+             value="{{ username or '' }}" required autofocus>
+    </div>
+    <div class="pf-form-group">
+      <label class="pf-form-label" for="deskPass">{{ t('Password', 'كلمة المرور') }}</label>
+      <input class="pf-form-control" id="deskPass" name="password" type="password"
+             autocomplete="off" required>
+      <small style="opacity:.75">
+        {{ t('Their own password — this signs them in, it does not switch to them.',
+              'كلمة المرور الخاصة بهم — هذا يسجّل دخولهم ولا يبدّل إليهم.') }}</small>
+    </div>
+    <button class="pf-btn pf-btn-primary" type="submit">
+      {{ t('Sign in on this PC', 'تسجيل الدخول على هذا الجهاز') }}</button>
+    <a class="pf-btn pf-btn-secondary" href="{{ url_for('launcher.index') }}">
+      {{ t('Cancel', 'إلغاء') }}</a>
+  </form>
+  {% endif %}
+
+  <p style="margin-top:18px;opacity:.75;font-size:13px;line-height:1.6">
+    {{ t('Anyone at this PC can switch between the people signed in here without
+          typing a password — that is the point of it. Every switch is written to
+          the audit log, and work is always recorded under whoever is active.',
+          'أي شخص أمام هذا الجهاز يمكنه التبديل بين المسجلين دون كلمة مرور — وهذا هو
+          الغرض منه. كل تبديل يُسجَّل في سجل التدقيق، والعمل يُنسب دائماً للمستخدم النشط.') }}
+  </p>
+</div>
+{% endblock %}

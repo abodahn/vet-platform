@@ -144,6 +144,12 @@
 
 {% block content %}
 <form method="post" autocomplete="off">
+{# What this record looked like when the form was opened. If it has moved by the
+   time Save is pressed, somebody else edited the same client and the save is
+   refused rather than quietly discarding their work. #}
+{% if is_edit and owner.updated_at %}
+<input type="hidden" name="_seen_updated_at" value="{{ owner.updated_at }}">
+{% endif %}
 
   <!-- ── Basic Info ──────────────────────────────────────── -->
   <div class="form-card">

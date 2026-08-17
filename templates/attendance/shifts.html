@@ -99,9 +99,14 @@
       <div class="pf-form-group">
         <label class="pf-form-label">{{ t('Working Days', 'أيام العمل') }}</label>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-          {% for val, label in [(1,'Mon'),(2,'Tue'),(3,'Wed'),(4,'Thu'),(5,'Fri'),(6,'Sat'),(0,'Sun')] %}
+          {# Listed Sunday first and pre-ticked Sun-Thu: the Egyptian week.
+             This used to list Mon first and tick `val < 6`, which quietly
+             ticked Mon-Fri AND Sunday — six days — while the schema default
+             said five. Nobody could see the difference because no calculation
+             read the column at all. #}
+          {% for val, label in [(0,'Sun'),(1,'Mon'),(2,'Tue'),(3,'Wed'),(4,'Thu'),(5,'Fri'),(6,'Sat')] %}
           <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:4px 8px;border:1px solid var(--cl-border);border-radius:4px">
-            <input type="checkbox" name="days_of_week" value="{{ val }}" class="day-cb" {% if val < 6 %}checked{% endif %}>
+            <input type="checkbox" name="days_of_week" value="{{ val }}" class="day-cb" {% if val < 5 %}checked{% endif %}>
             {{ label }}
           </label>
           {% endfor %}

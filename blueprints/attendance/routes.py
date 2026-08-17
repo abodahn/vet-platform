@@ -10,43 +10,83 @@ from blueprints.auth.routes import login_required
 from blueprints.hr.routes import can_view_staff
 from models.database import get_db
 from models import money
+from models import concurrency
 from models.excel_export import make_workbook
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def _calc_hours(check_in: str, check_out: str, break_min: int = 0) -> float:
-    """Return net hours worked between two HH:MM strings."""
-    try:
-        fmt = "%H:%M"
-        ci = datetime.strptime(check_in[:5], fmt)
-        co = datetime.strptime(check_out[:5], fmt)
-        if co < ci:          # night shift crosses midnight
-            co += timedelta(days=1)
-        mins = (co - ci).seconds // 60 - break_min
-        return round(max(0, mins / 60), 2)
-    except Exception:
-        return 0.0
+def _calc_hours(check_in: str, check_out: str, break_min: int = 0,
+                overnight: bool = False) -> float:
+    """Net hours between two HH:MM strings. Returns 0.0 on anything unusable.
 
-
-def default_shift(conn):
-    """The clinic's working day. Shifts are clinic-wide, not per employee.
-
-    Falls back to 08:00-17:00 with an hour's break, which is what the schema
-    itself defaults to, so a clinic that never opened the shifts screen still
-    gets sane behaviour instead of none.
+    `overnight` must be passed for a shift that genuinely crosses midnight.
+    This used to wrap WHENEVER check_out < check_in, on the assumption that it
+    meant a night shift. It also means a typo: a manager correcting 09:00-17:00
+    to 09:00-07:00 produced 21.98 hours, which payroll then paid fourteen hours
+    of overtime on. A day shift cannot end before it starts, so on a day shift
+    that ordering is an error and is reported as one rather than guessed at.
     """
     try:
-        row = conn.execute(
-            "SELECT start_time, end_time, break_minutes FROM shifts "
-            "WHERE is_active=1 ORDER BY id LIMIT 1").fetchone()
+        fmt = "%H:%M"
+        ci = datetime.strptime(str(check_in)[:5], fmt)
+        co = datetime.strptime(str(check_out)[:5], fmt)
     except Exception:
-        row = None
+        return 0.0
+    if co < ci:
+        if not overnight:
+            return 0.0
+        co += timedelta(days=1)
+    mins = int((co - ci).total_seconds() // 60) - int(break_min or 0)
+    return round(max(0, mins / 60), 2)
+
+
+def default_shift(conn, user_id: int = None, on_date: str = None):
+    """The working day THIS employee is judged against.
+
+    It used to take no user at all — "shifts are clinic-wide" — and return
+    `ORDER BY id LIMIT 1`, which on a seeded database is Morning 08:00. So the
+    night nurse who clocks in at 22:00 was measured against an 08:00 start and
+    marked Late by fourteen hours, every night; and close_forgotten_checkouts,
+    which closes an open record at "the shift end", closed her 22:00 record at
+    16:00 — a check-out BEFORE the check-in, paying roughly an hour for an
+    eight-hour night.
+
+    staff_shifts already maps employee to shift and is written by HR's roster
+    screen; nothing in attendance consulted it. Where an employee is unrostered
+    the clinic-wide first shift is still the only available answer, so that
+    remains the fallback rather than an error.
+    """
+    row = None
+    on_date = on_date or date.today().isoformat()
+    if user_id:
+        try:
+            row = conn.execute(
+                "SELECT sh.start_time, sh.end_time, sh.break_minutes"
+                " FROM staff_shifts ss JOIN shifts sh ON sh.id = ss.shift_id"
+                " WHERE ss.user_id=? AND ss.effective_from <= ?"
+                "   AND (ss.effective_to IS NULL OR ss.effective_to >= ?)"
+                " ORDER BY ss.effective_from DESC LIMIT 1",
+                (user_id, on_date, on_date)).fetchone()
+        except Exception:
+            row = None
+    if not row:
+        try:
+            row = conn.execute(
+                "SELECT start_time, end_time, break_minutes FROM shifts "
+                "WHERE is_active=1 ORDER BY id LIMIT 1").fetchone()
+        except Exception:
+            row = None
     if not row:
         return {"start_time": "08:00", "end_time": "17:00", "break_minutes": 60}
     return {"start_time": (row["start_time"] or "08:00")[:5],
             "end_time": (row["end_time"] or "17:00")[:5],
             "break_minutes": int(row["break_minutes"] or 0)}
+
+
+def shift_crosses_midnight(shift) -> bool:
+    """True for a night shift, e.g. 22:00-06:00."""
+    return _minutes(shift["end_time"]) <= _minutes(shift["start_time"])
 
 
 # Minutes after the shift start that still count as on time. Traffic in Cairo
@@ -62,16 +102,25 @@ def _minutes(hhmm: str) -> int:
         return 0
 
 
-def status_for_checkin(conn, check_in: str) -> tuple:
+def status_for_checkin(conn, check_in: str, user_id: int = None) -> tuple:
     """('Present'|'Late', minutes_late) for an arrival time.
 
     The 'Late' status has existed in this schema from the start and NOTHING
     EVER SET IT — the dashboard counted late days and the count was always
     zero. A status only ever counted and never assigned is a report that lies
     quietly, which is worse than not having the column.
+
+    Measured against the employee's OWN shift. Against the clinic-wide first
+    shift, every evening and night worker was permanently Late — which is not a
+    cosmetic label: payroll counts late days, and a record that reads Late all
+    month is the one a manager docks.
     """
-    shift = default_shift(conn)
+    shift = default_shift(conn, user_id)
     late_by = _minutes(check_in) - _minutes(shift["start_time"]) - LATE_GRACE_MINUTES
+    # A night shift starting at 22:00 wraps: clocking in at 00:10 is ten past
+    # midnight on a shift that began two hours ago, not fourteen hours early.
+    if shift_crosses_midnight(shift) and late_by < -12 * 60:
+        late_by += 24 * 60
     if late_by > 0:
         return "Late", late_by
     return "Present", 0
@@ -95,21 +144,30 @@ def close_forgotten_checkouts(conn, on_date: str = None) -> int:
     than paying zero; paying an estimate nobody can identify afterwards is not.
     """
     on_date = on_date or (date.today() - timedelta(days=1)).isoformat()
-    shift = default_shift(conn)
     rows = conn.execute(
-        "SELECT id, check_in, break_minutes FROM attendance_records "
+        "SELECT id, user_id, check_in, break_minutes FROM attendance_records "
         "WHERE work_date=? AND check_in IS NOT NULL AND check_in <> '' "
         "  AND (check_out IS NULL OR check_out = '')", (on_date,)).fetchall()
 
     closed = 0
     for r in rows:
+        # Each record closes at ITS OWN shift's end. One clinic-wide shift meant
+        # a 22:00 night record was closed at 16:00 — an end before the start —
+        # and the guard below then collapsed it to zero hours. An eight-hour
+        # night was paid as nothing, every night.
+        shift = default_shift(conn, r["user_id"], on_date)
         brk = int(r["break_minutes"] or shift["break_minutes"] or 0)
         end = shift["end_time"]
         # Someone who arrived after the shift ended gets their arrival time, so
         # the record closes with zero hours rather than a negative day.
-        if _minutes(r["check_in"]) > _minutes(end):
+        #
+        # NOT for a shift that crosses midnight: on a 22:00-06:00 night the
+        # check-in is ALWAYS "after" the end by clock arithmetic, so this guard
+        # fired on every single night record, rewrote the end to 22:00 and paid
+        # zero for an eight-hour shift. There the wrap is the correct reading.
+        if not shift_crosses_midnight(shift) and _minutes(r["check_in"]) > _minutes(end):
             end = r["check_in"]
-        hrs = _calc_hours(r["check_in"], end, brk)
+        hrs = _calc_hours(r["check_in"], end, brk, overnight=shift_crosses_midnight(shift))
         conn.execute(
             "UPDATE attendance_records "
             "SET check_out=?, hours_worked=?, break_minutes=?, "
@@ -125,17 +183,77 @@ def close_forgotten_checkouts(conn, on_date: str = None) -> int:
         conn.commit()
     return closed
 
-def _business_days(start: str, end: str, conn) -> int:
-    """Count weekdays (Sat=6, Sun=0 depending on locale) excl. public holidays."""
+# The Egyptian working week: Sunday to Thursday, weekend Friday and Saturday.
+#
+# Encoded the way the Shifts screen encodes it — Sun=0, Mon=1 … Sat=6.
+_DEFAULT_WORK_DAYS = frozenset({0, 1, 2, 3, 4})
+
+
+def _day_number(value) -> int:
+    """One weekday from days_of_week, normalised to Sun=0 … Sat=6.
+
+    Two conventions are already in the database and they disagree about Sunday.
+    The Shifts form writes it as 0 (its checkbox list ends with (0,'Sun')), and
+    the seeded shifts write it as 7 ("Weekend Morning" is stored "6,7", meaning
+    Saturday and Sunday). % 7 folds 7 onto 0 so both read the same, which is
+    also why a stored "7" must never be compared directly against weekday().
+    """
+    return int(value) % 7
+
+
+def working_weekdays(conn, user_id: int = None) -> frozenset:
+    """Which days of the week this employee — or this clinic — actually works.
+
+    shifts.days_of_week has been in the schema from the beginning, is saved by
+    the Shifts screen and rendered back on it, and was READ BY NOTHING. Every
+    calculation instead hardcoded `weekday() < 5`, i.e. Monday to Friday, which
+    is wrong in the one country this product is sold in: Friday was counted as
+    a working day, so every employee was marked absent on their day off and
+    docked for it about four times a month, while Sunday — a normal working day
+    in Egypt — never counted at all.
+    """
+    row = None
+    if user_id:
+        row = conn.execute(
+            "SELECT sh.days_of_week FROM staff_shifts ss"
+            " JOIN shifts sh ON sh.id = ss.shift_id"
+            " WHERE ss.user_id=? AND (ss.effective_to IS NULL OR ss.effective_to >= ?)"
+            " ORDER BY ss.effective_from DESC LIMIT 1",
+            (user_id, date.today().isoformat())).fetchone()
+    if not row:
+        row = conn.execute(
+            "SELECT days_of_week FROM shifts WHERE is_active=1"
+            " ORDER BY id LIMIT 1").fetchone()
+
+    raw = (row["days_of_week"] if row else "") or ""
+    days = set()
+    for part in str(raw).split(","):
+        part = part.strip()
+        if part.lstrip("-").isdigit():
+            days.add(_day_number(part))
+    # An empty or unparseable setting means nobody has chosen one, not that the
+    # clinic never opens.
+    return frozenset(days) if days else _DEFAULT_WORK_DAYS
+
+
+def _business_days(start: str, end: str, conn, user_id: int = None) -> int:
+    """Working days between two dates, excluding public holidays.
+
+    Counts against the clinic's real week (see working_weekdays), not a
+    hardcoded Monday-to-Friday.
+    """
     holidays = {r[0] for r in conn.execute(
         "SELECT holiday_date FROM public_holidays WHERE holiday_date BETWEEN ? AND ?",
         (start, end)).fetchall()}
+    work = working_weekdays(conn, user_id)
     d0 = date.fromisoformat(start)
     d1 = date.fromisoformat(end)
     count = 0
     cur = d0
     while cur <= d1:
-        if cur.weekday() < 5 and cur.isoformat() not in holidays:
+        # isoweekday() is Mon=1 … Sun=7; % 7 puts Sunday at 0 to match the
+        # Shifts screen's own numbering.
+        if (cur.isoweekday() % 7) in work and cur.isoformat() not in holidays:
             count += 1
         cur += timedelta(days=1)
     return count
@@ -254,7 +372,17 @@ def checkin():
             return redirect(url_for("attendance.checkin"))
         action         = request.form.get("action", "checkin")
         notes          = request.form.get("notes", "")
-        break_min      = int(request.form.get("break_minutes", 0) or 0)
+        # The unpaid break defaults to the SHIFT'S break, not to zero.
+        #
+        # Nobody types this box, so it was always 0: an 08:00-16:00 day stored
+        # hours_worked = 8.0 while payroll's standard_hours subtracted the
+        # shift's 60-minute break to get 7.0 — and paid the difference as an
+        # hour of overtime. Every hand-clocked day, roughly 22 hours a month per
+        # employee, invented by the two sides disagreeing about lunch.
+        _shift_now = default_shift(conn, target_user_id, today)
+        _raw_break = request.form.get("break_minutes")
+        break_min  = (int(_raw_break) if str(_raw_break or "").strip().isdigit()
+                      else int(_shift_now["break_minutes"] or 0))
 
         rec = conn.execute(
             "SELECT * FROM attendance_records WHERE user_id=? AND work_date=?",
@@ -265,7 +393,7 @@ def checkin():
                 flash("Already checked in today.", "warning")
             else:
                 u_row = conn.execute("SELECT * FROM users WHERE id=?", (target_user_id,)).fetchone()
-                st, late_by = status_for_checkin(conn, now)
+                st, late_by = status_for_checkin(conn, now, target_user_id)
                 conn.execute(
                     """INSERT INTO attendance_records
                            (user_id,username,full_name,work_date,check_in,status,notes,recorded_by)
@@ -290,7 +418,8 @@ def checkin():
             elif rec["check_out"]:
                 flash("Already checked out.", "warning")
             else:
-                hrs = _calc_hours(rec["check_in"], now, break_min)
+                hrs = _calc_hours(rec["check_in"], now, break_min,
+                                  overnight=shift_crosses_midnight(_shift_now))
                 conn.execute(
                     """UPDATE attendance_records
                        SET check_out=?, break_minutes=?, hours_worked=?, updated_at=datetime('now')
@@ -409,7 +538,33 @@ def record_edit(rec_id):
         status     = request.form.get("status", "Present")
         brk        = int(request.form.get("break_minutes", 0) or 0)
         notes      = request.form.get("notes", "")
-        hrs = _calc_hours(check_in, check_out, brk) if check_in and check_out else 0
+        # Two managers correcting the same day's hours is the collision that
+        # costs money: last-write-wins turns one of the two corrections into
+        # nothing, and nobody can tell afterwards which one survived.
+        try:
+            concurrency.guard(conn, "attendance_records", rec_id,
+                              request.form.get("_seen_updated_at"))
+        except concurrency.StaleRecord as clash:
+            conn.close()
+            flash(str(clash), "danger")
+            return redirect(url_for("attendance.record_edit", rec_id=rec_id))
+
+        shift = default_shift(conn, rec["user_id"], rec["work_date"])
+        overnight = shift_crosses_midnight(shift)
+
+        # A day shift cannot end before it starts. This used to be read as a
+        # night shift and wrapped, so correcting 17:00 to 07:00 by mistake wrote
+        # 21.98 hours and payroll paid fourteen hours of overtime on it. Refuse
+        # and say why, rather than store a number nobody typed.
+        if check_in and check_out and not overnight \
+                and _minutes(check_out) < _minutes(check_in):
+            conn.close()
+            flash("Check-out is before check-in. This employee is not on a "
+                  "night shift, so one of the two times is wrong.", "error")
+            return redirect(url_for("attendance.record_edit", rec_id=rec_id))
+
+        hrs = (_calc_hours(check_in, check_out, brk, overnight=overnight)
+               if check_in and check_out else 0)
         conn.execute(
             """UPDATE attendance_records
                SET check_in=?,check_out=?,status=?,break_minutes=?,hours_worked=?,
@@ -504,15 +659,34 @@ def leave_new():
             conn.close()
             return redirect(url_for("attendance.leave_new"))
 
-        days_req = _business_days(start_date, end_date, conn)
+        # Against THIS employee's week: a night nurse rostered across the
+        # weekend does not get the same day count as the day desk.
+        days_req = _business_days(start_date, end_date, conn, user["id"])
         lt_row   = conn.execute("SELECT * FROM leave_types WHERE id=?", (lt_id,)).fetchone()
 
-        # Check balance
-        bal = conn.execute(
-            "SELECT * FROM leave_balances WHERE user_id=? AND leave_type_id=? AND year=?",
-            (user["id"], lt_id, year)).fetchone()
-        if bal and (bal["remaining"] - bal["pending"]) < days_req:
-            flash(f"Insufficient balance. Available: {bal['remaining'] - bal['pending']:.1f} days.", "warning")
+        # The year the leave is TAKEN in, not the year it is booked in.
+        #
+        # This reserved against date.today().year while approve and reject both
+        # settle against start_date's year. A request made in December for
+        # January reserved days on this year's row and then deducted from next
+        # year's — which usually does not exist, so approving it deducted
+        # nothing at all and the reservation sat on the old row forever,
+        # permanently eating an allowance nobody could get back.
+        book_year = date.fromisoformat(start_date).year
+
+        # Create the row if this leave type has never been used before.
+        # _get_or_create_balance has existed all along and was called by NOTHING,
+        # so any type without a pre-existing row was completely untracked: the
+        # form advertised the full days_per_year allowance, the reservation was
+        # skipped, approval deducted nothing, and an employee could take the
+        # same three weeks every year forever.
+        bal = _get_or_create_balance(
+            conn, user["id"], lt_id, book_year,
+            float(lt_row["days_per_year"] or 0) if lt_row else 0.0)
+
+        available = float(bal["remaining"] or 0) - float(bal["pending"] or 0)
+        if available < days_req:
+            flash(f"Insufficient balance. Available: {available:.1f} days.", "warning")
 
         conn.execute(
             """INSERT INTO leave_requests
@@ -522,11 +696,11 @@ def leave_new():
             (user["id"], user["username"], user.get("full_name",""),
              lt_id, lt_row["name"] if lt_row else "",
              start_date, end_date, days_req, reason))
-        # Reserve pending balance
-        if bal:
-            conn.execute(
-                "UPDATE leave_balances SET pending=pending+? WHERE user_id=? AND leave_type_id=? AND year=?",
-                (days_req, user["id"], lt_id, year))
+        # Reserve against the year the leave falls in, so approve and reject —
+        # which both use the request's start year — settle the same row.
+        conn.execute(
+            "UPDATE leave_balances SET pending=pending+? WHERE user_id=? AND leave_type_id=? AND year=?",
+            (days_req, user["id"], lt_id, book_year))
         conn.commit()
         conn.close()
         flash(f"Leave request submitted for {days_req} day(s). Awaiting approval.", "success")
@@ -604,8 +778,17 @@ def leave_approve(req_id):
             """UPDATE leave_requests SET status='Approved', approved_by=?, approved_at=datetime('now')
                WHERE id=?""",
             (user["username"], req_id))
-        # Deduct from balance
+        # Deduct from the balance for the year the leave is taken in.
+        #
+        # The row is created if absent. A bare UPDATE here silently did nothing
+        # for any leave type that had no row — which was every type nobody had
+        # ever hand-seeded — so approving leave deducted nothing and the
+        # allowance never moved.
         yr = date.fromisoformat(req["start_date"]).year
+        lt = conn.execute("SELECT days_per_year FROM leave_types WHERE id=?",
+                          (req["leave_type_id"],)).fetchone()
+        _get_or_create_balance(conn, req["user_id"], req["leave_type_id"], yr,
+                               float(lt["days_per_year"] or 0) if lt else 0.0)
         conn.execute(
             """UPDATE leave_balances
                SET used=used+?, pending=MAX(0,pending-?), remaining=MAX(0,remaining-?)
@@ -684,7 +867,10 @@ def shift_save():
     start_time = request.form.get("start_time", "08:00")
     end_time   = request.form.get("end_time",   "17:00")
     break_min  = int(request.form.get("break_minutes", 60) or 60)
-    days       = ",".join(request.form.getlist("days_of_week") or ["1","2","3","4","5"])
+    # Sun-Thu when nothing was ticked, matching _DEFAULT_WORK_DAYS. A shift
+    # saved with no days used to fall back to Mon-Fri.
+    days = ",".join(request.form.getlist("days_of_week")
+                    or [str(d) for d in sorted(_DEFAULT_WORK_DAYS)])
     color      = request.form.get("color", "#3b82f6")
     is_active  = 1 if request.form.get("is_active") else 0
     if not name:
@@ -797,7 +983,19 @@ def balance_set():
     alloc, _   = money.form_amount(request.form.get("allocated"), "allocated days")
     used, _    = money.form_amount(request.form.get("used"), "used days")
     pending, _ = money.form_amount(request.form.get("pending"), "pending days")
-    remaining = max(0, alloc - used - pending)
+
+    # remaining = allocated - used. NOT minus pending.
+    #
+    # Every other place treats `remaining` that way: leave_approve does
+    # `remaining = remaining - days` while ALSO clearing the same days from
+    # pending, and leave_new reads availability as `remaining - pending`. This
+    # screen alone subtracted pending a second time, so a manager opening
+    # Balances and pressing Save without changing anything wrote a remaining
+    # that was short by the pending days. It is not visible immediately and it
+    # does not compound — but when that pending request is approved, its days
+    # come off `remaining` again, and the employee is permanently down twice
+    # what they took.
+    remaining = max(0, alloc - used)
     # Explicit ON CONFLICT ... DO UPDATE, not INSERT OR REPLACE.
     #
     # _fix_sql turns "INSERT OR REPLACE" into "ON CONFLICT DO NOTHING", which is

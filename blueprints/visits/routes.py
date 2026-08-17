@@ -953,8 +953,10 @@ def _owner_360(conn, owner_id):
         " ORDER BY a.appt_date, a.appt_start LIMIT 50", (owner_id, today))
 
     invoices = rows(
+        # visit_id so the History tab can show what each visit was billed and
+        # whether it was paid. exam_submit has always written it; nothing read it.
         "SELECT id, invoice_number, issue_date, total, paid_amount, due_amount,"
-        " status, pet_id FROM invoices WHERE owner_id=? AND status!='Cancelled'"
+        " status, pet_id, visit_id FROM invoices WHERE owner_id=? AND status!='Cancelled'"
         " ORDER BY issue_date DESC, id DESC LIMIT 100", (owner_id,))
 
     payments = rows(

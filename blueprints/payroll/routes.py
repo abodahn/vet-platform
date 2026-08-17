@@ -202,9 +202,22 @@ def _get_attendance_summary(conn, user_id: int, year: int, month: int) -> dict:
             if extra > 0:
                 overtime_hours += extra
 
-    # Working days in month (Mon–Fri, minus public holidays would be ideal but use total recorded)
-    _, days_in_month = calendar.monthrange(year, month)
-    working_days = total_days if total_days > 0 else days_in_month
+    # The month's ACTUAL working days for this employee — their shift's week,
+    # minus public holidays.
+    #
+    # This used to be "however many attendance rows happen to exist", with its
+    # own comment admitting the real calculation "would be ideal". That made the
+    # absence deduction a fraction of a moving denominator: an employee with two
+    # records, one of them absent, was docked HALF their basic salary. The
+    # calculation now exists in attendance.working_weekdays, so use it.
+    from blueprints.attendance.routes import _business_days
+    try:
+        working_days = _business_days(period_start, period_end, conn, user_id)
+    except Exception:
+        working_days = 0
+    if not working_days:
+        _, days_in_month = calendar.monthrange(year, month)
+        working_days = total_days if total_days > 0 else days_in_month
 
     return {
         "total_days":    total_days,

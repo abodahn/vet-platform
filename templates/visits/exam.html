@@ -435,14 +435,22 @@
       <details class="pf-card hw-pane hw-fold" data-fold="hist" open>
         <summary class="hw-h">{{ t('History', 'السجل') }}
           <span class="hw-muted" id="hwHistCount"></span></summary>
-        <div class="hw-tablewrap hw-scroll">
-          <table class="hw-table">
+        <p class="hw-muted hw-small">
+          {{ t('Every animal this client owns, newest first. Click a row for what was found, given and charged.',
+                'كل حيوانات هذا العميل، الأحدث أولاً. اضغط على أي سطر لعرض التشخيص والعلاج والفاتورة.') }}</p>
+        <div class="hw-tablewrap hw-scroll hw-scroll-tall">
+          <table class="hw-table hw-hist">
             <thead><tr>
               <th>{{ t('Date', 'التاريخ') }}</th>
+              <th>{{ t('Animal', 'الحيوان') }}</th>
+              <th>{{ t('Type', 'النوع') }}</th>
               <th>{{ t('Symptom or disease', 'العرض أو المرض') }}</th>
+              <th>{{ t('Diagnosis', 'التشخيص') }}</th>
               <th class="hw-w">{{ t('Weight', 'الوزن') }}</th>
               <th class="hw-w">{{ t('Temp', 'الحرارة') }}</th>
               <th>{{ t('Doctor', 'الطبيب') }}</th>
+              <th class="hw-w">{{ t('Charged', 'المبلغ') }}</th>
+              <th>{{ t('Paid', 'السداد') }}</th>
             </tr></thead>
             <tbody id="hwHistBody"></tbody>
           </table>
@@ -875,6 +883,29 @@
 .hw-nopet .hw-panel[data-panel="visit"],
 .hw-nopet .hw-billbar{display:none}
 .hw-petbtn-add{border-style:dashed;font-weight:600}
+/* History is the tab people read longest, so it gets more room than the
+   260px the other tables share. */
+.hw-scroll-tall{max-height:60vh}
+.hw-hist td{vertical-align:top}
+.hw-hist-has-more{cursor:pointer}
+.hw-hist-has-more:hover{background:var(--pf-surface-2,rgba(127,127,127,.07))}
+.hw-hist-has-more td:first-child::before{content:"▸ ";opacity:.5}
+.hw-hist-detail td{font-size:.92rem;opacity:.85;padding-inline-start:1.6rem;
+                   background:var(--pf-surface-2,rgba(127,127,127,.05))}
+.hw-hist-open{margin-inline-start:.6rem;white-space:nowrap}
+.hw-chip{display:inline-block;padding:.08rem .5rem;border-radius:999px;
+         font-size:.74rem;font-weight:700;white-space:nowrap}
+.hw-chip-paid{background:#dcfce7;color:#14532d}
+.hw-chip-partial{background:#fef3c7;color:#78350f}
+.hw-chip-unpaid{background:#fee2e2;color:#7f1d1d}
+html[data-theme="dark"] .hw-chip-paid{background:#052e16;color:#bbf7d0}
+html[data-theme="dark"] .hw-chip-partial{background:#422006;color:#fde68a}
+html[data-theme="dark"] .hw-chip-unpaid{background:#450a0a;color:#fecaca}
+@media (prefers-color-scheme:dark){
+  html:not([data-theme="light"]) .hw-chip-paid{background:#052e16;color:#bbf7d0}
+  html:not([data-theme="light"]) .hw-chip-partial{background:#422006;color:#fde68a}
+  html:not([data-theme="light"]) .hw-chip-unpaid{background:#450a0a;color:#fecaca}
+}
 .hw-task-done td{opacity:.55;text-decoration:line-through}
 .hw-task-done td:first-child{text-decoration:none}
 .hw-task-late td:nth-child(3){font-weight:700;color:#b91c1c}
@@ -1165,6 +1196,11 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     paidPart:     {{ t('Payment recorded', 'تم تسجيل الدفعة') | tojson }},
     stillOwes:    {{ t('Still owed:', 'المتبقي:') | tojson }},
     newCase:      {{ t('Start a new case', 'بدء حالة جديدة') | tojson }},
+    hVax:         {{ t('Vaccines', 'تطعيمات') | tojson }},
+    hMeds:        {{ t('Medicines', 'أدوية') | tojson }},
+    hFiles:       {{ t('Files', 'مرفقات') | tojson }},
+    hInvoice:     {{ t('Invoice', 'فاتورة') | tojson }},
+    hOpen:        {{ t('Open the full visit →', 'فتح الزيارة كاملة ←') | tojson }},
     needTask:     {{ t('Type what needs doing.', 'اكتب المطلوب عمله.') | tojson }},
     needDate:     {{ t('Pick a date for the appointment.', 'اختر تاريخاً للموعد.') | tojson }},
     bookedOk:     {{ t('Appointment booked', 'تم حجز الموعد') | tojson }},
@@ -1774,11 +1810,19 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     $('lnkFiles').href   = '/crm/pets/' + p.id;
     $('lnkNext').href    = '/appointments/new?pet_id=' + p.id;
 
-    fillTable('hwHistBody', 'hwNoHist', 'hwHistCount', data.history, function (h) {
-      return [(h.visit_date || '').slice(0, 16),
-              h.chief_complaint || h.symptoms,
-              d1(h.weight_kg), d1(h.temp_c), h.doctor_name];
-    }, function (h) { return '/visits/' + h.id; });
+    // History is drawn from the OWNER's record when it is loaded, so it covers
+    // every animal in the household — that is the whole point of a 360 view,
+    // and the previous "history" was this pet's visits only. Until the owner
+    // payload arrives, this pet's own history is better than an empty table.
+    if (!(OWNER360 && (OWNER360.visits || []).length)) {
+      renderHistory({visits: (data.history || []).map(function (h) {
+        return {id: h.id, visit_date: h.visit_date, visit_type: h.visit_type,
+                chief_complaint: h.chief_complaint, symptoms: h.symptoms,
+                weight_kg: h.weight_kg, temp_c: h.temp_c,
+                doctor_name: h.doctor_name, pet_name: (data.pet || {}).pet_name,
+                pet_id: (data.pet || {}).id};
+      })});
+    }
 
     $('hwCurrent').hidden = false;
     empty.hidden = true;
@@ -2115,6 +2159,7 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
       }, function (a) { return a.id ? '/appointments/' + a.id : null; });
 
     renderTasks(d.tasks || []);
+    renderHistory(d);
 
     // The inline booking form's animal list — this client's animals only.
     var bkPet = $('bkPet');
@@ -2330,6 +2375,116 @@ details.hw-pane[open]>summary{margin-bottom:.7rem}
     });
   });
   var payNonce = Math.random().toString(36).slice(2);
+
+  // ── history ───────────────────────────────────────────────────────
+  // Everything the 360 payload already carries, joined by visit_id: what was
+  // found, what was given, what it cost and whether it was paid. The table used
+  // to show five columns for ONE pet — date, symptom, weight, temp, doctor —
+  // which is not a history a vet can make a decision from.
+  function _by(list, key) {
+    var m = {};
+    (list || []).forEach(function (r) {
+      var k = r[key];
+      if (k === null || k === undefined) return;
+      (m[k] = m[k] || []).push(r);
+    });
+    return m;
+  }
+
+  function _cell(row, text, cls) {
+    var td = row.insertCell();
+    td.textContent = (text === null || text === undefined || text === '') ? '—' : text;
+    if (cls) td.className = cls;
+    return td;
+  }
+
+  function renderHistory(d) {
+    var tb = $('hwHistBody'), body = d || {};
+    var visits = body.visits || [];
+    while (tb.rows.length) tb.deleteRow(0);
+
+    var dxBy  = _by(body.diagnoses, 'visit_id');
+    var vaxBy = _by(body.vaccines, 'visit_id');
+    var medBy = _by(body.meds, 'visit_id');
+    var invBy = _by(body.invoices, 'visit_id');
+    var docBy = _by(body.documents, 'entity_id');
+
+    visits.forEach(function (v) {
+      var dx  = dxBy[v.id] || [];
+      var vax = vaxBy[v.id] || [];
+      var med = medBy[v.id] || [];
+      var inv = (invBy[v.id] || [])[0];
+      var docs = (docBy[v.id] || []).filter(function (a) {
+        return a.entity_type === 'visit';
+      });
+
+      var tr = tb.insertRow();
+      tr.className = 'hw-hist-row';
+
+      // The date is always a real link to the visit, on EVERY row. Hanging it
+      // off the expandable detail meant a plain consultation — no vaccine, no
+      // medicine, no invoice — could not be opened at all, which is worse than
+      // the flat table this replaced. It also keeps ctrl-click working.
+      var dateCell = tr.insertCell();
+      var open = document.createElement('a');
+      open.className = 'hw-link';
+      open.href = '/visits/' + v.id;
+      open.textContent = day(v.visit_date);
+      open.addEventListener('click', function (e) { e.stopPropagation(); });
+      dateCell.appendChild(open);
+
+      _cell(tr, v.pet_name, 'hw-strong');
+      _cell(tr, v.visit_type);
+      _cell(tr, v.chief_complaint || v.symptoms);
+      _cell(tr, dx.map(function (x) {
+        return x.diagnosis + (x.is_chronic ? ' *' : '');
+      }).join(', '));
+      _cell(tr, d1(v.weight_kg), 'hw-num');
+      _cell(tr, d1(v.temp_c), 'hw-num');
+      _cell(tr, v.doctor_name);
+      _cell(tr, inv ? money(inv.total) : '', 'hw-num');
+
+      var paid = tr.insertCell();
+      if (inv) {
+        var chip = document.createElement('span');
+        chip.className = 'hw-chip hw-chip-' + (inv.status || '').toLowerCase();
+        chip.textContent = inv.status || '';
+        paid.appendChild(chip);
+      } else {
+        paid.textContent = '—';
+      }
+
+      // The detail line: only built when there is something to say, so a plain
+      // consultation does not grow an empty grey row under it.
+      var extras = [];
+      if (vax.length)  extras.push(L.hVax + ': ' + vax.map(function (x) { return x.vaccine_name; }).join(', '));
+      if (med.length)  extras.push(L.hMeds + ': ' + med.map(function (x) { return x.medication_name; }).join(', '));
+      if (docs.length) extras.push(L.hFiles + ': ' + docs.length);
+      if (inv && inv.invoice_number) extras.push(L.hInvoice + ' ' + inv.invoice_number);
+      dx.filter(function (x) { return x.severity; }).forEach(function (x) {
+        extras.push(x.diagnosis + ' (' + x.severity + ')');
+      });
+
+      if (extras.length) {
+        tr.classList.add('hw-hist-has-more');
+        var det = tb.insertRow();
+        det.className = 'hw-hist-detail';
+        det.hidden = true;
+        var td = det.insertCell();
+        td.colSpan = 10;
+        td.textContent = extras.join('   ·   ');
+        var more = document.createElement('a');
+        more.className = 'hw-link hw-hist-open';
+        more.href = '/visits/' + v.id;
+        more.textContent = '  ' + L.hOpen;
+        td.appendChild(more);
+        tr.addEventListener('click', function () { det.hidden = !det.hidden; });
+      }
+    });
+
+    $('hwNoHist').hidden = visits.length > 0;
+    $('hwHistCount').textContent = visits.length ? '(' + visits.length + ')' : '';
+  }
 
   // ── tasks ─────────────────────────────────────────────────────────
   function renderTasks(list) {

@@ -1986,7 +1986,12 @@ CREATE TABLE IF NOT EXISTS shifts (
     start_time    TEXT NOT NULL DEFAULT '08:00',
     end_time      TEXT NOT NULL DEFAULT '17:00',
     break_minutes INTEGER DEFAULT 60,
-    days_of_week  TEXT DEFAULT '1,2,3,4,5',
+    -- Sun=0 … Sat=6, and Sun-Thu is the Egyptian week. This defaulted to
+    -- '1,2,3,4,5' (Mon-Fri), so any shift inserted without days silently got
+    -- the American week — and since nothing read the column until now, nobody
+    -- could see it. Fixing the seed alone was not enough: the default is what
+    -- every other INSERT falls back to.
+    days_of_week  TEXT DEFAULT '0,1,2,3,4',
     color         TEXT DEFAULT '#3b82f6',
     is_active     INTEGER DEFAULT 1,
     created_at    TEXT DEFAULT (datetime('now'))
@@ -2667,10 +2672,15 @@ def init_db(admin_user: str = "admin", admin_pass: str = "admin1234") -> None:
         # shifts
         if conn.execute("SELECT COUNT(*) FROM shifts").fetchone()[0] == 0:
             for (sn, st, et, bk, days) in [
-                ("Morning Shift",   "08:00", "16:00", 60, "1,2,3,4,5"),
-                ("Evening Shift",   "14:00", "22:00", 60, "1,2,3,4,5"),
-                ("Night Shift",     "22:00", "06:00", 60, "1,2,3,4,5,6,7"),
-                ("Weekend Morning", "09:00", "15:00", 30, "6,7"),
+                # Sun=0 … Sat=6, and the Egyptian week: Sunday to Thursday, with
+                # Friday and Saturday off. These used to seed a Monday-to-Friday
+                # week with a "Weekend Morning" shift on Sat+Sun, which is the
+                # American week — so every clinic started life expecting staff in
+                # on Friday and treating Sunday as a day off.
+                ("Morning Shift",   "08:00", "16:00", 60, "0,1,2,3,4"),
+                ("Evening Shift",   "14:00", "22:00", 60, "0,1,2,3,4"),
+                ("Night Shift",     "22:00", "06:00", 60, "0,1,2,3,4,5,6"),
+                ("Weekend Morning", "09:00", "15:00", 30, "5,6"),
             ]:
                 conn.execute(
                     "INSERT INTO shifts(name,start_time,end_time,break_minutes,days_of_week) VALUES(?,?,?,?,?)",
@@ -2847,6 +2857,21 @@ def get_user(username: str) -> Optional[dict]:
     row = conn.execute("SELECT * FROM users WHERE username=? AND is_active=1",(username,)).fetchone()
     conn.close()
     return dict(row) if row else None
+
+def get_user_by_id(user_id: int) -> Optional[dict]:
+    """A user by id, ACTIVE OR NOT — the caller decides what to do about it.
+
+    get_user() filters on is_active=1, which is right for a login. It is wrong
+    for the shared-desk switcher, which has to tell "no such user" apart from
+    "this account was deactivated while it sat signed in on a reception PC" —
+    the second must drop the account off that machine and say so, not fail
+    silently as though it never existed.
+    """
+    conn = get_db()
+    row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
 
 def update_user_theme(username: str, theme: str) -> None:
     conn = get_db()

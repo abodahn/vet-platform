@@ -427,7 +427,12 @@ def test_the_rows_are_rendered_as_links_not_plain_text(auth_client, leo):
     body = auth_client.get("/visits/exam/%d" % leo["pet_id"]).get_data(as_text=True)
     assert "hw-rowlink" in body, "clickable rows lost their class"
     assert "'/finance/invoices/'" in body, "invoice rows must link to the invoice"
-    assert "'/visits/' + h.id" in body, "history rows must link to the visit"
+    # Every history row carries a link to its visit on the date cell — on rows
+    # with expandable detail AND on plain ones. It used to be built by
+    # fillTable's row-link callback as "'/visits/' + h.id"; the enriched table
+    # builds it per row, so the assertion is on the URL rather than the old
+    # expression. A row that cannot be opened is the regression to catch.
+    assert "'/visits/' + v.id" in body, "history rows must link to the visit"
     assert "/crm/owners/" in body and "/crm/pets/" in body
     assert "wa.me" in body, "the WhatsApp shortcut is gone"
 
