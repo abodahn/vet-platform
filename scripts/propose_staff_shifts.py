@@ -45,12 +45,21 @@ MIN_RECORDS = 5
 MAX_DRIFT_MIN = 90
 
 
-def _mins(hhmm):
-    try:
-        h, m = str(hhmm)[:5].split(":")
-        return int(h) * 60 + int(m)
-    except Exception:
+def _mins(value):
+    """Minutes past midnight, via the app's own normaliser.
+
+    Not a local `str(v)[:5]`: this column holds BOTH "HH:MM" (written at
+    check-in) and "2026-08-12 09:27:00" (seeded and imported records), and
+    slicing the second yields "2026-". A first version of this script did
+    exactly that and reported every one of 980 live clock-ins as unparseable —
+    which is how the same bug was found in the application itself.
+    """
+    from blueprints.attendance.routes import hhmm
+    s = hhmm(value)
+    if not s:
         return None
+    h, m = s.split(":")
+    return int(h) * 60 + int(m)
 
 
 def _hhmm(mins):
@@ -68,10 +77,20 @@ def _gap(a, b):
     return min(d, 24 * 60 - d)
 
 
+def _days_of(raw):
+    """The weekdays a shift covers, as Sun=0 … Sat=6."""
+    out = set()
+    for part in str(raw or "").split(","):
+        part = part.strip()
+        if part.lstrip("-").isdigit():
+            out.add(int(part) % 7)
+    return out
+
+
 def _run(conn, apply_it):
     shifts = [dict(r) for r in conn.execute(
-        "SELECT id, name, start_time, end_time FROM shifts WHERE is_active=1"
-        " ORDER BY id").fetchall()]
+        "SELECT id, name, start_time, end_time, days_of_week FROM shifts"
+        " WHERE is_active=1 ORDER BY id").fetchall()]
     if not shifts:
         print("  No active shifts to roster onto.")
         return
@@ -93,24 +112,44 @@ def _run(conn, apply_it):
         if u["id"] in already:
             skipped.append((u, "already rostered", "", 0))
             continue
-        times = [_mins(r["check_in"]) for r in conn.execute(
-            "SELECT check_in FROM attendance_records"
+        rows = conn.execute(
+            "SELECT work_date, check_in FROM attendance_records"
             " WHERE user_id=? AND check_in IS NOT NULL AND check_in <> ''"
-            " ORDER BY check_in", (u["id"],)).fetchall()]
-        times = [t for t in times if t is not None]
+            " ORDER BY check_in", (u["id"],)).fetchall()
+        times, worked_days = [], set()
+        for r in rows:
+            t = _mins(r["check_in"])
+            if t is None:
+                continue
+            times.append(t)
+            try:
+                worked_days.add(date.fromisoformat(str(r["work_date"])[:10]).isoweekday() % 7)
+            except Exception:
+                pass
         if len(times) < MIN_RECORDS:
             skipped.append((u, "only %d clock-in(s)" % len(times), "", len(times)))
             continue
 
         median = sorted(times)[len(times) // 2]
+
+        # Start time alone is not enough. A 09:27 median is 33 minutes from the
+        # "Weekend Morning" 09:00 shift and 87 from Morning 08:00 — so pure
+        # time-matching rosters a Sunday-to-Thursday employee onto the weekend
+        # shift, which then judges them absent every day they actually work.
+        # A candidate has to cover most of the days this person turns up on.
         best, gap = None, None
         for s, m in starts:
+            covered = _days_of(s["days_of_week"])
+            if worked_days and covered:
+                overlap = len(worked_days & covered) / float(len(worked_days))
+                if overlap < 0.6:
+                    continue
             g = _gap(median, m)
             if gap is None or g < gap:
                 best, gap = s, g
         if gap is None or gap > MAX_DRIFT_MIN:
-            skipped.append((u, "usual start %s matches no shift" % _hhmm(median),
-                            "", len(times)))
+            skipped.append((u, "usual start %s matches no shift they work"
+                            % _hhmm(median), "", len(times)))
             continue
         proposals.append((u, best, median, gap, len(times)))
 

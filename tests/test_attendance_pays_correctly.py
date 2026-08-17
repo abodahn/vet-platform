@@ -485,3 +485,69 @@ def test_saving_a_balance_unchanged_does_not_destroy_entitlement(app, shifts):
         % bal["remaining"]
     available = float(bal["remaining"]) - float(bal["pending"])
     assert available == 15.0, "available days came out at %s" % available
+
+
+# ── the two stored time formats ──────────────────────────────────────────────
+
+def test_a_full_timestamp_is_read_as_a_time(app):
+    """The column holds two shapes and every helper assumed one.
+
+    The app writes "HH:MM" at check-in; seeded and imported records carry
+    "2026-08-12 09:27:00". Every helper did str(value)[:5], which on the second
+    form yields "2026-" — so _minutes returned 0 and _calc_hours returned 0.0.
+
+    On the live demo that is 980 of 1078 records, and it ran through the whole
+    module: lateness compared against minute zero so nobody could be Late, the
+    nightly auto-close paid zero hours, and the edit screen bound the raw value
+    into <input type="time">, which rejects it and renders EMPTY — so opening a
+    record showed blank times and saving wrote hours_worked = 0.
+    """
+    from blueprints.attendance.routes import hhmm, _minutes, _calc_hours
+
+    assert hhmm("2026-08-12 09:27:00") == "09:27"
+    assert hhmm("2026-08-12T09:27") == "09:27"
+    assert hhmm("09:27:00") == "09:27"
+    assert hhmm("09:27") == "09:27"
+    assert _minutes("2026-08-12 09:27:00") == 9 * 60 + 27, \
+        "a full timestamp still reads as minute zero"
+    assert _calc_hours("2026-08-12 08:00:00", "2026-08-12 17:00:00", 60) == 8.0, \
+        "a full-timestamp day still computes zero hours"
+
+
+def test_nonsense_is_still_no_time_at_all(app):
+    """The callers all treat falsy as 'nothing recorded' — keep that."""
+    from blueprints.attendance.routes import hhmm, _calc_hours
+    for junk in ("", None, "rubbish", "25:99", ":", "2026-08-12"):
+        assert hhmm(junk) == "", "%r was read as a time" % (junk,)
+    assert _calc_hours("rubbish", "17:00", 0) == 0.0
+
+
+def test_lateness_is_detectable_on_a_full_timestamp_record(app, shifts):
+    """Against minute zero, late_by is always negative and nobody is ever Late."""
+    from blueprints.attendance.routes import status_for_checkin
+    uid = _staff(app, "fmt_late_att", "Format Late", shifts["day"])
+    with app.app_context():
+        conn = db.get_db()
+        status, mins = status_for_checkin(conn, "2026-08-12 09:30:00", uid)
+        conn.close()
+    assert status == "Late" and mins > 0, \
+        "a 09:30 arrival on an 08:00 shift read as %s" % status
+
+
+def test_the_edit_screen_shows_the_times_it_stored(auth_client, app, shifts):
+    """<input type="time"> silently renders empty for anything but HH:MM."""
+    uid = _staff(app, "fmt_edit_att", "Format Edit", shifts["day"])
+    with app.app_context():
+        conn = db.get_db()
+        rid = conn.execute(
+            "INSERT INTO attendance_records(user_id, work_date, check_in,"
+            " check_out, hours_worked, status) VALUES(?,?,?,?,?,'Present')",
+            (uid, "2026-08-12", "2026-08-12 08:14:00", "2026-08-12 17:05:00", 7.85)
+        ).lastrowid
+        conn.commit()
+        conn.close()
+
+    body = auth_client.get("/attendance/records/edit/%d" % rid).get_data(as_text=True)
+    assert 'value="08:14"' in body, \
+        "the check-in box renders empty, so saving would wipe the record"
+    assert 'value="17:05"' in body

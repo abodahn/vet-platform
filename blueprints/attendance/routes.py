@@ -16,6 +16,45 @@ from models.excel_export import make_workbook
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+def hhmm(value) -> str:
+    """The clock time out of whatever shape the column happens to hold.
+
+    Two formats live in this column. The app writes "HH:MM" at check-in;
+    imported and seeded records carry a full timestamp,
+    "2026-08-12 09:27:00". Every helper here used to do `str(value)[:5]`,
+    which on the second form yields "2026-" — so _minutes returned 0 and
+    _calc_hours returned 0.0 for EVERY such record.
+
+    That was not theoretical. On the live demo 980 of 1078 records are stored
+    that way, and the consequences ran through the whole module: lateness
+    compared against minute zero so nobody could ever be Late; the nightly
+    auto-close computed zero hours and paid nothing; and the edit screen bound
+    the raw value into <input type="time">, which rejects it and renders EMPTY —
+    so opening a record showed blank times and saving wrote hours_worked = 0.
+    That last one is the "editing any attendance record wipes the times and
+    zeroes the hours" report, and the format is the whole of it.
+
+    Returns "" for anything with no recognisable time, so callers keep their
+    existing "falsy means no time recorded" behaviour.
+    """
+    s = str(value or "").strip()
+    if not s:
+        return ""
+    # "2026-08-12 09:27:00" / "2026-08-12T09:27" -> the part after the date.
+    if len(s) > 8 and (" " in s or "T" in s):
+        s = s.replace("T", " ").split(" ", 1)[1].strip()
+    parts = s.split(":")
+    if len(parts) < 2:
+        return ""
+    try:
+        h, m = int(parts[0]), int(parts[1])
+    except ValueError:
+        return ""
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        return ""
+    return "%02d:%02d" % (h, m)
+
+
 def _calc_hours(check_in: str, check_out: str, break_min: int = 0,
                 overnight: bool = False) -> float:
     """Net hours between two HH:MM strings. Returns 0.0 on anything unusable.
@@ -27,11 +66,14 @@ def _calc_hours(check_in: str, check_out: str, break_min: int = 0,
     of overtime on. A day shift cannot end before it starts, so on a day shift
     that ordering is an error and is reported as one rather than guessed at.
     """
+    ci_s, co_s = hhmm(check_in), hhmm(check_out)
+    if not ci_s or not co_s:
+        return 0.0
     try:
         fmt = "%H:%M"
-        ci = datetime.strptime(str(check_in)[:5], fmt)
-        co = datetime.strptime(str(check_out)[:5], fmt)
-    except Exception:
+        ci = datetime.strptime(ci_s, fmt)
+        co = datetime.strptime(co_s, fmt)
+    except ValueError:
         return 0.0
     if co < ci:
         if not overnight:
@@ -94,12 +136,13 @@ def shift_crosses_midnight(shift) -> bool:
 LATE_GRACE_MINUTES = int(os.environ.get("ATTENDANCE_GRACE_MINUTES", "15"))
 
 
-def _minutes(hhmm: str) -> int:
-    try:
-        h, m = str(hhmm)[:5].split(":")
-        return int(h) * 60 + int(m)
-    except Exception:
+def _minutes(value) -> int:
+    """Minutes past midnight. Accepts either stored format — see hhmm()."""
+    s = hhmm(value)
+    if not s:
         return 0
+    h, m = s.split(":")
+    return int(h) * 60 + int(m)
 
 
 def status_for_checkin(conn, check_in: str, user_id: int = None) -> tuple:
@@ -589,8 +632,14 @@ def record_edit(rec_id):
         ORDER BY ss.effective_from DESC LIMIT 1
     """, (rec["user_id"], rec["work_date"], rec["work_date"])).fetchone()
     conn.close()
+    # <input type="time"> only accepts HH:MM. Bound to a full timestamp it
+    # silently renders EMPTY, so opening a seeded or imported record showed
+    # blank times and saving them back wrote hours_worked = 0 — the record
+    # looked wiped by the act of opening it.
     return render_template("attendance/record_edit.html", active="attendance",
                            rec=rec, staff=u_row, shift=shift,
+                           check_in_hhmm=hhmm(rec["check_in"]),
+                           check_out_hhmm=hhmm(rec["check_out"]),
                            staff_name=u_row["full_name"] if u_row else "",
                            can_view_staff=can_view_staff(user))
 

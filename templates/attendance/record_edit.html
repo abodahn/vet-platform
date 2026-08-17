@@ -36,11 +36,11 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div class="pf-form-group">
           <label class="pf-form-label">{{ t('Check In Time', 'وقت الدخول') }}</label>
-          <input type="time" name="check_in" class="pf-form-control" value="{{ rec.check_in or '' }}">
+          <input type="time" name="check_in" class="pf-form-control" value="{{ check_in_hhmm }}">
         </div>
         <div class="pf-form-group">
           <label class="pf-form-label">{{ t('Check Out Time', 'وقت الخروج') }}</label>
-          <input type="time" name="check_out" class="pf-form-control" value="{{ rec.check_out or '' }}">
+          <input type="time" name="check_out" class="pf-form-control" value="{{ check_out_hhmm }}">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
