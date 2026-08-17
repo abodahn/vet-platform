@@ -21,10 +21,16 @@ WITH --apply it first writes every current (id, hours_worked) pair to a
 rollback CSV and prints the path, because this is not otherwise reversible —
 the previous value exists nowhere else.
 
-ONLY hours_worked is touched. Not status: Present / Late / Absent / On Leave is
-a judgement somebody made about the day, and recomputing lateness across months
-of history would rewrite that judgement wholesale. Rows missing either time are
-left alone — there is nothing to compute from.
+By default only hours_worked is touched. --status additionally recomputes
+Present vs Late from the arrival time against that employee's own shift start,
+plus the grace period — which is now possible, and was not before, because
+lateness compared every arrival against minute zero.
+
+--status NEVER touches Absent or On Leave. Those say somebody did not come in;
+they are a human judgement about an absence, not something a clock-in can
+contradict, and a row carrying one has no arrival time to recompute from
+anyway. Only rows that already say Present or Late and have a check-in are
+considered.
 
 THIS CHANGES PAY. Overtime is hours_worked minus the shift's standard hours, so
 every row that moves changes what the next payroll run calculates for that
@@ -53,9 +59,15 @@ from models import database as db   # noqa: E402
 EPSILON = 0.01
 
 
-def _run(conn, apply_it, backup_dir):
+# Statuses that describe an absence. A clock-in cannot contradict them and they
+# are somebody's judgement about the day, so --status leaves them alone.
+_ABSENCE_STATUSES = {"Absent", "On Leave", "Holiday", "Weekend"}
+
+
+def _run(conn, apply_it, backup_dir, do_status=False):
     from blueprints.attendance.routes import (
-        _calc_hours, default_shift, shift_crosses_midnight, hhmm)
+        _calc_hours, default_shift, shift_crosses_midnight, hhmm,
+        status_for_checkin)
 
     rows = [dict(r) for r in conn.execute(
         "SELECT id, user_id, work_date, check_in, check_out, break_minutes,"
@@ -63,14 +75,27 @@ def _run(conn, apply_it, backup_dir):
 
     shift_cache = {}
     changes, skipped_no_times, unchanged = [], 0, 0
+    status_changes, status_protected = [], 0
 
     for r in rows:
-        if not hhmm(r["check_in"]) or not hhmm(r["check_out"]):
-            skipped_no_times += 1
-            continue
         key = r["user_id"]
         if key not in shift_cache:
             shift_cache[key] = default_shift(conn, r["user_id"], r["work_date"])
+
+        if do_status and hhmm(r["check_in"]):
+            if (r["status"] or "") in _ABSENCE_STATUSES:
+                status_protected += 1
+            else:
+                fresh_status, _late_by = status_for_checkin(
+                    conn, r["check_in"], r["user_id"])
+                if fresh_status != (r["status"] or ""):
+                    status_changes.append((r, r["status"] or "", fresh_status))
+        elif do_status and (r["status"] or "") in _ABSENCE_STATUSES:
+            status_protected += 1
+
+        if not hhmm(r["check_in"]) or not hhmm(r["check_out"]):
+            skipped_no_times += 1
+            continue
         overnight = shift_crosses_midnight(shift_cache[key])
 
         fresh = _calc_hours(r["check_in"], r["check_out"],
@@ -103,7 +128,23 @@ def _run(conn, apply_it, backup_dir):
                   % (str(r["work_date"])[:10], hhmm(r["check_in"]),
                      hhmm(r["check_out"]), old, new, new - old))
 
-    if not changes:
+    if do_status:
+        print("")
+        print("  status — absences protected : %d" % status_protected)
+        print("  status — would change       : %d" % len(status_changes))
+        if status_changes:
+            moves = {}
+            for _r, was, now in status_changes:
+                moves["%s -> %s" % (was, now)] = moves.get("%s -> %s" % (was, now), 0) + 1
+            for k in sorted(moves, key=lambda x: -moves[x]):
+                print("      %-24s %d" % (k, moves[k]))
+            print("")
+            print("    %-12s %-8s %-10s %s" % ("date", "in", "was", "becomes"))
+            for r, was, now in status_changes[:6]:
+                print("    %-12s %-8s %-10s %s"
+                      % (str(r["work_date"])[:10], hhmm(r["check_in"]), was, now))
+
+    if not changes and not status_changes:
         print("")
         print("  Nothing to recompute: every row already agrees with its times.")
         return
@@ -120,10 +161,12 @@ def _run(conn, apply_it, backup_dir):
     path = os.path.join(backup_dir, "attendance_hours_before_%s.csv" % stamp)
     with io.open(path, "w", encoding="utf-8", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["id", "user_id", "work_date", "hours_worked_before",
-                    "hours_worked_after"])
+        w.writerow(["id", "user_id", "work_date", "field", "before", "after"])
         for r, old, new in changes:
-            w.writerow([r["id"], r["user_id"], r["work_date"], old, new])
+            w.writerow([r["id"], r["user_id"], r["work_date"], "hours_worked",
+                        old, new])
+        for r, was, now in status_changes:
+            w.writerow([r["id"], r["user_id"], r["work_date"], "status", was, now])
     print("")
     print("  rollback written to %s" % path)
 
@@ -132,9 +175,15 @@ def _run(conn, apply_it, backup_dir):
             "UPDATE attendance_records SET hours_worked=?,"
             " updated_at=datetime('now','localtime') WHERE id=?",
             (new, r["id"]))
+    for r, _was, now in status_changes:
+        conn.execute(
+            "UPDATE attendance_records SET status=?,"
+            " updated_at=datetime('now','localtime') WHERE id=?",
+            (now, r["id"]))
     conn.commit()
-    print("  %d row(s) recomputed. status was not touched, and no payslip was "
-          "rewritten." % len(changes))
+    print("  %d hours row(s) and %d status row(s) recomputed. Absences were not "
+          "touched, and no payslip was rewritten."
+          % (len(changes), len(status_changes)))
 
 
 def main():
@@ -145,6 +194,9 @@ def main():
                     help="clinic slug on a multi-clinic deployment, or 'all'")
     ap.add_argument("--backup-dir", default=".",
                     help="where to write the rollback CSV (default: cwd)")
+    ap.add_argument("--status", action="store_true",
+                    help="also recompute Present/Late from the arrival time "
+                         "(never touches Absent or On Leave)")
     args = ap.parse_args()
 
     app = create_app(Config)
@@ -172,14 +224,14 @@ def main():
             if slug is None:
                 conn = db.get_db()
                 try:
-                    _run(conn, args.apply, args.backup_dir)
+                    _run(conn, args.apply, args.backup_dir, args.status)
                 finally:
                     conn.close()
             else:
                 with tenancy.use(slug):
                     conn = db.get_db()
                     try:
-                        _run(conn, args.apply, args.backup_dir)
+                        _run(conn, args.apply, args.backup_dir, args.status)
                     finally:
                         conn.close()
             print("")
