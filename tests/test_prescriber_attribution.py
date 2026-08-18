@@ -23,7 +23,9 @@ def _mkuser(app, username, full_name, role):
     # outlive the test that created them and the second test would collide on
     # users.username. (IGNORE -> ON CONFLICT DO NOTHING is a faithful
     # translation on PostgreSQL; OR REPLACE is not and the translator refuses it.)
-    from blueprints.hr.routes import _hash
+    # HR no longer ships its own hasher — it wrote SHA-256 with a salt
+    # hardcoded in the repo. bcrypt is the app's one scheme now.
+    from models.database import _hash_password as _hash
     with app.app_context():
         conn = db.get_db()
         with conn:

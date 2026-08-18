@@ -222,7 +222,11 @@ def test_staff_new_get_renders(boss):
 
 def test_staff_new_creates_the_row_it_was_sent(app, boss):
     r = _post(boss, "/hr/staff/new", {
-        "username": "hrt_created", "password": "Secret123", "confirm_password": "Secret123",
+        # 12+ chars: HR staff creation now enforces the same policy as every
+        # other password path. "Secret123" was accepted before, and a
+        # clinical login could even be created with "1".
+        "username": "hrt_created", "password": "Str0ng!Created9",
+        "confirm_password": "Str0ng!Created9",
         "full_name": "Created Person", "full_name_ar": "شخص جديد",
         "email": "created@example.com", "phone": "01000000001",
         "role": "reception", "is_active": "1",
@@ -301,8 +305,12 @@ def test_reset_password_actually_changes_the_hash(app, owner, subject):
     after = _one(app, "SELECT password_hash FROM users WHERE id=?",
                  (subject["id"],))["password_hash"]
     assert after != before, "reset-password returned 200 but the hash is unchanged"
-    from blueprints.hr.routes import _hash
-    assert after == _hash("BrandNewPass1!")
+    # Verified, not compared. bcrypt salts every call, so hashing the same
+    # password twice yields different strings — an equality assertion only ever
+    # passed because HR was using unsalted SHA-256, which is the bug.
+    import models.database as _db
+    assert after.startswith("$2b$"), "the reset wrote a non-bcrypt hash"
+    assert _db._bcrypt.checkpw(b"BrandNewPass1!", after.encode()),         "the stored hash does not match the password that was set"
 
 
 def test_reset_password_rejects_short_password(app, owner, subject):
@@ -613,7 +621,17 @@ def test_hr_attendance_add_writes_the_record(app, boss, subject):
     assert row["status"] == "Late"
     assert str(row["check_in"])[:5] == "09:00"
     assert str(row["check_out"])[:5] == "17:30"
-    assert float(row["hours_worked"]) == 8.5, "hours_worked was not computed from the times"
+    # 09:00-17:30 is 8.5 hours GROSS; net of the shift's unpaid break it is 7.5.
+    # This asserted the gross figure, and payroll subtracts the break from the
+    # standard it compares against — so every HR-entered day booked the
+    # difference as overtime.
+    from blueprints.attendance.routes import default_shift
+    import models.database as _db
+    with app.app_context():
+        _c = _db.get_db()
+        _brk = int(default_shift(_c, subject["id"], "2026-03-09")["break_minutes"] or 0)
+        _c.close()
+    assert float(row["hours_worked"]) == round(8.5 - _brk / 60.0, 2),         "hours_worked is not net of the unpaid break"
     assert row["notes"] == "Traffic on the ring road"
     assert row["username"] == subject["username"]
 
@@ -629,7 +647,13 @@ def test_hr_attendance_add_upserts_the_same_day(app, boss, subject):
                  (subject["id"], "2026-03-10"))
     assert len(rows) == 1, f"expected one row for the day, found {len(rows)}"
     assert rows[0]["status"] == "Late"
-    assert float(rows[0]["hours_worked"]) == 9.0
+    from blueprints.attendance.routes import default_shift
+    import models.database as _db
+    with app.app_context():
+        _c = _db.get_db()
+        _brk = int(default_shift(_c, subject["id"], "2026-03-10")["break_minutes"] or 0)
+        _c.close()
+    assert float(rows[0]["hours_worked"]) == round(9.0 - _brk / 60.0, 2)
 
 
 def test_hr_attendance_add_without_user_writes_nothing(app, boss):

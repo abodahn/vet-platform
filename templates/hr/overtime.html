@@ -37,7 +37,10 @@
 <!-- KPI row -->
 <div class="ot-kpi">
   <div class="ot-kpi-card">
-    <div class="ot-kpi-num" style="color:var(--cl-primary)">{{ rows|length }}</div>
+    {# total_records is counted in SQL over every matching row. This used to
+       print rows|length, which is the 200 the table below is capped at, so a
+       clinic past 200 entries read a number a third under the truth. #}
+    <div class="ot-kpi-num" style="color:var(--cl-primary)">{{ total_records }}</div>
     <div class="ot-kpi-lbl">{{ t('Total Records','إجمالي السجلات') }}</div>
   </div>
   <div class="ot-kpi-card">
@@ -127,6 +130,15 @@
     {% endfor %}
     </tbody>
   </table>
+  {% if total_records > shown %}
+  {# A capped list that looks complete is how the old totals went unnoticed. #}
+  <p style="padding:10px 14px;opacity:.75;font-size:13px">
+    {{ t('Showing the most recent', 'يتم عرض أحدث') }} {{ shown }}
+    {{ t('of', 'من') }} {{ total_records }}
+    {{ t('records. The totals above cover all of them.',
+          'سجل. الإجماليات بالأعلى تشمل كل السجلات.') }}
+  </p>
+  {% endif %}
 </div>
 {% else %}
 <div style="text-align:center;padding:60px;color:var(--cl-muted)">

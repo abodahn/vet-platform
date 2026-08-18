@@ -93,7 +93,9 @@ def test_our_logs_are_not_the_clinics_data(auth_client, some_records):
 
 def test_a_receptionist_cannot_walk_out_with_the_database(auth_client, app):
     """This is every client record in one file. It belongs to the owner."""
-    from blueprints.hr.routes import _hash
+    # HR no longer ships its own hasher — it wrote SHA-256 with a salt
+    # hardcoded in the repo. bcrypt is the app's one scheme now.
+    from models.database import _hash_password as _hash
     with app.app_context():
         conn = db.get_db()
         with conn:

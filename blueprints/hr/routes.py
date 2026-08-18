@@ -3,7 +3,6 @@ HR / Staff Management Blueprint — Full Edition
 Covers: HR dashboard, staff CRUD with full profile, shift assignment,
         performance reviews, roles management.
 """
-import hashlib
 import logging
 from datetime import date, timedelta
 from flask import (
@@ -14,6 +13,7 @@ from . import hr_bp
 from blueprints.auth.routes import login_required, self_service, role_required
 import models.database as db
 import models.security as _sec
+from models import money
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +91,6 @@ _CONTRACT_TYPES = ["Full-time", "Part-time", "Contract", "Probation", "Intern"]
 _GENDERS        = ["Male", "Female", "Not specified"]
 _REVIEW_STATUSES = ["Draft", "Submitted", "Acknowledged"]
 
-_SALT = "pah_platform_2026"
-
 # Which database the HR schema has been ensured against — not a bare bool.
 # A plain "already done" flag is wrong the moment the process talks to more
 # than one database (a re-provisioned tenant, a test pointing db._db_path at a
@@ -107,8 +105,21 @@ def _db_target():
     return repr((db._db_path, db._PG_CONFIG))
 
 
-def _hash(pw: str) -> str:
-    return hashlib.sha256(f"{_SALT}{pw}".encode()).hexdigest()
+# HR used to hash passwords here with SHA-256 and a salt hardcoded three lines
+# up — the same salt for every clinic and every user, sitting in a public
+# repository. SHA-256 is built to be fast, which is the opposite of what a
+# password hash needs: a commodity GPU walks a dictionary against it in
+# minutes, and one shared salt means one rainbow table covers every deployment.
+# The rest of the app has used bcrypt at cost 12 throughout; only the two HR
+# paths that create a login or reset one for somebody else were still writing
+# the legacy scheme, so precisely the accounts an owner sets up for their staff
+# got the weakest protection in the system.
+#
+# Deleted rather than repointed: a helper named _hash sitting in this file is an
+# invitation to reimplement it. Both call sites now use db._hash_password, and
+# db._verify_and_migrate already accepts an existing SHA-256 hash and silently
+# upgrades it to bcrypt on that user's next successful login, so nobody is
+# locked out by this change.
 
 
 def _add_column(conn, ddl: str) -> None:
@@ -530,13 +541,23 @@ def _save_staff_fields(f, conn, user_id=None):
     else:
         username = f.get("username", "").strip()
         password = f.get("password", "")
+
+        # The same rule every other password path enforces. staff_reset_password
+        # already validates; CREATING an account did not, so a new clinical
+        # login could be given the password "1" — and these are real logins to
+        # a system holding medical records and money, handed out by whoever
+        # happens to run HR. The weakest door was the one being installed.
+        ok, why = _sec.validate_password_strength(password)
+        if not ok:
+            raise ValueError(why)
+
         conn.execute("""
             INSERT INTO users (
                 username, password_hash, full_name, full_name_ar, email, phone,
                 role, branch_id, is_active, job_title, contract_type, hire_date,
                 national_id, emergency_contact, emergency_phone, gender, dob
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (username, _hash(password),
+        """, (username, db._hash_password(password),
               full_name, full_name_ar, email, phone,
               role, branch_id, is_active,
               job_title, contract_type, hire_date,
@@ -788,6 +809,10 @@ def staff_edit(user_id):
         flash("User not found.", "danger")
         return redirect(url_for("hr.staff_list"))
     user = dict(user)
+    # users has no shift column — the assignment lives in staff_shifts, and the
+    # form never looked it up, so the Work Shift dropdown always read
+    # "— No Shift —" no matter who was on what.
+    user["shift_id"] = _current_shift_id(conn, user_id)
     branches, shifts = _get_form_deps(conn)
     conn.close()
 
@@ -795,6 +820,14 @@ def staff_edit(user_id):
         try:
             conn = db.get_db()
             _save_staff_fields(request.form, conn, user_id=user_id)
+
+            # Only when the form actually carried the field. Present-but-empty
+            # is a deliberate "— No Shift —"; absent means this submission was
+            # not about shifts at all, and overwriting on absence would let any
+            # unrelated edit silently unassign somebody.
+            if "shift_id" in request.form:
+                _set_shift(conn, user_id, request.form.get("shift_id") or None)
+                conn.commit()
             conn.close()
             db.log_audit(username=session["user"]["username"],
                          role=session["user"]["role"],
@@ -833,7 +866,7 @@ def staff_reset_password(user_id):
     try:
         conn = db.get_db()
         conn.execute("UPDATE users SET password_hash=?, updated_at=datetime('now') WHERE id=?",
-                     (_hash(new_password), user_id))
+                     (db._hash_password(new_password), user_id))
         conn.commit()
         conn.close()
         db.log_audit(username=session["user"]["username"],
@@ -848,33 +881,51 @@ def staff_reset_password(user_id):
 
 # ── SHIFT ASSIGNMENT ──────────────────────────────────────────────────────────
 
+def _current_shift_id(conn, user_id):
+    """The shift assignment in force for this employee today, or None."""
+    row = conn.execute(
+        "SELECT shift_id FROM staff_shifts WHERE user_id=? AND effective_from <= ?"
+        "   AND (effective_to IS NULL OR effective_to >= ?)"
+        " ORDER BY effective_from DESC LIMIT 1",
+        (user_id, date.today().isoformat(), date.today().isoformat())).fetchone()
+    return row[0] if row else None
+
+
+def _set_shift(conn, user_id, shift_id, eff_from=None, eff_to=None):
+    """Close whatever assignment is running and start the new one.
+
+    One implementation, called from the assign form AND from Edit Staff. The
+    Edit Staff dropdown used to be decorative: the GET never preselected the
+    current shift, so it always read "No Shift", and the POST ignored the field
+    entirely — so an HR officer set a nurse's shift there, saw it save, and
+    nothing changed. That matters more than it looks now that attendance judges
+    lateness and pays overtime against the assigned shift.
+    """
+    today = date.today().isoformat()
+    eff_from = eff_from or today
+    conn.execute(
+        "UPDATE staff_shifts SET effective_to=? WHERE user_id=?"
+        "   AND (effective_to IS NULL OR effective_to >= ?)",
+        (eff_from if shift_id else today, user_id, today))
+    if shift_id:
+        conn.execute(
+            "INSERT INTO staff_shifts(user_id,shift_id,effective_from,effective_to)"
+            " VALUES(?,?,?,?)", (user_id, shift_id, eff_from, eff_to))
+
+
 @hr_bp.route("/staff/<int:user_id>/assign-shift", methods=["POST"])
 @role_required("super_admin", "clinic_owner", "branch_manager", "support_admin", "hr")
 def staff_assign_shift(user_id):
     shift_id = request.form.get("shift_id")
-    eff_from = request.form.get("effective_from") or date.today().isoformat()
-    eff_to   = request.form.get("effective_to") or None
-    today    = date.today().isoformat()
-    conn     = db.get_db()
-    if shift_id:
-        conn.execute("""
-            UPDATE staff_shifts SET effective_to=?
-            WHERE user_id=? AND (effective_to IS NULL OR effective_to >= ?)
-        """, (eff_from, user_id, today))
-        conn.execute(
-            "INSERT INTO staff_shifts(user_id,shift_id,effective_from,effective_to) VALUES(?,?,?,?)",
-            (user_id, shift_id, eff_from, eff_to)
-        )
-        conn.commit()
-        flash("Shift assigned successfully.", "success")
-    else:
-        conn.execute("""
-            UPDATE staff_shifts SET effective_to=?
-            WHERE user_id=? AND (effective_to IS NULL OR effective_to >= ?)
-        """, (today, user_id, today))
-        conn.commit()
-        flash("Shift removed from staff member.", "info")
+    conn = db.get_db()
+    _set_shift(conn, user_id, shift_id,
+               request.form.get("effective_from") or None,
+               request.form.get("effective_to") or None)
+    conn.commit()
     conn.close()
+    flash("Shift assigned successfully." if shift_id
+          else "Shift removed from staff member.",
+          "success" if shift_id else "info")
     return redirect(url_for("hr.staff_detail", user_id=user_id))
 
 
@@ -1244,9 +1295,20 @@ def roster():
         "SELECT * FROM shifts WHERE is_active=1 ORDER BY start_time"
     ).fetchall()]
 
-    # Current shift assignments: user -> shift
+    # Assignments OVERLAPPING the week, not ones already running on the Monday.
+    #
+    # Both sides were bound to week_start, so an assignment beginning any later
+    # in the week — including one made today, because every write path defaults
+    # effective_from to today — was excluded from its own week. Rostering
+    # somebody on a Tuesday put them on the staff detail page and simultaneously
+    # under "Staff without shift assignment" on this one. Two halves of the same
+    # screen disagreeing about the same row.
+    #
+    # Interval overlap needs the ends crossed: starts on or before the LAST day,
+    # ends on or after the FIRST.
     assignments = conn.execute("""
-        SELECT ss.user_id, ss.shift_id, s.name shift_name, s.start_time,
+        SELECT ss.user_id, ss.shift_id, ss.effective_from, ss.effective_to,
+               s.name shift_name, s.start_time,
                s.end_time, s.color, s.days_of_week,
                u.full_name, u.role
         FROM staff_shifts ss
@@ -1255,7 +1317,7 @@ def roster():
         WHERE u.is_active = 1
           AND ss.effective_from <= ?
           AND (ss.effective_to IS NULL OR ss.effective_to >= ?)
-    """, (week_start.isoformat(), week_start.isoformat())).fetchall()
+    """, (week_days[-1].isoformat(), week_start.isoformat())).fetchall()
     assignments = [dict(a) for a in assignments]
 
     # Attendance records for the week
@@ -1343,7 +1405,24 @@ def overtime_list():
         LIMIT 200
     """, params).fetchall()]
 
-    total_hours = sum(float(r.get("hours") or 0) for r in rows if r.get("status") == "Approved")
+    # Totals in SQL, over EVERY matching row — not summed in Python over the
+    # 200 the table happens to show. The headline figures are the whole point
+    # of the page, and a clinic past 200 overtime entries (the default view is
+    # unfiltered, so that is simply "after a few months") saw a number a third
+    # below the truth, with nothing indicating it was a partial count. The list
+    # below stays capped because a page has to end somewhere; the arithmetic
+    # must not.
+    agg = conn.execute(f"""
+        SELECT COALESCE(SUM(CASE WHEN ol.status='Approved'
+                                 THEN ol.hours ELSE 0 END), 0) AS approved_hours,
+               COUNT(*) AS total_records
+        FROM overtime_log ol
+        JOIN users u ON u.id = ol.user_id
+        WHERE {where}
+    """, params).fetchone()
+    total_hours = float(agg["approved_hours"] or 0)
+    total_records = int(agg["total_records"] or 0)
+    shown = len(rows)
 
     staff = [dict(r) for r in conn.execute(
         "SELECT id, full_name FROM users WHERE is_active=1 ORDER BY full_name"
@@ -1355,6 +1434,8 @@ def overtime_list():
         rows=rows,
         staff=staff,
         total_hours=total_hours,
+        total_records=total_records,
+        shown=shown,
         uid_filter=uid,
         status_filter=status,
         date_from=date_from,
@@ -1369,15 +1450,41 @@ def add_overtime(user_id):
     f    = request.form
     conn = db.get_db()
     try:
-        hours = float(f.get("hours") or 0)
+        hours, err = money.form_amount(f.get("hours"), "overtime hours")
+        if err:
+            flash(err, "danger")
+            return redirect(url_for("hr.staff_detail", user_id=user_id))
+
+        # Overtime is hours somebody WORKED. A negative value is not a
+        # correction, it is a subtraction hidden inside an addition: approving
+        # one quietly reduced the clinic's approved total and, through payroll,
+        # somebody's pay. A bare float() also 500'd on an empty or mistyped box.
+        if hours <= 0:
+            flash("Overtime hours must be greater than zero. To remove an "
+                  "entry, reject or delete it rather than logging a negative.",
+                  "danger")
+            return redirect(url_for("hr.staff_detail", user_id=user_id))
+
+        work_date = f.get("work_date") or date.today().isoformat()
+        reason = f.get("reason", "").strip()
+
+        # A double-clicked Log Overtime used to write two identical Pending
+        # rows, each separately approvable — three clicks, triple pay, and
+        # nothing on screen to show it happened. The same person, same day,
+        # same hours, still pending is a repeat submission, not a second shift.
+        dupe = conn.execute(
+            "SELECT id FROM overtime_log WHERE user_id=? AND work_date=?"
+            "   AND hours=? AND status='Pending'",
+            (user_id, work_date, hours)).fetchone()
+        if dupe:
+            flash("That overtime is already logged and awaiting approval.",
+                  "warning")
+            return redirect(url_for("hr.staff_detail", user_id=user_id))
+
         conn.execute("""
             INSERT INTO overtime_log (user_id, work_date, hours, reason, status)
             VALUES (?,?,?,?,?)
-        """, (user_id,
-              f.get("work_date") or date.today().isoformat(),
-              hours,
-              f.get("reason", "").strip(),
-              "Pending"))
+        """, (user_id, work_date, hours, reason, "Pending"))
         conn.commit()
         flash(f"{hours}h overtime recorded.", "success")
     except Exception as e:
@@ -1556,22 +1663,48 @@ def hr_attendance_add():
         status   = f.get("status", "Present")
         notes    = f.get("notes", "").strip()
 
+        # Hours come from the attendance module's own arithmetic, not a second
+        # implementation of it. This block used to be four lines of subtraction
+        # and carried four separate blockers:
+        #
+        #   * a night shift is negative — 22:00 to 06:00 is -16 hours — so the
+        #     `if diff > 0` guard left hours_worked NULL and the whole night was
+        #     worth zero overtime;
+        #   * the shift's unpaid break was never deducted, while payroll's
+        #     standard hours DO subtract it, so every HR-entered day booked an
+        #     extra hour of overtime;
+        #   * strptime(..., "%H:%M") raises on the full-timestamp format that
+        #     most stored rows use, and the bare `except Exception` below turned
+        #     that into a flash message rather than a fix;
+        #   * and a status-only correction arrived with both time boxes empty,
+        #     because the form never carries the existing values — so
+        #     "mark this day Late" erased the clock-in, the clock-out and the
+        #     hours, and flashed success.
+        from blueprints.attendance.routes import (
+            _calc_hours, default_shift, shift_crosses_midnight, hhmm)
+
+        existing = conn.execute(
+            "SELECT id, check_in, check_out, hours_worked FROM attendance_records"
+            " WHERE user_id=? AND work_date=?", (uid, wdate)).fetchone()
+
+        # Correcting the status must not erase the clock. Only times the form
+        # actually supplied replace what is stored.
+        if existing:
+            check_in = check_in or existing["check_in"]
+            check_out = check_out or existing["check_out"]
+
         hours_worked = None
-        if check_in and check_out:
-            from datetime import datetime as _dt
-            t_in  = _dt.strptime(check_in,  "%H:%M")
-            t_out = _dt.strptime(check_out, "%H:%M")
-            diff  = (t_out - t_in).total_seconds() / 3600
-            if diff > 0:
-                hours_worked = round(diff, 2)
+        if hhmm(check_in) and hhmm(check_out):
+            shift = default_shift(conn, uid, wdate)
+            hours_worked = _calc_hours(
+                check_in, check_out, int(shift["break_minutes"] or 0),
+                overnight=shift_crosses_midnight(shift))
 
         # attendance_records carries no UNIQUE(user_id, work_date), so the
         # ON CONFLICT upsert this used to run raised on every call — the route
         # flashed an error, redirected, and wrote nothing. Read-then-write is
-        # the same pattern attendance.checkin already uses and needs no index.
-        existing = conn.execute(
-            "SELECT id FROM attendance_records WHERE user_id=? AND work_date=?",
-            (uid, wdate)).fetchone()
+        # the same pattern attendance.checkin already uses; `existing` is read
+        # above, where the preserved times are needed.
         if existing:
             conn.execute("""
                 UPDATE attendance_records

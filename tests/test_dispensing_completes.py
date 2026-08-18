@@ -19,7 +19,9 @@ import models.database as db
 
 
 def _mkuser(app, username, full_name, role):
-    from blueprints.hr.routes import _hash
+    # HR no longer ships its own hasher — it wrote SHA-256 with a salt
+    # hardcoded in the repo. bcrypt is the app's one scheme now.
+    from models.database import _hash_password as _hash
     with app.app_context():
         conn = db.get_db()
         with conn:
