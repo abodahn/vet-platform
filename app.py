@@ -14,6 +14,30 @@ from models.logging_setup import init_logging
 logger = logging.getLogger(__name__)
 
 
+def _seed_admin_pass(app):
+    """The password the FIRST super_admin account is created with.
+
+    This used to fall back to "1234". ProductionConfig.validate() refuses to
+    boot without PLATFORM_ADMIN_PASS, so a real production deploy was covered —
+    but anything running the base Config seeded a super_admin whose password is
+    the first thing anybody would try, and nothing anywhere said so.
+
+    An unset value now produces a random one that nobody holds. That locks the
+    installer out of an account they never configured, which is recoverable,
+    rather than leaving it open to the internet, which is not. The log line says
+    exactly how to fix it.
+    """
+    configured = (app.config.get("SEED_ADMIN_PASS") or "").strip()
+    if configured:
+        return configured
+    import secrets
+    logger.error(
+        "PLATFORM_ADMIN_PASS is not set. The seeded 'admin' account has been "
+        "given a random password that nobody has. Set PLATFORM_ADMIN_PASS and "
+        "reseed, or reset it from another super_admin account.")
+    return secrets.token_urlsafe(32)
+
+
 def create_app(cfg=None) -> Flask:
     # Validate production config has all required env vars before booting
     import os as _os
@@ -113,7 +137,7 @@ def create_app(cfg=None) -> Flask:
 
     db.init_db(
         admin_user=app.config.get("SEED_ADMIN_USER", "admin"),
-        admin_pass=app.config.get("SEED_ADMIN_PASS", "1234"),
+        admin_pass=_seed_admin_pass(app),
     )
 
     # Every registered clinic gets the schema too, not just the default database.
@@ -134,7 +158,7 @@ def create_app(cfg=None) -> Flask:
             with tenancy.use(_slug):
                 db.init_db(
                     admin_user=app.config.get("SEED_ADMIN_USER", "admin"),
-                    admin_pass=app.config.get("SEED_ADMIN_PASS", "1234"),
+                    admin_pass=_seed_admin_pass(app),
                 )
         except Exception:
             logger.exception(

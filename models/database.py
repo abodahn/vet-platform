@@ -193,7 +193,7 @@ def cache_invalidate(key: str):
 
 
 def configure_postgres(host="localhost", port=5432, dbname="vetclinic",
-                       user="postgres", password="1234",
+                       user="postgres", password="",
                        min_conn: int = 2, max_conn: int = 20):
     """Call once at startup to configure the PostgreSQL connection pool.
 
