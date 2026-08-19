@@ -8,6 +8,7 @@ from datetime import datetime
 from . import petshop_bp
 from blueprints.auth.routes import login_required, role_required
 import models.database as db
+from models import money
 
 
 def _now():
@@ -183,8 +184,8 @@ def index():
     today = datetime.utcnow().strftime("%Y-%m-%d")
     stats = {
         "products":      conn.execute("SELECT COUNT(*) FROM ps_products WHERE is_active=1").fetchone()[0],
-        "orders_today":  conn.execute("SELECT COUNT(*) FROM ps_orders WHERE date(created_at)=? AND status='paid'", (today,)).fetchone()[0],
-        "revenue_today": conn.execute("SELECT COALESCE(SUM(total),0) FROM ps_orders WHERE date(created_at)=? AND status='paid'", (today,)).fetchone()[0],
+        "orders_today":  conn.execute("SELECT COUNT(*) FROM ps_orders WHERE date(created_at)=? AND status NOT IN ('cancelled','refunded')", (today,)).fetchone()[0],
+        "revenue_today": conn.execute("SELECT COALESCE(SUM(total),0) FROM ps_orders WHERE date(created_at)=? AND status NOT IN ('cancelled','refunded')", (today,)).fetchone()[0],
         "low_stock":     conn.execute("SELECT COUNT(*) FROM ps_products WHERE stock_qty <= reorder_level AND is_active=1").fetchone()[0],
     }
     recent_orders = conn.execute(
@@ -454,11 +455,19 @@ def order_create():
         pay_method = data.get("payment_method", "Cash")
         pay_ref    = data.get("payment_ref", "")
         notes      = data.get("notes", "")
-        paid_amt   = float(data.get("paid_amount", 0))
-        discount_g = float(data.get("discount_amount", 0))
+        paid_amt   = money.form_amount(data.get("paid_amount"), "amount tendered")[0]
+        discount_g = money.form_amount(data.get("discount_amount"), "discount")[0]
 
         if not items:
             return jsonify({"error": "No items"}), 400
+
+        # A quantity has to be a positive number. A negative one minted stock
+        # out of nothing (the deduction below is a subtraction) and wrote a
+        # negative invoice line.
+        for _i in items:
+            if money.form_amount(_i.get("qty"), "quantity")[0] <= 0:
+                return jsonify({"error": "Every line needs a quantity greater "
+                                         "than zero."}), 400
 
         # Round every money value at the write. Without this, 65.9% of VAT
         # sales store a total that is not representable to 2 decimal places
@@ -470,7 +479,22 @@ def order_create():
         # printed line — and the invoice built from it — showed the discount.
         subtotal = round(sum(_line_net(i) for i in items), 2)
         tax_amt  = round(sum(_line_net(i) * float(i.get("tax_rate",0))/100 for i in items), 2)
+
+        # A discount cannot exceed what is being bought. Unclamped, a mistyped
+        # figure produced a NEGATIVE total: the till displayed 0.00, the sale
+        # went through, and Revenue Today went DOWN by the amount of the typo.
+        discount_g = max(0.0, min(discount_g, subtotal))
+
         total    = round(subtotal - discount_g + tax_amt, 2)
+
+        # Cash is tendered and change is given. Card, Transfer and Instapay are
+        # not: nothing is typed into "Amount tendered", so paid_amount arrived
+        # as 0 and the payment below was skipped entirely — three of the four
+        # buttons booked the sale as revenue in the shop while leaving the
+        # finance invoice UNPAID. The clinic's books then said a customer owed
+        # money they had already handed over.
+        if str(pay_method).strip().lower() != "cash":
+            paid_amt = total
         change   = round(max(0, paid_amt - total), 2)
 
         order_num = _next_order_number()
@@ -517,6 +541,13 @@ def order_create():
                 "issue_date": _date.today().isoformat(),
                 "notes":      f"Pet Shop Order {order_num}",
                 "created_by": _user().get("username", ""),
+                # The ORDER-level discount, which never reached the invoice.
+                # The lines carry their own per-line discounts, but the whole-
+                # order one was applied to what the customer paid and not to
+                # what they were billed — so every discounted sale left them
+                # owing exactly the discount, permanently.
+                "discount_type":  "value",
+                "discount_value": discount_g,
             }
             inv_lines = []
             for item in items:
@@ -604,6 +635,25 @@ def order_cancel(oid):
                 conn.execute(
                     "UPDATE invoices SET status='Cancelled',updated_at=datetime('now')"
                     " WHERE id=?", (inv_id,))
+                # And the money. Cancelling reversed the INVOICE but left the
+                # payment row standing, so a cancelled sale still counted as
+                # cash taken: the day's payment ledger and the invoice
+                # disagreed, and only the ledger feeds "collected".
+                #
+                # A reversing entry rather than a DELETE — the till took that
+                # money and the audit trail has to keep saying so. The pair
+                # nets to zero and both halves stay visible.
+                paid_rows = conn.execute(
+                    "SELECT id, owner_id, amount, method FROM payments"
+                    " WHERE invoice_id=? AND amount > 0", (inv_id,)).fetchall()
+                for pr in paid_rows:
+                    conn.execute(
+                        "INSERT INTO payments(invoice_id, owner_id, amount, method,"
+                        " reference, received_by, received_at)"
+                        " VALUES(?,?,?,?,?,?,datetime('now','localtime'))",
+                        (inv_id, pr["owner_id"], -float(pr["amount"] or 0),
+                         pr["method"], "Reversal of pet shop order %s" % oid,
+                         _user().get("username", "?")))
             for item in items:
                 conn.execute("UPDATE ps_products SET stock_qty=stock_qty+? WHERE id=?",
                              (item["qty"], item["product_id"]))
@@ -632,7 +682,7 @@ def reports():
         """SELECT COUNT(*) as cnt,
                   COALESCE(SUM(total),0) as revenue,
                   COALESCE(SUM(total - discount_amount),0) as net_revenue
-           FROM ps_orders WHERE status='paid' AND date(created_at) BETWEEN ? AND ?""",
+           FROM ps_orders WHERE status NOT IN ('cancelled','refunded') AND date(created_at) BETWEEN ? AND ?""",
         (date_from, date_to)
     ).fetchone()
     total_orders   = agg["cnt"]
@@ -644,7 +694,7 @@ def reports():
            FROM ps_order_items oi
            JOIN ps_orders o ON oi.order_id=o.id
            JOIN ps_products p ON oi.product_id=p.id
-           WHERE o.status='paid' AND date(o.created_at) BETWEEN ? AND ?""",
+           WHERE o.status NOT IN ('cancelled','refunded') AND date(o.created_at) BETWEEN ? AND ?""",
         (date_from, date_to)
     ).fetchone()[0]
 
@@ -664,7 +714,7 @@ def reports():
            FROM ps_order_items oi
            JOIN ps_orders o ON oi.order_id=o.id
            LEFT JOIN ps_products p ON oi.product_id=p.id
-           WHERE o.status='paid' AND date(o.created_at) BETWEEN ? AND ?
+           WHERE o.status NOT IN ('cancelled','refunded') AND date(o.created_at) BETWEEN ? AND ?
            GROUP BY oi.product_id, oi.product_name, p.sku ORDER BY revenue DESC LIMIT 10""",
         (date_from, date_to)
     ).fetchall()
@@ -674,7 +724,7 @@ def reports():
         """SELECT date(created_at) as order_date,
                   COUNT(*) as order_count,
                   COALESCE(SUM(total),0) as revenue
-           FROM ps_orders WHERE status='paid' AND date(created_at) BETWEEN ? AND ?
+           FROM ps_orders WHERE status NOT IN ('cancelled','refunded') AND date(created_at) BETWEEN ? AND ?
            GROUP BY date(created_at) ORDER BY order_date DESC""",
         (date_from, date_to)
     ).fetchall()
@@ -684,7 +734,7 @@ def reports():
         """SELECT LOWER(payment_method) as payment_method,
                   COUNT(*) as order_count,
                   COALESCE(SUM(total),0) as revenue
-           FROM ps_orders WHERE status='paid' AND date(created_at) BETWEEN ? AND ?
+           FROM ps_orders WHERE status NOT IN ('cancelled','refunded') AND date(created_at) BETWEEN ? AND ?
            GROUP BY LOWER(payment_method) ORDER BY revenue DESC""",
         (date_from, date_to)
     ).fetchall()
