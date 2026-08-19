@@ -98,6 +98,7 @@ def ensure_petshop_tables():
             unit_price  REAL DEFAULT 0,
             discount    REAL DEFAULT 0,
             tax_rate    REAL DEFAULT 0,
+            unit_cost   REAL DEFAULT 0,
             line_total  REAL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS ps_stock_movements (
@@ -117,6 +118,9 @@ def ensure_petshop_tables():
         # sale failed to link its invoice (inside a warning-only except) and
         # order_cancel could not reverse it. Idempotent top-up.
         db._try_stmt(conn, "ALTER TABLE ps_orders ADD COLUMN invoice_id INTEGER")
+        # What the goods cost when they were SOLD. Without it the profit
+        # report values last month at this month's purchase price.
+        db._try_stmt(conn, "ALTER TABLE ps_order_items ADD COLUMN unit_cost REAL DEFAULT 0")
     conn.close()
 
 
@@ -154,6 +158,10 @@ def _walk_in_owner_id():
         ).lastrowid
     conn.close()
     return oid
+
+
+class _OutOfStock(Exception):
+    """A line could not be deducted because the stock was gone."""
 
 
 def _line_net(item):
@@ -324,7 +332,12 @@ def product_edit(pid):
 @petshop_bp.route("/products/<int:pid>/stock", methods=["POST"])
 @role_required("super_admin", "clinic_owner", "branch_manager", "support_admin")
 def product_stock(pid):
-    qty   = int(request.form.get("qty", 0))
+    # int("") raises, and clearing this box is a normal thing to do on the way
+    # to typing a different number.
+    qty, qty_err = money.form_amount(request.form.get("qty"), "quantity")
+    if qty_err or qty <= 0:
+        flash(qty_err or "Enter a quantity greater than zero.", "danger")
+        return redirect(url_for("petshop.products"))
     move  = request.form.get("movement", "in")
     notes = request.form.get("notes", "")
     conn  = _get_db()
@@ -516,14 +529,36 @@ def order_create():
                 disc   = float(item.get("discount", 0))
                 trate  = float(item.get("tax_rate", 0))
                 ltotal = round(qty * price * (1 - disc/100), 2)
+
+                # The cost NOW, stored on the line. The profit report used to
+                # join ps_products live, so a supplier price rise rewrote every
+                # month already closed.
+                _cost_row = conn.execute(
+                    "SELECT cost_price FROM ps_products WHERE id=?",
+                    (item["product_id"],)).fetchone()
+                unit_cost = float(_cost_row["cost_price"] or 0) if _cost_row else 0.0
+
                 conn.execute(
-                    """INSERT INTO ps_order_items(order_id,product_id,product_name,qty,unit_price,discount,tax_rate,line_total)
-                       VALUES(?,?,?,?,?,?,?,?)""",
-                    (oid, item["product_id"], item["product_name"], qty, price, disc, trate, ltotal)
+                    """INSERT INTO ps_order_items(order_id,product_id,product_name,qty,unit_price,discount,tax_rate,unit_cost,line_total)
+                       VALUES(?,?,?,?,?,?,?,?,?)""",
+                    (oid, item["product_id"], item["product_name"], qty, price, disc, trate, unit_cost, ltotal)
                 )
-                # Deduct stock
-                conn.execute("UPDATE ps_products SET stock_qty=MAX(0,stock_qty-?) WHERE id=?",
-                             (qty, item["product_id"]))
+
+                # Deduct ONLY if the stock is actually there.
+                #
+                # This was MAX(0, stock_qty - qty), which never fails: two tills
+                # ringing up the same last unit both passed the browser's check,
+                # both deducted, both printed a receipt, and the clamp hid it by
+                # flooring at zero. The shop had sold something it did not have,
+                # with no error to either cashier. The condition moves the check
+                # to the database, where the two transactions are actually
+                # ordered against each other.
+                _upd = conn.execute(
+                    "UPDATE ps_products SET stock_qty=stock_qty-? "
+                    "WHERE id=? AND stock_qty >= ?",
+                    (qty, item["product_id"], qty))
+                if not _upd.rowcount:
+                    raise _OutOfStock(item.get("product_name") or "item")
                 conn.execute(
                     "INSERT INTO ps_stock_movements(product_id,movement,qty,ref_type,ref_id,created_by) VALUES(?,?,?,?,?,?)",
                     (item["product_id"], "out", qty, "sale", oid, _user().get("username","?"))
@@ -589,8 +624,19 @@ def order_create():
         _log("order_created", "ps_order", oid, f"Order {order_num}, total={total:.2f}, method={pay_method}")
         return jsonify({"success": True, "order_id": oid, "order_number": order_num,
                         "total": total, "change": change, "invoice_id": inv_id})
+    except _OutOfStock as oos:
+        # 409, not 500: somebody else took the last one between the screen
+        # loading and Charge being pressed. That is a real answer for the
+        # cashier, not a crash.
+        return jsonify({"error": "%s is out of stock — another till may have "
+                                 "just sold the last one. Refresh and try "
+                                 "again." % oos}), 409
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # The raw exception text used to go straight to the browser.
+        import logging as _lg
+        _lg.getLogger(__name__).exception("pet shop order failed")
+        return jsonify({"error": "The sale could not be completed. Nothing was "
+                                 "charged."}), 500
 
 
 @petshop_bp.route("/orders/<int:oid>")
@@ -674,8 +720,13 @@ def order_cancel(oid):
 def reports():
     ensure_petshop_tables()
     conn = _get_db()
-    date_from = request.args.get("date_from", datetime.utcnow().strftime("%Y-%m-01"))
-    date_to   = request.args.get("date_to",   datetime.utcnow().strftime("%Y-%m-%d"))
+    # `or`, not a get() default: clearing a date box submits an EMPTY STRING,
+    # and the key is present, so the default never applied. '' then reached
+    # PostgreSQL as ''::date and 500'd the whole report — verified on the live
+    # demo. Emptying a filter means "no bound", which is the same as not
+    # setting it.
+    date_from = (request.args.get("date_from") or "").strip()         or datetime.utcnow().strftime("%Y-%m-01")
+    date_to = (request.args.get("date_to") or "").strip()         or datetime.utcnow().strftime("%Y-%m-%d")
 
     # Aggregate stats
     agg = conn.execute(
@@ -688,9 +739,14 @@ def reports():
     total_orders   = agg["cnt"]
     total_revenue  = agg["revenue"]
 
-    # Cost = sum of (qty * cost_price) across sold items in period
+    # Cost of goods AS SOLD. This valued every sale at the product's cost price
+    # TODAY, so a supplier raising a price rewrote last month's profit — a
+    # closed month is supposed to stay closed. ps_order_items now records
+    # unit_cost at the moment of sale; rows written before that fall back to the
+    # current cost, because their real cost is not recoverable and a wrong
+    # number beats a crash.
     total_cost = conn.execute(
-        """SELECT COALESCE(SUM(oi.qty * p.cost_price), 0)
+        """SELECT COALESCE(SUM(oi.qty * COALESCE(NULLIF(oi.unit_cost,0), p.cost_price)), 0)
            FROM ps_order_items oi
            JOIN ps_orders o ON oi.order_id=o.id
            JOIN ps_products p ON oi.product_id=p.id

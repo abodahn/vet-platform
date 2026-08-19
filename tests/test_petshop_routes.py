@@ -268,14 +268,34 @@ def test_pos_sale_with_no_items_is_rejected(auth_client):
 
 
 def test_pos_never_drives_stock_negative(auth_client):
+    """Selling more than exists is REFUSED, not clamped.
+
+    This used to assert the opposite — that the sale succeeded and stock
+    floored at 0 — which is the oversell bug wearing the name of its own
+    guard. MAX(0, stock - qty) never fails, so two tills ringing up the same
+    last unit both printed a receipt and the clamp hid it. The shop cannot hand
+    over ten items it does not have; the stock is the answer, not the floor.
+    """
     pid = _product("POS Nearly Gone", 10.00, 3)
-    body = _post_json(auth_client, "/petshop/orders/create", {
+    r = _post_json(auth_client, "/petshop/orders/create", {
         "owner_id": _owner("Oversell Owner", "01088000014"), "paid_amount": 100.0,
         "items": [{"product_id": pid, "product_name": "POS Nearly Gone",
                    "qty": 10, "unit_price": 10.00}],
-    }).get_json()
-    assert body.get("success") is True, body
-    assert _stock(pid) == 0.0, "stock went negative on an oversell"
+    })
+    assert r.status_code == 409,         "a sale of 10 against 3 in stock returned %s" % r.status_code
+    assert _stock(pid) == 3.0,         "the refused sale still moved stock (now %s)" % _stock(pid)
+
+
+def test_pos_sells_exactly_what_is_left(auth_client):
+    """The guard must not block a legitimate sale of the last units."""
+    pid = _product("POS Exactly Enough", 10.00, 3)
+    r = _post_json(auth_client, "/petshop/orders/create", {
+        "owner_id": _owner("Exact Owner", "01088000015"), "paid_amount": 30.0,
+        "items": [{"product_id": pid, "product_name": "POS Exactly Enough",
+                   "qty": 3, "unit_price": 10.00}],
+    })
+    assert r.get_json().get("success") is True, r.get_json()
+    assert _stock(pid) == 0.0
 
 
 # ═══ CANCELLATION — the reverse direction ════════════════════════════════════
