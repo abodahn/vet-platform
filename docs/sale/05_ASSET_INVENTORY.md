@@ -360,7 +360,7 @@ Stated explicitly so it cannot be inferred otherwise.
 
 ### 7.1 In git history — cannot be un-published
 
-The password **`Ahmed@1122`** was committed. Verified present in:
+The password **`the previously-leaked admin password`** was committed. Verified present in:
 
 | Commit | Files |
 |---|---|
@@ -374,7 +374,7 @@ until commit `ad3ac4a` ("remove shipped credentials") removed it from the deploy
 scripts. It remains recoverable from history forever unless the history is
 rewritten. The audit register (D-21) records rotation as *"still owed by owner"*.
 
-**Action for the buyer:** treat `Ahmed@1122` as public. Any environment that ever
+**Action for the buyer:** treat `the previously-leaked admin password` as public. Any environment that ever
 used it must have both the admin password and the PostgreSQL role password
 changed. Optionally scrub it from `docs/market/05_PRODUCT_READINESS.md`, though
 leaving the documented example is defensible now that it is burned.
@@ -392,7 +392,7 @@ these files come with it. They hold live values:
 
 | File | Live secrets it contains |
 |---|---|
-| `.env` | `POSTGRES_DSN`, `PLATFORM_SECRET_KEY` (128 chars), `PLATFORM_ADMIN_PASS` (= `Ahmed@1122`) |
+| `.env` | `POSTGRES_DSN`, `PLATFORM_SECRET_KEY` (128 chars), `PLATFORM_ADMIN_PASS` (= `the previously-leaked admin password`) |
 | `.env.production` | `POSTGRES_DSN`, `PLATFORM_SECRET_KEY`, `PLATFORM_ADMIN_PASS`, **`AI_API_KEY`** (24 chars) |
 | `.env.development` | `POSTGRES_DSN`, `PLATFORM_SECRET_KEY`, `PLATFORM_ADMIN_PASS`, **`AI_API_KEY`** (73 chars — an OpenRouter key) |
 
@@ -474,7 +474,7 @@ stored `subtotal` column and reconciliation queries against
 - [ ] Decision recorded on the `+20 112 767 7015` number
 - [ ] Buyer opens their own OpenRouter account; seller's key deleted
 - [ ] All `.env*` files deleted on receipt and regenerated via `provision.sh`
-- [ ] `Ahmed@1122` treated as public; every environment that used it rotated
+- [ ] `the previously-leaked admin password` treated as public; every environment that used it rotated
 - [ ] `OFL.txt` added alongside `static/fonts/` (OFL redistribution requirement)
 - [ ] Written confirmation that no customer, contract, trademark registration or
       e-invoicing accreditation is included

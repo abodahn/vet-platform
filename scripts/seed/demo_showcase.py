@@ -44,7 +44,32 @@ from config import Config     # noqa: E402
 
 SEED = 20260728               # fixed -> identical dataset on every run
 DEMO_EMAIL_DOMAIN = "demo.aleefy.local"
-DEMO_PASSWORD = "Demo@1234"
+# From the environment. This was a literal, so the password for all 15 demo
+# logins — including a clinic_owner — sat in a public repository, and the sales
+# demo guide reprinted it. Set DEMO_SEED_PASS where the other secrets live
+# (/etc/aleefy/aleefy.env, 640 root:aleefy); the seeder refuses rather than
+# falling back, because a default here is how the last one got published.
+def _demo_password():
+    """The password the demo logins get, from the environment.
+
+    A FUNCTION, not a module-level constant that raises. The first version of
+    this refused at import time, which killed `import demo_showcase` outright —
+    the seed tests import the module to call run() and got
+    "module has no attribute 'run'", because the SystemExit fired before the
+    module body finished. Importing something must never have side effects; the
+    refusal belongs where the password is actually needed.
+
+    No fallback: this was a literal, so the password for all fifteen demo
+    logins — one of them a clinic_owner — sat in a public repository and the
+    sales demo guide reprinted it. A default is how that happens again.
+    """
+    pw = os.environ.get("DEMO_SEED_PASS", "").strip()
+    if not pw:
+        raise SystemExit(
+            "DEMO_SEED_PASS is not set. Choose a password for the demo logins "
+            "and export it, or add it to the service env file. It must not be "
+            "written into this repository.")
+    return pw
 
 # Invisible bidi / zero-width marks. Arabic pasted from anywhere carries them,
 # and two visually identical names then compare unequal forever after.
@@ -426,7 +451,7 @@ def seed_staff(conn, rnd: Random, today: date) -> dict:
     # test run). Ceiling: every demo account shares one password, and identical
     # hashes are visible in the users table. Give them distinct passwords the
     # day a demo needs to show per-user credential handling.
-    pw_hash = db._hash(DEMO_PASSWORD)
+    pw_hash = db._hash(_demo_password())
     users = {}
     for i, (uname, latin, arabic, role, title) in enumerate(STAFF):
         hire = (today - timedelta(days=rnd.randint(200, 2100))).isoformat()
@@ -1463,7 +1488,7 @@ def run(target: str, force: bool = False, wipe_only: bool = False,
         # so that was a demo-data overwrite of a clinic's real records.
         db.use_sqlite(path)
 
-    db.init_db(admin_user="admin", admin_pass=os.environ.get("DEMO_ADMIN_PASS", DEMO_PASSWORD))
+    db.init_db(admin_user="admin", admin_pass=os.environ.get("DEMO_ADMIN_PASS") or _demo_password())
     ensure_module_tables()
 
     rnd = Random(SEED)
@@ -1497,7 +1522,7 @@ def run(target: str, force: bool = False, wipe_only: bool = False,
         # system, which is the worst possible failure for a demo being read
         # aloud to a customer. The seeder owns every other row here; it owns
         # this one too.
-        admin_pass = os.environ.get("DEMO_ADMIN_PASS", DEMO_PASSWORD)
+        admin_pass = os.environ.get("DEMO_ADMIN_PASS") or _demo_password()
         conn.execute("UPDATE users SET password_hash=? WHERE username=?",
                      (db._hash(admin_pass), "admin"))
         conn.commit()
@@ -1522,8 +1547,8 @@ def run(target: str, force: bool = False, wipe_only: bool = False,
         print(f"\nDemo dataset written to {where}\n")
         for k in sorted(counts):
             print(f"  {k:<16} {counts[k]}")
-        print(f"\n  login: admin / {os.environ.get('DEMO_ADMIN_PASS', DEMO_PASSWORD)}")
-        print(f"  staff: dr.sara, rec.yasmine, fin.dalia, ... / {DEMO_PASSWORD}\n")
+        print(f"\n  login: admin / {os.environ.get('DEMO_ADMIN_PASS') or _demo_password()}")
+        print(f"  staff: dr.sara, rec.yasmine, fin.dalia, ... / {_demo_password()}\n")
     return counts
 
 

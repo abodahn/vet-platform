@@ -37,7 +37,7 @@ The old seed password is in **5 commits** of this repository's history. Anyone
 you hand the code to has a working credential.
 
 ```bash
-git log --oneline --all -S "Ahmed@1122" | wc -l
+git log --oneline --all -S "$LEAKED_SECRET" | wc -l
 ```
 
 Change it wherever it is still set, and never put the replacement in a file

@@ -16,6 +16,17 @@ credentials come from the DSN — none are hardcoded here.
 import os
 import sys
 import pytest
+
+# The demo seeder refuses to run without this, deliberately: it used to hold a
+# literal, and that password ended up published in docs/sale/02_DEMO_GUIDE.md —
+# the file written to be handed to buyers. A default there is how it happens
+# again, so the refusal stays and the SUITE supplies its own throwaway value
+# for its throwaway databases.
+#
+# Here rather than in each test file: three separate files call the seeder, I
+# patched two, and the third only surfaced on the next full run. setdefault, so
+# a developer with a real value exported keeps it.
+os.environ.setdefault("DEMO_SEED_PASS", "seed-test-Str0ng!Pass9")
 from urllib.parse import urlparse, unquote
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))

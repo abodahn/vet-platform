@@ -48,7 +48,7 @@ def main() -> int:
     dsn = (f"postgresql://{admin['user']}:{admin['password']}"
            f"@{admin['host']}:{admin['port']}/vetclinic_test")
     env = dict(os.environ, TEST_POSTGRES_DSN=dsn, POSTGRES_DSN=dsn,
-               PLATFORM_ADMIN_PASS="Demo@1234", FLASK_ENV="development",
+               PLATFORM_ADMIN_PASS=os.environ.get("PLATFORM_ADMIN_PASS", "pg-throwaway-Str0ng!9"), FLASK_ENV="development",
                PYTHONIOENCODING="utf-8")
 
     print("seeding…")

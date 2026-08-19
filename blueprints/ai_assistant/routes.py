@@ -527,10 +527,22 @@ def insights():
         rev_today    = _q("SELECT COALESCE(SUM(paid_amount),0) FROM invoices WHERE SUBSTRING(issue_date::text,1,10)=? AND status IN ('Paid','Partial')", (today,))
         unpaid_count = _q("SELECT COUNT(*) FROM invoices WHERE status='Unpaid'")
         unpaid_total = _q("SELECT COALESCE(SUM(due_amount),0) FROM invoices WHERE status='Unpaid'")
+        # On hand is SUM(batches.quantity) — what the rest of the platform uses
+        # (list_items, get_item, the inventory dashboard).
+        #
+        # This summed stock_movements instead, and that ledger stores OUTGOING
+        # rows with a POSITIVE quantity, the direction living in movement_type.
+        # So receipts and dispensings both counted as additions: receive 40,
+        # dispense 40, and the "on hand" figure reads 80 against a reorder level
+        # of 8. The failure grows with turnover, so the faster a medication
+        # moves the more certainly it can never be flagged — and the owner's
+        # home screen showed a green "no items require reordering" card while
+        # four items sat at zero on the live demo.
         low_stock    = _q("""
             SELECT COUNT(*) FROM items i
             WHERE i.reorder_level > 0 AND i.is_active = 1
-            AND (SELECT COALESCE(SUM(sm.quantity),0) FROM stock_movements sm WHERE sm.item_id = i.id) <= i.reorder_level
+            AND COALESCE((SELECT SUM(b.quantity) FROM batches b WHERE b.item_id = i.id), 0)
+                <= i.reorder_level
         """)
         overdue_vax  = _q("SELECT COUNT(*) FROM vaccinations WHERE SUBSTRING(next_due_at::text,1,10)<? AND next_due_at IS NOT NULL", (today,))
         new_owners   = _q("SELECT COUNT(*) FROM owners WHERE SUBSTRING(created_at::text,1,10)=?", (today,))

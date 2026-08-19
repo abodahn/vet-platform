@@ -104,8 +104,8 @@ What actually happens today to stand up a new clinic:
 
 ```bash
 PLATFORM_DIR="/home/ahmed/vet/platform"
-sudo -u postgres psql -c "CREATE USER vetapp WITH PASSWORD 'Ahmed@1122';"
-echo "  Login:     admin / Ahmed@1122"
+sudo -u postgres psql -c "CREATE USER vetapp WITH PASSWORD 'the previously-leaked admin password';"
+echo "  Login:     admin / the previously-leaked admin password"
 ```
 
 Every clinic deployed with this script gets **the same PostgreSQL password and the same admin password**, and

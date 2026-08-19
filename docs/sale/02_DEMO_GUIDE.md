@@ -32,11 +32,11 @@ Open <http://localhost:5100>.
 
 | Login          | Password    | Shows                                        |
 |----------------|-------------|----------------------------------------------|
-| `admin`        | `Demo@1234` | Everything (super_admin)                     |
-| `dr.sara`      | `Demo@1234` | Doctor view — queue, patients, visits         |
-| `rec.yasmine`  | `Demo@1234` | Reception — appointments, POS. UI in Arabic.  |
-| `fin.dalia`    | `Demo@1234` | Finance — invoices, expenses, P&L             |
-| `hr.marwa`     | `Demo@1234` | HR — staff, attendance, payroll               |
+| `admin`        | *(see your demo credentials note)* | Everything (super_admin)                     |
+| `dr.sara`      | *(see your demo credentials note)* | Doctor view — queue, patients, visits         |
+| `rec.yasmine`  | *(see your demo credentials note)* | Reception — appointments, POS. UI in Arabic.  |
+| `fin.dalia`    | *(see your demo credentials note)* | Finance — invoices, expenses, P&L             |
+| `hr.marwa`     | *(see your demo credentials note)* | HR — staff, attendance, payroll               |
 
 Override the admin password with `DEMO_ADMIN_PASS` if you want something else on
 a machine you leave with a prospect.
