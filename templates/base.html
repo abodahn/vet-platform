@@ -45,7 +45,7 @@
     ...then delete the `{% set %}` below. Jinja's `set` would shadow the
     context processor, so it has to go.
   -#}
-  {% set ASSET_V = "cb571a99bb" %}
+  {% set ASSET_V = "20c51ee702" %}
 
   {#- Fonts + icons are SELF-HOSTED (static/fonts/) — no CDN, no third-party
       request, works on a blocked or slow connection. See tokens.css. -#}
@@ -493,6 +493,20 @@
         <i class="bi bi-wifi-off"></i>
         {{ t('No internet connection — some features may be unavailable', 'لا يوجد اتصال بالإنترنت — بعض الميزات قد تكون غير متاحة') }}
       </div>
+
+      <!-- Licence notice. Informational only: nothing here blocks the app,
+           and the wording is chosen so nobody thinks their records are at risk. -->
+      {% set _lic = license_banner() %}
+      {% if _lic %}
+      <div class="v3-offline-banner" style="background:#2C2410;color:#E8C97A">
+        <i class="bi bi-info-circle"></i>
+        <span>{{ _lic }}</span>
+        <a href="{{ url_for('system.license_page') }}"
+           style="margin-inline-start:auto;color:inherit;font-weight:700">
+          {{ t('Details', 'التفاصيل') }}
+        </a>
+      </div>
+      {% endif %}
 
       <!-- Flash messages -->
       {% with msgs = get_flashed_messages(with_categories=True) %}

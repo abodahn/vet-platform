@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ t('Licence', 'الترخيص') }}{% endblock %}
+
+{% block content %}
+<div class="v3-page-head">
+  <h1>{{ t('Licence', 'الترخيص') }}</h1>
+</div>
+
+{% set st = lic.state %}
+
+<div class="v3-card" style="max-width:640px">
+
+  {# Status. Note that none of these states stops the system working. #}
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+    {% if st == 'active' %}
+      <span class="v3-badge v3-badge-success">{{ t('Active', 'مفعّل') }}</span>
+      <span>{{ t('Valid until', 'صالح حتى') }} <b>{{ lic.valid_until }}</b></span>
+    {% elif st == 'expiring' %}
+      <span class="v3-badge v3-badge-warning">{{ t('Renews soon', 'قرب التجديد') }}</span>
+      <span>{{ t('Valid until', 'صالح حتى') }} <b>{{ lic.valid_until }}</b>
+        ({{ lic.days_left }} {{ t('days', 'يوم') }})</span>
+    {% elif st == 'lapsed' %}
+      <span class="v3-badge v3-badge-warning">{{ t('Expired', 'منتهي') }}</span>
+      <span>{{ t('Expired on', 'انتهى في') }} <b>{{ lic.valid_until }}</b></span>
+    {% elif st == 'grace' %}
+      <span class="v3-badge v3-badge-success">{{ t('Permanent', 'دائم') }}</span>
+      <span>{{ t('This installation is no longer asking for a code.',
+                 'هذه النسخة لم تعد تطلب كود تفعيل.') }}</span>
+    {% else %}
+      <span class="v3-badge">{{ t('Not activated', 'غير مفعّل') }}</span>
+    {% endif %}
+  </div>
+
+  {# Said plainly, because a licence screen makes people afraid of losing their data. #}
+  <div class="v3-alert v3-alert-info" style="margin-bottom:18px">
+    {{ t('Your records are never locked. The system works normally whatever this page says.',
+         'بياناتك لا تُغلق أبداً. النظام يعمل بشكل طبيعي مهما كانت حالة الترخيص.') }}
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--v3-border);margin:18px 0">
+
+  <h3 style="font-size:15px;margin-bottom:6px">
+    {{ t('To activate or renew', 'للتفعيل أو التجديد') }}
+  </h3>
+  <p style="font-size:13px;color:var(--v3-text-muted);margin-bottom:14px">
+    {{ t('Read this number to your supplier. They will give you a code to type below.',
+         'اقرأ هذا الرقم لمزوّد النظام، وسيعطيك كود تكتبه بالأسفل.') }}
+  </p>
+
+  <div style="background:var(--v3-bg-alt);border:1px solid var(--v3-border);border-radius:10px;
+              padding:16px;text-align:center;margin-bottom:18px">
+    <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+                color:var(--v3-text-muted);margin-bottom:6px">
+      {{ t('Your machine number', 'رقم جهازك') }}
+    </div>
+    <div id="chal" style="font-size:26px;font-weight:800;letter-spacing:.06em;
+                          font-variant-numeric:tabular-nums">{{ lic.challenge }}</div>
+    <button type="button" class="v3-btn v3-btn-sm v3-btn-ghost" style="margin-top:8px"
+            onclick="navigator.clipboard.writeText(document.getElementById('chal').textContent.trim());
+                     this.textContent='{{ t('Copied', 'تم النسخ') }}'">
+      {{ t('Copy', 'نسخ') }}
+    </button>
+  </div>
+
+  <form method="post">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <label class="v3-label" for="code">{{ t('Activation code', 'كود التفعيل') }}</label>
+    <div style="display:flex;gap:8px">
+      <input class="v3-input" id="code" name="code" required
+             placeholder="2708-4471-8823" autocomplete="off"
+             inputmode="numeric" style="font-size:17px;letter-spacing:.04em"
+             pattern="[0-9\-\s]+">
+      <button class="v3-btn v3-btn-primary" type="submit">
+        {{ t('Activate', 'تفعيل') }}
+      </button>
+    </div>
+  </form>
+
+  {% if lic.machine_changed %}
+    <div class="v3-alert v3-alert-warning" style="margin-top:18px">
+      {{ t('This looks like a different computer than the one activated. Nothing has stopped working — ask your supplier for a new code when convenient.',
+           'يبدو أن هذا جهاز مختلف عن الجهاز المفعّل. لم يتوقف أي شيء — اطلب كود جديد من المزوّد وقت ما يناسبك.') }}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

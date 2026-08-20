@@ -657,6 +657,15 @@ def order_detail(oid):
         return redirect(url_for("petshop.orders"))
     items = conn.execute("SELECT * FROM ps_order_items WHERE order_id=?", (oid,)).fetchall()
     conn.close()
+    # ?print=1 is what the "Print Receipt" button and the POS confirmation modal
+    # both link to. It used to fall through to the ordinary order page, which has
+    # no print stylesheet and never called window.print(), so the button opened a
+    # tab and nothing came out of the printer.
+    if request.args.get("print"):
+        return render_template("petshop/receipt.html",
+                               order=dict(order),
+                               items=[dict(i) for i in items],
+                               clinic=db.get_clinic())
     return render_template("petshop/order_detail.html",
                            order=dict(order),
                            items=[dict(i) for i in items],

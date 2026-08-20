@@ -415,6 +415,47 @@ def settings():
     )
 
 
+# ─────────────────────────────────────────────
+# LICENCE
+# ─────────────────────────────────────────────
+
+@system_bp.route("/license", methods=["GET", "POST"])
+@role_required("super_admin", "clinic_owner")
+def license_page():
+    """Show the machine's challenge and accept an activation code.
+
+    The clinic reads the challenge to their supplier over the phone and types
+    back the code they are given. Nothing here ever blocks access to the
+    system - see models/licensing.py for why that is deliberate.
+    """
+    from models import licensing
+
+    if request.method == "POST":
+        # Rate limited because the code is only eight digits. That is ample
+        # against a person typing, and nothing at all against a script: 10^8
+        # tries with no limit is a weekend's work. Reuses the same limiter the
+        # login form uses, so a lockout is visible in the same place.
+        from models import security as sec
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+        ip = ip.split(",")[0].strip()
+        locked, wait = sec.is_rate_limited(ip, "license-activation")
+        if locked:
+            flash("Too many attempts. Try again in %d seconds." % wait, "danger")
+            return redirect(url_for("system.license_page"))
+
+        ok, msg = licensing.activate(
+            request.form.get("code", ""),
+            (session.get("user") or {}).get("username", "system"))
+        if not ok:
+            sec.record_failed_login(ip, "license-activation")
+        flash(msg, "success" if ok else "danger")
+        return redirect(url_for("system.license_page"))
+
+    return render_template("system/license.html",
+                           lic=licensing.status(),
+                           active="system")
+
+
 def _archive_or_abort(filename):
     """Resolve a URL-supplied backup name, or refuse outright.
 

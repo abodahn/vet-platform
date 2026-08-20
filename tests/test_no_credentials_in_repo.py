@@ -121,3 +121,54 @@ def test_the_audit_record_is_the_only_documented_exception():
     doc_exceptions = {p for p in ALLOWED if p.startswith("docs/")}
     assert doc_exceptions == {"docs/AUDIT_FINDINGS.md"}, \
         "another document has been granted permission to hold credentials"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Licence signing secrets
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The licence master secret is a different class of leak from a password. A
+# password opens one account and rotating it costs an afternoon. The master
+# secret mints activation codes for EVERY clinic, and rotating it invalidates
+# every code already issued — so every paying customer would have to be phoned
+# and re-activated before their next renewal.
+#
+# Three passwords have already reached this repository. This is the guard for
+# the one that would be far more expensive.
+
+_KEY_MATERIAL = re.compile(
+    r"""(?ix)
+    (?: -----BEGIN [A-Z ]* PRIVATE\ KEY-----        # any PEM private key
+      | \bALEEFY_LICENSE_MASTER\s*[:=]\s*['"]?[A-Za-z0-9_\-+/]{16,}
+      | \bALEEFY_LICENSE_SECRET\s*[:=]\s*['"]?[0-9a-f]{32,}
+    )
+    """)
+
+# Where these names may legitimately appear: docs explaining them, the script
+# that generates them, and this test.
+_KEY_ALLOWED = {
+    "tests/test_no_credentials_in_repo.py",
+    "scripts/make_license.py",
+    "models/licensing.py",
+    ".env.example",
+}
+
+
+def test_no_licence_signing_material_is_tracked():
+    """A leaked master secret means unlimited free licences, and revoking it
+    breaks every clinic already paying. It must never be committed."""
+    offenders = []
+    for path in _tracked():
+        if path in _KEY_ALLOWED:
+            continue
+        body = _read(path)
+        for m in _KEY_MATERIAL.finditer(body):
+            line = body[:m.start()].count("\n") + 1
+            offenders.append("%s:%d  %s" % (path, line, m.group(0)[:48]))
+
+    assert not offenders, (
+        "Licence signing material is in a tracked file:\n  "
+        + "\n  ".join(offenders)
+        + "\n\nRotating this is not like rotating a password: every activation "
+          "code already issued stops working, and every clinic has to be phoned."
+    )

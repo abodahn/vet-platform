@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0D2B24">
+<title>Aleefy Codes</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/images/tool-icon-apple.png">
+<link rel="icon" href="/static/images/tool-icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Codes">
+<meta name="robots" content="noindex,nofollow">
+<!--
+  VENDOR TOOL. Never install this at a clinic.
+
+  Why this exists: scripts/make_license.py only runs on your laptop, and a
+  clinic phoning at 8pm does not care where your laptop is. This is the same
+  algorithm in the browser, so the code can be issued from your phone.
+
+  A normal authenticator app cannot do this job. Those generate a code from a
+  fixed seed and the clock; this has to take THEIR machine number as input and
+  answer for that machine specifically.
+
+  It works fully offline - there is not one network request in this file. Add
+  it to your phone's home screen and it opens like an app, on a plane, in a
+  basement, with no signal.
+
+  THE MASTER SECRET IS NOT IN THIS FILE. You paste it once on your own phone
+  and it is encrypted with a PIN into that phone's local storage. This file is
+  therefore safe to keep in the repository and safe to publish - it is a
+  calculator with no key in it.
+-->
+<style>
+:root{
+  --bg:#0B1512; --card:#132420; --line:#24413A; --ink:#EAF3F0;
+  --muted:#8FADA5; --brand:#3FBF9F; --warn:#E8C97A; --danger:#E8837A;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--ink);min-height:100vh;
+  padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));
+  font-size:16px;line-height:1.5;
+}
+.wrap{max-width:460px;margin:0 auto}
+header{text-align:center;padding:14px 0 20px}
+h1{font-size:19px;font-weight:800;letter-spacing:-.01em}
+header p{font-size:12.5px;color:var(--muted);margin-top:3px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+input,select{
+  width:100%;background:#0B1512;border:1px solid var(--line);color:var(--ink);
+  border-radius:10px;padding:13px 14px;font-size:17px;font-family:inherit;
+  margin-bottom:14px;
+}
+input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px}
+input[inputmode=numeric]{font-variant-numeric:tabular-nums;letter-spacing:.06em}
+button{
+  width:100%;background:var(--brand);color:#06231C;border:none;border-radius:10px;
+  padding:15px;font-size:16px;font-weight:800;font-family:inherit;cursor:pointer;
+}
+button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);
+             font-weight:600;font-size:14px;padding:11px}
+button:active{transform:translateY(1px)}
+.hide{display:none!important}
+.out{text-align:center;padding:22px 14px}
+.out .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.out .code{
+  font-size:clamp(30px,10vw,42px);font-weight:900;letter-spacing:.04em;
+  font-variant-numeric:tabular-nums;margin:8px 0;color:var(--brand);
+  user-select:all;-webkit-user-select:all;
+}
+.out .sub{font-size:13px;color:var(--muted)}
+.msg{font-size:13px;padding:11px 13px;border-radius:9px;margin-bottom:14px}
+.msg.err{background:#2B1614;color:var(--danger);border:1px solid #4A2320}
+.msg.warn{background:#2A2413;color:var(--warn);border:1px solid #4A3F20}
+.foot{font-size:11.5px;color:var(--muted);text-align:center;padding:8px 4px 20px;line-height:1.7}
+.row{display:flex;gap:10px}.row>*{flex:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>🐾 Aleefy Codes</h1>
+    <p>Activation codes · works offline</p>
+  </header>
+
+  <!-- ── first run ─────────────────────────────────────────── -->
+  <div id="setup" class="card hide">
+    <div class="msg warn">
+      First time on this phone. Paste your master secret and choose a PIN.
+      The secret is encrypted with the PIN and stored only on this device.
+    </div>
+    <label for="master">Master secret</label>
+    <input id="master" type="password" autocomplete="off" autocapitalize="off"
+           spellcheck="false" placeholder="from your password manager">
+    <label for="pin1">Choose a PIN (6+ characters)</label>
+    <input id="pin1" type="password" inputmode="numeric" autocomplete="off" placeholder="••••••">
+    <label for="pin2">Repeat the PIN</label>
+    <input id="pin2" type="password" inputmode="numeric" autocomplete="off" placeholder="••••••">
+    <button onclick="saveMaster()">Save on this phone</button>
+  </div>
+
+  <!-- ── unlock ────────────────────────────────────────────── -->
+  <div id="lock" class="card hide">
+    <label for="pin">PIN</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off"
+           placeholder="••••••" onkeydown="if(event.key==='Enter')unlock()">
+    <button onclick="unlock()">Unlock</button>
+    <button class="ghost" style="margin-top:10px" onclick="forget()">Forget this phone</button>
+  </div>
+
+  <!-- ── issue a code ──────────────────────────────────────── -->
+  <div id="main" class="card hide">
+    <label for="clinic">Clinic id</label>
+    <input id="clinic" autocomplete="off" autocapitalize="off" spellcheck="false"
+           placeholder="hatem-vet" list="clinics">
+    <datalist id="clinics"></datalist>
+
+    <label for="machine">Machine number they read to you</label>
+    <input id="machine" inputmode="numeric" autocomplete="off" placeholder="ALF-7706-4095">
+
+    <label for="years">Valid for</label>
+    <select id="years">
+      <option value="1" selected>1 year</option>
+      <option value="2">2 years</option>
+      <option value="3">3 years</option>
+    </select>
+
+    <button onclick="issue()">Get code</button>
+  </div>
+
+  <div id="result" class="card out hide">
+    <div class="lbl">Read this to them</div>
+    <div class="code" id="code">····</div>
+    <div class="sub" id="detail"></div>
+    <button class="ghost" style="margin-top:16px" onclick="copyCode()">Copy</button>
+    <button class="ghost" style="margin-top:8px" onclick="again()">Another clinic</button>
+  </div>
+
+  <div id="err"></div>
+
+  <div class="foot">
+    The code only works on the machine number they gave you.<br>
+    Diary a reminder to call them one month before it lapses.
+  </div>
+
+</div>
+
+<script>
+"use strict";
+const enc = new TextEncoder();
+const KEY = "aleefy.master.v1";
+const RECENT = "aleefy.clinics.v1";
+let MASTER = null;                     // plaintext, in memory only, never stored
+
+const $ = id => document.getElementById(id);
+const show = (...ids) => {
+  ["setup","lock","main","result"].forEach(i => $(i).classList.add("hide"));
+  ids.forEach(i => $(i).classList.remove("hide"));
+};
+function err(m){
+  $("err").innerHTML = m ? '<div class="msg err">'+m+'</div>' : "";
+}
+
+/* ── crypto helpers ──────────────────────────────────────────
+   These must match models/licensing.py EXACTLY. Cross-checked against the
+   Python by scripts/verify_phone_tool.js - if you change one, change both and
+   re-run that check, or you will hand a clinic a code that will not work and
+   have no way to tell which side is wrong.                                  */
+
+async function hmac(keyBytes, msg){
+  const k = await crypto.subtle.importKey("raw", keyBytes,
+              {name:"HMAC", hash:"SHA-256"}, false, ["sign"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", k, enc.encode(msg)));
+}
+const hex = u8 => [...u8].map(b => b.toString(16).padStart(2,"0")).join("");
+
+// HMAC(master, "clinic:<id>") -> hex string. Python then UTF-8 encodes that
+// hex TEXT as the signing key, so this does the same.
+async function clinicSecret(master, clinicId){
+  return hex(await hmac(enc.encode(master), "clinic:" + clinicId));
+}
+
+// RFC 4226 dynamic truncation, same as _digits() in the Python.
+async function digits(secretHex, machine, yymm){
+  const mac = await hmac(enc.encode(secretHex), machine + "|" + yymm);
+  const off = mac[mac.length - 1] & 0x0F;
+  const val = ((mac[off] & 0x7f) * 16777216)
+            + (mac[off+1] * 65536) + (mac[off+2] * 256) + mac[off+3];
+  return String(val).padStart(8,"0").slice(-8);
+}
+
+async function makeCode(master, clinicId, machine, expiry){
+  const yymm = String(expiry.getFullYear()).slice(2)
+             + String(expiry.getMonth()+1).padStart(2,"0");
+  const d = await digits(await clinicSecret(master, clinicId), machine, yymm);
+  return yymm + "-" + d.slice(0,4) + "-" + d.slice(4);
+}
+
+// End of the same month, n years out - matches _plus_years() in the script.
+function plusYears(n){
+  const t = new Date();
+  return new Date(t.getFullYear() + n, t.getMonth() + 1, 0);
+}
+
+/* ── PIN-encrypted storage ─────────────────────────────────── */
+
+async function keyFromPin(pin, salt){
+  const base = await crypto.subtle.importKey("raw", enc.encode(pin),
+                 "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    {name:"PBKDF2", salt, iterations:250000, hash:"SHA-256"},
+    base, {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]);
+}
+
+async function saveMaster(){
+  err("");
+  const m = $("master").value.trim(), p1 = $("pin1").value, p2 = $("pin2").value;
+  if (!m)            return err("Paste your master secret first.");
+  if (p1.length < 6) return err("Use a PIN of at least 6 characters.");
+  if (p1 !== p2)     return err("The two PINs are different.");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const ct   = new Uint8Array(await crypto.subtle.encrypt(
+                 {name:"AES-GCM", iv}, await keyFromPin(p1, salt), enc.encode(m)));
+  localStorage.setItem(KEY, JSON.stringify(
+    {salt:hex(salt), iv:hex(iv), ct:hex(ct)}));
+  MASTER = m;
+  $("master").value = $("pin1").value = $("pin2").value = "";
+  show("main");
+}
+
+const unhex = h => new Uint8Array(h.match(/../g).map(b => parseInt(b,16)));
+
+async function unlock(){
+  err("");
+  const blob = JSON.parse(localStorage.getItem(KEY) || "null");
+  if (!blob) return show("setup");
+  try {
+    const pt = await crypto.subtle.decrypt(
+      {name:"AES-GCM", iv:unhex(blob.iv)},
+      await keyFromPin($("pin").value, unhex(blob.salt)), unhex(blob.ct));
+    MASTER = new TextDecoder().decode(pt);
+    $("pin").value = "";
+    show("main");
+  } catch (e) {
+    err("Wrong PIN.");
+  }
+}
+
+function forget(){
+  if (!confirm("Remove the stored secret from this phone?\n\n" +
+               "You will need to paste it again from your password manager.")) return;
+  localStorage.removeItem(KEY);
+  MASTER = null;
+  show("setup");
+}
+
+/* ── issuing ─────────────────────────────────────────────── */
+
+async function issue(){
+  err("");
+  const clinic = $("clinic").value.trim();
+  const machine = $("machine").value.replace(/\D/g, "");
+  if (!clinic)             return err("Which clinic?");
+  if (machine.length !== 8) return err(
+    "That machine number does not look right. Expected eight digits, like ALF-7706-4095.");
+
+  const years = parseInt($("years").value, 10);
+  const expiry = plusYears(years);
+  const code = await makeCode(MASTER, clinic, machine, expiry);
+
+  $("code").textContent = code;
+  $("detail").innerHTML =
+      clinic + " · ALF-" + machine.slice(0,4) + "-" + machine.slice(4) + "<br>"
+    + "valid to " + expiry.toLocaleDateString(undefined,
+        {day:"numeric", month:"long", year:"numeric"});
+
+  // Remember clinic ids so they are one tap next time - and so a typo in the
+  // id, which would silently produce a code that never works, is less likely.
+  const seen = JSON.parse(localStorage.getItem(RECENT) || "[]");
+  if (!seen.includes(clinic)) {
+    seen.unshift(clinic);
+    localStorage.setItem(RECENT, JSON.stringify(seen.slice(0, 40)));
+  }
+  show("result");
+}
+
+function copyCode(){
+  navigator.clipboard.writeText($("code").textContent.trim());
+  event.target.textContent = "Copied";
+}
+function again(){ $("machine").value = ""; show("main"); loadClinics(); }
+
+function loadClinics(){
+  $("clinics").innerHTML = JSON.parse(localStorage.getItem(RECENT) || "[]")
+    .map(c => '<option value="'+c.replace(/"/g,"&quot;")+'">').join("");
+}
+
+/* ── offline ─────────────────────────────────────────────── */
+// Registered in its own scope so it cannot touch a single page of the app.
+// After the first visit the tool opens with no network at all, which is the
+// whole reason it exists - a clinic phones from somewhere with no coverage.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js", {scope: "./"})
+      .catch(() => { /* file:// or an old browser - the tool still works */ });
+  });
+}
+
+/* ── start ───────────────────────────────────────────────── */
+loadClinics();
+show(localStorage.getItem(KEY) ? "lock" : "setup");
+if (!crypto.subtle) {
+  err("This browser cannot do the maths. Open it over https:// or from a file, not http://.");
+}
+</script>
+</body>
+</html>

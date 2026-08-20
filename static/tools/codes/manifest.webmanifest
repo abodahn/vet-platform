@@ -1,0 +1,16 @@
+{
+  "name": "Aleefy Codes",
+  "short_name": "Codes",
+  "description": "Activation codes for Aleefy licences. Works offline.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1512",
+  "theme_color": "#0D2B24",
+  "icons": [
+    {"src": "/static/images/tool-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/static/images/tool-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/static/images/tool-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

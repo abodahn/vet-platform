@@ -369,7 +369,7 @@ function submitOrder(){
     if(data.error){ alert('Error: '+data.error); document.getElementById('charge-btn').disabled=false; document.getElementById('charge-btn').textContent='✅ Charge'; return; }
     document.getElementById('receipt-info').innerHTML =
       '<strong>Order: '+data.order_number+'</strong><br>Total: '+data.total.toFixed(2)+' EGP<br>Change: '+data.change.toFixed(2)+' EGP';
-    document.getElementById('receipt-link').href='/petshop/orders/'+data.order_id;
+    document.getElementById('receipt-link').href='/petshop/orders/'+data.order_id+'?print=1';
     document.getElementById('receipt-modal').style.display='flex';
   }).catch(function(e){ alert('Network error: '+e); document.getElementById('charge-btn').disabled=false; });
 }

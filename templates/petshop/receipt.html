@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="{{ current_lang or 'en' }}"
+      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}">
+<head>
+<meta charset="UTF-8">
+<title>{{ order.order_number or order.id }} — {{ clinic.name if clinic else app_title }}</title>
+<style>
+/* Sized for an 80mm thermal till roll, the printer a shop counter actually has.
+   It still prints legibly on A4 — the receipt just sits in the top-left corner. */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#000;background:#f1f5f9;padding:20px}
+.roll{width:80mm;margin:0 auto;background:#fff;padding:6mm 5mm;box-shadow:0 2px 12px rgba(0,0,0,.12)}
+.center{text-align:center}
+.clinic-name{font-size:16px;font-weight:900;letter-spacing:.02em}
+.clinic-sub{font-size:11px;color:#333;margin-top:2px}
+.rule{border:none;border-top:1px dashed #999;margin:8px 0}
+.meta{font-size:11px;line-height:1.6}
+.meta span{float:right;font-weight:600}
+table{width:100%;border-collapse:collapse;margin:4px 0}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#444;
+   border-bottom:1px solid #000;padding:3px 0;text-align:left}
+td{padding:4px 0;vertical-align:top;font-size:11px}
+.qty{white-space:nowrap;color:#444;font-size:10px}
+.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tot{display:flex;justify-content:space-between;padding:2px 0;font-size:11px}
+.tot.grand{border-top:1px solid #000;margin-top:5px;padding-top:6px;font-size:15px;font-weight:900}
+.void{border:2px solid #b91c1c;color:#b91c1c;font-weight:900;text-align:center;
+      padding:6px;margin-bottom:8px;font-size:13px;letter-spacing:.06em}
+.foot{font-size:10px;color:#444;line-height:1.5}
+.no-print{width:80mm;margin:0 auto 12px;text-align:center}
+.no-print button,.no-print a{border:none;padding:9px 18px;border-radius:7px;font-size:13px;
+   font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
+@media print{
+  .no-print{display:none}
+  body{background:#fff;padding:0}
+  .roll{width:auto;box-shadow:none;padding:0}
+  @page{size:80mm auto;margin:3mm}
+}
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <button onclick="window.print()" style="background:#1B6B5C;color:#fff">{{ t('🖨 Print', '🖨 طباعة') }}</button>
+  <button onclick="window.close()" style="background:#e2e8f0;color:#1a1a1a;margin-inline-start:6px">{{ t('✕ Close', '✕ إغلاق') }}</button>
+</div>
+
+<div class="roll">
+
+  {# A cancelled or refunded order must never hand over as a valid receipt. #}
+  {% if order.status in ('cancelled', 'refunded') %}
+    <div class="void">
+      {{ t('CANCELLED — NOT A VALID RECEIPT', 'ملغي — إيصال غير صالح') if order.status == 'cancelled'
+         else t('REFUNDED', 'مسترجع') }}
+    </div>
+  {% endif %}
+
+  <div class="center">
+    <div class="clinic-name">🐾 {{ clinic.name if clinic else app_title }}</div>
+    {% if clinic and clinic.address %}<div class="clinic-sub">{{ clinic.address }}</div>{% endif %}
+    {% if clinic and clinic.phone %}<div class="clinic-sub">📞 {{ clinic.phone }}</div>{% endif %}
+    {% if clinic and clinic.doctor_name %}<div class="clinic-sub">{{ clinic.doctor_name }}</div>{% endif %}
+  </div>
+
+  <hr class="rule">
+
+  <div class="meta">
+    <div>{{ t('Receipt', 'إيصال') }} <span>{{ order.order_number or order.id }}</span></div>
+    <div>{{ t('Date', 'التاريخ') }} <span>{{ (order.created_at or '')[:16] }}</span></div>
+    {% if order.served_by %}<div>{{ t('Served by', 'بواسطة') }} <span>{{ order.served_by }}</span></div>{% endif %}
+    {% if order.owner_name %}<div>{{ t('Customer', 'العميل') }} <span>{{ order.owner_name }}</span></div>{% endif %}
+    {% if order.pet_name %}<div>{{ t('Pet', 'الحيوان') }} <span>{{ order.pet_name }}</span></div>{% endif %}
+  </div>
+
+  <hr class="rule">
+
+  <table>
+    <thead>
+      <tr>
+        <th>{{ t('Item', 'الصنف') }}</th>
+        <th class="num">{{ t('Amount', 'المبلغ') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td>
+          {{ it.product_name or '—' }}
+          <div class="qty">
+            {{ "{:g}".format(it.qty or 0) }} × {{ "{:,.2f}".format(it.unit_price or 0) }}
+            {%- if it.discount %} · −{{ "{:,.2f}".format(it.discount) }}{% endif %}
+          </div>
+        </td>
+        <td class="num">{{ "{:,.2f}".format(it.line_total or 0) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2" class="center" style="color:#666">{{ t('No items on this order.', 'لا توجد أصناف.') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <hr class="rule">
+
+  <div class="tot"><span>{{ t('Subtotal', 'المجموع') }}</span><span>{{ "{:,.2f}".format(order.subtotal or 0) }}</span></div>
+  {% if order.discount_amount %}<div class="tot"><span>{{ t('Discount', 'الخصم') }}</span><span>− {{ "{:,.2f}".format(order.discount_amount) }}</span></div>{% endif %}
+  {% if order.tax_amount %}<div class="tot"><span>{{ t('Tax', 'الضريبة') }}</span><span>+ {{ "{:,.2f}".format(order.tax_amount) }}</span></div>{% endif %}
+  <div class="tot grand"><span>{{ t('TOTAL', 'الإجمالي') }}</span><span>{{ "{:,.2f}".format(order.total or 0) }} {{ t('EGP', 'ج.م') }}</span></div>
+
+  <div class="tot" style="margin-top:6px">
+    <span>{{ t('Paid', 'مدفوع') }} ({{ order.payment_method or t('Cash', 'نقدي') }})</span>
+    <span>{{ "{:,.2f}".format(order.paid_amount or 0) }}</span>
+  </div>
+  {% if order.change_amount %}<div class="tot"><span>{{ t('Change', 'الباقي') }}</span><span>{{ "{:,.2f}".format(order.change_amount) }}</span></div>{% endif %}
+  {% if order.payment_ref %}<div class="tot"><span>{{ t('Ref', 'مرجع') }}</span><span>{{ order.payment_ref }}</span></div>{% endif %}
+
+  {# Anything still owed is the single most important line on the paper. #}
+  {% set due = (order.total or 0) - (order.paid_amount or 0) %}
+  {% if due > 0.01 %}
+    <div class="tot" style="font-weight:900;color:#b91c1c">
+      <span>{{ t('BALANCE DUE', 'المتبقي') }}</span><span>{{ "{:,.2f}".format(due) }} {{ t('EGP', 'ج.م') }}</span>
+    </div>
+  {% endif %}
+
+  <hr class="rule">
+
+  <div class="center foot">
+    {{ t('Thank you for your visit', 'شكراً لزيارتكم') }}<br>
+    {{ clinic.name if clinic else app_title }}{% if clinic and clinic.phone %} · {{ clinic.phone }}{% endif %}
+  </div>
+
+</div>
+
+<script>
+  // Same behaviour as the invoice print view: open, settle, print.
+  setTimeout(function () { window.print(); }, 400);
+</script>
+</body>
+</html>

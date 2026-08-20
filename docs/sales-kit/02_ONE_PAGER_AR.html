@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>أليفي — نظام إدارة العيادات البيطرية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap">
+<style>
+:root{
+  --ink:#0F2A24;        /* almost-black green, for text */
+  --brand:#1B6B5C;      /* the app's own teal */
+  --brand-dark:#0D2B24;
+  --gold:#C89B3C;       /* accent, used once */
+  --line:#D9E2DF;
+  --paper:#FFFFFF;
+  --soft:#F4F8F6;
+  --muted:#5B7169;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Cairo',"Segoe UI",Tahoma,sans-serif;
+  color:var(--ink);background:#E8EDEB;padding:24px;font-size:13px;line-height:1.7;
+}
+.page{
+  width:210mm;min-height:297mm;margin:0 auto;background:var(--paper);
+  box-shadow:0 4px 24px rgba(0,0,0,.13);padding:14mm 15mm;
+}
+
+/* ── header ───────────────────────────────── */
+.head{
+  background:linear-gradient(135deg,var(--brand),var(--brand-dark));
+  color:#fff;border-radius:12px;padding:20px 24px;margin-bottom:18px;
+  display:flex;justify-content:space-between;align-items:center;gap:16px;
+}
+.brand{font-size:30px;font-weight:900;letter-spacing:-.01em}
+.tag{font-size:13px;opacity:.9;margin-top:2px}
+.head-note{
+  text-align:left;font-size:11.5px;opacity:.92;border-inline-start:2px solid rgba(255,255,255,.35);
+  padding-inline-start:12px;line-height:1.6;
+}
+
+h2{
+  font-size:15px;font-weight:800;color:var(--brand);margin:16px 0 8px;
+  padding-bottom:5px;border-bottom:2px solid var(--line);
+}
+
+/* ── the hook ─────────────────────────────── */
+.hook{
+  background:var(--soft);border:1px solid var(--line);border-radius:10px;
+  padding:14px 18px;margin-bottom:4px;
+}
+.hook .big{font-size:16px;font-weight:700;color:var(--brand-dark);line-height:1.6}
+.hook .small{font-size:12px;color:var(--muted);margin-top:5px}
+
+/* ── modules ──────────────────────────────── */
+.mods{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px}
+.mod{
+  background:var(--soft);border:1px solid var(--line);border-radius:7px;
+  padding:7px 9px;font-size:11.5px;font-weight:600;
+}
+.mod b{display:block;font-size:10px;font-weight:400;color:var(--muted);margin-top:1px}
+
+/* ── pricing ──────────────────────────────── */
+.prices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.card{border:1.5px solid var(--line);border-radius:11px;padding:15px 16px;position:relative}
+.card.featured{border-color:var(--brand);border-width:2px;background:var(--soft)}
+.ribbon{
+  position:absolute;top:-10px;inset-inline-start:16px;background:var(--gold);color:#fff;
+  font-size:10px;font-weight:700;padding:2px 10px;border-radius:20px;letter-spacing:.02em;
+}
+.card h3{font-size:14px;font-weight:800;color:var(--brand-dark);margin-bottom:3px}
+.price{font-size:26px;font-weight:900;color:var(--brand);line-height:1.2}
+.price span{font-size:12px;font-weight:600;color:var(--muted)}
+.card ul{list-style:none;margin-top:9px;font-size:11.5px}
+.card li{padding:3px 0;padding-inline-start:17px;position:relative;line-height:1.6}
+.card li::before{content:"✓";position:absolute;inset-inline-start:0;color:var(--brand);font-weight:900}
+.card li.no::before{content:"—";color:var(--muted)}
+
+/* ── founding offer ───────────────────────── */
+.founder{
+  border:2px dashed var(--gold);border-radius:11px;padding:13px 17px;margin-top:12px;
+  background:#FDFBF5;
+}
+.founder h3{font-size:14px;font-weight:800;color:#8A6A21;margin-bottom:4px}
+.founder p{font-size:11.5px;line-height:1.7}
+
+/* ── why us ───────────────────────────────── */
+.why{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:4px}
+.why div{font-size:11.5px;padding-inline-start:19px;position:relative;line-height:1.65}
+.why div::before{
+  content:"◆";position:absolute;inset-inline-start:0;color:var(--gold);font-size:9px;top:4px;
+}
+.why b{color:var(--brand-dark)}
+
+/* ── footer ───────────────────────────────── */
+.foot{
+  margin-top:16px;background:var(--brand-dark);color:#fff;border-radius:11px;
+  padding:15px 20px;display:flex;justify-content:space-between;align-items:center;gap:14px;
+}
+.foot .cta{font-size:14.5px;font-weight:800;line-height:1.5}
+.foot .cta small{display:block;font-size:11px;font-weight:400;opacity:.85;margin-top:3px}
+.contact{text-align:left;font-size:12px;line-height:1.8;white-space:nowrap}
+.contact b{font-size:13px}
+
+/* Placeholders you must replace before sending. Loud on purpose. */
+.fill{background:#FFE9A8;border-bottom:1px dashed #B7902F;padding:0 3px;border-radius:2px}
+
+@media print{
+  body{background:#fff;padding:0}
+  .page{box-shadow:none;width:auto;min-height:auto;padding:10mm 12mm}
+  @page{size:A4;margin:0}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="head">
+    <div>
+      <div class="brand">🐾 أليفي</div>
+      <div class="tag">نظام إدارة العيادات البيطرية — عربي بالكامل</div>
+    </div>
+    <div class="head-note">
+      برنامج واحد يشغّل العيادة كلها:<br>
+      الكشف، الصيدلية، المخزون،<br>
+      الفواتير، الحسابات والموظفين.
+    </div>
+  </div>
+
+  <div class="hook">
+    <div class="big">
+      كام حالة ملغيتش معادها الشهر اللي فات؟ لو ١٠ حالات بـ ٣٠٠ جنيه،
+      يبقى <b style="color:var(--brand)">٣٬٠٠٠ جنيه</b> راحت.
+    </div>
+    <div class="small">
+      أليفي بيبعت تذكير واتساب لكل عميل قبل معاده — ودي لوحدها بترجّع معظم الحالات دي.
+    </div>
+  </div>
+
+  <h2>كل حاجة في العيادة، في مكان واحد</h2>
+  <div class="mods">
+    <div class="mod">المواعيد والاستقبال<b>Appointments</b></div>
+    <div class="mod">ملفات الملاك والحيوانات<b>Owners &amp; Pets</b></div>
+    <div class="mod">طريقة حاتم — كشف بشاشة واحدة<b>One-Screen Exam</b></div>
+    <div class="mod">الصيدلية وصرف الأدوية<b>Pharmacy</b></div>
+    <div class="mod">المختبر والتشخيص<b>Laboratory</b></div>
+    <div class="mod">التطعيمات والرعاية الوقائية<b>Vaccinations</b></div>
+    <div class="mod">الجراحة والإجراءات<b>Surgery</b></div>
+    <div class="mod">القسم الداخلي والتنويم<b>Inpatient</b></div>
+    <div class="mod">التصوير الطبي<b>Imaging</b></div>
+    <div class="mod">المخزون والمستودع<b>Inventory</b></div>
+    <div class="mod">المشتريات والموردون<b>Procurement</b></div>
+    <div class="mod">الفواتير والمدفوعات<b>Invoicing</b></div>
+    <div class="mod">المالية والمحاسبة<b>Accounting</b></div>
+    <div class="mod">الحضور والإجازات<b>Attendance</b></div>
+    <div class="mod">الرواتب والأجور<b>Payroll</b></div>
+    <div class="mod">محل مستلزمات ونقطة بيع<b>Pet Shop &amp; POS</b></div>
+    <div class="mod">التجميل والإيواء<b>Grooming &amp; Boarding</b></div>
+    <div class="mod">مركز واتساب<b>WhatsApp Center</b></div>
+    <div class="mod">التقارير ولوحة التحكم<b>Reports</b></div>
+    <div class="mod">الطب عن بُعد<b>Telemedicine</b></div>
+    <div class="mod">إدارة عدة فروع<b>Multi-Branch</b></div>
+  </div>
+
+  <h2>الأسعار</h2>
+  <div class="prices">
+
+    <div class="card featured">
+      <div class="ribbon">الأكثر طلباً</div>
+      <h3>رخصة دائمة</h3>
+      <div class="price">٧٬٠٠٠ <span>جنيه — مرة واحدة</span></div>
+      <ul>
+        <li>٦ شهور دعم فني مجاني</li>
+        <li>٣ طلبات تعديل (كل طلب حتى ٨ ساعات عمل)</li>
+        <li>نقل بياناتك من الإكسل — مجاناً</li>
+        <li>تدريب فريق العيادة (جلستين)</li>
+        <li>البرنامج ملكك، بيشتغل للأبد</li>
+      </ul>
+      <div style="margin-top:9px;padding-top:8px;border-top:1px solid var(--line);font-size:11.5px">
+        بعد أول ٦ شهور: <b>١٬٨٠٠ جنيه سنوياً</b> للدعم والتحديثات.
+        <span style="color:var(--muted)">اختياري — البرنامج بيفضل شغال من غيرها.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>اشتراك شهري</h3>
+      <div class="price">٦٠٠ <span>جنيه / شهرياً</span></div>
+      <ul>
+        <li>من غير أي مقدم</li>
+        <li>الدعم والتحديثات داخلة</li>
+        <li>نقل البيانات والتدريب داخلين</li>
+        <li>توقف في أي وقت</li>
+        <li>بياناتك بتنزل إكسل وتاخدها معاك</li>
+      </ul>
+      <div style="margin-top:9px;padding-top:8px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)">
+        مناسب لو مش عايز تدفع مبلغ كبير مرة واحدة.
+      </div>
+    </div>
+
+  </div>
+
+  <div class="founder">
+    <h3>★ عرض العيادات المؤسِّسة — أول ٣ عيادات فقط</h3>
+    <p>
+      <b>سنة كاملة مجاناً</b> — الرخصة والدعم وكل حاجة. مقابل إن حضرتك تدينا رأيك الحقيقي
+      بعد ٣ شهور استخدام، وتسمحلنا نستخدم اسم العيادة. مش خصم — ده تبادل،
+      إحنا محتاجين رأي دكتور شغّال فعلاً أكتر ما إحنا محتاجين الفلوس.
+    </p>
+  </div>
+
+  <h2>ليه أليفي بالذات</h2>
+  <div class="why">
+    <div><b>عربي حقيقي، مش ترجمة.</b> الشاشات من اليمين للشمال، والفاتورة المطبوعة بتطلع عربي سليم — وده أكتر حاجة بتفشل في البرامج التانية.</div>
+    <div><b>مش هتعيد إدخال بياناتك.</b> ابعتلنا ملف الإكسل بتاعك ونرجعلك النظام وفيه كل عملائك وحيواناتهم قبل ما تدفع جنيه.</div>
+    <div><b>كل العيادة، مش الكشف بس.</b> معظم البرامج بتقف عند الملف الطبي والفاتورة. أليفي فيه كمان المخزون والمشتريات والحسابات والرواتب والمحل.</div>
+    <div><b>مبني لمصر.</b> الجنيه المصري، أسبوع العمل من الأحد للخميس، وتذكيرات واتساب — مش برنامج أجنبي متعرّب.</div>
+    <div><b>يشتغل على جهاز واحد أو على السيرفر</b> — وكل فرع بياناته لوحده لو عندك أكتر من فرع.</div>
+    <div><b>٤١٣ شاشة و٣٤ قسم</b>، و<b>٢٬٠٩٢ اختبار آلي</b> بيتأكدوا إن كل حاجة شغالة مع كل تحديث.</div>
+  </div>
+
+  <div class="foot">
+    <div class="cta">
+      ابعتلنا ملف الإكسل بتاع العيادة — ونجهّزلك النظام كامل تجربه قبل ما تقرر.
+      <small>العرض ساري حتى <span class="fill">[التاريخ]</span> · الأسعار بالجنيه المصري ولا تشمل الضريبة</small>
+    </div>
+    <div class="contact">
+      <b><span class="fill">[اسمك]</span></b><br>
+      📞 <span class="fill">[رقم الموبايل]</span><br>
+      ✉ <span class="fill">[الإيميل]</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

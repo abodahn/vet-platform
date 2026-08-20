@@ -407,6 +407,22 @@ def create_app(cfg=None) -> Flask:
             """Return Arabic text when lang=='ar', English otherwise."""
             return ar if (lang == "ar" and ar) else en
 
+        def license_banner():
+            """One line about the licence, or "". Called only by base.html.
+
+            A callable rather than a value so a JSON or print response never
+            pays for the lookup, and wrapped because this context processor is
+            the choke point every render passes through - an exception here
+            turns a handled error into an unhandled 500, which is exactly how
+            UnknownTenant became a 500 on every mistyped subdomain.
+            """
+            try:
+                from models import licensing
+                return licensing.banner()
+            except Exception:
+                logger.debug("licence banner suppressed", exc_info=True)
+                return ""
+
         def loc(row, field):
             """A record's own name in the reader's language.
 
@@ -438,6 +454,7 @@ def create_app(cfg=None) -> Flask:
             return base or ""
 
         return dict(
+            license_banner = license_banner,
             app_title     = app.config.get("APP_TITLE", "Aleefy"),
             app_title_ar  = app.config.get("APP_TITLE_AR", "اليفي"),
             app_subtitle  = app.config.get("APP_SUBTITLE", "Dr. Hatem El Khateeb"),
