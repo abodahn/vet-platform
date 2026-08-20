@@ -22,11 +22,11 @@
  * offline; a new version lands on the visit after it is published, which for a
  * calculator that has not changed in months is the right trade.
  */
-const CACHE = "aleefy-codes-v1";
+const CACHE = "aleefy-codes-v2";
 const ASSETS = [
   "./",
   "./index.html",
-  "./manifest.webmanifest",
+  "./manifest.json",
   "/static/images/tool-icon-192.png",
   "/static/images/tool-icon-512.png",
   "/static/images/tool-icon-apple.png",
