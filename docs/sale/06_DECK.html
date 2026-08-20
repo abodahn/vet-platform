@@ -1,0 +1,630 @@
+<!--
+  Aleefy — acquirer brief. Fifteen slides, scroll-snapped, arrow keys navigate.
+
+  Published copy: https://claude.ai/code/artifact/985ddc3f-91cf-49e5-83d4-c381cb6cecf1
+  (private until shared from that page's share menu)
+
+  Content source: docs/sale/06_DECK_CONTENT.md — every figure on these slides is
+  measured there, with the command that reproduces it. If you change a number
+  here, change it there too, and re-measure rather than adjusting by hand. The
+  documentation-volume figure in particular is NOT frozen by a commit pin,
+  because docs/ grows.
+
+  Deliberately absent: the personal phone number carried in the marketing site.
+  It is a real diligence item (does it transfer?) and belongs in the agreement,
+  not on a page that may be shared.
+-->
+<title>Aleefy Asset Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+  /* ── tokens: light is the base, both dark states redefine only these ────── */
+  :root{
+    --ink:        #0b1210;
+    --ink-2:      #33433d;
+    --ink-3:      #6d7f78;
+    --paper:      #f2f5f2;
+    --surface:    #ffffff;
+    --surface-2:  #e8eeea;
+    --rule:       #cfdad4;
+    --accent:     #0f7a53;
+    --accent-2:   #16a06e;
+    --amber:      #8a5d0d;
+    --amber-bg:   #f7ecd4;
+    --clay:       #a33a2f;
+    --clay-bg:    #f7e3e0;
+    --good-bg:    #dcefe4;
+    --shadow:     0 1px 2px rgba(11,18,16,.05), 0 18px 40px -28px rgba(11,18,16,.4);
+
+    --sans:   "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --mono:   "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --arabic: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:       #e6efe9;
+      --ink-2:     #a7b8b0;
+      --ink-3:     #74867e;
+      --paper:     #070c0a;
+      --surface:   #0e1714;
+      --surface-2: #16211d;
+      --rule:      #22302b;
+      --accent:    #38c48d;
+      --accent-2:  #4fdba2;
+      --amber:     #e0ae57;
+      --amber-bg:  #2a2113;
+      --clay:      #e28a7e;
+      --clay-bg:   #2b1815;
+      --good-bg:   #10291f;
+      --shadow:    0 1px 2px rgba(0,0,0,.5), 0 18px 40px -28px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#e6efe9; --ink-2:#a7b8b0; --ink-3:#74867e;
+    --paper:#070c0a; --surface:#0e1714; --surface-2:#16211d; --rule:#22302b;
+    --accent:#38c48d; --accent-2:#4fdba2;
+    --amber:#e0ae57; --amber-bg:#2a2113;
+    --clay:#e28a7e; --clay-bg:#2b1815; --good-bg:#10291f;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 18px 40px -28px rgba(0,0,0,.9);
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{animation:none!important;transition:none!important} }
+
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    scroll-snap-type:y proximity;
+  }
+
+  /* ── the rail: a real progress instrument, not decoration ──────────────── */
+  .rail{position:fixed; top:0; right:0; bottom:0; width:44px; z-index:50;
+        display:flex; flex-direction:column; align-items:center;
+        justify-content:center; gap:7px; pointer-events:none}
+  .rail a{pointer-events:auto; width:8px; height:8px; border-radius:50%;
+          background:var(--rule); transition:background .18s, transform .18s;
+          outline-offset:3px}
+  .rail a:hover, .rail a:focus-visible{background:var(--ink-3); transform:scale(1.4)}
+  .rail a.on{background:var(--accent-2); transform:scale(1.5)}
+  @media (max-width:820px){ .rail{display:none} }
+
+  .counter{position:fixed; left:20px; bottom:16px; z-index:50;
+           font-family:var(--mono); font-size:12px; color:var(--ink-3);
+           letter-spacing:.06em; font-variant-numeric:tabular-nums}
+
+  /* ── slides ────────────────────────────────────────────────────────────── */
+  .slide{min-height:100svh; scroll-snap-align:start; display:flex;
+         align-items:center; padding:64px 56px 64px 64px;
+         border-bottom:1px solid var(--rule)}
+  .slide > .inner{width:100%; max-width:1080px; margin:0 auto}
+  @media (max-width:820px){ .slide{padding:48px 22px; min-height:auto} }
+
+  .eyebrow{font-family:var(--mono); font-size:11.5px; letter-spacing:.16em;
+           text-transform:uppercase; color:var(--accent); font-weight:500;
+           display:flex; align-items:center; gap:10px; margin-bottom:22px}
+  .eyebrow::before{content:""; width:26px; height:1px; background:var(--accent)}
+
+  h1{font-size:clamp(34px,6.4vw,74px); line-height:1.02; margin:0 0 22px;
+     font-weight:700; letter-spacing:-.03em; text-wrap:balance}
+  h2{font-size:clamp(26px,3.9vw,46px); line-height:1.1; margin:0 0 18px;
+     font-weight:600; letter-spacing:-.02em; text-wrap:balance}
+  h3{font-size:17px; margin:0 0 10px; font-weight:600; letter-spacing:-.005em}
+  p{margin:0 0 16px; max-width:66ch; color:var(--ink-2)}
+  .lead{font-size:clamp(17px,2vw,21px); color:var(--ink-2); max-width:60ch}
+  strong{color:var(--ink); font-weight:600}
+  .ar{font-family:var(--arabic); direction:rtl; unicode-bidi:isolate}
+
+  /* the signature device: a number and the command that proves it */
+  .register{display:grid; gap:14px;
+            grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); margin-top:8px}
+  .metric{background:var(--surface); border:1px solid var(--rule); border-radius:3px;
+          padding:16px 18px; box-shadow:var(--shadow)}
+  .metric .n{font-size:clamp(28px,3.4vw,40px); font-weight:600; line-height:1;
+             letter-spacing:-.02em; font-variant-numeric:tabular-nums;
+             color:var(--ink)}
+  .metric .l{font-size:12.5px; color:var(--ink-2); margin-top:7px; line-height:1.4}
+  .metric .cmd{font-family:var(--mono); font-size:10.5px; color:var(--ink-3);
+               margin-top:10px; padding-top:9px; border-top:1px dashed var(--rule);
+               overflow-x:auto; white-space:nowrap}
+
+  .cols{display:grid; gap:32px; grid-template-columns:1fr 1fr; align-items:start}
+  @media (max-width:820px){ .cols{grid-template-columns:1fr; gap:22px} }
+
+  .card{background:var(--surface); border:1px solid var(--rule);
+        border-radius:3px; padding:20px 22px; box-shadow:var(--shadow)}
+  .card.flag{border-left:3px solid var(--amber)}
+  .card.absent{border-left:3px solid var(--clay)}
+  .card.good{border-left:3px solid var(--accent-2)}
+
+  pre{font-family:var(--mono); font-size:12.5px; line-height:1.65;
+      background:var(--surface-2); border:1px solid var(--rule); border-radius:3px;
+      padding:15px 17px; overflow-x:auto; margin:0 0 16px; color:var(--ink)}
+  code{font-family:var(--mono); font-size:.88em; background:var(--surface-2);
+       border:1px solid var(--rule); border-radius:2px; padding:1px 5px}
+  pre code{background:none; border:0; padding:0}
+
+  .scroller{overflow-x:auto; margin:0 0 16px}
+  table{width:100%; border-collapse:collapse; font-size:14px; min-width:520px}
+  th{text-align:left; font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+     color:var(--ink-3); font-weight:600; padding:9px 12px;
+     border-bottom:1.5px solid var(--rule)}
+  td{padding:10px 12px; border-bottom:1px solid var(--rule); vertical-align:top;
+     color:var(--ink-2)}
+  td.num{text-align:right; font-variant-numeric:tabular-nums; font-family:var(--mono);
+         color:var(--ink); white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+
+  ul{margin:0 0 16px; padding-left:20px; color:var(--ink-2); max-width:66ch}
+  li{margin:8px 0}
+  li::marker{color:var(--accent)}
+  ul.absent li::marker{color:var(--clay)}
+
+  .chip{display:inline-block; font-family:var(--mono); font-size:11px;
+        letter-spacing:.05em; padding:3px 9px; border-radius:2px;
+        background:var(--surface-2); color:var(--ink-2); border:1px solid var(--rule)}
+  .chip.no{background:var(--clay-bg); color:var(--clay); border-color:transparent}
+  .chip.yes{background:var(--good-bg); color:var(--accent); border-color:transparent}
+  .chip.warn{background:var(--amber-bg); color:var(--amber); border-color:transparent}
+
+  .arrow{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+         font-variant-numeric:tabular-nums}
+  .arrow .was{font-family:var(--mono); font-size:clamp(24px,3vw,34px);
+              color:var(--ink-3); text-decoration:line-through;
+              text-decoration-thickness:1.5px}
+  .arrow .to{font-family:var(--mono); font-size:clamp(34px,5vw,58px);
+             font-weight:600; color:var(--accent); letter-spacing:-.02em}
+  .arrow .sep{color:var(--ink-3); font-size:22px}
+
+  .foot{font-size:12.5px; color:var(--ink-3); margin-top:20px;
+        border-top:1px solid var(--rule); padding-top:12px; max-width:70ch}
+  .foot code{font-size:11.5px}
+</style>
+
+<nav class="rail" aria-label="Slides">
+  <a href="#s1"  class="on" aria-label="1. Title"></a>
+  <a href="#s2"  aria-label="2. What it is"></a>
+  <a href="#s3"  aria-label="3. The correction"></a>
+  <a href="#s4"  aria-label="4. The problem"></a>
+  <a href="#s5"  aria-label="5. The alternatives"></a>
+  <a href="#s6"  aria-label="6. Product tour"></a>
+  <a href="#s7"  aria-label="7. Arabic to paper"></a>
+  <a href="#s8"  aria-label="8. Breadth"></a>
+  <a href="#s9"  aria-label="9. One command per clinic"></a>
+  <a href="#s10" aria-label="10. Isolation"></a>
+  <a href="#s11" aria-label="11. The audit"></a>
+  <a href="#s12" aria-label="12. One story"></a>
+  <a href="#s13" aria-label="13. What is not there"></a>
+  <a href="#s14" aria-label="14. The market"></a>
+  <a href="#s15" aria-label="15. What transfers"></a>
+</nav>
+<div class="counter" id="counter">01 / 15</div>
+
+<!-- 1 ─────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s1">
+  <div class="inner">
+    <div class="eyebrow">Asset brief · veterinary clinic ERP · Cairo</div>
+    <h1>Aleefy <span class="ar" style="font-weight:600">أليفي</span></h1>
+    <p class="lead" style="font-size:clamp(19px,2.4vw,25px); color:var(--ink)">
+      A complete Arabic-first veterinary clinic ERP.
+      <strong>No customers. No revenue.</strong>
+      This deck exists to tell you exactly what that means, before you find it yourself.
+    </p>
+    <div class="register" style="margin-top:34px; max-width:820px">
+      <div class="metric"><div class="n">413</div><div class="l">routes across 34 blueprints</div></div>
+      <div class="metric"><div class="n">2,034</div><div class="l">automated tests, no external services</div></div>
+      <div class="metric"><div class="n">5,219</div><div class="l">bilingual UI strings, 176 of 179 templates</div></div>
+      <div class="metric"><div class="n">0</div><div class="l">paying clinics, to date</div></div>
+    </div>
+    <p class="foot">Every number in this deck ships with the command that reproduces it.
+      A buyer's engineer can re-run all of them in about ten minutes on a clean checkout.</p>
+  </div>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s2">
+  <div class="inner">
+    <div class="eyebrow">02 — What it is</div>
+    <h2>Twenty-eight functional modules, one install, both languages</h2>
+    <p class="lead">Clinical records, pharmacy, laboratory, inventory, invoicing, accounting,
+      HR, payroll, retail point-of-sale, grooming, boarding and telemedicine — installed on a
+      single clinic PC or a shared server with one command.</p>
+    <div class="register" style="margin-top:26px">
+      <div class="metric"><div class="n">413</div><div class="l">non-static URL rules; 195 accept POST</div>
+        <div class="cmd">app.url_map.iter_rules()</div></div>
+      <div class="metric"><div class="n">96</div><div class="l">database tables at full exercise (83 at first boot)</div>
+        <div class="cmd">fresh SQLite build</div></div>
+      <div class="metric"><div class="n">76,106</div><div class="l">lines of Python across 233 files</div>
+        <div class="cmd">find . -name "*.py" | xargs cat | wc -l</div></div>
+      <div class="metric"><div class="n">40,590</div><div class="l">lines of Jinja across 179 templates</div>
+        <div class="cmd">find templates -name "*.html"</div></div>
+      <div class="metric"><div class="n">14</div><div class="l">seeded roles, each with an Arabic label</div>
+        <div class="cmd">models/database._SEED_ROLES</div></div>
+      <div class="metric"><div class="n">63,796</div><div class="l">lines of documentation under docs/</div>
+        <div class="cmd">find docs -name "*.md"</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s3">
+  <div class="inner">
+    <div class="eyebrow">03 — The correction</div>
+    <h2>The summary you were sent understates this asset</h2>
+    <p class="lead">The executive summary was measured at commit <code>8979f72</code> on
+      28 July. Eighty-six commits have landed since. We are correcting our own numbers —
+      upward.</p>
+    <div class="cols" style="margin-top:26px">
+      <div class="card good">
+        <h3>Automated tests</h3>
+        <div class="arrow"><span class="was">573</span><span class="sep">→</span><span class="to">2,034</span></div>
+        <p style="margin:12px 0 0; font-size:14px">Collected on SQLite with no external
+          services. A further 56 PostgreSQL-only tests skip without a DSN.</p>
+      </div>
+      <div class="card good">
+        <h3>Routes</h3>
+        <div class="arrow"><span class="was">378</span><span class="sep">→</span><span class="to">413</span></div>
+        <p style="margin:12px 0 0; font-size:14px">The suite more than tripled while the
+          route count grew 9%. Features were not being added. Defects were being closed.</p>
+      </div>
+    </div>
+    <p class="foot">If a document's own numbers are stale, ask what else is. That is the
+      right question, and it is why this slide is third rather than absent.</p>
+  </div>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s4">
+  <div class="inner">
+    <div class="eyebrow">04 — The problem</div>
+    <h2>The incumbent is a paper notebook and a WhatsApp thread</h2>
+    <p class="lead">It works, right up to the week the clinic hires its second vet. Then
+      nobody knows which animal was seen, what was dispensed from the shelf, or who is owed
+      what.</p>
+    <div class="cols" style="margin-top:22px">
+      <div class="card">
+        <h3>What breaks first</h3>
+        <ul>
+          <li>Two people writing in one notebook</li>
+          <li>Stock counted by looking at the shelf</li>
+          <li>Vaccine reminders remembered, not scheduled</li>
+          <li>The month's takings reconstructed from memory</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Why software has not replaced it</h3>
+        <ul>
+          <li>Priced in dollars, for practices ten times the size</li>
+          <li>English-only interfaces, in an Arabic-speaking clinic</li>
+          <li>Arabic that breaks the moment it is printed</li>
+          <li>Modules sold separately: the shop, the salon, the payroll</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s5">
+  <div class="inner">
+    <div class="eyebrow">05 — The alternatives</div>
+    <h2>EGP 13,000–27,800 a month, and none of them speaks Arabic</h2>
+    <p class="lead">That is the run-rate an Egyptian clinic faces from the international
+      incumbents, before anyone has translated a single screen.</p>
+    <div class="scroller" style="margin-top:22px">
+      <table>
+        <thead><tr><th>What a clinic needs</th><th>International vet software</th><th>Aleefy</th></tr></thead>
+        <tbody>
+          <tr><td>Arabic interface, right-to-left</td><td><span class="chip no">rare</span></td><td><span class="chip yes">5,219 strings</span></td></tr>
+          <tr><td>Arabic on a printed invoice</td><td><span class="chip no">breaks</span></td><td><span class="chip yes">shaped correctly</span></td></tr>
+          <tr><td>Retail shop and grooming in the same system</td><td><span class="chip no">separate products</span></td><td><span class="chip yes">included</span></td></tr>
+          <tr><td>Payroll and attendance</td><td><span class="chip no">separate products</span></td><td><span class="chip yes">included</span></td></tr>
+          <tr><td>Priced for an Egyptian consultation fee</td><td><span class="chip no">USD pricing</span></td><td><span class="chip yes">source-owned</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s6">
+  <div class="inner">
+    <div class="eyebrow">06 — Product</div>
+    <h2>Thirty-four modules on the launcher</h2>
+    <p class="lead">Thirty-two active, one in beta, one planned — each with an Arabic name
+      the clinic actually sees.</p>
+    <div class="cols" style="margin-top:22px; grid-template-columns:1fr 1fr 1fr">
+      <div class="card">
+        <h3>Clinical</h3>
+        <ul style="font-size:14px">
+          <li>Visits &amp; the one-screen exam</li>
+          <li>Patients &amp; owners <span class="ar">العملاء</span></li>
+          <li>Appointments <span class="ar">المواعيد</span></li>
+          <li>Pharmacy <span class="ar">الصيدلية</span></li>
+          <li>Laboratory &amp; imaging</li>
+          <li>Telemedicine</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Commercial</h3>
+        <ul style="font-size:14px">
+          <li>Invoicing &amp; payments <span class="ar">الفواتير</span></li>
+          <li>Accounting &amp; expenses</li>
+          <li>Inventory <span class="ar">المخزون</span></li>
+          <li>Procurement <span class="ar">المشتريات</span></li>
+          <li>Pet shop point-of-sale</li>
+          <li>Grooming &amp; boarding</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Back office</h3>
+        <ul style="font-size:14px">
+          <li>HR &amp; staff files</li>
+          <li>Attendance <span class="ar">الحضور</span></li>
+          <li>Payroll <span class="ar">الرواتب</span></li>
+          <li>WhatsApp centre</li>
+          <li>Roles &amp; permissions</li>
+          <li>Backup &amp; multi-clinic</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s7">
+  <div class="inner">
+    <div class="eyebrow">07 — Differentiator</div>
+    <h2>Arabic all the way to paper</h2>
+    <p class="lead">Four things must be right for Arabic to survive onto a printed invoice.
+      All four are — including the one almost nobody finds.</p>
+    <div class="cols" style="margin-top:22px">
+      <div class="card good">
+        <h3>The three most people get</h3>
+        <ul style="font-size:14.5px">
+          <li>A translated interface — 5,219 <code>t(en, ar)</code> pairs</li>
+          <li>Right-to-left layout that mirrors, not just aligns</li>
+          <li>A font in the PDF that contains Arabic glyphs at all</li>
+        </ul>
+      </div>
+      <div class="card good">
+        <h3>The fourth</h3>
+        <p style="font-size:14.5px">Arabic letters change shape by position, and joining is
+          done by the <em>font's</em> ligature tables. A font missing one ligature prints a
+          word that is legible-but-wrong to a clinic and invisible to the developer who
+          cannot read it.</p>
+        <p style="font-size:14.5px; margin-bottom:0">That class of bug was found and fixed
+          at the level of a specific font's missing ligature. A translation project does not
+          reach this.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s8">
+  <div class="inner">
+    <div class="eyebrow">08 — Differentiator</div>
+    <h2>Breadth is the moat, not any single module</h2>
+    <p class="lead">No competitor identified in our own market research covers grooming
+      <em>and</em> boarding <em>and</em> payroll <em>and</em> retail in one system.</p>
+    <p>A clinic that grooms, boards, sells food and employs six people is running four
+      products and reconciling them by hand. This is one database, one login, one set of
+      numbers — and the retail till posts into the same ledger as the consultation.</p>
+    <div class="card" style="margin-top:14px">
+      <h3>The honest version of this claim</h3>
+      <p style="margin-bottom:0; font-size:14.5px">Competitors have things this does not:
+        lab-machine integrations and a pet-owner mobile app, among others. The buyer for
+        this asset wants the breadth and the source — not to win a feature comparison.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s9">
+  <div class="inner">
+    <div class="eyebrow">09 — Differentiator</div>
+    <h2>One command per clinic</h2>
+    <pre><code>python scripts/add_clinic.py --slug nilevet --name "Nile Vet Clinic"</code></pre>
+    <p class="lead">That provisions a clinic: its own database, its own schema, its own first
+      administrator, reachable on its own subdomain.</p>
+    <p>For a software house acquiring this, onboarding cost is the number that decides
+      whether a vertical product is a business or a consultancy. This one is a command and a
+      DNS record.</p>
+  </div>
+</section>
+
+<!-- 10 ────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s10">
+  <div class="inner">
+    <div class="eyebrow">10 — Differentiator</div>
+    <h2>Isolation is physical, not a <code>WHERE</code> clause</h2>
+    <p class="lead">Every clinic gets its own database. Not a shared table with a tenant
+      column — a separate database, resolved by subdomain before the first query runs.</p>
+    <div class="cols" style="margin-top:20px">
+      <div class="card absent">
+        <h3>Shared-table multi-tenancy</h3>
+        <p style="font-size:14.5px; margin-bottom:0">One forgotten <code>WHERE tenant_id = ?</code>
+          in any one of hundreds of queries shows one clinic another clinic's medical records.
+          The bug is invisible until it is a breach.</p>
+      </div>
+      <div class="card good">
+        <h3>Database per clinic</h3>
+        <p style="font-size:14.5px; margin-bottom:0">A missing <code>WHERE</code> cannot cross
+          a database boundary. The isolation does not depend on every query being written
+          correctly forever.</p>
+      </div>
+    </div>
+    <p class="foot">A session also carries the clinic it was issued for, so a cookie minted at
+      one clinic is refused at another.</p>
+  </div>
+</section>
+
+<!-- 11 ────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s11">
+  <div class="inner">
+    <div class="eyebrow">11 — Proof of rigour</div>
+    <h2>A 334-item defect register, opened deliberately</h2>
+    <p class="lead">The codebase was audited against itself. The register is handed over in
+      full — including the findings that turned out to be wrong.</p>
+    <div class="register" style="margin-top:24px">
+      <div class="metric"><div class="n">334</div><div class="l">findings recorded</div></div>
+      <div class="metric"><div class="n">63</div><div class="l">rated blocker</div></div>
+      <div class="metric"><div class="n">~60</div><div class="l">blockers closed, each pinned by a test</div></div>
+      <div class="metric"><div class="n">7</div><div class="l">modules swept: finance, system, attendance, HR, WhatsApp, pet shop, AI</div></div>
+    </div>
+    <p style="margin-top:20px">Each fix carries a test that fails if the defect returns.
+      Several of those tests replaced earlier ones that had asserted the <em>bug</em> as
+      expected behaviour — which is the failure mode a test suite cannot catch on its own.</p>
+    <p class="foot">The register opens by telling the reader to expect some of it to be
+      wrong. Roughly a third of the findings were already fixed by the time they were
+      re-checked.</p>
+  </div>
+</section>
+
+<!-- 12 ────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s12">
+  <div class="inner">
+    <div class="eyebrow">12 — Proof of rigour, in one story</div>
+    <h2>A reports page showed 334,070 EGP of real sales as zero</h2>
+    <p class="lead">The pet shop had 172 completed orders on the books. Every report read
+      <strong>zero</strong>.</p>
+    <pre><code>-- every aggregate filtered on one spelling of the status
+WHERE status = 'paid'
+
+-- every order in the database carried
+status = 'completed'</code></pre>
+    <p>The sale-creation code wrote <code>'paid'</code>. The live data said
+      <code>'completed'</code>. So whichever spelling a row happened to have, an entire set
+      was invisible — and the page looked like it was working, because it rendered a number.</p>
+    <div class="card good" style="margin-top:6px">
+      <p style="margin:0; font-size:14.5px">Seven filters now count every order that is not
+        cancelled or refunded. <strong>0.00 EGP → 334,070.00 EGP</strong>, verified against
+        the live database.</p>
+    </div>
+    <p class="foot">This is the slide to rehearse. It is the only one where a non-technical
+      buyer feels the value of the engineering rather than being told about it.</p>
+  </div>
+</section>
+
+<!-- 13 ────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s13">
+  <div class="inner">
+    <div class="eyebrow">13 — What is not there</div>
+    <h2>Stated first, because diligence finds all of it anyway</h2>
+    <p class="lead">The discovery costs more than the disclosure. None of the following is
+      softened.</p>
+    <div class="cols" style="margin-top:20px">
+      <div class="card absent">
+        <h3>Commercial</h3>
+        <ul class="absent" style="font-size:14.5px">
+          <li><strong>Zero customers, zero revenue</strong>, no operating history</li>
+          <li>No reference customer, testimonial or site visit to offer</li>
+          <li>No support contract, SLA or ticket history</li>
+          <li>No trademark registration for the name</li>
+          <li>No e-invoicing accreditation with the Egyptian Tax Authority</li>
+          <li>One demo clinic, and its data is synthetic</li>
+        </ul>
+      </div>
+      <div class="card absent">
+        <h3>Product</h3>
+        <ul class="absent" style="font-size:14.5px">
+          <li><strong>WhatsApp has never been sent end to end.</strong> The transport is
+            real and unified; no message has provably reached a phone from this code</li>
+          <li>Online card payments are unverified</li>
+          <li>No client portal or online booking</li>
+          <li>34 money columns are floats; the migration is written and deliberately
+            unapplied</li>
+          <li>The PostgreSQL CI job is non-blocking — one hardcoded database name</li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot">A credential reached the git history. It cannot be removed from history,
+      only rotated — it has been, a test now blocks a new one from being committed, and it is
+      disclosed here rather than left to be found.</p>
+  </div>
+</section>
+
+<!-- 14 ────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s14">
+  <div class="inner">
+    <div class="eyebrow">14 — The market, honestly</div>
+    <h2>Egypt is the proof, not the business</h2>
+    <div class="register" style="margin-top:22px; max-width:760px">
+      <div class="metric"><div class="n">~$25k</div><div class="l">central three-year Egyptian ARR, from our own sizing</div></div>
+      <div class="metric"><div class="n">2–9×</div><div class="l">pricing achievable in neighbouring MENA markets</div></div>
+    </div>
+    <p style="margin-top:22px">Anyone valuing this on Egyptian ARR alone should not buy it.
+      The asset is a finished, Arabic-complete vertical product that a MENA software house can
+      monetise across several markets — where a consultation fee is two to nine times the
+      Egyptian one, and the localisation work is already done.</p>
+    <p class="foot">Jordan, Iraq and Lebanon run on the existing Arabic/English build
+      unchanged. Morocco, Algeria and Tunisia would need French — the vets there are trained
+      French-medium. That is in our research, not discovered by a buyer afterwards.</p>
+  </div>
+</section>
+
+<!-- 15 ────────────────────────────────────────────────────────────────────── -->
+<section class="slide" id="s15" style="border-bottom:0">
+  <div class="inner">
+    <div class="eyebrow">15 — What transfers</div>
+    <h2>The software, the localisation, the documentation, the brand</h2>
+    <div class="scroller" style="margin-top:20px">
+      <table>
+        <thead><tr><th>Asset</th><th style="text-align:right">Measure</th></tr></thead>
+        <tbody>
+          <tr><td>Application source, 34 blueprints</td><td class="num">76,106 lines</td></tr>
+          <tr><td>Jinja templates</td><td class="num">40,590 lines</td></tr>
+          <tr><td>Automated tests, CI on every push</td><td class="num">2,034</td></tr>
+          <tr><td>Arabic localisation</td><td class="num">5,219 pairs</td></tr>
+          <tr><td>Documentation — manual, workflow book, guide</td><td class="num">63,796 lines</td></tr>
+          <tr><td>Defect register, handed over in full</td><td class="num">334 findings</td></tr>
+          <tr><td>Database migrations with a verified baseline</td><td class="num">Alembic</td></tr>
+          <tr><td>Brand and unregistered common-law mark</td><td class="num">Aleefy <span class="ar">أليفي</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="foot">No GPL or AGPL dependencies. Three LGPL. Fonts are OFL, commercial use
+      permitted. One author — budget a week of overlap and say so.</p>
+  </div>
+</section>
+
+<script>
+  (function () {
+    var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+    var dots   = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+    var counter = document.getElementById('counter');
+    var current = 0;
+
+    function pad(n){ return (n < 10 ? '0' : '') + n; }
+
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          var i = slides.indexOf(e.target);
+          if (i < 0) return;
+          current = i;
+          dots.forEach(function (d, j) { d.classList.toggle('on', j === i); });
+          counter.textContent = pad(i + 1) + ' / ' + pad(slides.length);
+        });
+      }, { threshold: 0.5 });
+      slides.forEach(function (s) { io.observe(s); });
+    }
+
+    // Arrow keys, so it presents like a deck rather than a web page.
+    document.addEventListener('keydown', function (e) {
+      var next = null;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown') next = current + 1;
+      if (e.key === 'ArrowUp'   || e.key === 'ArrowLeft'  || e.key === 'PageUp')   next = current - 1;
+      if (e.key === 'Home') next = 0;
+      if (e.key === 'End')  next = slides.length - 1;
+      if (next === null || next < 0 || next >= slides.length) return;
+      e.preventDefault();
+      slides[next].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  })();
+</script>
