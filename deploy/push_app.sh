@@ -8,7 +8,14 @@
 #
 #   curl -H "Authorization: Bearer $API_V1_KEY" https://demo.aleefy.online/healthz
 #
+# A full deploy also REMOVES server files that are no longer in git. It did not
+# used to, and untarring over the top meant anything deleted from the repo lived
+# on in production for ever: a removed template, a retired debug route, a file
+# with a credential in it. Deleting it from git did not delete it from the box.
+# Found when a renamed manifest kept serving 200 after a clean redeploy.
+#
 # Usage:  deploy/push_app.sh [file ...]     (no args = the whole app tree)
+#         ALEEFY_NO_PRUNE=1 deploy/push_app.sh      (deploy, remove nothing)
 set -euo pipefail
 
 HOST="${ALEEFY_HOST:-ubuntu@63.186.196.107}"
@@ -37,21 +44,76 @@ if [ "$DIRTY" != "0" ]; then
 fi
 
 FILES=("$@")
+FULL=0
 if [ ${#FILES[@]} -eq 0 ]; then
   mapfile -t FILES < <(git ls-files -- . ':!:tests' ':!:docs')
+  FULL=1
 fi
 echo "deploying ${#FILES[@]} file(s) at $SHORT"
+
+# Pruning is only ever safe on a FULL deploy. On a partial one the manifest is
+# whatever files were named on the command line, so "delete everything not in
+# the manifest" would delete the entire application.
+PRUNE=$FULL
+[ "${ALEEFY_NO_PRUNE:-0}" = "1" ] && PRUNE=0
 
 # Stage under /tmp first: the ubuntu login cannot write $APP, which is aleefy's.
 "${SSH[@]}" "$HOST" "rm -rf /tmp/deploy && mkdir -p /tmp/deploy"
 tar -czf - "${FILES[@]}" | "${SSH[@]}" "$HOST" "tar -xzf - -C /tmp/deploy"
 
+# The list of what SHOULD exist, for the prune step to compare against.
+printf '%s
+' "${FILES[@]}" | "${SSH[@]}" "$HOST" "cat > /tmp/deploy-manifest.txt"
+
 "${SSH[@]}" "$HOST" "sudo bash -s" <<REMOTE
 set -euo pipefail
+PRUNE=$PRUNE
 cd /tmp/deploy
 find . -type f -print0 | while IFS= read -r -d '' f; do
   install -D -o aleefy -g aleefy -m 644 "\$f" "$APP/\${f#./}"
 done
+
+if [ "$PRUNE" = "1" ]; then
+  cd "$APP"
+  # NEVER prune these. Each line is something the server owns and git does not:
+  #
+  #   data/        the clinic's database and its backups. Deleting this is the
+  #                worst thing this script could possibly do.
+  #   logs/        written by the running service
+  #   __pycache__  regenerated on import; deleting it churns for no gain
+  #   *.bak*       somebody kept that on purpose. Report it, do not remove it.
+  #   .git         not deployed, but if it ever appears, leave it alone
+  #
+  # The list is deliberately conservative. A file that should have gone and did
+  # not is untidy; a file that should have stayed and went can end a clinic.
+  KEEP='^(data|logs)/|(^|/)__pycache__/|\.pyc|\.bak|(^|/)\.git/'
+
+  find . -type f -printf '%P\n' | sort > /tmp/server-files.txt
+  # grep exits 1 when nothing matches, which here means "nothing to prune" -
+  # the clean case, and set -e would abort the deploy on success.
+  grep -Fxv -f /tmp/deploy-manifest.txt /tmp/server-files.txt > /tmp/extra.txt || true
+  grep -Ev "\$KEEP" /tmp/extra.txt > /tmp/prune.txt || true
+
+  N=\$(wc -l < /tmp/prune.txt | tr -d ' ')
+  if [ "\$N" != "0" ]; then
+    echo "removing \$N file(s) no longer in git:"
+    sed 's/^/  - /' /tmp/prune.txt
+    # -- so a filename that begins with a dash is not read as an option.
+    while IFS= read -r f; do [ -n "\$f" ] && rm -f -- "$APP/\$f"; done < /tmp/prune.txt
+    # Directories left empty by the above, but never the protected ones.
+    find . -mindepth 1 -type d -empty          -not -path './data*' -not -path './logs*' -not -path './.git*'          -delete 2>/dev/null || true
+  else
+    echo "nothing to prune"
+  fi
+
+  # An explicit if, not `[ ] && echo`: that form returns non-zero when the test
+  # fails, and under set -e it would abort the deploy AFTER pruning but BEFORE
+  # the service restart if anything ever moved it to the end of the block.
+  KEPT=\$(grep -Ec "\$KEEP" /tmp/extra.txt || true)
+  if [ "\$KEPT" != "0" ]; then
+    echo "left \$KEPT protected file(s) alone (data, logs, backups)"
+  fi
+fi
 
 # The stamp. config.py:_git_commit() prefers GIT_COMMIT over reading .git,
 # which is exactly the deployed case: there is no .git here.
