@@ -1,6 +1,6 @@
 # Sale pack — how these documents fit together
 
-Six documents. They are written to be read in different orders by different
+Seven documents. They are written to be read in different orders by different
 people, so start with the row that describes you.
 
 | If you are… | Read, in this order |
@@ -22,6 +22,7 @@ people, so start with the row that describes you.
 | **03** | `BUYER_SHORTLIST.md` | Named targets with real contact routes, what to lead with per category, disclosure sequencing. | Seller only — never send this |
 | **04** | `HANDOVER.md` | Day-one commands, architecture, and the traps that will break a new developer. | Buyer's engineer |
 | **05** | `ASSET_INVENTORY.md` | Exactly what transfers, what does not, and known encumbrances. | Buyer's lawyer and engineer |
+| **06** | `DECK_CONTENT.md` | Raw material for an acquirer presentation: every headline number re-measured, the four proof-of-rigour stories, the gaps, and a slide-by-slide skeleton. **Corrects `00`'s stale figures.** | Seller, building the deck |
 
 **`03_BUYER_SHORTLIST` is internal.** It names competitors as targets and
 discusses what to withhold from them. Sending it to a buyer would be an

@@ -766,38 +766,53 @@ weight; this dossier only certifies their absence.
 
 ---
 
-## 3.8 Two WhatsApp clients that cannot both be correct
+## 3.8 The two WhatsApp clients — FIXED 13 Aug 2026
 
-**Severity: high — WhatsApp reminders are a headline feature.**
+**Status: closed.** This section described a live high-severity defect when the
+dossier was written on 28 July. It was fixed on 13 August and is left here,
+corrected, because a buyer who read the original deserves to know what happened
+to it rather than finding the entry silently deleted.
 
-| | Host | Path | Auth header |
-|---|---|---|---|
-| `blueprints/whatsapp/wapilot.py:11, :24` — drives the 58-route UI | `api.wapilot.**net**` | `/api/v2` | `token: <key>` |
-| `blueprints/whatsapp/scheduler.py:40, :42` — the daily 09:00 job | `api.wapilot.**io**` | `/send` | `Authorization: Bearer` |
+**What it was.** Two different transports. Every manual send button used
+`blueprints/whatsapp/wapilot.py` — `api.wapilot.net`, `/api/v2/{instance}/send-message`,
+a `token` header, body `{chat_id, text}`. The nightly 09:00 job used its own
+hand-rolled `urllib.request` call to `api.wapilot.io/send` with a Bearer header and
+body `{phone, message}`, reading `$WAPILOT_TOKEN` from the environment and ignoring
+the token and instance id the Settings screen saves. So a clinic that connected
+WhatsApp the only documented way — scan the QR, save the token in the UI — got a
+working Send Centre and a nightly job that logged `"Not Configured"` for every
+reminder. There was no configuration under which a scheduled reminder was
+deliverable.
 
-Different domain, different TLD, different path, different authentication scheme, and
-the scheduler uses raw `urllib.request` rather than the client module. One of these is
-dead. The scheduler is the one customers depend on, and it is the one not shared with
-the tested UI path. **Which one is correct is not verified** — it requires a live
-Wapilot account.
+**What changed.** `blueprints/whatsapp/scheduler.py` now builds a `WapilotClient`
+from the same settings the UI reads (`_make_sender`, scheduler.py:112-124) and sends
+through it (scheduler.py:149). One transport, one set of credentials. It also
+resolves the client ONCE per run and abandons the run after five consecutive
+failures: one send against an unreachable host was measured at 535 seconds, so an
+unbounded run over 200 clients would have held the scheduler thread for most of a
+day.
 
-The related defect *has* been fixed: the scheduler no longer writes `status = "Sent"`
-when `WAPILOT_TOKEN` is unset. It now writes `"Not Configured"` with an explanatory
-error (`blueprints/whatsapp/scheduler.py:50-62`). Before that fix, an unconfigured
-clinic saw a green column of delivered reminders that had never been sent.
+The surviving mention of `api.wapilot.io` in that file is a past-tense comment
+(scheduler.py:98-100) recording the bug that was removed.
 
-The whatsapp blueprint is 58 routes — **15% of the entire route surface — with zero
-test coverage** (§2.2).
+**Verified by test**, not by inspection:
+`tests/test_whatsapp_reminders_work.py::test_the_nightly_job_and_the_send_screen_use_one_transport`
+asserts the convergence, and a companion test asserts the run gives up on a dead
+connection rather than burning the night. The test that previously guarded this
+finding asserted the OPPOSITE — that the two paths disagreed — and was written to
+start failing on the day it was fixed. That is what happened.
 
-**Effort: 2 days.** Half a day to determine which endpoint is live and delete the
-other; one day to route the scheduler through the tested client module; half a day for
-a contract test against a recorded response.
+**Still not verified, and still a real commercial risk:** whether the transport
+actually delivers. The demo has never had a Wapilot instance connected
+(`settings` holds no `wapilot_token`), so nothing has been sent end to end. The
+code path is correct and tested; the round trip to a live account is not proven.
+A buyer should ask for a live send before the feature appears on any price list.
 
-**Additional risk, not a defect:** Wapilot is an unofficial WhatsApp automation
-gateway. WhatsApp bans numbers used this way, without warning and without appeal. A
-customer's headline feature can disappear overnight through no fault of the software.
-**Not verified** whether Wapilot fronts the official WhatsApp Business Cloud API.
-This should be established before the feature appears on any price list.
+**Additional risk, unchanged:** Wapilot is an unofficial WhatsApp automation
+gateway. WhatsApp bans numbers used this way, without warning and without appeal.
+A customer's headline feature can disappear overnight through no fault of the
+software. **Not verified** whether Wapilot fronts the official WhatsApp Business
+Cloud API.
 
 ---
 
