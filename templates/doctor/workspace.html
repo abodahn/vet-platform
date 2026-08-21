@@ -55,7 +55,7 @@
       <tbody>
         {% for a in todays_appointments %}
         <tr>
-          <td style="white-space:nowrap;font-weight:600">{{ (a.appointment_date or '')[-8:-3] }}</td>
+          <td style="white-space:nowrap;font-weight:600">{{ (a.appt_start or '')[:5] }}</td>
           <td>
             <strong>
               {% if a.pet_id %}<a href="{{ url_for('crm.pet_detail', pet_id=a.pet_id) }}">{{ a.pet_name }}</a>

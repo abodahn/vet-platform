@@ -74,6 +74,13 @@
                 color:{{ '#166534' if pct >= 0 else '#991b1b' }}">
       {{ '▲' if pct >= 0 else '▼' }} {{ pct|abs }}% vs prev period
     </div>
+  {% else %}
+    {# The previous period earned nothing, so a percentage change from it is
+       undefined. Rendering nothing put a blank line under a green figure,
+       which a manager reads as "unchanged" — a claim we cannot make. #}
+    <div style="font-size:11px;font-weight:600;margin-top:4px;color:var(--cl-muted)">
+      — no comparable prev period
+    </div>
   {% endif %}
 {% endmacro %}
 

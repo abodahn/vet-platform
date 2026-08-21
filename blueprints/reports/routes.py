@@ -271,15 +271,30 @@ def doctor_revenue():
 @login_required
 def financial_compare():
     """Period-over-period comparison for financial report."""
-    date_to   = request.args.get("date_to",   date.today().isoformat())
-    date_from = request.args.get("date_from", (date.today() - timedelta(days=29)).isoformat())
-    # Previous period of same length
-    from datetime import datetime
-    d1 = datetime.fromisoformat(date_from)
-    d2 = datetime.fromisoformat(date_to)
-    delta = (d2 - d1).days
+    today = date.today()
+
+    def _day(value, fallback):
+        # Clearing the From box on the financial report and then following
+        # "Compare Periods" handed this an empty string, and fromisoformat()
+        # raised straight out of the view: a 500 two clicks from a report.
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            return fallback
+
+    d2 = _day(request.args.get("date_to", ""), today)
+    d1 = _day(request.args.get("date_from", ""), today - timedelta(days=29))
+    date_to, date_from = d2.isoformat(), d1.isoformat()
+
+    # Previous period of the same length, ending the day before this one.
+    # date, not datetime: these strings are compared against issue_date
+    # ('YYYY-MM-DD') and printed in the page header. A datetime stringifies to
+    # '...T00:00:00', which sorts AFTER every invoice raised on that date, so
+    # the previous period silently dropped its own first day — the comparison
+    # was against one day less revenue than it claimed.
+    span = max((d2 - d1).days + 1, 1)
     prev_to   = (d1 - timedelta(days=1)).isoformat()
-    prev_from = (d1 - timedelta(days=delta+1)).isoformat()
+    prev_from = (d1 - timedelta(days=span)).isoformat()
 
     curr = db.get_finance_summary(date_from, date_to)
     prev = db.get_finance_summary(prev_from, prev_to)
@@ -298,7 +313,7 @@ def financial_compare():
     invoices_change = _pct_change(curr.get("invoice_count", 0), prev.get("invoice_count", 0))
     paid_change     = _pct_change(curr.get("invoiced", 0),      prev.get("invoiced", 0))
 
-    revenue_by_day = db.get_revenue_by_day(delta + 1 if delta < 90 else 30)
+    revenue_by_day = db.get_revenue_by_day(span if span <= 90 else 30)
 
     conn = db.get_db()
     row = conn.execute(

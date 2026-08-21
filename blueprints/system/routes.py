@@ -7,11 +7,13 @@ import sys
 import glob
 import platform as _platform
 from datetime import date, datetime, timedelta
+from functools import wraps
 from flask import (render_template, request, redirect, url_for, session, flash,
                    current_app, jsonify, send_file, abort)
 from . import system_bp
 from blueprints.auth.routes import (login_required, role_required,
-                                    clear_permission_cache)
+                                    clear_permission_cache, has_permission,
+                                    _role_permissions)
 from blueprints.settings.routes import LogoError, encode_logo
 import models.database as db
 import models.audit as audit
@@ -230,9 +232,49 @@ def _get_flask_version():
 
 AUDIT_PAGE_SIZE = 50
 
+# The Audit Log is the one screen in this blueprint that is not system
+# administration, and `auditor` is the read-only role that exists to read it.
+#
+# @role_required named auditor here and the page refused it anyway, because the
+# module gate inside login_required keys EVERY /system route on the single
+# `system` permission. auditor holds `audit` and must not hold `system`, so the
+# route advertised an access it always denied, with no way to grant it from the
+# Roles screen. The gate was wrong, not the role list: `audit` is a real key in
+# db.ALL_PERMISSIONS with its own checkbox, and this is the only route it
+# governs — so ask that question instead. The session check is repeated from
+# login_required rather than reused, because reusing login_required is what
+# drags the wrong module gate back in with it.
+#
+# The roles below are a FALLBACK for a role with no permission data at all —
+# same rule as auth.routes.permission_required, and for the same reason: an
+# upgrade must not lock a clinic out of its own audit trail. Where grant data
+# exists it wins, so unticking Audit Log on the Roles screen closes this page.
+#
+# ponytail: route-local, because exactly one route is governed by `audit`. The
+# platform fix is a per-view permission key honoured by _permission_denied()
+# in blueprints/auth/routes.py, which would retire this and known limit #5.
+_AUDIT_FALLBACK_ROLES = ("super_admin", "clinic_owner", "support_admin", "auditor")
+
+
+def _audit_access(f):
+    @wraps(f)
+    def gate(*args, **kwargs):
+        if not session.get("user"):
+            flash("Please log in to continue.", "warning")
+            return redirect(url_for("auth.login", next=request.path))
+        role = session["user"].get("role", "")
+        granted = _role_permissions(role)
+        allowed = (role in _AUDIT_FALLBACK_ROLES if granted is None
+                   else has_permission("audit", role))
+        if not allowed:
+            flash("You don't have permission to access this page.", "danger")
+            return redirect(url_for("launcher.index"))
+        return f(*args, **kwargs)
+    return gate
+
 
 @system_bp.route("/audit")
-@role_required("super_admin", "clinic_owner", "support_admin", "auditor")
+@_audit_access
 def audit_log():
     """Filtered, paginated view of the live `audit_log` table.
 

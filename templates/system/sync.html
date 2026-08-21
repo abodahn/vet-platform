@@ -199,13 +199,13 @@
         <div class="conflict-actions">
           <form method="post" action="{{ url_for('system.sync_resolve_conflict', conflict_id=c.id) }}"
                 onsubmit="return confirm('Keep LOCAL version? This overwrites server data.')" style="display:inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="keep" value="local">
             <button class="btn-keep-local">{{ t('Keep Local', 'الاحتفاظ بالمحلية') }}</button>
           </form>
           <form method="post" action="{{ url_for('system.sync_resolve_conflict', conflict_id=c.id) }}"
                 onsubmit="return confirm('Keep SERVER version? Device change will be discarded.')" style="display:inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="keep" value="server">
             <button class="btn-keep-server">{{ t('Keep Server', 'الاحتفاظ بالخادم') }}</button>
           </form>

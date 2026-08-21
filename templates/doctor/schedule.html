@@ -35,7 +35,7 @@
       {% for a in day_appts %}
       <div style="background:#fff;border:1px solid var(--pf-border);border-radius:6px;padding:.4rem .6rem;margin-bottom:.4rem;font-size:.78rem;border-left:3px solid
         {% if a.status == 'Completed' %}#10b981{% elif a.status == 'In Progress' %}#3b82f6{% elif a.status == 'Cancelled' %}#ef4444{% else %}#f59e0b{% endif %}">
-        <div style="font-weight:600">{{ (a.appointment_date or '')[-8:-3] }}</div>
+        <div style="font-weight:600">{{ (a.appt_start or '')[:5] }}</div>
         <div style="color:var(--pf-text)">{{ a.pet_name }}</div>
         <div style="color:var(--pf-muted)">{{ a.owner_name }}</div>
         <div style="color:var(--pf-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">{{ a.reason or '' }}</div>

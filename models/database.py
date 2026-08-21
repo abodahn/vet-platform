@@ -1113,8 +1113,8 @@ CREATE TABLE IF NOT EXISTS clinic (
     name_ar     TEXT DEFAULT 'اليفي',
     phone       TEXT, email TEXT, address TEXT, address_ar TEXT,
     website     TEXT, tax_number TEXT, license_number TEXT,
-    doctor_name TEXT DEFAULT 'Lead Veterinarian',
-    tagline     TEXT DEFAULT 'Happy Pets, Healthy Lives',
+    doctor_name TEXT,
+    tagline     TEXT,
     logo_data   TEXT,
     -- Instapay: the clinic's own payment handle and QR. Stored in the clinic
     -- ROW, not on disk, for the same reason as the logo -- models/backup.py
@@ -2821,7 +2821,10 @@ def _verify_and_migrate(row, password: str, conn) -> bool:
                          (new_hash, row["id"]))
             conn.commit()
         except Exception:
-            pass
+            # The sign-in itself has already succeeded and must not be undone
+            # by a failed upgrade - but a rehash that silently never lands
+            # means legacy SHA-256 hashes live for ever with nobody informed.
+            logger.exception("could not upgrade a legacy password hash")
         return True
     return False
 
@@ -2964,15 +2967,28 @@ def set_setting(key: str, value: str, category: str = "general", updated_by: str
 # ── AUDIT ──────────────────────────────────────────────────────
 def log_audit(username="", role="", action="", module="",
               entity_type="", entity_id="", details="", ip="", user_agent=""):
+    """Record one audit row. Never raises — an audit failure must not roll back
+    the operation being audited — but never fails silently either: an audit log
+    everyone believes in that quietly stopped recording is worse than none.
+
+    The INSERT runs on its own connection, so a failure here cannot abort the
+    caller's PostgreSQL transaction.
+    """
     try:
         conn = get_db()
-        with conn:
-            conn.execute(
-                "INSERT INTO audit_log(username,role,action,module,entity_type,entity_id,details,ip,user_agent) VALUES(?,?,?,?,?,?,?,?,?)",
-                (username,role,action,module,entity_type,entity_id,details,ip,user_agent))
-        conn.close()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO audit_log(username,role,action,module,entity_type,entity_id,details,ip,user_agent) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (username,role,action,module,entity_type,entity_id,details,ip,user_agent))
+        finally:
+            # `with conn:` commits/rolls back but does not close on sqlite3.
+            conn.close()
     except Exception:
-        pass
+        logger.error("audit log write FAILED — action=%r module=%r user=%r "
+                     "entity=%r/%r was not recorded",
+                     action, module, username, entity_type, entity_id,
+                     exc_info=True)
 
 def get_audit_log(limit: int = 200) -> list:
     conn = get_db()
@@ -4143,7 +4159,11 @@ def create_notification(recipient_id: int, title: str, body: str = "",
                 (recipient_id, recipient_role, title, body, icon, link, module, entity_type, entity_id))
         conn.close()
     except Exception:
-        pass
+        # Same reasoning as log_audit: a notification failure must not
+        # break the operation that triggered it, but it must not vanish
+        # either. A notifier everyone trusts that quietly stopped
+        # delivering is worse than one that was never wired up.
+        logger.exception("could not write a notification")
 
 
 def notify_role(role: str, title: str, body: str = "", icon: str = "🔔",
@@ -4161,7 +4181,11 @@ def notify_role(role: str, title: str, body: str = "", icon: str = "🔔",
                     (u["id"], role, title, body, icon, link, module))
         conn.close()
     except Exception:
-        pass
+        # Same reasoning as log_audit: a notification failure must not
+        # break the operation that triggered it, but it must not vanish
+        # either. A notifier everyone trusts that quietly stopped
+        # delivering is worse than one that was never wired up.
+        logger.exception("could not write a notification")
 
 
 def notify_managers(title: str, body: str = "", icon: str = "🔔",

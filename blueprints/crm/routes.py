@@ -725,14 +725,21 @@ def pet_new():
 
         pet_id = db.create_pet(data)
 
-        # Save diet_notes inline if column exists
-        try:
-            conn = get_db()
-            with conn:
-                conn.execute("UPDATE pets SET diet_notes=? WHERE id=?", (data["diet_notes"], pet_id))
-            conn.close()
-        except Exception:
-            pass
+        # db.create_pet() INSERTs neither diet_notes nor the three insurance
+        # columns, so everything typed into the Insurance box on the New Pet
+        # form used to vanish and only reappear if somebody edited the pet
+        # afterwards. Same follow-up UPDATE pet_edit does. Not wrapped in a
+        # swallow: the columns are guaranteed by _ensure_schema, and silently
+        # dropping the insurance details is the bug being fixed here.
+        conn = get_db()
+        with conn:
+            conn.execute(
+                """UPDATE pets SET diet_notes=?, insurance_provider=?,
+                   policy_number=?, policy_expiry=? WHERE id=?""",
+                (data["diet_notes"], data["insurance_provider"],
+                 data["policy_number"], data["policy_expiry"], pet_id)
+            )
+        conn.close()
 
         db.log_audit(
             username=session["user"].get("username", ""),
@@ -901,7 +908,7 @@ def pet_history_pdf(pet_id):
     # FPDFUnicodeEncodingException — a 500 — for every Arabic-named patient.
     # _ArabicFPDF redirects the font and reshapes the text at the boundary, so
     # every cell() below is covered without touching any of them.
-    from models.pdf_generator import _ArabicFPDF as FPDF
+    from models.pdf_generator import _ArabicFPDF as FPDF, _clinic_name
 
     pet = db.get_pet(pet_id)
     if not pet:
@@ -947,8 +954,11 @@ def pet_history_pdf(pet_id):
 
     # Clinic header
     pdf.set_font("Helvetica", "B", 16)
-    clinic_name = (clinic.get("clinic_name") or "Animal Hospital") if clinic else "Animal Hospital"
-    pdf.cell(0, 10, clinic_name, ln=True, align="C")
+    # `clinic_name` is not a column — the row has `name`/`name_ar` — so the
+    # fallback fired every time and every history sheet a clinic handed a
+    # customer was headed "Animal Hospital". _clinic_name() is the same helper
+    # every other document uses, so this page cannot drift from them again.
+    pdf.cell(0, 10, _clinic_name(clinic), ln=True, align="C")
     pdf.set_font("Helvetica", "", 11)
     pdf.cell(0, 6, "Patient Medical History Report", ln=True, align="C")
     pdf.set_font("Helvetica", "", 9)

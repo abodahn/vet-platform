@@ -273,8 +273,21 @@ def test_plausible_weight_raises_no_flag():
 
 
 def test_insulin_is_dosed_in_units_not_milligrams():
+    """ASSERTION CORRECTED: this test used to require r.unit == "IU/kg".
+
+    `.unit` labels the TOTAL dose - it is "mg" for meloxicam and amoxicillin,
+    and min_total/max_total/max_daily_total are all expressed in it. A total
+    of "1 IU/kg" is not a quantity, and the same raw string also drove the
+    per-kg line, which printed "0.25-0.5 IU/kg/kg". So the test was pinning
+    the defect in place: any correct fix had to fail it.
+
+    Insulin is a drug where a tenfold misread is fatal, so the unit on the
+    card has to be the unit of the number beside it.
+    """
     r = cds.calculate_dose("Caninsulin", "Cat", "4")
-    assert r.ok and r.unit == "IU/kg"
+    assert r.ok
+    assert r.unit == "IU", "the total dose must be labelled IU, not IU/kg"
+    assert "/kg/kg" not in repr(r), "doubled unit is back"
 
 
 def test_dose_refuses_a_combination_product():

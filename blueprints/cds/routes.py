@@ -26,7 +26,7 @@ import json
 import os
 import re
 from dataclasses import dataclass, field, asdict
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, getcontext
 from typing import Optional
 
 from flask import render_template, request, jsonify
@@ -50,7 +50,10 @@ def _load(path=_DATA_PATH):
     # is dosed in IU/kg rather than mg/kg; a vet adding another such drug just
     # sets "units" and "min_units_per_kg" / "max_units_per_kg".
     for row in data["doses"]:
-        unit = row.get("units") or "mg"
+        # "units" is the unit of the drug itself, not of the per-kg rate. A row
+        # written "IU/kg" would otherwise label the TOTAL as IU/kg and double the
+        # suffix on the per-kg line ("0.25-0.5 IU/kg/kg").
+        unit = (row.get("units") or "mg").split("/")[0].strip() or "mg"
         row["unit"] = unit
         row["min_per_kg"] = row.get("min_mg_per_kg") or row.get("min_units_per_kg")
         row["max_per_kg"] = row.get("max_mg_per_kg") or row.get("max_units_per_kg")
@@ -73,6 +76,29 @@ _WEIGHT_RANGES = DATA["species_weight_range_kg"]
 
 # Longest alias key, in tokens — bounds the n-gram scan in _resolve_drug.
 _MAX_ALIAS_TOKENS = max(len(k.split()) for k in _ALIASES)
+
+
+def _class_coverage_gaps():
+    """Members of a drug class that no interaction rule can reach.
+
+    An interaction written against ``gentamicin`` does not extend to its
+    aminoglycoside siblings, so screening tobramycin is silently narrower than
+    screening gentamicin. The engine cannot invent the missing rules — the
+    clinical facts are not in the data file — but it can refuse to be silent
+    about the hole. Maps member -> (class, siblings that DO have rules).
+    """
+    named = {k for e in DATA["interactions"] for k in e["drugs"]}
+    gaps = {}
+    for cls, members in _CLASSES.items():
+        if cls in named:
+            continue                       # the class itself is screened
+        covered = sorted(m for m in members if m in named)
+        if covered:
+            gaps.update({m: (cls, covered) for m in members if m not in named})
+    return gaps
+
+
+_CLASS_GAPS = _class_coverage_gaps()
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -333,7 +359,11 @@ def check_contraindications(drug: str, species: str, breed: str = None) -> list:
         for entry in DATA["breed_contraindications"]:
             if not (_drug_in(entry["drug"], canonical) and sp in entry["species"]):
                 continue
-            hit = [b for b in entry["breeds"] if b in breed_clean] if breed_clean else []
+            # Both sides through _basic_clean: the typed breed is stripped of
+            # punctuation, so a rule string like "long-haired whippet" could
+            # never match "Long-haired Whippet" while only one side was cleaned.
+            hit = ([b for b in entry["breeds"] if _basic_clean(b) in breed_clean]
+                   if breed_clean else [])
             if hit:
                 alerts.append(Alert(
                     severity=entry["severity"], kind="breed",
@@ -389,6 +419,27 @@ def check_interactions(drug_list) -> list:
                 ))
             seen.setdefault(canonical, m.raw)
 
+    # Only worth saying when an interaction screen actually happened.
+    if len(resolved) > 1:
+        for m in resolved:
+            for canonical in m.canonicals:
+                cls, covered = _CLASS_GAPS.get(canonical, (None, None))
+                if not cls:
+                    continue
+                alerts.append(Alert(
+                    severity=CAUTION, kind="lookup", drugs=[m.raw],
+                    message_en=(f"{canonical} is in the {cls} class, but no interaction "
+                                f"rule in this dataset is written against that class — "
+                                f"only against {', '.join(covered)} individually. The "
+                                f"interactions recorded for those drugs have NOT been "
+                                f"checked for {canonical}. Check them manually."),
+                    message_ar=(f"ينتمي {canonical} إلى فئة {cls}، لكن لا توجد في هذه "
+                                f"البيانات قاعدة تداخل مكتوبة على مستوى الفئة — بل على "
+                                f"أدوية بعينها ({'، '.join(covered)}). لم تُفحص التداخلات "
+                                f"المسجَّلة لتلك الأدوية بالنسبة لـ {canonical} — يجب "
+                                f"مراجعتها يدويًا."),
+                ))
+
     for i in range(len(resolved)):
         for j in range(i + 1, len(resolved)):
             a, b = resolved[i], resolved[j]
@@ -421,23 +472,39 @@ def check_interactions(drug_list) -> list:
 
 
 def _dec(value):
+    """Parse a caller-supplied number, or None if it is not one the engine can
+    compute on. "nan" and "inf" parse cleanly and then raise InvalidOperation on
+    the first comparison or quantize; a magnitude past the working precision
+    cannot be rounded for display and would render millions of digits. Both are
+    rejected here rather than reaching the arithmetic — a 500 is not a refusal.
+    """
     try:
-        return Decimal(str(value).strip())
+        d = Decimal(str(value).strip())
     except (InvalidOperation, AttributeError, ValueError):
         return None
+    return d if d.is_finite() and d.adjusted() < getcontext().prec else None
 
 
 def _fmt(d: Decimal) -> str:
     """Trim a Decimal for display without going anywhere near float."""
-    q = d.quantize(Decimal("0.0001")).normalize()
-    return format(q, "f")
+    try:
+        d = d.quantize(Decimal("0.0001"))
+    except InvalidOperation:
+        pass    # more digits than the context can round — print it whole, not 500
+    return format(d.normalize(), "f")
 
 
-def calculate_dose(drug: str, species: str, weight_kg) -> DoseResult:
+# No animal a veterinary clinic treats weighs more than this. The bound is
+# about catching a typed extra zero, not about zoology.
+MAX_BODY_WEIGHT_KG = 2000
+
+
+def calculate_dose(drug: str, species: str, weight_kg, breed: str = None) -> DoseResult:
     """Weight-based dose range for one drug in one patient.
 
-    Refuses rather than extrapolates: an unknown drug, an unknown species or a
-    drug/species pair with no entry all return ok=False with a reason.
+    Refuses rather than extrapolates: an unknown drug, an unknown species, a
+    drug/species pair with no entry, or a drug that is contraindicated in this
+    patient all return ok=False with a reason.
     All arithmetic is Decimal — a rounding error here has physical consequences.
     """
     match = resolve_drug(drug)
@@ -471,7 +538,26 @@ def calculate_dose(drug: str, species: str, weight_kg) -> DoseResult:
             f'النوع "{species or "(فارغ)"}" غير معروف. مدى الجرعات يختلف حسب النوع '
             f"ولا يُنقل بين الأنواع.",
         )
-    if weight is None or weight <= 0:
+    # Before any number is produced. A dose card printed under a DO NOT GIVE
+    # card reads as an instruction; the guard belongs here rather than in the
+    # template so /api/dose cannot serve one either.
+    blocked = [a for a in check_contraindications(drug, species, breed)
+               if a.severity == CONTRAINDICATED]
+    if blocked:
+        return refuse(
+            f'"{drug}" is contraindicated in this patient, so no dose is calculated. '
+            f"A drug that must not be given has no safe dose.",
+            f'الدواء "{drug}" ممنوع الإعطاء لهذا المريض، لذلك لم تُحسب أي جرعة. '
+            f"الدواء الممنوع ليس له جرعة آمنة.",
+            blocked,
+        )
+    # An upper bound as well as a lower one. Removing the crash on an absurd
+    # weight is only half the fix: 1e24 kg stopped raising and started
+    # returning 1e23 mg as a real dose card, which is worse than an error -
+    # an error is obviously wrong, a printed number looks considered.
+    # 2000 kg clears every patient a mixed practice sees, a draught horse
+    # included, and a typed extra zero above that is a slip, not a patient.
+    if weight is None or weight <= 0 or weight > MAX_BODY_WEIGHT_KG:
         return refuse(
             f'Weight "{weight_kg}" is not a usable body weight in kg.',
             f'الوزن "{weight_kg}" غير صالح كوزن جسم بالكيلوجرام.',
@@ -540,7 +626,7 @@ def screen(drugs, species, breed=None, weight_kg=None) -> dict:
             unique.append(al)
     unique.sort(key=lambda a: a.rank)
 
-    doses = [calculate_dose(d, species, weight_kg) for d in drugs] if weight_kg else []
+    doses = [calculate_dose(d, species, weight_kg, breed) for d in drugs] if weight_kg else []
 
     return {
         "drugs": drugs,
@@ -629,7 +715,7 @@ def api_dose():
     """JSON dose calculation for a single drug. Refuses rather than extrapolates."""
     data = request.get_json(silent=True) or {}
     res = calculate_dose(data.get("drug", ""), data.get("species", ""),
-                         data.get("weight_kg"))
+                         data.get("weight_kg"), data.get("breed") or None)
     out = res.to_dict()
     out["advisory"] = ADVISORY
     return jsonify(out)

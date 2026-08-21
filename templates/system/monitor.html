@@ -267,12 +267,21 @@
         </div>
       </div>
       {% if latest_backup %}
-        <div class="kv-row"><span class="kv-key">{{ t('Last Backup', 'آخر نسخة احتياطية') }}</span><span class="kv-val">{{ (latest_backup.created_at or '')[:16] }}</span></div>
+        {# `timestamp`, not `created_at` — models.backup.list_backups() has never
+           produced a created_at, so Jinja resolved it to Undefined and this row
+           rendered blank on every clinic that HAD a backup. #}
+        <div class="kv-row"><span class="kv-key">{{ t('Last Backup', 'آخر نسخة احتياطية') }}</span><span class="kv-val">{{ (latest_backup.timestamp or '')[:16] }}</span></div>
         <div class="kv-row"><span class="kv-key">{{ t('File', 'الملف') }}</span><span class="kv-val">{{ (latest_backup.filename or '')[:32] }}</span></div>
         <div class="kv-row"><span class="kv-key">{{ t('Size', 'الحجم') }}</span><span class="kv-val">{{ latest_backup.size_kb }} KB</span></div>
+        {# Freshness, not integrity. A backup record carries no integrity field —
+           that is a per-file PRAGMA integrity_check, run on demand from the
+           Backup page, far too expensive for a page opened all day. This badge
+           used to read it anyway and so showed a red "?" forever, which trains
+           everyone to ignore the one time it turns red for real. Age is the
+           question this page already computes an answer to. #}
         <div class="kv-row">
-          <span class="kv-key">{{ t('Integrity', 'السلامة') }}</span>
-          <span class="kv-val"><span class="ibadge {{ 'ibadge-ok' if latest_backup.integrity == 'ok' else 'ibadge-err' }}">{{ latest_backup.integrity or '?' }}</span></span>
+          <span class="kv-key">{{ t('Freshness', 'حداثة النسخة') }}</span>
+          <span class="kv-val"><span class="ibadge {{ 'ibadge-err' if backup_health.stale else 'ibadge-ok' }}">{{ t('Stale', 'قديمة') if backup_health.stale else t('Up to date', 'محدّثة') }}</span></span>
         </div>
       {% else %}
         <div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">

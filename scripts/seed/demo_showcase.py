@@ -669,15 +669,25 @@ def seed_clinical(conn, rnd: Random, today: date, users, owners, pets, items, se
         inv_seq += 1
         return f"INV-{d.strftime('%Y%m')}-{inv_seq:04d}"
 
-    days = list(range(-182, 15))
+    # The future window runs well past a fortnight on purpose: a demo database
+    # is usually seeded days or weeks before it is shown, and once the real
+    # date runs off the end of the seeded range the Today board opens empty.
+    days = list(range(-182, 46))
     for offset in days:
         day = today + timedelta(days=offset)
-        if day.weekday() == 4:                      # Friday — clinic closed
-            continue
+        # Friday is the Egyptian weekend, so the clinic runs on emergency cover
+        # rather than closing outright. It used to be skipped entirely, which
+        # left two holes: seeding ON a Friday skipped the one day the Today
+        # board shows, and DEMOING on any other Friday showed an empty board -
+        # a dead first screen one day in seven, which reads as broken software
+        # rather than as a quiet day.
+        friday = day.weekday() == 4
         n_appt = rnd.choices([0, 1, 2, 3, 4, 5], weights=[3, 8, 16, 22, 18, 10])[0]
         if offset > 0:
             n_appt = rnd.choices([2, 3, 4, 5], weights=[15, 35, 30, 20])[0]
-        elif offset == 0:
+        if friday and offset != 0:
+            n_appt = rnd.choices([1, 2], weights=[6, 4])[0]   # emergency cover
+        if offset == 0:
             # The Today board is the first screen anyone opens. Never let the
             # dice leave it empty.
             n_appt = 7

@@ -460,7 +460,11 @@
 </div>
 {% endblock %}
 
-<!-- AI Pet Summary Modal -->
+{# AI Pet Summary Modal. Must be INSIDE a block: markup between blocks in a
+   child template is discarded by Jinja, so #petSummaryModal never reached the
+   page and the AI Summary button died on `modal.style.display` of null.
+   `overlays` rather than `content` because it is position:fixed — see base.html. #}
+{% block overlays %}
 <div id="petSummaryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
      z-index:9999;align-items:flex-start;justify-content:center;padding-top:60px">
   <div style="background:linear-gradient(160deg,#0f172a,#1e1b4b);border:1px solid rgba(139,92,246,.4);
@@ -502,6 +506,7 @@
 <style>
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 </style>
+{% endblock %}
 
 {% block scripts %}
 <script>

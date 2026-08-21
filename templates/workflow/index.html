@@ -799,17 +799,45 @@
     renderAside();
   }
 
-  /* POST to an EXISTING route, exactly as the browser form would. The route
-     redirects on success; fetch follows it, so a 200 back means the chain
-     worked. Server state is then re-read rather than assumed. */
+  /* POST to an EXISTING route, exactly as the browser form would.
+
+     A 200 back does NOT mean the chain worked. These routes answer a refusal
+     the way a browser form expects — flash the reason, redirect — and fetch
+     follows that redirect to a 200. So every step here re-reads server state
+     afterwards instead of believing the status, and when a step did not take
+     effect, refusalIn() digs the reason out rather than the page guessing. */
   async function postForm(url, fields) {
     const body = new URLSearchParams(fields);
     body.set("_csrf_token", CSRF);
     const r = await fetch(url, {
       method: "POST", body, redirect: "follow",
-      headers: { "X-Requested-With": "XMLHttpRequest" },
+      // Accept JSON so the module permission gate answers 403 instead of
+      // bouncing to the dashboard (blueprints/auth/routes.py). A refusal that
+      // arrives as a 200 gets reported to the user as something else entirely
+      // — a doctor was told their payment was declined when the truth was
+      // that their role may not take payments at all.
+      headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" },
     });
-    return { ok: r.ok, status: r.status, url: r.url, text: await r.text() };
+    const text = await r.text();
+    return {
+      ok: r.ok, status: r.status, url: r.url, text: text,
+      // A failed CSRF check is a 403 too, but renders the HTML error page.
+      // The body is what separates "your role may not do this" from "reload".
+      forbidden: r.status === 403 && text.indexOf('"forbidden"') >= 0,
+    };
+  }
+
+  /* Why a step was refused, in the server's own words.
+
+     Only ever called once something else has established that the step did not
+     happen — a flash in the response is not by itself proof of failure. */
+  function refusalIn(res) {
+    if (res.forbidden) {
+      return "{{ t('Your role is not permitted to do this.', 'دورك لا يسمح بهذا الإجراء.') }}";
+    }
+    const el = new DOMParser().parseFromString(res.text || "", "text/html")
+      .querySelector(".v3-flash-danger .v3-flash-msg, .v3-flash-error .v3-flash-msg");
+    return el ? el.textContent.trim() : "";
   }
 
   const getJSON = (u) => fetch(u, { headers: { "Accept": "application/json" } })
@@ -899,10 +927,13 @@
           return;
         }
       }
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      // Re-find by phone rather than parsing an id out of the HTML.
+      if (!res.ok) throw new Error(refusalIn(res) || "HTTP " + res.status);
+      // The id comes from the URL the route redirected to. Falling back to the
+      // first search hit was a guess: the server stores a normalised phone, so
+      // an exact string match can miss and hand the visit to another client.
+      const m = res.url.match(/\/crm\/owners\/(\d+)/);
       const rows = await getJSON("/workflow/api/owners?q=" + encodeURIComponent(phone));
-      const created = rows.find((o) => o.phone === phone) || rows[0];
+      const created = rows.find((o) => (m ? o.id === Number(m[1]) : o.phone === phone));
       if (!created) throw new Error("{{ t('The client was not saved.', 'لم يتم حفظ العميل.') }}");
       selectOwner(created);
     } catch (err) {
@@ -950,10 +981,20 @@
         sex: $("pt_sex").value, weight_kg: $("pt_weight_kg").value,
         dob: $("pt_dob").value, allergies: $("pt_allergies").value.trim(),
       });
-      if (!res.ok) throw new Error("HTTP " + res.status);
+      if (!res.ok) throw new Error(refusalIn(res) || "HTTP " + res.status);
+      // The new patient's id comes from the URL the route redirected to, the
+      // same way the visit's does at step 3.
+      //
+      // Taking the LAST row of the client's pet list instead filed the whole
+      // visit — vitals, diagnosis, prescription and invoice — against another
+      // animal: that list is ordered by name, so registering "Bella" for a
+      // client who already owns "Zeus" selected Zeus. Identify the animal or
+      // refuse; there is no safe guess here.
+      const m = res.url.match(/\/crm\/pets\/(\d+)/);
       const data = await getJSON("/workflow/api/owner/" + state.owner.id + "/pets");
-      const created = (data.pets || []).slice(-1)[0];
-      if (!created) throw new Error("{{ t('The patient was not saved.', 'لم يتم حفظ الحيوان.') }}");
+      const created = m && (data.pets || []).find((p) => p.id === Number(m[1]));
+      if (!created) throw new Error(refusalIn(res) ||
+        "{{ t('The patient was not saved.', 'لم يتم حفظ الحيوان.') }}");
       selectPet(created);
     } catch (err) {
       showError("{{ t('Could not save the patient.', 'تعذر حفظ الحيوان.') }} " + err.message);
@@ -1088,7 +1129,17 @@
     }
     if (any) {
       const res = await postForm("/visits/" + state.visitId + "/prescription", fields);
-      if (!res.ok) throw new Error("HTTP " + res.status);
+      if (!res.ok) throw new Error(refusalIn(res) || "HTTP " + res.status);
+      // Read it back, as the diagnosis step does, and for the same reason: this
+      // route refuses to record a non-vet as the prescriber (a nurse may type
+      // one, she may not sign it) with a flash and a redirect, which arrives
+      // here as a success. Carrying on completed the visit and raised the
+      // invoice with no medication on it and nothing said on screen.
+      const v = await getJSON("/workflow/api/visit/" + state.visitId);
+      if (!(v.prescription || []).length) {
+        throw new Error(refusalIn(res) ||
+          "{{ t('The prescription did not save.', 'لم يتم حفظ الروشتة.') }}");
+      }
     }
     // Before completing: completing raises the invoice, and a vaccination
     // recorded after that would miss its line on the bill.
@@ -1115,10 +1166,15 @@
     // service catalogue and turns prescription lines into invoice lines — 125
     // lines of logic that this page deliberately does not reimplement.
     const res = await postForm("/visits/" + state.visitId + "/complete", {});
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    // Deliberately not `if (!res.ok)`. This is the one step that redirects OUT
+    // of its own module — to the invoice, behind the `invoicing` grant, which
+    // the doctor or nurse standing here does not hold. A 403 from following
+    // that redirect says nothing about whether the visit completed; only the
+    // invoice existing does.
     const v = await getJSON("/workflow/api/visit/" + state.visitId);
     if (!v.invoice) {
-      throw new Error("{{ t('The visit completed but no invoice was raised.', 'اكتملت الزيارة لكن لم تصدر فاتورة.') }}");
+      throw new Error(refusalIn(res) ||
+        "{{ t('The visit completed but no invoice was raised.', 'اكتملت الزيارة لكن لم تصدر فاتورة.') }}");
     }
     state.invoice = v.invoice;
     renderInvoice(v);
@@ -1232,13 +1288,21 @@
           method: $("pay_method").value,
           reference: $("pay_reference").value.trim(),
         });
-        if (!res.ok) throw new Error("HTTP " + res.status);
+        // A refusal is not a decline. Taking payment needs the `invoicing`
+        // grant, which doctor, nurse and pharmacist do not hold — and telling
+        // a doctor to check the amount sent her hunting a problem that was
+        // never there while the money went uncollected.
+        if (res.forbidden) {
+          throw new Error("{{ t('Your role is not permitted to take payments. The visit and the invoice are saved — ask reception or accounts to settle it.', 'دورك لا يسمح بتحصيل المدفوعات. الزيارة والفاتورة محفوظتان — اطلب من الاستقبال أو الحسابات تحصيلها.') }}");
+        }
+        if (!res.ok) throw new Error(refusalIn(res) || "HTTP " + res.status);
         const fresh = await getJSON("/workflow/api/visit/" + state.visitId);
         renderInvoice(fresh);
         // The route refuses an overpayment with a message rather than clamping,
-        // so an unchanged balance means it was rejected — say so.
+        // so an unchanged balance means it was rejected — say so, in the
+        // server's own words where it gave a reason.
         if (Number(fresh.invoice.due_amount) >= due - 0.005) {
-          showError("{{ t('The payment was not accepted. Check the amount against the balance due.', 'لم يتم قبول الدفع. راجع المبلغ مقابل المستحق.') }}", "warn");
+          showError(refusalIn(res) || "{{ t('The payment was not accepted. Check the amount against the balance due.', 'لم يتم قبول الدفع. راجع المبلغ مقابل المستحق.') }}", "warn");
         }
       } catch (err) {
         showError("{{ t('Could not record the payment.', 'تعذر تسجيل الدفع.') }} " + err.message);

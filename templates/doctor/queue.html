@@ -42,7 +42,7 @@
       {% for a in appointments %}
       <tr style="{% if a.status == 'In Progress' %}background:#eff6ff{% elif a.status == 'Completed' %}opacity:.6{% endif %}">
         <td style="color:var(--pf-muted)">{{ loop.index }}</td>
-        <td style="font-weight:700;white-space:nowrap">{{ (a.appointment_date or '')[-8:-3] }}</td>
+        <td style="font-weight:700;white-space:nowrap">{{ (a.appt_start or '')[:5] }}</td>
         <td>
           <strong>
             {% if a.pet_id %}<a href="{{ url_for('crm.pet_detail', pet_id=a.pet_id) }}">{{ a.pet_name }}</a>

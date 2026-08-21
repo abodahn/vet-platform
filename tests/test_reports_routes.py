@@ -199,16 +199,28 @@ def test_financial_compare_reports_the_real_percentage_change(app, admin, owner)
     returned, so _pct_change() always saw 0 vs 0 and returned None."""
     curr_from = (date.today() - timedelta(days=9)).isoformat()
     curr_to = date.today().isoformat()
+    # The comparable window must be the SAME LENGTH as the current one, which
+    # is what the view computes: span = (d2 - d1).days + 1, then
+    # prev_from = d1 - span. The current period is 10 days (today-9..today), so
+    # the previous is today-19..today-10.
+    #
+    # This used to say today-20, an 11-day window. Alone that never showed,
+    # because no invoice existed on day 20; in the full suite another test's
+    # invoice landed there and the expected percentage stopped matching the
+    # page. The view was right the whole time.
     prev_to = (date.today() - timedelta(days=10)).isoformat()
-    prev_from = (date.today() - timedelta(days=20)).isoformat()
+    prev_from = (date.today() - timedelta(days=19)).isoformat()
 
     with app.app_context():
+        # Deliberately DIFFERENT amounts. They used to be equal, so the
+        # expected change was 0.0% - a string already on the page for other
+        # reasons, which meant this test passed even with the bug restored.
         _invoice(owner["owner_id"], owner["pet_id"],
                  (date.today() - timedelta(days=15)).isoformat(),
                  1000.0, 1000.0, "Paid")
         _invoice(owner["owner_id"], owner["pet_id"],
                  (date.today() - timedelta(days=2)).isoformat(),
-                 1000.0, 1000.0, "Paid")
+                 1731.0, 1731.0, "Paid")
 
         curr = _scalar("SELECT COALESCE(SUM(paid_amount),0) FROM invoices"
                        " WHERE issue_date BETWEEN ? AND ?"
@@ -221,10 +233,16 @@ def test_financial_compare_reports_the_real_percentage_change(app, admin, owner)
 
     body = _text(admin.get(
         f"/reports/financial/compare?date_from={curr_from}&date_to={curr_to}"))
-    assert "vs " in body or "%" in body
-    assert f"{abs(expected_pct):.1f}%" in body, (
-        f"expected a {expected_pct}% change badge; the comparison is blank, which "
-        f"is what a None revenue_change renders as")
+    # Assert on the BADGE, not anywhere on the page. The macro renders either
+    # "N% vs prev period" or "no comparable prev period", so requiring the
+    # suffix makes a blank comparison fail instead of quietly matching some
+    # unrelated percentage elsewhere in the report.
+    assert "no comparable prev period" not in body, (
+        "the comparison rendered as undefined even though the previous period "
+        "earned %s" % prev)
+    assert f"{abs(expected_pct):.1f}% vs prev period" in body, (
+        f"expected a {expected_pct}% change badge next to Collected; "
+        f"got neither that nor an honest 'no comparable' notice")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
