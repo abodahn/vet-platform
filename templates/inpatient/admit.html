@@ -15,7 +15,8 @@
 
       <div class="pf-form-group" style="grid-column:1/-1">
         <label class="pf-label">{{ t('Owner *', 'المالك *') }}</label>
-        <select name="owner_id" id="ownerSelect" class="pf-input" required onchange="loadPets(this.value)">
+        <select name="owner_id" id="ownerSelect" class="pf-input" required
+                data-search-url="{{ url_for('crm.owner_search_json') }}" onchange="loadPets(this.value)">
           <option value="">{{ t('— select owner —', '— اختر المالك —') }}</option>
           {% for o in owners %}
           <option value="{{ o.id }}">{{ o.full_name }} ({{ o.phone }})</option>

@@ -49,7 +49,8 @@
         <div class="form-grid-2">
           <div class="form-group">
             <label class="form-label">{{ t('Owner', 'المالك') }} *</label>
-            <select name="owner_id" id="owner-select" class="form-control" required onchange="filterPets(this.value)">
+            <select name="owner_id" id="owner-select" class="form-control" required
+                    data-search-url="{{ url_for('crm.owner_search_json') }}" onchange="filterPets(this.value)">
               <option value="">— {{ t('Select owner', 'اختر المالك') }} —</option>
               {% for o in owners %}
               <option value="{{ o.id }}">{{ o.full_name }}{% if o.phone %} · {{ o.phone }}{% endif %}</option>

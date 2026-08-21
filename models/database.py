@@ -3040,6 +3040,17 @@ def update_user_role(user_id: int, role: str) -> None:
     conn.close()
 
 # ── CRM — OWNERS ───────────────────────────────────────────────
+# The owner search rule, in ONE place. list_owners() and count_owners() had
+# drifted apart - the list matched whatsapp_phone and the count did not - so the
+# header said one number and the table showed another (bug-503). A shared clause
+# makes that particular disagreement impossible rather than merely fixed.
+_OWNER_SEARCH_COLS = ("full_name", "full_name_ar", "phone", "whatsapp_phone", "email")
+
+
+def _owner_search_where(prefix: str = "") -> str:
+    return " OR ".join("%s%s LIKE ?" % (prefix, c) for c in _OWNER_SEARCH_COLS)
+
+
 def list_owners(search: str = "", limit: int = 100, offset: int = 0) -> list:
     """Return owners with pet_count in a single aggregated query (no N+1)."""
     conn = get_db()
@@ -3051,11 +3062,15 @@ def list_owners(search: str = "", limit: int = 100, offset: int = 0) -> list:
     )
     if search:
         q = f"%{search}%"
+        # full_name_ar is searched too. Every owner dropdown in the app now
+        # types into this one query, and the CRM lets a clinic record a client
+        # in Arabic - so without this a clinic working in Arabic could enter a
+        # name once and then never find that client again. That is the same
+        # defect loc() was added to fix on the display side.
         rows = conn.execute(
-            base + " WHERE o.full_name LIKE ? OR o.phone LIKE ?"
-                   " OR o.whatsapp_phone LIKE ? OR o.email LIKE ?"
-                   " ORDER BY o.full_name LIMIT ? OFFSET ?",
-            (q, q, q, q, limit, offset)).fetchall()
+            base + " WHERE " + _owner_search_where("o.") +
+            " ORDER BY o.full_name LIMIT ? OFFSET ?",
+            tuple([q] * len(_OWNER_SEARCH_COLS)) + (limit, offset)).fetchall()
     else:
         rows = conn.execute(
             base + " ORDER BY o.created_at DESC LIMIT ? OFFSET ?",
@@ -3068,8 +3083,8 @@ def count_owners(search: str = "") -> int:
     if search:
         q = f"%{search}%"
         n = conn.execute(
-            "SELECT COUNT(*) FROM owners WHERE full_name LIKE ? OR phone LIKE ? OR email LIKE ?",
-            (q,q,q)).fetchone()[0]
+            "SELECT COUNT(*) FROM owners WHERE " + _owner_search_where(),
+            tuple([q] * len(_OWNER_SEARCH_COLS))).fetchone()[0]
     else:
         n = conn.execute("SELECT COUNT(*) FROM owners").fetchone()[0]
     conn.close()

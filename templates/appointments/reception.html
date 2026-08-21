@@ -334,30 +334,12 @@
                class="owner-search-input"
                placeholder="{{ t('Type owner name or phone…', 'اكتب اسم المالك أو الهاتف…') }}"
                autocomplete="off">
-        <div class="owner-search-hint">{{ owners|length }} owners registered</div>
+        <div class="owner-search-hint">{{ owner_count }} owners registered</div>
       </div>
 
-      <!-- Results list (filtered by JS) -->
-      <div class="owner-results" id="ownerResults">
-        {% for owner in owners %}
-        <div class="owner-result-row"
-             data-name="{{ (owner.full_name or '')|lower }}"
-             data-phone="{{ (owner.phone or '')|lower }}"
-             data-owner-id="{{ owner.id }}"
-             data-owner-name="{{ owner.full_name }}"
-             data-owner-phone="{{ owner.phone or '' }}"
-             onclick="selectOwner(this)">
-          <div class="owner-avatar">👤</div>
-          <div>
-            <div class="owner-name">{{ owner.full_name }}</div>
-            <div class="owner-phone">{{ owner.phone or 'No phone' }}</div>
-          </div>
-          {% if owner.pet_count is defined %}
-          <div class="owner-pets-count">{{ owner.pet_count }} pet{{ 's' if owner.pet_count != 1 }}</div>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
+      <!-- Results list (filled from the server as you type) -->
+      <div class="owner-results" id="ownerResults"
+           data-search-url="{{ url_for('crm.owner_search_json') }}"></div>
 
       <!-- Selected owner + pets -->
       <div class="selected-owner-panel" id="selectedOwnerPanel">
@@ -471,18 +453,74 @@
    broken Reception page and eight failing tests to learn that twice. */
 const TODAY = {{ today_str | tojson }};
 
-/* ── Owner search filter ─────────────────────────────────── */
+/* ── Owner search ────────────────────────────────────────────
+   Asks the server, and so reaches every client. This list used to be the
+   newest 500 owners rendered into the page and filtered here, which meant a
+   busy clinic's older clients could not be looked up at all. */
 const searchInput  = document.getElementById('ownerSearchInput');
 const ownerResults = document.getElementById('ownerResults');
-const allRows      = Array.from(ownerResults.querySelectorAll('.owner-result-row'));
+const OWNER_SEARCH = ownerResults.dataset.searchUrl;
+let   searchTimer  = null;
+
+function ownerRows() {
+  return Array.from(ownerResults.querySelectorAll('.owner-result-row'));
+}
+
+function hint(text) {
+  ownerResults.innerHTML = '';
+  const d = document.createElement('div');
+  d.className = 'owner-search-hint';
+  d.style.padding = '10px';
+  d.textContent = text;
+  ownerResults.appendChild(d);
+}
+
+/* textContent everywhere: owner names can come from the PUBLIC booking API
+   (no auth), so a stranger's markup must never be parsed on this screen. */
+function renderOwners(owners) {
+  if (!owners.length) { hint('{{ t("No match", "لا توجد نتائج") }}'); return; }
+  ownerResults.innerHTML = '';
+  owners.forEach(o => {
+    const row = document.createElement('div');
+    row.className = 'owner-result-row';
+    row.dataset.ownerId = o.id;
+    row.dataset.ownerName = o.full_name || '';
+    row.dataset.ownerPhone = o.phone || '';
+    row.addEventListener('click', () => selectOwner(row));
+
+    const avatar = document.createElement('div');
+    avatar.className = 'owner-avatar';
+    avatar.textContent = '👤';
+
+    const who = document.createElement('div');
+    const name = document.createElement('div');
+    name.className = 'owner-name';
+    name.textContent = o.full_name || '';
+    const phone = document.createElement('div');
+    phone.className = 'owner-phone';
+    phone.textContent = o.phone || 'No phone';
+    who.appendChild(name);
+    who.appendChild(phone);
+
+    row.appendChild(avatar);
+    row.appendChild(who);
+    ownerResults.appendChild(row);
+  });
+}
 
 searchInput.addEventListener('input', () => {
-  const q = searchInput.value.trim().toLowerCase();
-  allRows.forEach(row => {
-    const match = !q || row.dataset.name.includes(q) || row.dataset.phone.includes(q);
-    row.style.display = match ? '' : 'none';
-  });
+  const q = searchInput.value.trim();
+  clearTimeout(searchTimer);
+  if (q.length < 2) { hint('{{ t("Type at least 2 characters", "اكتب حرفين على الأقل") }}'); return; }
+  searchTimer = setTimeout(() => {
+    fetch(OWNER_SEARCH + '?q=' + encodeURIComponent(q), {credentials: 'same-origin'})
+      .then(r => r.ok ? r.json() : {owners: []})
+      .then(d => renderOwners(d.owners || []))
+      .catch(() => hint('{{ t("Search failed", "فشل البحث") }}'));
+  }, 220);
 });
+
+hint('{{ t("Type a name or phone to find a client", "اكتب الاسم أو الهاتف للبحث") }}');
 
 /* ── Owner selection → show pets ────────────────────────── */
 async function selectOwner(row) {
@@ -491,7 +529,7 @@ async function selectOwner(row) {
   const ownerPhone = row.dataset.ownerPhone;
 
   // Highlight selected row
-  allRows.forEach(r => r.style.background = '');
+  ownerRows().forEach(r => r.style.background = '');
   row.style.background = 'color-mix(in srgb, var(--cl-primary) 8%, var(--cl-surface))';
 
   // Show panel

@@ -380,11 +380,111 @@
 
   /* ── Searchable select (owner / patient dropdowns) ──────────── */
 
+  // Filter the options already in the DOM. Only honest when the page rendered
+  // the complete list — never use it for a table that can outgrow the page.
+  function _localFilter(sel, inp) {
+    var allOpts = Array.from(sel.options).map(function (o) {
+      return { text: o.text, value: o.value, el: o };
+    });
+
+    inp.addEventListener('input', function () {
+      var q = inp.value.trim().toLowerCase();
+      allOpts.forEach(function (o) {
+        var match = !q || o.text.toLowerCase().includes(q);
+        o.el.hidden = !match;
+      });
+      // auto-select first visible non-empty option when one match
+      var visible = allOpts.filter(function (o) { return !o.el.hidden && o.value; });
+      if (visible.length === 1) sel.value = visible[0].value;
+    });
+
+    // Clear filter when user clicks the select directly
+    sel.addEventListener('focus', function () { inp.value = ''; allOpts.forEach(function (o) { o.el.hidden = false; }); });
+  }
+
+  // Ask the server as you type. The page renders no list at all, so nothing a
+  // clinic accumulates can push a client out of reach.
+  function _remoteSearch(sel, inp) {
+    var url = sel.dataset.searchUrl;
+    var first = sel.options[0] && !sel.options[0].value ? sel.options[0].cloneNode(true) : null;
+    var timer = null;
+    // Whatever the page arrived with, kept aside. On an EDIT form the server
+    // renders the record's current owner as the selected option, and the
+    // rebuild below wipes every option on the first keystroke - so without
+    // this, typing in the search box silently drops the owner already on the
+    // invoice, and a single-match search can move the record to someone else.
+    var preset = (function () {
+      var o = sel.options[sel.selectedIndex];
+      return o && o.value ? o.cloneNode(true) : null;
+    })();
+
+    inp.addEventListener('input', function () {
+      var q = inp.value.trim();
+      clearTimeout(timer);
+      if (q.length < 2) return;
+      timer = setTimeout(function () {
+        fetch(url + '?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+          .then(function (r) {
+            // An empty list and a broken server look identical in a dropdown,
+            // and a receptionist who searches, sees nothing and concludes the
+            // client does not exist will create a duplicate. Say which it is.
+            if (!r.ok) throw new Error('search failed: ' + r.status);
+            return r.json();
+          })
+          .then(function (d) {
+            var found = d.owners || [];
+            var keep = sel.value;
+            sel.innerHTML = '';
+            if (first) sel.appendChild(first.cloneNode(true));
+            if (preset && !found.some(function (o) { return String(o.id) === preset.value; })) {
+              sel.appendChild(preset.cloneNode(true));
+            }
+            found.forEach(function (o) {
+              var opt = document.createElement('option');
+              opt.value = o.id;
+              // The clinic's own spelling first. An Arabic-first clinic that
+              // recorded a client in Arabic must read that name back, not a
+              // transliteration it never typed.
+              opt.textContent = (o.full_name_ar || o.full_name)
+                              + (o.phone ? ' · ' + o.phone : '');
+              sel.appendChild(opt);
+            });
+            if (keep) sel.value = keep;
+            // One match is the common case. Pick it and fire change, so the
+            // page's own onchange (pet list, rates) runs as if a human had.
+            if (found.length === 1) {
+              sel.value = String(found[0].id);
+              sel.dispatchEvent(new Event('change', { bubbles: true }));
+            } else if (!keep) {
+              sel.selectedIndex = 0;
+            }
+          })
+          .catch(function () {
+            // Say it in the control the user is already looking at. An empty
+            // dropdown and a failed request are indistinguishable otherwise,
+            // and the reader concludes the client does not exist and creates a
+            // duplicate - the expensive outcome this whole box exists to stop.
+            var ar = (document.documentElement.lang || '').indexOf('ar') === 0;
+            sel.innerHTML = '';
+            if (preset) sel.appendChild(preset.cloneNode(true));
+            var opt = document.createElement('option');
+            opt.value = '';
+            opt.disabled = true;
+            opt.selected = !preset;
+            opt.textContent = ar
+              ? 'تعذّر البحث — حاول مرة أخرى'
+              : 'Search unavailable - try again';
+            sel.appendChild(opt);
+          });
+      }, 220);
+    });
+  }
+
   function initSearchableSelect() {
-    // Apply to any select with id containing "ownerSel", "petSel",
-    // or having the attribute data-searchable
+    // Apply to any select with id "ownerSel", or carrying data-searchable /
+    // data-search-url. data-search-url means the options come from the server.
     var selects = document.querySelectorAll(
-      'select[id="ownerSel"], select[data-searchable]'
+      'select[id="ownerSel"], select[data-searchable], select[data-search-url]'
     );
     selects.forEach(function (sel) {
       if (sel.dataset.searchableInit) return; // already wired
@@ -397,34 +497,21 @@
 
       var inp = document.createElement('input');
       inp.type = 'text';
-      inp.placeholder = 'Type to search…';
+      inp.placeholder = document.documentElement.lang === 'ar'
+        ? 'اكتب للبحث…' : 'Type to search…';
       inp.className = sel.className;
       inp.style.marginBottom = '4px';
       wrapper.insertBefore(inp, sel);
 
-      var allOpts = Array.from(sel.options).map(function (o) {
-        return { text: o.text, value: o.value, el: o };
-      });
+      if (sel.dataset.searchUrl) _remoteSearch(sel, inp);
+      else _localFilter(sel, inp);
 
-      inp.addEventListener('input', function () {
-        var q = inp.value.trim().toLowerCase();
-        allOpts.forEach(function (o) {
-          var match = !q || o.text.toLowerCase().includes(q);
-          o.el.hidden = !match;
-        });
-        // auto-select first visible non-empty option when one match
-        var visible = allOpts.filter(function (o) { return !o.el.hidden && o.value; });
-        if (visible.length === 1) sel.value = visible[0].value;
-      });
-
-      // When select changes, update the input text
-      sel.addEventListener('change', function () {
+      // When the USER changes the select, mirror the choice into the input.
+      // isTrusted keeps an auto-selected single match from eating the query.
+      sel.addEventListener('change', function (e) {
         var chosen = sel.options[sel.selectedIndex];
-        if (chosen && chosen.value) inp.value = chosen.text;
+        if (e.isTrusted && chosen && chosen.value) inp.value = chosen.text;
       });
-
-      // Clear filter when user clicks the select directly
-      sel.addEventListener('focus', function () { inp.value = ''; allOpts.forEach(function (o) { o.el.hidden = false; }); });
     });
   }
 

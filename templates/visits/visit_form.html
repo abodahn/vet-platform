@@ -19,7 +19,8 @@
         <div style="padding:1.25rem">
           <div style="margin-bottom:1rem">
             <label class="pf-label">{{ t('Owner', 'المالك') }} *</label>
-            <select name="owner_id" id="ownerSelect" class="pf-input" required onchange="filterPets(this.value)">
+            <select name="owner_id" id="ownerSelect" class="pf-input" required
+                    data-search-url="{{ url_for('crm.owner_search_json') }}" onchange="filterPets(this.value)">
               <option value="">— {{ t('Select Owner', 'اختر المالك') }} —</option>
               {% for o in owners %}
               <option value="{{ o.id }}" {% if owner and owner.id==o.id %}selected{% endif %}>{{ o.full_name }} · {{ o.phone }}</option>

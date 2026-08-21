@@ -160,7 +160,8 @@
 
         <div class="form-group">
           <label class="form-label">{{ t('Owner', 'المالك') }} <span class="req">*</span></label>
-          <select name="owner_id" id="owner-select" class="form-control" required>
+          <select name="owner_id" id="owner-select" class="form-control" required
+                  data-search-url="{{ url_for('crm.owner_search_json') }}">
             <option value="">{{ t('— Select Owner —', '— اختر المالك —') }}</option>
             {% for owner in owners %}
             <option value="{{ owner.id }}"

@@ -76,13 +76,22 @@ def _row(app, sql, params):
 # ── admit ─────────────────────────────────────────────────────────────────────
 
 def test_admit_form_loads(app, auth_client):
-    """The GET the six broken POSTs all looked fine behind."""
+    """The GET the six broken POSTs all looked fine behind.
+
+    The owner is no longer rendered into the page — the form used to carry the
+    entire owners table, and its sibling forms carried a capped slice that made
+    later clients unselectable. It now searches the server, so the check is
+    that the search is wired up and finds the owner.
+    """
     fx = _mk_stay(app, auth_client, "AdmitForm")
     r = auth_client.get("/inpatient/admit")
     assert r.status_code == 200
-    assert "AdmitForm Owner" in r.get_data(as_text=True), \
-        "admit form does not offer the clinic's owners to admit against"
-    assert fx  # fixture used only for the owner list
+    assert "/crm/owners/search-json" in r.get_data(as_text=True), \
+        "admit form has no way to reach the clinic's owners"
+    found = auth_client.get("/crm/owners/search-json",
+                            query_string={"q": "AdmitForm Owner"}).get_json()
+    assert fx["owner_id"] in [o["id"] for o in found["owners"]], \
+        "the owner search cannot find an owner the admit form must reach"
 
 
 def test_admit_writes_the_stay(app, auth_client):

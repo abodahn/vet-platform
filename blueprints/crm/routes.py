@@ -554,8 +554,13 @@ def owner_search_json():
     q = (request.args.get("q") or "").strip()
     if len(q) < 2:
         return jsonify({"owners": []})
+    # full_name_ar travels with the row so the dropdown can label a client the
+    # way the clinic recorded them. Returning only the Latin name meant an
+    # Arabic-first clinic typed Arabic, matched, and then read a Latin label -
+    # the display half of the same defect loc() exists to fix.
     return jsonify({"owners": [
-        {"id": o["id"], "full_name": o["full_name"], "phone": o["phone"]}
+        {"id": o["id"], "full_name": o["full_name"],
+         "full_name_ar": o.get("full_name_ar") or "", "phone": o["phone"]}
         for o in db.list_owners(search=q, limit=25)
     ]})
 

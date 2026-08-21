@@ -13,7 +13,8 @@
     <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
       <div>
         <label class="pf-label">{{ t('Owner *', 'المالك *') }}</label>
-        <select name="owner_id" id="ownerSel" class="pf-input" required data-searchable onchange="loadPets(this.value)">
+        <select name="owner_id" id="ownerSel" class="pf-input" required
+                data-search-url="{{ url_for('crm.owner_search_json') }}" onchange="loadPets(this.value)">
           <option value="">{{ t('— Select Owner —', '— اختر المالك —') }}</option>
           {% for o in owners %}
           <option value="{{ o.id }}">{{ o.full_name }} · {{ o.phone }}</option>

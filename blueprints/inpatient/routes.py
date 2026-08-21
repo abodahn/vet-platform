@@ -218,14 +218,12 @@ def admit():
             conn.rollback()
             flash(f"Error admitting patient: {e}", "danger")
 
-    # GET — load owners/pets for form
-    owners = conn.execute(
-        "SELECT id, full_name, phone FROM owners ORDER BY full_name"
-    ).fetchall()
+    # GET — the owner dropdown searches the server (crm.owner_search_json)
+    # rather than carrying the whole owners table into the page.
     conn.close()
     return render_template("inpatient/admit.html",
         active="inpatient",
-        owners=[dict(o) for o in owners],
+        owners=[],
         wards=WARDS,
         today=date.today().isoformat(),
     )

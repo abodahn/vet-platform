@@ -347,7 +347,6 @@ def appt_new():
     prefill_pet_id   = request.args.get("pet_id", "")
     prefill_date     = request.args.get("date", _today_str())
 
-    owners = db.list_owners(limit=500)
     pets   = []
 
     # If owner pre-selected, load their pets
@@ -357,6 +356,12 @@ def appt_new():
             pets = db.list_pets(owner_id=int(selected_owner_id))
         except (ValueError, TypeError):
             pets = []
+
+    # Only the pre-selected owner is rendered — every other client is found by
+    # typing, against crm.owner_search_json. The old list stopped at 500 owners
+    # and gave no sign that the rest existed.
+    owner = db.get_owner(selected_owner_id) if selected_owner_id else None
+    owners = [owner] if owner else []
 
     # Load staff/doctors for dropdown
     conn = get_db()
@@ -374,7 +379,7 @@ def appt_new():
         appt_types=APPT_TYPES,
         priorities=PRIORITIES,
         channels=CHANNELS,
-        prefill_owner_id=str(prefill_owner_id),
+        prefill_owner_id=str(selected_owner_id or ""),
         prefill_pet_id=str(prefill_pet_id),
         prefill_date=prefill_date,
         active="appointments",
@@ -556,7 +561,13 @@ def api_slots():
 def reception():
     day_str = date.today().isoformat()
     appointments = db.list_appointments(date_from=day_str, date_to=day_str, limit=200)
-    owners = db.list_owners(limit=500)
+    # The lookup box asks the server (crm.owner_search_json) instead of
+    # filtering a rendered slice — it used to hold the newest 500 owners and
+    # label them "N owners registered", so both the search and the count went
+    # quietly wrong as soon as the clinic passed 500 clients.
+    conn = get_db()
+    owner_count = conn.execute("SELECT COUNT(*) AS c FROM owners").fetchone()["c"]
+    conn.close()
 
     # Build quick stats
     total      = len(appointments)
@@ -582,7 +593,7 @@ def reception():
         "appointments/reception.html",
         appointments=appointments,
         agenda=agenda,
-        owners=owners,
+        owner_count=owner_count,
         today_str=day_str,
         status_colors=STATUS_COLORS,
         total=total,

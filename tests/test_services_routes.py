@@ -71,6 +71,12 @@ def _mk_pet(owner_id, pet_name, species="Dog"):
                    (owner_id, pet_name, species))
 
 
+def _search_ids(client, q):
+    """Owner ids the shared type-to-search endpoint returns for `q`."""
+    payload = client.get("/crm/owners/search-json", query_string={"q": q}).get_json()
+    return {o["id"] for o in payload["owners"]}
+
+
 TODAY = date.today().isoformat()
 SOON = (date.today() + timedelta(days=5)).isoformat()
 
@@ -109,12 +115,23 @@ def _mk_booking(owner_id, pet_id, room_id=None, check_in=None, status="Reserved"
         (pet_id, owner_id, room_id, check_in or TODAY, SOON, status))
 
 
-def test_boarding_new_form_lists_owners_and_rooms(auth_client, room, client_pair):
+def test_boarding_new_form_lists_rooms_and_searches_owners(auth_client, room,
+                                                           client_pair):
+    """The owner box must reach every client, not a rendered slice of them.
+
+    This used to assert the Arabic owner appeared in the page. That passed only
+    while the shared test database held fewer owners than the dropdown's
+    LIMIT 300 — the same accident that hides the bug on the demo. The form now
+    renders no owner list at all, so what matters is that it points at the
+    search endpoint, and that the endpoint finds the client.
+    """
     resp = auth_client.get("/boarding/bookings/new")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "TEST-KENNEL" in body
-    assert AR_OWNER in body, "the owner dropdown lost its Arabic name"
+    assert "/crm/owners/search-json" in body, "the owner box has no live search"
+    assert _search_ids(auth_client, AR_OWNER) >= {client_pair["owner_id"]}, \
+        "the owner search cannot find the Arabic-named client"
 
 
 def test_boarding_booking_is_actually_created(app, auth_client, room, client_pair):
@@ -355,13 +372,15 @@ def _mk_groom_booking(owner_id, pet_id, service_id, when=None, status="Scheduled
         (pet_id, owner_id, service_id, "Groomer Hana", when or TODAY, status))
 
 
-def test_grooming_new_form_lists_owners_and_services(auth_client, groom_service,
-                                                     client_pair):
+def test_grooming_new_form_lists_services_and_searches_owners(auth_client,
+                                                              groom_service,
+                                                              client_pair):
     resp = auth_client.get("/grooming/bookings/new")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "Test Full Groom" in body
-    assert AR_OWNER in body
+    assert "/crm/owners/search-json" in body, "the owner box has no live search"
+    assert _search_ids(auth_client, AR_OWNER) >= {client_pair["owner_id"]}
 
 
 def test_grooming_booking_is_actually_created(app, auth_client, groom_service,

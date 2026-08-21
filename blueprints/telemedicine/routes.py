@@ -162,9 +162,9 @@ def new_session():
         flash("Telemedicine session created. Share the room link with the owner.", "success")
         return redirect(url_for("telemedicine.session_detail", sid=sid))
 
-    owners = conn.execute(
-        "SELECT id, full_name, phone FROM owners ORDER BY full_name LIMIT 500"
-    ).fetchall()
+    # Owner picking is a server-side search (crm.owner_search_json); a rendered
+    # slice made clients past the cap unselectable.
+    owners = []
     # Default doctor name from logged-in user
     default_doctor = session.get("user", {}).get("full_name") or session.get("user", {}).get("username", "")
     conn.close()

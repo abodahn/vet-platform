@@ -144,16 +144,17 @@ def test_unconfigured_ai_says_so_instead_of_going_quiet(app, auth_client, monkey
 
 # ═══ bug-503 — header count vs rows shown ═════════════════════════════════════
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="fix belongs in models/database.py count_owners (not owned by this "
-           "agent): its WHERE omits whatsapp_phone, which list_owners searches. "
-           "Add ` OR whatsapp_phone LIKE ?` and a fourth q. Remove this marker "
-           "when that lands.",
-)
 def test_owner_search_count_matches_the_rows_it_returns(app):
-    """Searching a WhatsApp-only number lists the client but heads the page
-    "0 registered clients"."""
+    """Searching a WhatsApp-only number listed the client but headed the page
+    "0 registered clients".
+
+    This carried an xfail(strict) marker because the fix lived in
+    models/database.py count_owners(), outside the reporting agent's ownership.
+    That fix has landed: both queries now build their WHERE from one shared
+    _OWNER_SEARCH_COLS, so the count and the rows cannot disagree again. The
+    strict marker did its job - it failed the build the moment the fix arrived,
+    instead of letting a known gap sit quietly green.
+    """
     with app.app_context():
         _mk_owner("Whatsapp Only Owner", "01777504005",
                   whatsapp_phone="01777504905")

@@ -131,9 +131,9 @@ def bookings_list():
 @login_required
 def booking_new_form():
     conn = get_db()
-    owners = conn.execute(
-        "SELECT id, full_name, phone FROM owners ORDER BY full_name LIMIT 300"
-    ).fetchall()
+    # Owner picking is a server-side search (crm.owner_search_json), not a
+    # rendered slice of the table — see boarding.booking_new_form.
+    owners = []
     services = conn.execute(
         "SELECT * FROM grooming_services WHERE is_active=1 ORDER BY name"
     ).fetchall()
