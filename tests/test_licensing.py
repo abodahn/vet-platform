@@ -223,3 +223,144 @@ def test_phone_tool_contains_no_secret():
         pytest.fail("the phone tool appears to embed a secret: %s" % m.group(0)[:60])
     assert "localStorage" in body and "PBKDF2" in body, (
         "the phone tool should store the master encrypted, not in the file")
+
+
+# ── block mode ───────────────────────────────────────────────────────────────
+#
+# This is the dangerous half of the feature. Every test here exists because the
+# failure it guards against means a clinic cannot open its own patient records.
+
+def _mode(monkeypatch, mode):
+    monkeypatch.setenv("ALEEFY_LICENSE_MODE", mode)
+    # Block mode deliberately refuses to block without a secret - see
+    # test_block_mode_without_a_secret_refuses_to_block - so these tests must
+    # supply one or they would be asserting the safety valve, not the feature.
+    monkeypatch.setenv("ALEEFY_LICENSE_SECRET", "secret-for-block-tests")
+
+
+def _set_state(app, until):
+    with app.app_context():
+        import models.database as db
+        if until is None:
+            db.set_setting("license_valid_until", "", "license")
+        else:
+            db.set_setting("license_valid_until", until.isoformat(), "license")
+
+
+def test_default_mode_blocks_nothing(app, monkeypatch):
+    """The default must stay banner. A deploy that silently starts blocking
+    because someone changed a default would be catastrophic."""
+    monkeypatch.delenv("ALEEFY_LICENSE_MODE", raising=False)
+    assert lic.enforcement_mode() == "banner"
+    _set_state(app, None)
+    with app.app_context():
+        assert lic.is_blocked() is False
+
+
+def test_an_unknown_mode_falls_back_to_banner(app, monkeypatch):
+    """A typo in the env var must not lock a clinic out."""
+    _mode(monkeypatch, "blcok")
+    assert lic.enforcement_mode() == "banner"
+    _set_state(app, None)
+    with app.app_context():
+        assert lic.is_blocked() is False
+
+
+def test_block_mode_blocks_a_never_activated_copy(app, monkeypatch):
+    _mode(monkeypatch, "block")
+    _set_state(app, None)
+    with app.app_context():
+        assert lic.is_blocked() is True
+
+
+def test_block_mode_allows_an_active_licence(app, monkeypatch):
+    _mode(monkeypatch, "block")
+    _set_state(app, date.today() + timedelta(days=100))
+    with app.app_context():
+        assert lic.is_blocked() is False
+
+
+def test_a_late_payer_is_not_locked_out_mid_week(app, monkeypatch):
+    """QUIET_DAYS of slack after expiry. A renewal that slips by a fortnight
+    must never interrupt a consultation."""
+    _mode(monkeypatch, "block")
+    _set_state(app, date.today() - timedelta(days=14))
+    with app.app_context():
+        assert lic.is_blocked() is False
+
+
+def test_a_long_lapsed_licence_does_block(app, monkeypatch):
+    _mode(monkeypatch, "block")
+        # 75 days: past QUIET_DAYS, still inside AUTO_GRACE_DAYS
+    _set_state(app, date.today() - timedelta(days=75))
+    with app.app_context():
+        assert lic.is_blocked() is True
+
+
+def test_auto_grace_is_never_blocked(app, monkeypatch):
+    """The safety valve. If the vendor is ill, unreachable, has lost the master
+    secret or has sold the business, no clinic may be bricked by it."""
+    _mode(monkeypatch, "block")
+    for days in (95, 200, 3000):
+        _set_state(app, date.today() - timedelta(days=days))
+        with app.app_context():
+            assert lic.is_blocked() is False, "%d days past expiry was blocked" % days
+
+
+def test_a_broken_licence_module_fails_open(app, monkeypatch):
+    """If reading the licence raises, the answer must be ALLOW. A bug in this
+    file must never be the reason a clinic cannot open its records."""
+    _mode(monkeypatch, "block")
+    monkeypatch.setattr(lic, "status",
+                        lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    with app.app_context():
+        assert lic.is_blocked() is False
+
+
+def test_the_licence_page_is_always_reachable(app):
+    """Without this a clinic holding a valid code could never type it in."""
+    assert "system.license_page" in lic.ALWAYS_ALLOWED
+    assert "auth.login" in lic.ALWAYS_ALLOWED
+    assert "auth.logout" in lic.ALWAYS_ALLOWED
+    assert "static" in lic.ALWAYS_ALLOWED
+
+
+def test_the_blocked_page_says_the_records_are_safe():
+    """Somebody seeing this screen for the first time assumes their data is
+    gone. Both languages must say plainly that it is not."""
+    body = open("templates/system/blocked.html", encoding="utf-8").read()
+    assert "Nothing has been deleted" in body
+    assert "لم يُحذف أي شيء" in body
+    assert "url_for('system.license_page')" in body   # can actually activate
+    assert "url_for('auth.logout')" in body           # and can get out
+
+
+def test_block_reason_never_sounds_like_a_crash(app):
+    with app.app_context():
+        _set_state(app, None)
+        r = lic.block_reason()
+        assert "records are safe" in r
+        for scary in ("error", "failed", "exception", "denied", "corrupt"):
+            assert scary not in r.lower()
+
+
+def test_block_mode_without_a_secret_refuses_to_block(app, monkeypatch):
+    """Blocking with no secret configured would be a permanent lockout: every
+    page held, and every activation code refused with 'no_secret'. There would
+    be no way back in through the front door. It must fail open and log."""
+    monkeypatch.setenv("ALEEFY_LICENSE_MODE", "block")
+    monkeypatch.delenv("ALEEFY_LICENSE_SECRET", raising=False)
+    _set_state(app, None)
+    with app.app_context():
+        assert lic.clinic_secret() == b""
+        assert lic.is_blocked() is False, (
+            "blocked with no secret - nothing could ever unblock this install")
+
+
+def test_block_mode_with_a_secret_does_block(app, monkeypatch):
+    """The other half: once a secret exists, blocking is recoverable and on."""
+    monkeypatch.setenv("ALEEFY_LICENSE_MODE", "block")
+    monkeypatch.setenv("ALEEFY_LICENSE_SECRET", "a-real-secret")
+    _set_state(app, None)
+    with app.app_context():
+        assert lic.is_blocked() is True

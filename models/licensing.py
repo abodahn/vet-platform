@@ -53,16 +53,34 @@ Each clinic gets its OWN secret, derived from your master secret and their
 clinic id. A secret lifted from one installation mints codes for that machine
 only. The master secret never leaves your laptop and is never in this repo.
 
-IT NEVER LOCKS ANYBODY OUT
+ENFORCEMENT
 
-An expired licence shows a banner. That is all it does. These are patient
-records, and a vet locked out at 11pm with a sick animal on the table would end
-the product's reputation in a market where every clinic knows every other one.
+ALEEFY_LICENSE_MODE decides what an unlicensed installation may do.
 
-If no code has been issued for 90 days past expiry, the installation grants
-itself permanent grace and stops asking. That is deliberate: if you are ill,
-travelling or unreachable, no clinic is left stranded, and a buyer asking "what
-happens if he disappears" has a real answer.
+  banner   (default) A notice, and nothing else. Every screen keeps working.
+  block    An installation that has NEVER been activated is held at the licence
+           screen until a code is entered. One that WAS activated and has since
+           lapsed is held too, but only after the quiet period.
+
+"block" is what a vendor wants: a copy handed to another clinic does nothing
+until you are phoned. The blast radius is deliberately limited, because the
+thing being withheld is a clinic's patient records:
+
+  - Never-activated is the safe case to block. There is no data in it yet, and
+    nobody is mid-consultation. This is ordinary activate-before-use.
+  - A lapsed licence gets QUIET_DAYS of silence, then a banner, and only after
+    that does it block. A clinic that pays late is inconvenienced, not stranded
+    in the middle of a Tuesday.
+  - AUTO_GRACE_DAYS past expiry the installation gives itself permanent grace
+    and is NEVER blocked again. If the vendor is ill, travelling, has lost the
+    master secret or has sold the business, no clinic is bricked by it. This
+    protects the vendor as much as the clinic.
+  - The licence screen, signing in and out, the health check and static files
+    always stay reachable, or the clinic could not activate even with a valid
+    code in their hand.
+
+A blocked screen says what is wrong and who to call. It never pretends to be a
+crash, and it never suggests the records are gone.
 """
 import hashlib
 import hmac
@@ -292,3 +310,85 @@ def banner() -> str:
     except Exception:
         logger.debug("licence banner suppressed", exc_info=True)
         return ""
+
+
+# ── enforcement ───────────────────────────────────────────────────────────────
+
+# Endpoints reachable even while blocked. Without the licence page itself a
+# clinic holding a perfectly good code could never type it in, and without
+# auth.login they could not reach the licence page in the first place.
+ALWAYS_ALLOWED = frozenset({
+    "system.license_page",
+    "auth.login", "auth.logout",
+    "static",
+    # Health checks must answer even while blocked. A blocked install that
+    # cannot answer /healthz looks to monitoring exactly like a server that has
+    # fallen over, and someone gets paged at 3am for a licence renewal.
+    # Endpoint names verified against the live url_map, not guessed.
+    "_healthz", "public_api.health",
+})
+
+
+def enforcement_mode() -> str:
+    """'banner' (default) or 'block'. Deployment decides, not the code."""
+    mode = (os.environ.get("ALEEFY_LICENSE_MODE") or "banner").strip().lower()
+    return mode if mode in ("banner", "block") else "banner"
+
+
+def is_blocked(st=None) -> bool:
+    """Whether this installation should be held at the licence screen.
+
+    Only ever true in block mode. Note what is NOT blocked:
+
+      grace   - past AUTO_GRACE_DAYS the installation has given up asking, on
+                purpose. An unreachable vendor must not brick a clinic.
+      lapsed  - inside the quiet period. A late payer gets QUIET_DAYS before
+                anything stops, so a renewal that slips never interrupts a
+                consultation.
+    """
+    if enforcement_mode() != "block":
+        return False
+
+    # Block mode with no secret configured is a TRAP, not a lock: status()
+    # would say unlicensed, this would block every page, and check_code() would
+    # refuse every code with "no_secret" - so nothing could ever unblock it.
+    # An install that cannot be rescued from its own front door is worse than
+    # one that is not locked at all, so refuse to block and say why, loudly.
+    if not clinic_secret():
+        logger.error(
+            "ALEEFY_LICENSE_MODE=block but ALEEFY_LICENSE_SECRET is not set. "
+            "Refusing to block: with no secret no activation code could ever "
+            "be accepted, so this would lock the clinic out permanently. "
+            "Install the secret with scripts/install_license_secret.sh.")
+        return False
+
+    try:
+        st = status() if st is None else st
+    except Exception:
+        # If the licence state cannot be read, ALLOW. A bug in this module must
+        # never be the reason a clinic cannot open its own records.
+        logger.debug("licence state unreadable - allowing", exc_info=True)
+        return False
+
+    state = st.get("state")
+    if state == "unlicensed":
+        return True
+    if state == "lapsed":
+        days_past = -(st.get("days_left") or 0)
+        return days_past > QUIET_DAYS
+    return False        # active, expiring, grace
+
+
+def block_reason(st=None) -> str:
+    """One sentence for the blocked screen. Must never sound like a crash."""
+    try:
+        st = status() if st is None else st
+    except Exception:
+        return ""
+    if st.get("state") == "unlicensed":
+        return ("This copy has not been activated yet. Your records are safe - "
+                "nothing has been lost. Contact your supplier with the number "
+                "below and they will give you an activation code.")
+    return ("Your licence expired on %s. Your records are safe and nothing has "
+            "been deleted. Contact your supplier with the number below to renew."
+            % (st.get("valid_until") or ""))

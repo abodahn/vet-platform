@@ -339,6 +339,27 @@ def create_app(cfg=None) -> Flask:
                 flash("Please sign in to this clinic.", "warning")
                 return redirect(url_for("auth.login"))
 
+        # Licence gate. Only ever active when ALEEFY_LICENSE_MODE=block; in the
+        # default banner mode is_blocked() returns False and this costs one
+        # dict lookup. Placed AFTER tenancy resolution so a blocked clinic is
+        # still the right clinic, and BEFORE anything that does real work.
+        #
+        # It renders a page rather than redirecting: a redirect loop is what
+        # this would become if the licence page itself were ever caught by the
+        # gate, and a clinic staring at a browser error learns nothing.
+        try:
+            from models import licensing
+            if (request.endpoint not in licensing.ALWAYS_ALLOWED
+                    and not (request.path or "").startswith("/static/")
+                    and licensing.is_blocked()):
+                return render_template("system/blocked.html",
+                                       lic=licensing.status(),
+                                       reason=licensing.block_reason()), 402
+        except Exception:
+            # A fault in licensing must never be the reason a clinic cannot
+            # open its own records. Fail OPEN, loudly.
+            logger.exception("licence gate failed - allowing the request")
+
         # Session timeout check
         if sec.check_session_timeout():
             session.clear()

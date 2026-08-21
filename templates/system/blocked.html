@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="{{ current_lang or 'en' }}"
+      dir="{{ 'rtl' if (current_lang or 'en') == 'ar' else 'ltr' }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ t('Activation required', 'التفعيل مطلوب') }} — {{ clinic.name if clinic else app_title }}</title>
+<style>
+/* Standalone, not extending base.html: base carries the sidebar and the whole
+   navigation, and offering a person a menu they cannot use is a worse
+   experience than a clear, quiet page that says exactly what to do. */
+:root{
+  --bg:#F4F7F6; --card:#FFFFFF; --ink:#12241F; --muted:#5B7169;
+  --line:#DCE6E2; --brand:#1B6B5C; --warn:#8A6A21; --warn-bg:#FDF8EC;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1512; --card:#132420; --ink:#EAF3F0; --muted:#8FADA5;
+    --line:#24413A; --brand:#3FBF9F; --warn:#E8C97A; --warn-bg:#2A2413;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1512; --card:#132420; --ink:#EAF3F0; --muted:#8FADA5;
+  --line:#24413A; --brand:#3FBF9F; --warn:#E8C97A; --warn-bg:#2A2413;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--ink);
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:24px;font-size:15px;line-height:1.65;
+}
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:16px;
+  max-width:540px;width:100%;padding:34px 32px;
+  box-shadow:0 4px 28px rgba(0,0,0,.07);
+}
+.mark{font-size:34px;margin-bottom:10px}
+h1{font-size:21px;font-weight:800;margin-bottom:12px}
+p{color:var(--muted);margin-bottom:18px}
+.safe{
+  background:var(--warn-bg);border:1px solid var(--line);border-radius:10px;
+  padding:13px 16px;font-size:13.5px;color:var(--warn);margin-bottom:22px;
+}
+.numbox{
+  background:var(--bg);border:1px solid var(--line);border-radius:12px;
+  padding:18px;text-align:center;margin-bottom:22px;
+}
+.numlbl{
+  font-size:11px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--muted);margin-bottom:7px;
+}
+.num{
+  font-size:30px;font-weight:900;letter-spacing:.06em;
+  font-variant-numeric:tabular-nums;color:var(--brand);
+  user-select:all;-webkit-user-select:all;
+}
+form{display:flex;gap:9px;margin-bottom:16px}
+input{
+  flex:1;padding:13px 15px;border:1px solid var(--line);border-radius:10px;
+  background:var(--bg);color:var(--ink);font-size:17px;font-family:inherit;
+  letter-spacing:.04em;
+}
+input:focus{outline:2px solid var(--brand);outline-offset:1px}
+button{
+  background:var(--brand);color:#fff;border:none;border-radius:10px;
+  padding:13px 24px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;
+}
+.flash{
+  padding:11px 14px;border-radius:9px;margin-bottom:16px;font-size:13.5px;
+  background:var(--warn-bg);color:var(--warn);border:1px solid var(--line);
+}
+.foot{
+  font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);
+  padding-top:16px;margin-top:4px;
+}
+.foot a{color:var(--brand)}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="mark">🔑</div>
+  <h1>{{ t('Activation required', 'التفعيل مطلوب') }}</h1>
+
+  <p>{{ reason }}</p>
+
+  {# The single most important sentence on this page. Somebody looking at this
+     screen for the first time assumes their records are gone. #}
+  <div class="safe">
+    {{ t('Nothing has been deleted. All of your patients, visits and invoices are exactly as you left them, and return the moment a code is entered.',
+         'لم يُحذف أي شيء. كل المرضى والزيارات والفواتير كما تركتها تماماً، وتعود فور إدخال كود التفعيل.') }}
+  </div>
+
+  {% with msgs = get_flashed_messages() %}
+    {% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}
+  {% endwith %}
+
+  <div class="numbox">
+    <div class="numlbl">{{ t('Read this number to your supplier', 'اقرأ هذا الرقم لمزوّد النظام') }}</div>
+    <div class="num">{{ lic.challenge }}</div>
+  </div>
+
+  <form method="post" action="{{ url_for('system.license_page') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <input name="code" required autocomplete="off" inputmode="numeric"
+           placeholder="2708-4471-8823" aria-label="{{ t('Activation code', 'كود التفعيل') }}">
+    <button type="submit">{{ t('Activate', 'تفعيل') }}</button>
+  </form>
+
+  <div class="foot">
+    {% if clinic and clinic.phone %}
+      {{ t('Your clinic', 'عيادتك') }}: {{ clinic.name }} · {{ clinic.phone }}<br>
+    {% endif %}
+    <a href="{{ url_for('auth.logout') }}">{{ t('Sign out', 'تسجيل الخروج') }}</a>
+  </div>
+
+</div>
+</body>
+</html>
