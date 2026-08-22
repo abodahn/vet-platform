@@ -172,3 +172,43 @@ def test_no_licence_signing_material_is_tracked():
         + "\n\nRotating this is not like rotating a password: every activation "
           "code already issued stops working, and every clinic has to be phoned."
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The rotation tool
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_the_rotation_tool_covers_every_known_leak():
+    """scripts/rotate_demo_passwords.py exists to stop a published password
+    opening anything. If a password is listed as leaked here but the tool does
+    not try it, an account keeps using it and nobody finds out."""
+    src = _read("scripts/rotate_demo_passwords.py")
+    assert src, "the rotation tool is missing"
+    for pw in KNOWN_LEAKED:
+        assert pw in src, (
+            "%s is a known leaked password but the rotation tool never tries "
+            "it, so an account still using it would be missed" % pw)
+
+
+def test_the_rotation_tool_never_touches_the_admin_account():
+    """The owner chose the admin password themselves and signs in with it.
+    Rotating it here would lock them out of their own system with no warning
+    and no way back except a shell on the server."""
+    src = _read("scripts/rotate_demo_passwords.py")
+    assert 'PROTECTED_USERNAMES = {"admin"}' in src, (
+        "admin is no longer protected from rotation")
+    assert 'if r["username"] in PROTECTED_USERNAMES:' in src, (
+        "the protection is declared but never applied")
+
+
+def test_rotated_passwords_are_never_printed_to_the_terminal():
+    """They go to a file the caller names. A password in a terminal scrollback
+    survives the session, and often a screen share."""
+    src = _read("scripts/rotate_demo_passwords.py")
+    assert "--out" in src, "there is no file to write the new passwords to"
+    assert "NOT printed here" in src, "the tool does not promise to stay quiet"
+    # The password variable must never reach a print().
+    import re
+    for m in re.finditer(r"print\((.*)\)", src):
+        assert "new" not in m.group(1).split("%")[0].replace("new passwords", ""), (
+            "a print() looks like it emits a generated password: %s" % m.group(0)[:70])
