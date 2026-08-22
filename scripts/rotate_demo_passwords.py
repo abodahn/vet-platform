@@ -64,7 +64,7 @@ def _new_password() -> str:
     return "Aleefy-%s!" % body
 
 
-def _run(conn, apply_it, out_path):
+def _run(conn, apply_it, out_path, shared=None):
     rows = [dict(r) for r in conn.execute(
         "SELECT id, username, full_name, role, is_active FROM users"
         " ORDER BY role, username").fetchall()]
@@ -108,15 +108,23 @@ def _run(conn, apply_it, out_path):
         print("  nobody can sign into is not a demo.")
         return 2
 
+    # A demo is meant to be signed into, repeatedly, in front of somebody. One
+    # shared password keeps that possible; fourteen separate ones mean fumbling
+    # through a list to show a vet what reception sees. The security that
+    # matters here is only that the password is not a PUBLISHED one.
     lines = ["Aleefy demo accounts - rotated passwords",
              "PRINT THIS, STORE IT, THEN DELETE THIS FILE.",
              ""]
+    if shared:
+        lines.append("All accounts below share this password: %s" % shared)
+        lines.append("")
     for r, _pw in affected:
-        new = _new_password()
+        new = shared or _new_password()
         conn.execute("UPDATE users SET password_hash=? WHERE id=?",
                      (db._hash_password(new), r["id"]))
         lines.append("%-20s %-18s %s"
-                     % (r["username"], r["role"] or "-", new))
+                     % (r["username"], r["role"] or "-",
+                        "(shared)" if shared else new))
     conn.commit()
 
     io.open(out_path, "w", encoding="utf-8").write("\n".join(lines) + "\n")
@@ -135,7 +143,14 @@ def main():
                     help="clinic slug on a multi-clinic deployment, or 'all'")
     ap.add_argument("--out", default="",
                     help="file to write the new passwords to (required with --apply)")
+    ap.add_argument("--same", action="store_true",
+                    help="give every account ONE shared new password, so a demo "
+                         "stays demonstrable. Still refuses any published one.")
     args = ap.parse_args()
+
+    shared = _new_password() if args.same else None
+    if shared and shared in LEAKED:            # belt and braces
+        shared = _new_password()
 
     app = create_app(Config)
     with app.app_context():
@@ -162,14 +177,14 @@ def main():
             if slug is None:
                 conn = db.get_db()
                 try:
-                    rc |= _run(conn, args.apply, args.out)
+                    rc |= _run(conn, args.apply, args.out, shared)
                 finally:
                     conn.close()
             else:
                 with tenancy.use(slug):
                     conn = db.get_db()
                     try:
-                        rc |= _run(conn, args.apply, args.out)
+                        rc |= _run(conn, args.apply, args.out, shared)
                     finally:
                         conn.close()
             print("")

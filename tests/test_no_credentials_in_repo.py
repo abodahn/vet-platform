@@ -30,6 +30,10 @@ KNOWN_LEAKED = [
 # Where a credential is legitimately named in order to REFUSE it.
 ALLOWED = {
     "scripts/preflight.py",              # denylist: refuses to boot if in use
+    # Also a denylist: it TRIES each leaked password against every account so
+    # it can rotate whatever still answers to one. It has to name them to do
+    # that, and a test that forbade it would forbid the fix.
+    "scripts/rotate_demo_passwords.py",
     "tests/test_no_credentials_in_repo.py",
     "docs/AUDIT_FINDINGS.md",            # historical audit record — see below
 }
