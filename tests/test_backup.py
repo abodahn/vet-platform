@@ -275,11 +275,26 @@ def test_offsite_is_skipped_cleanly_when_unset(live):
 
 
 def test_offsite_folder_copy(live, tmp_path, monkeypatch):
+    """UPDATED when off-site copies became encrypted.
+
+    An off-site copy leaves the building - this is the USB-stick case - so it
+    is now sealed before it goes and arrives as <name>.enc. The key is set here
+    because without one the copy is refused outright, which is the subject of
+    tests/test_backup_encryption.py rather than of this one.
+    """
+    from cryptography.fernet import Fernet
+    monkeypatch.setenv("BACKUP_ENCRYPTION_KEY", Fernet.generate_key().decode())
     usb = tmp_path / "usb"
     monkeypatch.setenv("BACKUP_OFFSITE_DIR", str(usb))
     result = bk.run_backup()
     assert result["offsite"][0]["ok"] is True
-    assert (usb / result["filename"]).exists()
+
+    landed = usb / (result["filename"] + bk.ENCRYPTED_SUFFIX)
+    assert landed.exists(), "nothing arrived on the stick: %s" % list(usb.iterdir())
+    assert not (usb / result["filename"]).exists(), (
+        "an unencrypted archive was written to the stick as well")
+    assert b"SQLite format 3" not in landed.read_bytes(), (
+        "what landed is still a readable database")
 
 
 def test_offsite_failure_does_not_fail_the_local_backup(live, tmp_path, monkeypatch):
@@ -293,6 +308,11 @@ def test_offsite_failure_does_not_fail_the_local_backup(live, tmp_path, monkeypa
 
 
 def test_s3_upload_is_signed_and_uses_path_style(live, monkeypatch):
+    # Set for the same reason as the folder test: an unkeyed off-site copy is
+    # refused before it reaches the transport, so without this the signing
+    # logic under test is never exercised at all.
+    from cryptography.fernet import Fernet
+    monkeypatch.setenv("BACKUP_ENCRYPTION_KEY", Fernet.generate_key().decode())
     monkeypatch.setenv("BACKUP_S3_ENDPOINT", "https://s3.eu-central-003.backblazeb2.com")
     monkeypatch.setenv("BACKUP_S3_BUCKET", "clinic-backups")
     monkeypatch.setenv("BACKUP_S3_KEY", "AKIAEXAMPLE")
@@ -311,7 +331,13 @@ def test_s3_upload_is_signed_and_uses_path_style(live, monkeypatch):
     result = bk.run_backup()
     assert result["offsite"][0]["ok"] is True
     url, kw = calls[0]
-    assert url.endswith(f"/clinic-backups/{result['filename']}")
+    # .enc: what goes to the bucket is the sealed copy, not the archive. The
+    # object key still carries the archive name so it can be matched back to a
+    # local backup by eye.
+    assert url.endswith(
+        f"/clinic-backups/{result['filename']}{bk.ENCRYPTED_SUFFIX}")
+    assert result["filename"] in url, (
+        "the object name no longer identifies which backup it is")
     auth = kw["headers"]["Authorization"]
     assert auth.startswith("AWS4-HMAC-SHA256 Credential=AKIAEXAMPLE/")
     assert "eu-central-003/s3/aws4_request" in auth

@@ -644,10 +644,18 @@ def accept_upload(fileobj, filename: str) -> dict:
     # Only the EXTENSION is taken from the submitted name — the destination
     # name is generated here, so a hostile filename has nothing to steer.
     base = os.path.basename(str(filename).replace("\\", "/")).strip()
+
+    # An off-site copy is encrypted, so the file somebody carries back from the
+    # bucket or the USB stick ends in .enc. Refusing it here would make the
+    # off-site copies write-only - technically backed up, practically not.
+    encrypted = base.endswith(ENCRYPTED_SUFFIX)
+    if encrypted:
+        base = base[:-len(ENCRYPTED_SUFFIX)]
+
     if not base.endswith(ARCHIVE_EXTS):
         return {"success": False,
                 "message": "Only .db (SQLite) or .dump (PostgreSQL) backup files "
-                           "can be uploaded."}
+                           "can be uploaded, encrypted (.enc) or not."}
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     ext = os.path.splitext(base)[1]
@@ -664,6 +672,27 @@ def accept_upload(fileobj, filename: str) -> dict:
         return {"success": False, "message": "Could not store the uploaded file."}
     fileobj.save(dest)
 
+    if encrypted:
+        # Decrypt in place, so everything downstream - verification, the
+        # restore list, the restore itself - sees an ordinary archive and needs
+        # to know nothing about encryption.
+        try:
+            enc_tmp = dest + ENCRYPTED_SUFFIX
+            os.replace(dest, enc_tmp)
+            decrypt_archive(enc_tmp, dest)
+            os.remove(enc_tmp)
+        except Exception as exc:
+            for leftover in (dest, dest + ENCRYPTED_SUFFIX):
+                try:
+                    if os.path.exists(leftover):
+                        os.remove(leftover)
+                except OSError:
+                    pass
+            # The message from decrypt_archive distinguishes "wrong key" from
+            # "damaged file", which is the difference between a five-minute fix
+            # and a lost backup.
+            return {"success": False, "message": str(exc)[:400]}
+
     check = verify_backup(os.path.basename(dest))
     if not check["success"]:
         os.remove(dest)
@@ -677,6 +706,66 @@ def accept_upload(fileobj, filename: str) -> dict:
 # ─────────────────────────────────────────────────────────────────
 # Off-site copies
 # ─────────────────────────────────────────────────────────────────
+
+ENCRYPTED_SUFFIX = ".enc"
+
+
+def encryption_key() -> bytes:
+    """The key an off-site copy is encrypted with, or b"" if none is set.
+
+    Off-site means the archive leaves the building - onto somebody else's
+    storage, or onto a USB stick that travels in a pocket. It holds every
+    patient record, every client's phone number and every invoice the clinic
+    has ever raised. The LOCAL copy is deliberately left in the clear: it sits
+    on the clinic's own disk beside the database it came from, and an encrypted
+    local backup whose key has been lost is not a backup at all.
+    """
+    raw = (os.environ.get("BACKUP_ENCRYPTION_KEY") or "").strip()
+    return raw.encode("utf-8") if raw else b""
+
+
+def _encrypt_for_offsite(path: str) -> str:
+    """Encrypt an archive for transport. Returns the path to send.
+
+    Fernet: AES-128-CBC with an HMAC, from `cryptography`, which is already a
+    dependency for TOTP secrets - no new package for a backup path.
+    """
+    from cryptography.fernet import Fernet
+
+    key = encryption_key()
+    token = Fernet(key).encrypt(open(path, "rb").read())
+    dest = path + ENCRYPTED_SUFFIX
+    with open(dest, "wb") as fh:
+        fh.write(token)
+    return dest
+
+
+def decrypt_archive(path: str, out_path: str = "") -> str:
+    """Turn a .enc archive back into a restorable one.
+
+    Used by restore_backup when an encrypted file is uploaded, and by
+    scripts/verify_backup_key.py, which exists so the key can be proven to work
+    on a day when nothing is on fire.
+    """
+    from cryptography.fernet import Fernet, InvalidToken
+
+    key = encryption_key()
+    if not key:
+        raise RuntimeError(
+            "This archive is encrypted but BACKUP_ENCRYPTION_KEY is not set. "
+            "Without the key it cannot be restored, by anyone.")
+    try:
+        clear = Fernet(key).decrypt(open(path, "rb").read())
+    except InvalidToken:
+        raise RuntimeError(
+            "BACKUP_ENCRYPTION_KEY does not decrypt this archive. It is the "
+            "wrong key - the data is not damaged, but this key cannot open it.")
+    dest = out_path or (path[:-len(ENCRYPTED_SUFFIX)]
+                        if path.endswith(ENCRYPTED_SUFFIX) else path + ".dec")
+    with open(dest, "wb") as fh:
+        fh.write(clear)
+    return dest
+
 
 def offsite_targets() -> list[dict]:
     """Configured off-site targets. Empty list means none — which is itself
@@ -700,22 +789,90 @@ def copy_offsite(path: str) -> list[dict]:
     reported failure — but it is logged at ERROR and notified, because a
     silently missing off-site copy is the failure mode this exists to prevent.
     """
-    results = []
-    for target in offsite_targets():
+    targets = offsite_targets()
+    if not targets:
+        return []
+
+    # Configuration faults are reported BEFORE the encryption gate. A target
+    # that is half-configured cannot send anything anyway, and "S3 is
+    # half-configured" is the message that tells somebody what to go and fix -
+    # whereas "no encryption key" sends them to the wrong problem.
+    misconfigured = []
+    for t in targets:
+        if t["kind"] == "s3":
+            missing = [n for n, v in (
+                ("BACKUP_S3_ENDPOINT", os.environ.get("BACKUP_S3_ENDPOINT", "").strip()),
+                ("BACKUP_S3_BUCKET", os.environ.get("BACKUP_S3_BUCKET", "").strip()),
+                ("BACKUP_S3_KEY", os.environ.get("BACKUP_S3_ACCESS_KEY", "").strip()
+                 or os.environ.get("BACKUP_S3_KEY", "").strip()),
+                ("BACKUP_S3_SECRET", os.environ.get("BACKUP_S3_SECRET_KEY", "").strip()
+                 or os.environ.get("BACKUP_S3_SECRET", "").strip()),
+            ) if not v]
+            if missing:
+                err = ("S3 off-site is half-configured - need %s"
+                       % ", ".join(missing))
+                logger.error("OFF-SITE MISCONFIGURED: %s", err)
+                _alert("Off-site backup is misconfigured", err)
+                misconfigured.append({**t, "ok": False, "error": err})
+    if misconfigured:
+        # Only the broken ones are reported here; a folder target alongside a
+        # broken S3 target still goes, once the key gate below is satisfied.
+        broken = {id(m) for m in misconfigured}
+        targets = [t for t in targets
+                   if not any(m["label"] == t["label"] for m in misconfigured)]
+        if not targets:
+            return misconfigured
+
+    # FAIL CLOSED. Without a key this would put every patient record, every
+    # client phone number and every invoice onto storage the clinic does not
+    # control, in the clear. Refusing to send is recoverable - somebody sets
+    # the key and tomorrow's backup goes. Sending is not: it cannot be recalled
+    # from a bucket, a NAS or a USB stick somebody already has.
+    if not encryption_key():
+        msg = ("BACKUP_ENCRYPTION_KEY is not set, so the off-site copy was NOT "
+               "sent. The local backup succeeded. Set the key - see "
+               "scripts/verify_backup_key.py - and the next nightly run will "
+               "send it.")
+        logger.error("OFF-SITE SKIPPED: %s", msg)
+        _alert("Off-site backup not sent - no encryption key", msg)
+        return misconfigured + [
+            {**t, "ok": False, "error": "no encryption key"} for t in targets]
+
+    try:
+        sendable = _encrypt_for_offsite(path)
+    except Exception as exc:
+        logger.error("Could not encrypt %s for off-site: %s",
+                     os.path.basename(path), exc)
+        _alert("Off-site backup not sent - encryption failed", str(exc)[:400])
+        return misconfigured + [
+            {**t, "ok": False, "error": "encryption failed"} for t in targets]
+
+    results = list(misconfigured)
+    for target in targets:
         try:
             if target["kind"] == "folder":
-                _copy_to_folder(path, target["label"])
+                _copy_to_folder(sendable, target["label"])
             else:
-                _s3_put(path)
-            logger.info("Off-site copy OK (%s): %s", target["kind"],
-                        os.path.basename(path))
+                _s3_put(sendable)
+            logger.info("Off-site copy OK (%s, encrypted): %s", target["kind"],
+                        os.path.basename(sendable))
             results.append({**target, "ok": True, "error": ""})
         except Exception as exc:
             logger.error("OFF-SITE COPY FAILED (%s -> %s): %s",
-                         os.path.basename(path), target["label"], exc)
+                         os.path.basename(sendable), target["label"], exc)
             results.append({**target, "ok": False, "error": str(exc)[:300]})
             _alert("Off-site backup copy failed",
                    f"{target['label']}: {exc}"[:400])
+
+    # The encrypted copy was a transport artefact. Leaving it beside the real
+    # archives doubles the disk the backup directory uses and confuses the
+    # restore list with files the local restore path cannot read directly.
+    try:
+        if sendable != path and os.path.exists(sendable):
+            os.remove(sendable)
+    except OSError:
+        logger.debug("could not remove the temporary encrypted archive",
+                     exc_info=True)
     return results
 
 
