@@ -72,7 +72,16 @@ it. Multi-branch is not implemented either.
 compatibility layer with raw SQL strings scattered across 34 blueprints — roughly 800 statements. SQLAlchemy
 users retrofit tenancy with a global query filter hook; here there is no such hook and no place to put one.
 Every `SELECT`, `INSERT` and `JOIN` would need a `clinic_id` predicate added by hand, and a single missed one is
-a silent cross-clinic data leak in a system holding patient records. **Realistic effort: 40–60 developer-days,
+a silent cross-clinic data leak in a system holding patient records.
+
+> **Superseded 2026-08-23.** Multi-tenancy shipped: subdomain routing with a
+> database per clinic (`models/tenancy.py`), tenant-scoped sessions, migrations
+> and backups, covered by `tests/test_tenancy.py`,
+> `tests/test_tenant_migrations.py` and `tests/test_backup_tenant_scope.py`.
+> The effort estimate below is left in place as a record of what was expected,
+> not as a statement of what remains.
+
+**Realistic effort (as estimated then): 40–60 developer-days,
 with a high residual risk of leakage that no test suite would catch.**
 
 **Consequence — accept it and design around it.** This is the right call, not a compromise:
@@ -579,7 +588,7 @@ this codebase.
 | | **Total** | **~25** | |
 
 **Explicitly NOT in this list, and why:**
-- *Multi-tenancy* — 40–60 days, high leak risk, and the business model works without it (§1.1).
+- ~~*Multi-tenancy* — 40–60 days~~ — **DONE, August 2026.** Database-per-clinic, subdomain-routed. The leak this warned about was real, was found live, and is fixed and tested.
 - *Licensing* — customer 1 will not copy it; solve it commercially by hosting (§1.5).
 - *RBAC rollout* — the Roles screen lies today, but at one customer you know the staff. Not at ten.
 - *Owner portal, payments, offline* — none of these lose you customer 1.
@@ -606,7 +615,7 @@ this codebase.
 | **True offline / PWA** | 15+ | Probably never (§2.6). Sell a UPS and a 4G dongle instead. Revisit only when a named customer's connectivity provably blocks a sale. |
 | **Multi-branch scoping** (real `branch_id` enforcement) | 12 | When you have a chain prospect. Not before. |
 | **Lab machine integration** (IDEXX etc.) | 10+ | Asked about in demos, rarely decisive at the price point Egyptian single-site clinics pay. |
-| **Multi-tenancy retrofit** | 40–60 | Almost certainly never (§1.1). One container per clinic is the correct architecture for this business. |
+| ~~**Multi-tenancy retrofit**~~ | ~~40–60~~ **0 — shipped** | Done in August 2026, and by database-per-clinic rather than a `clinic_id` column, so isolation is physical. |
 | **Label printing, prescription PDFs** | 3 | Genuinely useful, genuinely not a blocker. |
 | **Clinical decision support wiring** | 5 | `blueprints/cds/` exists and is deliberately non-blocking because its drug data is marked DRAFT (`app.py:140-146`). That was the right call. Gate on data review, not on code. |
 

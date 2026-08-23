@@ -423,16 +423,25 @@ in the deliverable, the code handles its absence cleanly ("server dir not found 
 skipping"), and the live AI path is plain HTTP to OpenRouter. It is dead code,
 not a dependency.
 
-### 8.2 The product is single-tenant, structurally
+### 8.2 The product is multi-tenant, by database
 
-No table carries an enforced `clinic_id`. One clinic = one deployment. The
-readiness document estimates a multi-tenancy retrofit at 40–60 developer-days.
-This constrains the hosting model and therefore the unit economics — it is a
-commercial fact, not just an engineering one.
+**Corrected 2026-08-23 — this section previously said single-tenant.**
+
+One deployment serves many clinics, resolved by subdomain, each with its own
+database (`models/tenancy.py`). No table carries a `clinic_id`, and that is now
+the design rather than the gap: isolation is physical, so a query that forgets
+its filter cannot reach another clinic's data — there is no connection to it.
+
+The commercial consequence has flipped. A hosted, per-clinic-subdomain model is
+available, which is what the unit economics of a subscription business need. What
+remains true is that N clinics means N databases to back up, migrate and monitor
+— a running cost, not an architectural ceiling.
+
+The 40–60 developer-day retrofit the readiness document estimated is done.
 
 ### 8.3 The green test suite does not cover the production database
 
-549 tests pass on SQLite. The PostgreSQL CI job is non-blocking because
+2,223 tests pass on SQLite (549 when this was written). The PostgreSQL CI job is non-blocking because
 `tests/test_postgres_full.py` calls `configure_postgres(dbname="vetclinic")` at
 module scope with hardcoded credentials — importing it would point the whole
 suite at a production database, so it is excluded from collection. Until that is

@@ -2,7 +2,7 @@
 
 **Asset:** Aleefy — veterinary clinic ERP, Python/Flask + PostgreSQL, ~28,000 LOC, 170 templates, 73 tables, ~380 routes, 549 passing tests, CI, Alembic migrations, 28 modules, fully bilingual Arabic/English with real RTL including Arabic in generated PDFs (4,372 translated strings), one-command per-clinic provisioning, verified backup and restore.
 
-**Status of the business, stated plainly and repeated everywhere in this document because it governs every conversation below:** **zero customers, zero revenue, no support organisation, no operating history.** Single-tenant — one deployment per clinic. Built in Egypt, priced for Egypt, targeting Egyptian and wider Arabic-speaking veterinary clinics.
+**Status of the business, stated plainly and repeated everywhere in this document because it governs every conversation below:** **zero customers, zero revenue, no support organisation, no operating history.** **Multi-tenant since 2026-08:** one deployment serves many clinics, resolved by subdomain, each with its own database. (This document originally said single-tenant; that is no longer true.) Built in Egypt, priced for Egypt, targeting Egyptian and wider Arabic-speaking veterinary clinics.
 
 **What is therefore actually for sale:** a finished, tested, localised codebase and the time it would take to reproduce it. Not a customer base, not a brand, not an income stream. Every buyer category below is assessed on that basis. Any pitch that implies otherwise will collapse in the first hour of diligence and cost the seller the deal.
 
@@ -69,7 +69,7 @@ Aleefy is one of very few products that covers **retail + grooming + boarding + 
 
 **Why they pay well.** They have real capital, they operate across multiple GCC countries so per-seat licensing compounds painfully, and unlike a three-clinic Egyptian group they have an IT function that can own software.
 
-**Why they might not buy.** Single-tenant deployment is a real objection for a 20-store chain — they will ask for one system with 20 branches, not 20 systems. `../market/05_PRODUCT_READINESS.md` should be checked for what multi-branch support actually exists before this conversation is opened. Do not bluff this; a retail group will find out in week one.
+**Why they might not buy.** ~~Single-tenant deployment~~ — **this objection has been answered.** One deployment now serves many clinics by subdomain, each with its own database, and there is a Multi-Branch Control Centre module. Still do not bluff the detail: isolation is database-per-clinic, which is stronger than row-level filtering (a missing WHERE cannot cross a database boundary) but means N databases to back up and migrate. For a 20-store chain that is a feature; for a vendor running hundreds of clinics it is an operating cost. Say which one they are.
 
 ---
 
@@ -298,7 +298,7 @@ There is one real exception: a group whose owner is themselves a technologist or
 | **Size** | Claims 500+ clients, operating since 2020 `[P]` |
 | **Contact route** | Email **support@quadinsight.com** `[V]` — note the parent-company domain, which is the most useful single finding here. LinkedIn **https://www.linkedin.com/company/veticare-connect/** `[V]`; Facebook https://www.facebook.com/VetIcareConnect `[V]`; Instagram https://www.instagram.com/vet.icare/ `[V]`. `/contact` returns 404 — the LinkedIn page is the better route for a commercial approach. |
 
-**Why them specifically.** The direct competitor, with paying Egyptian customers by name. What Aleefy has that they demonstrably do not surface: **grooming, boarding depth, telemedicine, payroll, procurement, a report builder, budgeting and cashflow, clinical decision support, and an on-premise/single-tenant deployment model** for buyers who will not accept cloud. What they have that Aleefy does not: named lab-analyser integrations (Exigo, Edan), a pet-owner mobile app, ZATCA e-invoicing, and 500 customers.
+**Why them specifically.** The direct competitor, with paying Egyptian customers by name. What Aleefy has that they demonstrably do not surface: **grooming, boarding depth, telemedicine, payroll, procurement, a report builder, budgeting and cashflow, clinical decision support, and an on-premise deployment model** for buyers who will not accept cloud. What they have that Aleefy does not: named lab-analyser integrations (Exigo, Edan), a pet-owner mobile app, ZATCA e-invoicing, and 500 customers.
 
 **The honest read.** They are the most likely of any vendor to understand the asset instantly and the least likely to pay well for it, because they know the build cost and they know you have no customers. The realistic deal shape here is not an acquisition of the company but a **purchase of specific components** — the Arabic PDF pipeline, the accounting module, the grooming/boarding subsystem — or an acqui-hire of the developer. Structure the approach around that, not around a whole-asset sale.
 
@@ -341,7 +341,7 @@ There is one real exception: a group whose owner is themselves a technologist or
 | **Size** | Not disclosed |
 | **Contact route** | Site contact page at https://www.const-tech.org/ — **specific email/phone not verified this session.** `[UNVERIFIED]` |
 
-**Why them.** Their vet module runs **"على الويب مباشرة أو شبكة داخلية"** — web or internal LAN, i.e. **on-premise capable** `[P]`. That is the same deployment philosophy as Aleefy's single-tenant model, which means no architectural argument to have. Their module covers records, appointments, radiology, lab, pharmacy, accounting, RBAC, vaccination tracking and WhatsApp notifications — real overlap, but narrower.
+**Why them.** Their vet module runs **"على الويب مباشرة أو شبكة داخلية"** — web or internal LAN, i.e. **on-premise capable** `[P]`. That is the same deployment philosophy Aleefy supports, which means no architectural argument to have. Their module covers records, appointments, radiology, lab, pharmacy, accounting, RBAC, vaccination tracking and WhatsApp notifications — real overlap, but narrower.
 
 ---
 
@@ -403,7 +403,7 @@ There is one real exception: a group whose owner is themselves a technologist or
 
 **Why them specifically — and the reason this entry is the most instructive in the document.** Their client booking portal runs at **`thecityvetclinic.euw1.ezyvet.com`** `[V]`. They are a **confirmed ezyVet customer**, on the EU-West cluster, across nine sites. That is a per-user, per-site, USD-denominated recurring bill, and it is exactly the TCO argument Rank 4 exists for.
 
-**And the reason to be honest with yourself:** they are also therefore the hardest sale in the document. Nine live branches with patient records, billing and an integrated booking portal do not migrate to an unsupported single-tenant Flask application on the strength of a cold email. The realistic ask here is **not** "replace ezyVet." It is a paid pilot at one branch, or a conversation about the modules ezyVet does not give them.
+**And the reason to be honest with yourself:** they are also therefore the hardest sale in the document. Nine live branches with patient records, billing and an integrated booking portal do not migrate to an unsupported single-developer Flask application on the strength of a cold email. The realistic ask here is **not** "replace ezyVet." It is a paid pilot at one branch, or a conversation about the modules ezyVet does not give them.
 
 ---
 
@@ -570,7 +570,7 @@ For each: **what to lead with**, **what they will actually verify**, and **what 
 
 **What they will argue the price down with:**
 - **"Flask, not Django/Laravel/.NET — our team doesn't work in this."** A real objection with a real cost. Prepare an honest answer about what the handover actually requires.
-- **"Single-tenant means we can't run this as SaaS."** The strongest technical lever anyone has. One deployment per clinic is an operating-cost multiplier for a vendor selling to hundreds of clinics. Expect this to be the central negotiation, and do not pretend the multi-tenancy work is small.
+- ~~**"Single-tenant means we can't run this as SaaS."**~~ **No longer true, and this was previously the strongest technical lever in the document.** Multi-tenancy shipped in August 2026: subdomain routing, a database per clinic, tenant-scoped sessions, and tenant-aware migrations and backups, covered by `tests/test_tenancy.py`, `test_backup_tenant_scope.py` and `test_tenant_migrations.py`. What honestly survives of the objection is narrower: isolation is database-per-tenant, so a vendor at hundreds of clinics carries N databases to operate rather than one. That is a cost argument, not an architecture rewrite.
 - **"170 templates is a maintenance liability, not an asset."** Server-rendered templates in a market that expects an SPA and a mobile app.
 - **"No customers means no product-market fit evidence — we're buying your guess."** Unanswerable. Do not try to answer it; concede it and reprice the conversation around build-cost avoidance instead.
 - **"No mobile app."** Both major Arabic competitors ship one.
@@ -588,7 +588,7 @@ For each: **what to lead with**, **what they will actually verify**, and **what 
 - Arabic invoice output, in a browser, in front of you.
 
 **What they will argue the price down with:**
-- **"Single-tenant across 20 stores is a non-starter."** The category's defining objection.
+- ~~**"Single-tenant across 20 stores is a non-starter."**~~ Answered — subdomain-routed multi-tenancy plus a Multi-Branch Control Centre. Was the category's defining objection.
 - **"We already have an ERP for retail."** Displacement, not greenfield.
 - **"Who supports this at 9pm on a Friday when the POS won't close?"** Retail runs at consumer hours. "No support organisation" is more damaging in this category than in any other on the list.
 - **"No e-invoicing integration for our tax authority."** ZATCA in Saudi, and the Egyptian Tax Authority e-receipt regime in Egypt. Competitors ship this. Check what exists before the meeting.
@@ -642,7 +642,7 @@ For each: **what to lead with**, **what they will actually verify**, and **what 
 
 ## The situation, without flattery
 
-A solo seller, in Egypt, with no broker, no revenue, no customers, no operating history, selling a single-tenant Flask codebase, to buyers who are mostly abroad. Every structural advantage belongs to the other side. The process therefore has to be run on the two things the seller does control: **preparation quality and sequencing.**
+A solo seller, in Egypt, with no broker, no revenue, no customers, no operating history, selling a pre-customer Flask codebase, to buyers who are mostly abroad. Every structural advantage belongs to the other side. The process therefore has to be run on the two things the seller does control: **preparation quality and sequencing.**
 
 ## 4.1 Do these three things before sending any message
 
@@ -814,7 +814,7 @@ Because they are the only category that (a) can absorb a 28,000-line Flask codeb
 
 Every other category has a structural reason to discount: operators must hire a developer forever, competitors know the build cost precisely and have no information asymmetry to lose, and distributors do not want a support liability at all.
 
-**With one honest qualification.** "Most likely" here is relative, not absolute. A pre-customer, single-tenant, single-developer asset is a hard sale in every category, and the most probable outcome of any process — direct or marketplace — is **no sale at the seller's expected price.** The three preparation steps in T4.1 exist because they are what change that: a live demo, a stranger-reproducible test run, and one real clinic using the software. **The third is worth more than the other two combined**, and it is worth more than every name in this document.
+**With one honest qualification.** "Most likely" here is relative, not absolute. A pre-customer, single-developer asset is a hard sale in every category, and the most probable outcome of any process — direct or marketplace — is **no sale at the seller's expected price.** The three preparation steps in T4.1 exist because they are what change that: a live demo, a stranger-reproducible test run, and one real clinic using the software. **The third is worth more than the other two combined**, and it is worth more than every name in this document.
 
 ## Are marketplaces worth the effort?
 

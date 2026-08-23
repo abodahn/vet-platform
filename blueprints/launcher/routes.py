@@ -171,7 +171,7 @@ MODULES = [
         "name":        "Clinical Decision Support",
         "name_ar":     "دعم القرار السريري",
         "icon":        "⚕️",
-        "description": "Species contraindications · Drug interactions · Weight-based dose ranges · Cited sources",
+        "description": "DRAFT — not reviewed by a licensed veterinarian. Contraindications · Interactions · Dose ranges",
         "url_key":     "cds.index",
         "url":         "/cds/",
         "legacy":      False,

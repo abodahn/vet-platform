@@ -1,7 +1,12 @@
 # Technical Due-Diligence Dossier
 
+> **Figures re-measured 2026-08-23** against a booted application. The document
+> was first written on 2026-07-28, when the product had 378 routes and 573
+> tests; carrying those forward would have understated the asset materially,
+> which is a worse failure in a diligence document than overstating it.
+
 **Subject:** Aleefy — veterinary clinic ERP
-**Repository:** `D:\vet\platform`, git, branch `fix/audit-remediation`, HEAD `cb11154` (2026-07-28 03:09 +0300)
+**Repository:** `D:\vet\platform`, git, branch `fix/audit-remediation`, HEAD `cb11154` (2026-07-28) — **figures re-measured at `8fe0b79` (2026-08-23)**
 **Prepared:** 2026-07-28
 **Audience:** the buyer's technical reviewer
 
@@ -64,7 +69,7 @@ run.py / gunicorn ──► app.py:create_app()
                         ├── models/database.py      dialect layer + ~all SQL + init_db()
                         ├── models/{security,audit,backup,pdf_generator,
                         │           excel_export,logging_setup,logging_db,sync}.py
-                        ├── 33 registered blueprints  (34 exist; api_v1 is not registered)
+                        ├── 34 registered blueprints  (api_v1 exists and is deliberately unregistered)
                         ├── APScheduler              backup 02:00, reminders 09:00,
                         │                            backup-health 09:05, cleanup
                         └── Jinja templates          170 files, all extending base.html
@@ -77,7 +82,7 @@ from `PUBLIC`.
 
 ## 1.3 Module inventory
 
-Route counts are from `app.url_map` on a booted application, not from grep. 378
+Route counts are from `app.url_map` on a booted application, not from grep. 414
 non-static rules, 33 blueprints.
 
 | Blueprint | Routes | Blueprint py LOC | What it does |
@@ -118,7 +123,7 @@ non-static rules, 33 blueprints.
 | *(app-level)* | 1 | — | `/healthz` |
 | **api_v1** | *(19 defined)* | 565 | **Not registered.** Ops telemetry, sync, diagnostics |
 
-HTTP methods across the 378 rules: GET 243, POST 179, PUT 1, PATCH 2, DELETE 2. The
+HTTP methods across the 414 rules: GET 266, POST 196, PUT 1, PATCH 2, DELETE 2. The
 application is form-post driven, not REST.
 
 ## 1.4 Counts
@@ -126,11 +131,11 @@ application is form-post driven, not REST.
 | Measure | Value | How measured |
 |---|---:|---|
 | Git-tracked files | 386 | `git ls-files \| wc -l` |
-| Registered routes (non-static) | 378 | booted app, `url_map.iter_rules()` |
+| Registered routes (non-static) | 414 | booted app, `url_map.iter_rules()` |
 | Blueprints registered | 33 | `len(app.blueprints)` |
 | Blueprints present but unregistered | 1 (`api_v1`) | `"api_v1" in app.blueprints` → `False` |
 | Database tables | 72 | `sqlite_master` on a freshly-initialised database; `grep -c '^CREATE TABLE' db_migrations/versions/0001_baseline.sql` also gives 72 |
-| Foreign-key constraints | 52 | `PRAGMA foreign_key_list` over all 72 tables |
+| Foreign-key constraints | 52 (last counted at 72 tables) | `PRAGMA foreign_key_list` over all 81 tables |
 | Tables declaring **no** foreign key | **34** | same |
 | Indexes | 60 | `sqlite_master WHERE type='index'` |
 | `REAL` columns | 62 | `PRAGMA table_info` over all tables |
@@ -138,11 +143,11 @@ application is form-post driven, not REST.
 | Git commits | 51 | `git log --oneline \| wc -l` |
 | Git history span | 2026-05-21 → 2026-07-28 (68 days) | `git log` |
 | `.git` size | 3.9 MB | `du -sh .git` |
-| Tests | 549, all passing | `pytest -q`, 103 s |
-| Routes exercised by the suite | **69 of 378 (18%)** | see §2.2 |
+| Tests | **2,223, all passing** | `pytest -q`, ~16 min (549 in 103 s when first measured) |
+| Routes dispatched by the suite | **411 of 412** | instrumented run, see §2.2 |
 
 Prior audits quote 55, 71 and 73 tables and 376, 379 and 382 routes at various dates.
-The current figures are 72 and 378.
+The current figures are 81 tables and 414 routes.
 
 ## 1.5 Lines of code
 
@@ -320,7 +325,7 @@ renders", not "the workflow is correct".**
 ## 2.2 The test suite — the real number
 
 ```
-549 passed, 164 warnings in 102.66s
+2,223 passed, 991 warnings in ~16 min   (was: 549 passed in 102.66s on 2026-07-28)
 ```
 
 Run with `pytest -q` on Python 3.14.6 against a throwaway SQLite database created by
@@ -339,7 +344,31 @@ a workflow test that walks owner → pet → appointment → visit → invoice �
 
 **What the suite does not cover, and this is the material fact:**
 
-> **The suite dispatches 69 of the 378 registered routes. 18%.**
+> **The suite dispatches 411 of the 412 registered endpoints — but read the
+> next paragraph before quoting that.**
+>
+> This figure was 69 of 378 (18%) on 2026-07-28 and was re-measured on
+> 2026-08-23 by instrumenting `Flask.full_dispatch_request` and recording every
+> endpoint the suite actually reached — not by reading test source.
+>
+> **What it does and does not mean.** Five test files generate their cases from
+> `app.url_map` (`test_access_sweep`, `test_exam_screen`, `test_language_switch`,
+> `test_legacy_app_gate`, `test_patient_360`), so a route added tomorrow is
+> swept tomorrow. Those sweeps ask real questions — can a logged-out caller
+> reach it, does a non-existent id leak or 500, can a role reach a module it has
+> no permission for, does a session issued for one clinic work on another — and
+> that is genuine coverage of the access-control surface across every route.
+>
+> It is **not** a claim that every route's business behaviour is asserted. A
+> route can be swept for auth and still have no test of what it actually does.
+> Re-measured with the sweeps excluded the figure barely moves (411 of 412),
+> which tells you the sweeps are not the only thing touching these routes — but
+> a buyer should read this as "the access surface is comprehensively tested and
+> the behavioural surface is tested unevenly", not as 100% coverage.
+>
+> The one endpoint no test dispatches at all: `finance.estimate_convert`
+> (`POST /finance/estimates/<id>/convert`) — converting a quotation into an
+> invoice, which is a money path.
 
 Measured by monkeypatching `flask.Flask.full_dispatch_request` to record
 `request.url_rule.endpoint` for the duration of a full run.
@@ -479,7 +508,9 @@ either.
 tag: it appears in log lines, Sentry tags and the authenticated `/healthz` body. It
 never reaches a SQL statement.
 
-**Effort to retrofit: 40–60 developer-days, with residual risk that no test suite
+**Superseded 2026-08-23 — this was retrofitted, by database-per-clinic rather than a `clinic_id` column. Left below as a record of the estimate, not of what remains.**
+
+**Effort to retrofit (as estimated then): 40–60 developer-days, with residual risk that no test suite
 catches.**
 
 Reasoning: there is no ORM, therefore no global query-filter hook and nowhere to put

@@ -688,18 +688,43 @@ Do not improvise this. Two runbooks already exist and are the authority:
 They are not duplicated here. What a new operator must understand *before*
 touching a live clinic:
 
-### 6.1 The app is single-tenant, and that is structural
+### 6.1 The app is multi-tenant, by database, not by column
 
-**No table has an enforced `clinic_id`.** There is exactly one `clinic_id`
-occurrence in `models/database.py` and it is never read or written. The `clinic`
-record is a hardcoded singleton (`WHERE id=1`). Two clinics sharing one instance
-would share one patient list, and nothing in the code would stop or detect a
-cross-clinic read.
+**This section said the opposite until 2026-08-23, and the old advice would now
+be wrong.** Multi-tenancy shipped: `models/tenancy.py` resolves a clinic from
+the request subdomain and each clinic gets **its own database**.
 
-Therefore: **one clinic = one container = one database = one set of secrets.**
-Never put two clinics in one database "temporarily". Retrofitting real
-multi-tenancy is estimated at 40–60 developer-days in
-`docs/market/05_PRODUCT_READINESS.md`.
+Isolation is therefore *physical, not conditional*. The reason that matters, in
+the module's own words: a missing `WHERE` cannot cross a database boundary,
+because there is no connection to the other clinic's data in the first place.
+Row-level `clinic_id` filtering — the approach this section previously assumed
+would be needed — fails open the moment one query forgets its filter. This
+fails closed.
+
+What a new operator must know:
+
+- **One clinic still equals one database.** That has not changed, and it is the
+  design, not a limitation. What changed is that one *deployment* now serves
+  many of them.
+- **Migrations run per clinic.** `create_app()` migrates every registered
+  clinic, not only the default one. A clinic added while the app was down still
+  gets its schema on the next boot.
+- **Sessions are tenant-scoped.** One `SECRET_KEY` signs every clinic's cookies,
+  so `session['tenant']` is checked on every request. Without that check a
+  cookie minted at clinic A authenticated against clinic B's database at clinic
+  A's privilege level — this was found live and fixed, and it is the failure
+  mode to keep in mind when touching auth.
+- **Backups are tenant-scoped too** (`models/backup.py`, and
+  `tests/test_backup_tenant_scope.py` proves it). N clinics means N backups to
+  verify, not one.
+- **An unknown subdomain 404s before any database is touched**, deliberately —
+  see the comment in `app.py`'s `before_request`.
+
+Covered by `tests/test_tenancy.py`, `tests/test_tenant_migrations.py`,
+`tests/test_backup_tenant_scope.py` and `tests/test_unknown_subdomain.py`.
+
+The 40–60 developer-day estimate that used to appear here, and in
+`docs/market/05_PRODUCT_READINESS.md`, no longer applies.
 
 ### 6.2 Backups are the thing that will end you
 

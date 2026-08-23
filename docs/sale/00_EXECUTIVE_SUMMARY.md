@@ -1,6 +1,7 @@
 # Aleefy — Veterinary Clinic ERP
 
 **Asset summary for prospective acquirers**
+**Figures re-measured 2026-08-23 against a booted application.**
 Prepared 2026-07-28 · All figures measured from commit `8979f72`, not estimated
 
 ---
@@ -8,7 +9,7 @@ Prepared 2026-07-28 · All figures measured from commit `8979f72`, not estimated
 ## In one paragraph
 
 Aleefy is a working, tested, fully bilingual (Arabic/English, right-to-left)
-veterinary clinic ERP: 378 routes, 72 database tables, 573 passing automated
+veterinary clinic ERP: 414 routes, 81 database tables, 2,223 passing automated
 tests, and 28 functional modules covering clinical records, pharmacy, laboratory,
 inventory, invoicing, accounting, HR, payroll, retail point-of-sale, grooming,
 boarding and telemedicine. It installs on a single clinic PC or a shared server
@@ -24,11 +25,11 @@ business.
 |---|---|
 | Python | 40,035 lines |
 | Templates | 33,891 lines across 170 files |
-| Routes | **378** across 33 registered blueprints |
-| Database | **72 tables**, 60 indexes, Alembic migrations with a verified baseline |
-| Tests | **573 passing**, no external services required, CI on every push |
+| Routes | **414** across 34 registered blueprints |
+| Database | **81 tables**, 60 indexes, Alembic migrations with a verified baseline |
+| Tests | **2,223 passing**, no external services required, CI on every push |
 | Localisation | **4,424 translated strings**, 169 of 170 templates, incl. Arabic in generated PDFs |
-| History | 56 commits over 68 days, one author |
+| History | 154 commits, one author |
 | Licences | No GPL/AGPL. Three LGPL dependencies. Fonts are OFL (commercial use permitted) |
 
 Two of those deserve emphasis, because they are the hardest to reproduce:
@@ -56,18 +57,46 @@ less disclosed than discovered.
 
 - **Zero customers, zero revenue, no operating history.** Nothing here has been
   run by a paying clinic.
-- **Single-tenant.** One deployment per clinic. `clinic_id` exists in the schema
-  and is never read. Retrofitting multi-tenancy is estimated at 40–60 developer-
-  days and carries a silent cross-clinic data-leak risk that no current test
-  would catch.
-- **Test coverage is 18% by route.** 573 tests is a real number; it is also
-  concentrated. 177 routes have no test. The PostgreSQL CI job is non-blocking,
-  so the green build is a statement about SQLite.
+- **The Arabic veterinary niche is not empty, and the competitive research in
+  `docs/market/` says so.** A reviewer will find this in an hour, so it is here
+  rather than there. **VetICare** (https://veticareapp.com) ships Arabic with
+  explicit RTL, names four Egyptian clinics as customers, has operated since
+  2020, and publishes $52/month for five users. It also has two things this
+  product does not: laboratory-analyser integration and a pet-owner mobile app.
+  Separately, **Provet Cloud already ships Hebrew** among sixteen locales, which
+  means its right-to-left plumbing exists and Arabic would be a translation
+  project rather than an engineering one. The Arabic work here is real and
+  complete — see above, and it is genuinely hard to reproduce at the PDF layer —
+  but it is not an unoccupied position, and this document should not have implied
+  that it was.
+- ~~**Single-tenant.**~~ **Resolved since this document was first written.**
+  Multi-tenancy is implemented and in use: `models/tenancy.py` resolves a clinic
+  from the request subdomain, each clinic has its own database, and
+  `create_app()` migrates every registered clinic rather than only the default
+  one. The cross-clinic leak this section warned about was found and fixed —
+  one `SECRET_KEY` signs every clinic's cookies, so a cookie minted at clinic A
+  authenticated against clinic B's database until `session['tenant']` was
+  enforced on every request. It is now covered by tests
+  (`tests/test_tenancy.py`, `tests/test_backup_tenant_scope.py`,
+  `tests/test_tenant_migrations.py`). The 40–60 developer-day estimate this
+  document previously quoted no longer applies.
+- **Test coverage, stated carefully.** The suite has grown from 573 tests to
+  **2,223**, and route coverage was re-measured on 2026-08-23 by instrumenting
+  the request dispatcher rather than by reading test source: **411 of 412
+  endpoints are dispatched**, up from 69 of 378. That is not a claim of 100%
+  coverage. Five test files generate their cases from `app.url_map`, so every
+  route is swept for access control — logged-out reach, leaking ids, wrong-role
+  access, cross-clinic sessions — which is real coverage of the *access* surface.
+  The *behavioural* surface is still tested unevenly: a route can be swept for
+  auth and have no test of what it does. See `01_TECHNICAL_DOSSIER` §2.2. The
+  PostgreSQL CI job remains non-blocking, so a green build is still primarily a
+  statement about SQLite.
 - **Money is stored as binary floating point** in 34 columns. One
   customer-visible defect this caused has been fixed and the corrective migration
   is written and tested, but deliberately unapplied — see `01_TECHNICAL_DOSSIER`
   §4 for why applying it without the surrounding work would achieve little.
-- **The permission engine is applied to zero routes.** It exists and works;
+- **The permission engine is applied to five routes, not zero.** It exists and
+  works;
   authorisation is still by hardcoded role lists. The administration screen
   therefore does not do what it appears to do.
 - **A recurring pattern**: this codebase builds correct mechanisms and does not

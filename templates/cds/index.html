@@ -73,6 +73,27 @@
 {% set ICONS = {'contraindicated':'⛔','major':'⚠️','unverified':'❓','moderate':'⚡','caution':'🔎','info':'ℹ️'} %}
 {% set L = 'ar' if current_lang == 'ar' else 'en' %}
 
+{# The review status used to appear only in the results footer, while the
+   launcher card described the module like a finished clinical feature. A vet
+   reaching this screen has to meet the disclaimer BEFORE the first answer, not
+   underneath it. Understating what this module checks is safe; overstating it
+   is not. #}
+<div style="border:2px solid #b45309;background:#FDF6E7;color:#7C4A03;
+            border-radius:10px;padding:14px 18px;margin-bottom:18px;
+            font-size:13.5px;line-height:1.7">
+  <div style="font-weight:800;font-size:14.5px;margin-bottom:5px">
+    ⚠️ {{ t('DRAFT — not reviewed by a licensed veterinarian',
+            'مسودة — لم تُراجَع من قِبل طبيب بيطري مرخّص') }}
+  </div>
+  {{ t('This tool checks a fixed rule set. A drug combination that is absent from
+        that rule set produces no warning, and no warning is NOT a statement that
+        something is safe. It does not replace clinical judgement, a current
+        formulary, or a datasheet.',
+       'هذه الأداة تفحص مجموعة قواعد ثابتة. أي تركيبة دوائية غير موجودة في هذه
+        القواعد لن يظهر لها تحذير، وغياب التحذير لا يعني أن الدواء آمن. لا تُغني
+        هذه الأداة عن الحكم الطبي أو عن نشرة الدواء.') }}
+</div>
+
 <div class="pf-card" style="margin-bottom:1.2rem">
   <form method="post" action="{{ url_for('cds.index') }}">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
