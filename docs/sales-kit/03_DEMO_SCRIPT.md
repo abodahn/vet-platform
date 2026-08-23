@@ -24,6 +24,22 @@ Do not skip any of these. Each one has ended a demo.
 | ☐ | An invoice printed once today, so you know the printer path works |
 | ☐ | Language set to Arabic |
 
+**Most of that is machine-checkable, so check it by machine:**
+
+```bash
+python scripts/demo_check.py --tenant demo
+```
+
+It verifies the clinic's own name and logo, today's appointment board, whether
+the database looks like a working clinic or a test fixture, whether prices read
+as placeholders, WhatsApp, published passwords, the CDS warning, that the
+invoice PDF actually renders, and the default language. It changes nothing, so
+it is safe to run five minutes before a meeting.
+
+It cannot check the four that matter most, and those stay yours: their data
+loaded, one real WhatsApp message sent to your own phone, an invoice printed on
+paper, and a charged phone with a hotspot.
+
 ### The trick that wins the meeting
 
 **Load their real data before the demo.** When a vet sees their own patients'
