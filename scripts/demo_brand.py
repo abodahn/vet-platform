@@ -35,7 +35,58 @@ DEMO_DEFAULTS = dict(
     phone="0226701234",
     address="12 Abbas El-Akkad St., Nasr City, Cairo",
     address_ar="١٢ شارع عباس العقاد، مدينة نصر، القاهرة",
+    # Cleared on --reset. Otherwise the last prospect's logo is still sitting
+    # at the top of the page when the next one walks in.
+    logo_data="",
 )
+
+
+# 220px is the largest the header or a PDF ever draws it, and the column holds
+# base64 inside the clinic ROW - see models/backup.py, which backs up the
+# database and nothing else, so a logo on disk would not survive a restore.
+_LOGO_PX = 220
+_LOGO_MAX_BYTES = 400_000
+
+
+def _logo_data_uri(path: str) -> str:
+    """Read an image file and return a data: URI, or raise SystemExit saying why.
+
+    Square-ish and small on purpose. A 4 MB phone photograph in this column is
+    carried in every page render and every backup, and the header draws it at
+    44 pixels regardless.
+    """
+    import base64
+    import mimetypes
+
+    if not os.path.isfile(path):
+        raise SystemExit("No such file: %s" % path)
+    try:
+        from PIL import Image
+    except ImportError:
+        # Without Pillow, pass the bytes through unchanged rather than refuse -
+        # but only if they are already small enough to belong in a row.
+        raw = open(path, "rb").read()
+        if len(raw) > _LOGO_MAX_BYTES:
+            raise SystemExit(
+                "%s is %d KB and Pillow is not installed to shrink it. "
+                "Install Pillow, or resize it to about %dpx first."
+                % (path, len(raw) // 1024, _LOGO_PX))
+        mime = mimetypes.guess_type(path)[0] or "image/png"
+        return "data:%s;base64,%s" % (mime, base64.b64encode(raw).decode())
+
+    import io as _io
+    try:
+        im = Image.open(path)
+    except Exception as exc:
+        raise SystemExit("Could not read %s as an image: %s" % (path, exc))
+    im = im.convert("RGBA")
+    im.thumbnail((_LOGO_PX, _LOGO_PX), Image.LANCZOS)
+    buf = _io.BytesIO()
+    im.save(buf, "PNG", optimize=True)
+    raw = buf.getvalue()
+    if len(raw) > _LOGO_MAX_BYTES:
+        raise SystemExit("That logo is still %d KB after resizing." % (len(raw) // 1024))
+    return "data:image/png;base64,%s" % base64.b64encode(raw).decode()
 
 
 def _configure_registry() -> None:
@@ -77,6 +128,9 @@ def main(argv=None) -> int:
     p.add_argument("--doctor", help="his name, e.g. د. أحمد سالم")
     p.add_argument("--phone")
     p.add_argument("--address-ar")
+    p.add_argument("--logo", metavar="PATH",
+                   help="their logo, as an image file. Resized and stored in "
+                        "the clinic row, so it survives a restore.")
     p.add_argument("--reset", action="store_true",
                    help="put the generic demo branding back")
     a = p.parse_args(argv)
@@ -102,6 +156,8 @@ def main(argv=None) -> int:
             fields["phone"] = a.phone
         if a.address_ar:
             fields["address_ar"] = a.address_ar
+        if a.logo:
+            fields["logo_data"] = _logo_data_uri(a.logo)
 
     with tenancy.use(a.slug):
         conn = db.get_db()
