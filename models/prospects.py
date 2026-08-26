@@ -367,3 +367,31 @@ def call_list(conn, cohort=None, governorate=None, limit=200) -> list:
         " ORDER BY governorate, district, score DESC, name LIMIT ?"
         % " AND ".join(where), tuple(args)).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── how usable is a record ───────────────────────────────────────────────────
+
+# What a row needs before somebody can act on it. A clinic with a name and
+# nothing else is a lead in name only, and counting those as "mapped" is how a
+# pipeline looks full while nobody can be phoned.
+_ESSENTIAL = ("phone", "whatsapp")
+_USEFUL = ("district", "address", "name_ar", "website", "facebook",
+           "contact_name", "vets")
+
+
+def completeness(row: dict) -> tuple:
+    """(level, missing) - level is 'callable' | 'researchable' | 'name only'.
+
+    Deliberately three words rather than a percentage. "62% complete" tells
+    nobody what to do next; "researchable - no phone, has a Facebook page"
+    tells them exactly.
+    """
+    has_number = any((row.get(k) or "").strip() for k in _ESSENTIAL)
+    has_route = any((row.get(k) or "").strip()
+                    for k in ("website", "facebook", "instagram", "address"))
+    missing = [k for k in _USEFUL if not str(row.get(k) or "").strip()]
+    if has_number:
+        return "callable", missing
+    if has_route:
+        return "researchable", missing
+    return "name only", missing

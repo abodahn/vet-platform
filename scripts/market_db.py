@@ -167,46 +167,55 @@ def cmd_why(conn, name: str) -> int:
 
 
 def cmd_export(conn, path: str) -> int:
-    """An Excel workbook to actually make calls from.
+    """A workbook to actually work from.
 
-    A CLI is the wrong tool for a person with a phone in one hand. This is
-    sorted the way the calls should be made, and has the columns that get
-    written in during the call.
+    A CLI is the wrong tool for somebody with a phone in one hand. Three
+    sheets: what to do today, the market from above, and where every fact came
+    from.
     """
     from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
     P.ensure_tables(conn)
     rows = [dict(r) for r in conn.execute(
-        "SELECT * FROM prospects ORDER BY cohort, governorate, district,"
+        "SELECT * FROM prospects ORDER BY governorate, district,"
         " score DESC, name").fetchall()]
     if not rows:
         print("  Nothing to export yet - import a CSV first.")
         return 1
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Call list"
-    heads = ["Cohort", "Score", "Clinic", "الاسم", "Governorate", "District",
-             "Phone", "WhatsApp", "Signals", "Already using",
-             "Status", "Last contact", "Next action", "When", "Notes"]
-    widths = [8, 7, 30, 26, 14, 18, 16, 16, 34, 16, 14, 14, 30, 12, 40]
-    for i, (h, w) in enumerate(zip(heads, widths), start=1):
-        c = ws.cell(row=1, column=i, value=h)
-        c.font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor="1B6B5C")
-        c.alignment = Alignment(vertical="center", wrap_text=True)
-        ws.column_dimensions[get_column_letter(i)].width = w
-    ws.row_dimensions[1].height = 26
-    ws.freeze_panes = "C2"
+    F = "Arial"
+    INK, BRAND = "1A1A1A", "1B6B5C"
+    HDR = Font(name=F, size=10, bold=True, color="FFFFFF")
+    BODY = Font(name=F, size=10, color=INK)
+    BOLD = Font(name=F, size=10, bold=True, color=INK)
+    LINK = Font(name=F, size=10, color="0563C1", underline="single")
+    SMALL = Font(name=F, size=9, color="5B7169")
+    H1 = Font(name=F, size=14, bold=True, color="0D2B24")
+    FILL_HDR = PatternFill("solid", fgColor=BRAND)
+    # Score bands. Green is not decoration - it means "worth the drive".
+    BAND = {"hot": PatternFill("solid", fgColor="D5F0E4"),
+            "warm": PatternFill("solid", fgColor="FDF6E3"),
+            "cold": PatternFill("solid", fgColor="FFFFFF")}
+    NOCALL = PatternFill("solid", fgColor="FDECEA")
+    THIN = Side(style="thin", color="E2E8F0")
+    BOX = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+    TOP = Alignment(vertical="top")
+    WRAP = Alignment(vertical="top", wrap_text=True)
+    CENTRE = Alignment(horizontal="center", vertical="top")
+
+    def band(score):
+        return "hot" if score >= 8 else ("warm" if score >= 3 else "cold")
 
     def signals(r):
         got = []
         if int(r.get("branches") or 1) > 1:
             got.append("%s branches" % r["branches"])
-        for key, label in (("is_hospital", "hospital"), ("has_grooming", "grooming"),
-                           ("has_boarding", "boarding"), ("has_pharmacy", "pharmacy"),
+        for key, label in (("is_hospital", "hospital"),
+                           ("has_grooming", "grooming"),
+                           ("has_boarding", "boarding"),
+                           ("has_pharmacy", "pharmacy"),
                            ("has_petshop", "shop"), ("has_lab", "lab")):
             if int(r.get(key) or 0):
                 got.append(label)
@@ -214,42 +223,154 @@ def cmd_export(conn, path: str) -> int:
             got.append("%s vets" % r["vets"])
         return " · ".join(got)
 
-    for n, r in enumerate(rows, start=2):
-        vals = [r.get("cohort"), r.get("score"), r.get("name"), r.get("name_ar"),
-                r.get("governorate"), r.get("district"), r.get("phone"),
-                r.get("whatsapp"), signals(r), r.get("current_software"),
-                r.get("status"), r.get("last_contact"), r.get("next_action"),
-                r.get("next_action_on"), r.get("notes")]
+    wb = Workbook()
+
+    # 1. Call list
+    ws = wb.active
+    ws.title = "Call list"
+    ws.sheet_view.showGridLines = False
+    ws["A1"] = "Who to call, in the order to call them"
+    ws["A1"].font = H1
+    ws["A2"] = ("Grouped by district first, then by score. Five clinics in one "
+                "district in an afternoon beats five scattered across Cairo - "
+                "vets in a district talk to each other, and that is the whole "
+                "mechanism. Green = 8+, worth the drive. Red = no number yet.")
+    ws["A2"].font = SMALL
+    ws["A2"].alignment = WRAP
+    ws.merge_cells("A2:N2")
+    ws.row_dimensions[2].height = 30
+
+    heads = ["Cohort", "Score", "Clinic", "الاسم",
+             "District", "Phone", "WhatsApp", "What they run", "Already using",
+             "Reachable", "Status", "Last contact", "Next action", "Notes"]
+    widths = [7, 6, 32, 26, 15, 15, 15, 32, 14, 13, 13, 13, 28, 46]
+    HROW = 4
+    for i, (h, w) in enumerate(zip(heads, widths), start=1):
+        c = ws.cell(row=HROW, column=i, value=h)
+        c.font, c.fill, c.border = HDR, FILL_HDR, BOX
+        c.alignment = Alignment(vertical="center", wrap_text=True)
+        ws.column_dimensions[get_column_letter(i)].width = w
+    ws.row_dimensions[HROW].height = 28
+    ws.freeze_panes = "C%d" % (HROW + 1)
+
+    r = HROW + 1
+    for row in rows:
+        score = row.get("score") or 0
+        level, _missing = P.completeness(row)
+        vals = [row.get("cohort"), score, row.get("name"), row.get("name_ar"),
+                row.get("district"), row.get("phone"), row.get("whatsapp"),
+                signals(row), row.get("current_software"), level,
+                row.get("status"), row.get("last_contact"),
+                row.get("next_action"), row.get("notes")]
         for i, v in enumerate(vals, start=1):
-            c = ws.cell(row=n, column=i, value=v)
-            c.font = Font(name="Arial", size=10)
-            c.alignment = Alignment(vertical="top", wrap_text=(i in (9, 15)))
-        # A clinic with no number cannot be called, however good it looks.
-        if not (r.get("phone") or r.get("whatsapp")):
-            for i in range(1, len(heads) + 1):
-                ws.cell(row=n, column=i).fill = PatternFill("solid", fgColor="FDECEA")
+            c = ws.cell(row=r, column=i, value=v)
+            c.font = BOLD if i == 3 else BODY
+            c.border = BOX
+            c.alignment = (WRAP if i in (8, 14)
+                           else (CENTRE if i in (1, 2, 10) else TOP))
+            c.fill = NOCALL if level != "callable" else BAND[band(score)]
+        # Tapping the number should start the call, not select the text.
+        if row.get("phone"):
+            cell = ws.cell(row=r, column=6)
+            cell.hyperlink = "tel:%s" % row["phone"]
+            cell.font = LINK
+        if row.get("whatsapp"):
+            wa = str(row["whatsapp"]).lstrip("0")
+            cell = ws.cell(row=r, column=7)
+            cell.hyperlink = "https://wa.me/20%s" % wa
+            cell.font = LINK
+        ws.row_dimensions[r].height = 30
+        r += 1
+    ws.auto_filter.ref = "A%d:%s%d" % (HROW, get_column_letter(len(heads)), r - 1)
 
-    ws.auto_filter.ref = "A1:%s%d" % (get_column_letter(len(heads)), len(rows) + 1)
+    # 2. Overview
+    ov = wb.create_sheet("Overview")
+    ov.sheet_view.showGridLines = False
+    ov["A1"] = "The market, from above"
+    ov["A1"].font = H1
+    ov.column_dimensions["A"].width = 30
+    ov.column_dimensions["B"].width = 12
+    ov.column_dimensions["C"].width = 64
 
-    # A second sheet that says where every number came from, because the first
-    # wrong phone number destroys trust in the whole list.
+    callable_n = sum(1 for x in rows if P.completeness(x)[0] == "callable")
+    research_n = sum(1 for x in rows if P.completeness(x)[0] == "researchable")
+    hot = sum(1 for x in rows if (x.get("score") or 0) >= 8)
+    on_comp = sum(1 for x in rows if (x.get("current_software") or "").strip())
+
+    facts = [
+        ("Clinics mapped", len(rows),
+         "every one carries the URL its facts came from"),
+        ("Callable today", callable_n, "a phone or WhatsApp number is on file"),
+        ("Need a number", research_n,
+         "an address or Facebook page but no phone - minutes each to find"),
+        ("Score 8 or more", hot,
+         "multi-branch or full-service: the clinics Aleefy's breadth is FOR"),
+        ("Already on a competitor", on_comp,
+         "willingness to pay is proven, and a contract is in the way"),
+    ]
+    rr = 3
+    for label, value, note in facts:
+        ov.cell(row=rr, column=1, value=label).font = BOLD
+        c = ov.cell(row=rr, column=2, value=value)
+        c.font = Font(name=F, size=12, bold=True, color=BRAND)
+        c.alignment = CENTRE
+        ov.cell(row=rr, column=3, value=note).font = SMALL
+        rr += 1
+
+    rr += 1
+    ov.cell(row=rr, column=1, value="By district").font = H1
+    rr += 1
+    for h, i in (("District", 1), ("Clinics", 2), ("Callable", 3)):
+        c = ov.cell(row=rr, column=i, value=h)
+        c.font, c.fill = HDR, FILL_HDR
+    rr += 1
+    by_d = {}
+    for x in rows:
+        d = x.get("district") or "(not recorded)"
+        got = by_d.setdefault(d, [0, 0])
+        got[0] += 1
+        got[1] += 1 if P.completeness(x)[0] == "callable" else 0
+    for d, (n, ca) in sorted(by_d.items(), key=lambda kv: -kv[1][0]):
+        ov.cell(row=rr, column=1, value=d).font = BODY
+        ov.cell(row=rr, column=2, value=n).font = BODY
+        ov.cell(row=rr, column=3, value=ca).font = BODY
+        rr += 1
+    ov.cell(row=rr + 1, column=1,
+            value="Work one district at a time. Density is the mechanism - the "
+                  "goal is a vet saying 'I know several clinics using it', "
+                  "which never happens from one clinic per area.").font = SMALL
+    ov.cell(row=rr + 1, column=1).alignment = WRAP
+    ov.merge_cells(start_row=rr + 1, start_column=1, end_row=rr + 2, end_column=3)
+
+    # 3. Sources
     src = wb.create_sheet("Sources")
+    src.sheet_view.showGridLines = False
+    src["A1"] = "Where every record came from"
+    src["A1"].font = H1
+    src["A2"] = ("A market database nobody can audit is a list of rumours, and "
+                 "the first wrong phone number destroys trust in all of it.")
+    src["A2"].font = SMALL
     for i, h in enumerate(["Clinic", "Source", "URL"], start=1):
-        c = src.cell(row=1, column=i, value=h)
-        c.font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor="1B6B5C")
-    for w, col in zip((30, 24, 70), "ABC"):
+        c = src.cell(row=4, column=i, value=h)
+        c.font, c.fill = HDR, FILL_HDR
+    for w, col in zip((32, 22, 80), "ABC"):
         src.column_dimensions[col].width = w
-    for n, r in enumerate(rows, start=2):
-        src.cell(row=n, column=1, value=r.get("name")).font = Font(name="Arial", size=10)
-        src.cell(row=n, column=2, value=r.get("source")).font = Font(name="Arial", size=10)
-        src.cell(row=n, column=3, value=r.get("source_url")).font = Font(name="Arial", size=10)
+    for n, row in enumerate(rows, start=5):
+        src.cell(row=n, column=1, value=row.get("name")).font = BODY
+        src.cell(row=n, column=2, value=row.get("source")).font = BODY
+        c = src.cell(row=n, column=3, value=row.get("source_url"))
+        if row.get("source_url"):
+            c.hyperlink = row["source_url"]
+            c.font = LINK
+        else:
+            c.font = BODY
+    src.freeze_panes = "A5"
 
     wb.save(path)
-    reachable = sum(1 for r in rows if r.get("phone") or r.get("whatsapp"))
     print("  wrote %s" % path)
-    print("  %d clinic(s), %d reachable by phone" % (len(rows), reachable))
-    print("  Rows shaded red have no number yet.")
+    print("  %d clinic(s)  |  %d callable today  |  %d need a number"
+          % (len(rows), callable_n, len(rows) - callable_n))
+    print("  %d score 8+ (multi-branch or full service)" % hot)
     return 0
 
 
