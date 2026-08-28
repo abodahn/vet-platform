@@ -410,7 +410,27 @@ def _purge_dir(directory: str) -> int:
     deleted = 0
     try:
         for f in Path(directory).iterdir():
-            if f.suffix not in ARCHIVE_EXTS or not f.name.startswith(ARCHIVE_PREFIXES):
+            # Look through the .enc wrapper before deciding this is one of ours.
+            #
+            # copy_offsite sends the ENCRYPTED artefact, so every file this
+            # function meets in the off-site folder is named
+            # "platform_backup_20260828_020000.dump.enc" - whose suffix is
+            # ".enc", which is not in ARCHIVE_EXTS. So the filter skipped all of
+            # them and RETENTION_DAYS was silently a no-op off-site: the USB
+            # stick or NAS grew forever, and once it filled, every night's copy
+            # failed with ENOSPC. That is loud (copy_offsite alerts) but it is
+            # still the end of off-site backups, which are the entire
+            # justification for putting a clinic's records on a server at all.
+            #
+            # Only here. list_backups() has the same expression and must KEEP
+            # it: resolve_archive() will not resolve a .enc, restore_backup()
+            # refuses one and verify_backup() cannot read one, so listing them
+            # would put rows in the restore UI that cannot be restored.
+            name = f.name
+            if name.endswith(ENCRYPTED_SUFFIX):
+                name = name[:-len(ENCRYPTED_SUFFIX)]
+            if (os.path.splitext(name)[1] not in ARCHIVE_EXTS
+                    or not name.startswith(ARCHIVE_PREFIXES)):
                 continue
             stamp = _stamp_of(f.name)
             if stamp and stamp < cutoff:
@@ -803,10 +823,18 @@ def copy_offsite(path: str) -> list[dict]:
             missing = [n for n, v in (
                 ("BACKUP_S3_ENDPOINT", os.environ.get("BACKUP_S3_ENDPOINT", "").strip()),
                 ("BACKUP_S3_BUCKET", os.environ.get("BACKUP_S3_BUCKET", "").strip()),
-                ("BACKUP_S3_KEY", os.environ.get("BACKUP_S3_ACCESS_KEY", "").strip()
-                 or os.environ.get("BACKUP_S3_KEY", "").strip()),
-                ("BACKUP_S3_SECRET", os.environ.get("BACKUP_S3_SECRET_KEY", "").strip()
-                 or os.environ.get("BACKUP_S3_SECRET", "").strip()),
+                # One spelling only, the same one _s3_put() reads below.
+                #
+                # These used to accept BACKUP_S3_ACCESS_KEY / BACKUP_S3_SECRET_KEY
+                # as well, which is what .env.example shipped - so an operator
+                # who filled in the template we gave them passed this pre-flight,
+                # watched the archive get encrypted, and then had _s3_put reject
+                # the very same config. Tolerating both spellings here is what
+                # let the two drift apart in the first place; the fix is for the
+                # template to agree with the reader, not for the checker to
+                # accept a config the uploader will refuse.
+                ("BACKUP_S3_KEY", os.environ.get("BACKUP_S3_KEY", "").strip()),
+                ("BACKUP_S3_SECRET", os.environ.get("BACKUP_S3_SECRET", "").strip()),
             ) if not v]
             if missing:
                 err = ("S3 off-site is half-configured - need %s"

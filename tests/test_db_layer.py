@@ -247,8 +247,13 @@ def test_pg_execute_is_bare_and_passes_none_for_empty_params():
     cur._cur, cur._raw_conn, cur.lastrowid, cur.rowcount, cur._sp_seq = stub, None, None, 0, 0
 
     # No params -> None, so psycopg2 never interpolates a literal % away.
+    # LIKE arrives as ILIKE because _fix_sql now translates it - PostgreSQL's
+    # LIKE is case-sensitive where SQLite's is not, so every search in the app
+    # was silently case-sensitive on production. What this test is actually
+    # pinning is the part either side of it: the '%tele%' literal survives
+    # untouched, and params is None rather than ().
     cur.execute("SELECT 1 FROM t WHERE name LIKE '%tele%'")
-    assert stub.calls[-1] == ("SELECT 1 FROM t WHERE name LIKE '%tele%'", None)
+    assert stub.calls[-1] == ("SELECT 1 FROM t WHERE name ILIKE '%tele%'", None)
 
     # INSERT gets exactly one round-trip with RETURNING id appended.
     cur.execute("INSERT INTO visits (pet_id) VALUES (?)", (3,))

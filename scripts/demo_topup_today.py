@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Fill today's appointment board on a demo, without reseeding.
 
-    python scripts/demo_topup_today.py --slug demo
+    python scripts/demo_topup_today.py                      # single-clinic box
+    python scripts/demo_topup_today.py --apply
     python scripts/demo_topup_today.py --slug demo --count 8 --apply
 
 The first screen anyone opens is the diary. A demo seeded three weeks ago has
@@ -16,8 +17,9 @@ adds appointments, to today, from clients and patients that already exist.
 Idempotent. It counts what today already has and tops up to --count, so running
 it twice does not produce sixteen appointments. Run it the morning of a demo.
 
-Only ever touches a clinic whose slug says demo/test/staging, so it can never
-invent appointments in a real clinic's diary.
+Named clinics: only ever touches one whose slug says demo/test/staging, so it
+can never invent appointments in a real clinic's diary. With no --slug it uses
+the single default database, and refuses to guess if the server hosts several.
 """
 import argparse
 import os
@@ -155,10 +157,10 @@ def _run(conn, count, apply_it):
 
     planned.sort(key=lambda a: a["appt_start"])
     print("")
-    print("    %-6s %-10s %-16s %-22s %s"
+    print("    %-6s %-12s %-16s %-22s %s"
           % ("time", "type", "patient", "client", "status"))
     for a in planned:
-        print("    %-6s %-10s %-16s %-22s %s"
+        print("    %-6s %-12s %-16s %-22s %s"
               % (a["appt_start"], a["appointment_type"],
                  (a["pet_name"] or "")[:16], (a["owner_name"] or "")[:22],
                  a["status"]))
@@ -184,28 +186,78 @@ def _run(conn, count, apply_it):
     return 0
 
 
+def _known_slugs() -> list:
+    try:
+        return [t.get("slug") for t in tenancy.all_tenants() if t.get("slug")]
+    except Exception:
+        return []
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--slug", default=os.environ.get("DEMO_SLUG", "demo"),
-                   help="which clinic on this server (default: demo)")
+    p.add_argument("--slug", default=os.environ.get("DEMO_SLUG", ""),
+                   help="which clinic on this server (default: the only one)")
     p.add_argument("--count", type=int, default=8,
                    help="how many appointments today should have (default: 8)")
     p.add_argument("--apply", action="store_true",
                    help="actually book them (default: show only)")
     a = p.parse_args(argv)
 
-    _guard(a.slug)
+    # Build the app, exactly as demo_check.py and demo_brand.py do. Not
+    # ceremony: models.database._db_path starts empty and only create_app()
+    # fills it in, so without this every query below runs against a throwaway
+    # database that is deleted on close. _sqlite_connect() now refuses that
+    # outright rather than pretending the tables are missing.
+    from app import create_app
+    from config import Config
+    app = create_app(Config)
+
+    with app.app_context():
+        return _main_inner(a)
+
+
+def _main_inner(a):
     _configure_registry()
 
-    print("Clinic %s:" % a.slug)
-    with tenancy.use(a.slug):
+    # No slug. On a single-clinic install - which is every install, by the
+    # 2026-08-26 decision - there is exactly one database and naming it is
+    # ceremony. On a multi-clinic server "the default" is ambiguous, so there
+    # we refuse rather than guess which diary to write into.
+    if not a.slug:
+        if tenancy.enabled():
+            raise SystemExit(
+                "This server hosts more than one clinic, so there is no "
+                "default.\nName one:  --slug <slug>\nRegistered: %s"
+                % (", ".join(_known_slugs()) or "none"))
+        print("Default database:")
         conn = db.get_db()
         try:
             return _run(conn, a.count, a.apply)
         finally:
             conn.close()
+
+    _guard(a.slug)
+
+    print("Clinic %s:" % a.slug)
+    try:
+        with tenancy.use(a.slug):
+            conn = db.get_db()
+            try:
+                return _run(conn, a.count, a.apply)
+            finally:
+                conn.close()
+    except tenancy.UnknownTenant:
+        # This runs on the morning of a demo. A stack trace is the wrong
+        # answer; the list of slugs that DO exist is the right one.
+        known = _known_slugs()
+        raise SystemExit(
+            "There is no clinic called '%s' on this server.\n%s"
+            % (a.slug,
+               ("Registered: " + ", ".join(known)) if known else
+               "No clinics are registered here - this install uses the single "
+               "default database, so run it with no --slug at all."))
 
 
 if __name__ == "__main__":

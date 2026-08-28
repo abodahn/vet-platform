@@ -394,7 +394,8 @@ def add_expense():
     expense_date = f.get("expense_date") or date.today().isoformat()
     vendor = f.get("vendor", "").strip() or None
     receipt_ref = f.get("receipt_ref", "").strip() or None
-    payment_method = f.get("payment_method", "Cash").strip()
+    # No payment_method here: the expenses table has no such column, so the
+    # form field it read was never stored anywhere.
 
     if not description or amount <= 0:
         flash("Description and valid amount are required.", "danger")
@@ -403,24 +404,28 @@ def add_expense():
     conn = get_db()
     try:
         with conn:
-            # Try with payment_method column, fall back without
-            try:
-                conn.execute(
-                    """INSERT INTO expenses
-                       (category, description, amount, expense_date, vendor, receipt_ref,
-                        payment_method, created_by)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (category, description, amount, expense_date, vendor, receipt_ref,
-                     payment_method, session["user"].get("full_name", ""))
-                )
-            except Exception:
-                conn.execute(
-                    """INSERT INTO expenses
-                       (category, description, amount, expense_date, vendor, receipt_ref, created_by)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    (category, description, amount, expense_date, vendor, receipt_ref,
-                     session["user"].get("full_name", ""))
-                )
+            # One INSERT, no probe. There used to be a "try with payment_method,
+            # fall back without" pair here, and the expenses table has no
+            # payment_method column - it appears nowhere in models/database.py -
+            # so the first statement failed every single time.
+            #
+            # On SQLite the bare except caught it and the fallback saved the
+            # row, which is why this looked fine for so long and why the whole
+            # test suite passes. On PostgreSQL a failed statement aborts the
+            # entire transaction, so the fallback failed too with "current
+            # transaction is aborted" and EVERY expense a clinic entered was
+            # silently lost - on the engine production actually runs, and only
+            # there.
+            #
+            # blueprints/finance/routes.py:779 already writes this table
+            # correctly; this is now the same shape.
+            conn.execute(
+                """INSERT INTO expenses
+                   (category, description, amount, expense_date, vendor, receipt_ref, created_by)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (category, description, amount, expense_date, vendor, receipt_ref,
+                 session["user"].get("full_name", ""))
+            )
         flash("Expense recorded successfully.", "success")
     except Exception as e:
         flash(f"Error saving expense: {e}", "danger")

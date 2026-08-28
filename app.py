@@ -390,12 +390,33 @@ def create_app(cfg=None) -> Flask:
     @app.context_processor
     def _inject_globals():
         user = session.get("user") or {}
-        theme = user.get("theme_preference") or session.get("theme") or "medical"
-        # The fallback is the language a VISITOR sees — the sign-in page, the
-        # error pages, anything before a user row exists. Hardcoding "en" meant
-        # an Egyptian clinic's first screen was English on an Arabic-first
-        # product. Deployment decides: PLATFORM_DEFAULT_LANG=ar.
+
+        # The clinic-wide defaults chosen on System Settings. Both dropdowns
+        # saved, both flashed "Settings saved successfully.", and both were then
+        # read by NOTHING - the page even redisplayed the saved value, so it
+        # looked like it had worked. A clinic setting its interface to Arabic
+        # and watching every screen stay English is not a small defect on a
+        # product sold in Egypt.
+        #
+        # Wrapped for the same reason as get_clinic() below: this context
+        # processor is the choke point every render passes through, so an
+        # exception here turns a handled error into an unhandled 500.
+        # db.get_setting caches for 300s, so this costs a dict lookup per render.
+        def _clinic_default(key: str) -> str:
+            try:
+                return db.get_setting(key, "") or ""
+            except Exception:
+                return ""
+
+        theme = (user.get("theme_preference") or session.get("theme")
+                 or _clinic_default("default_theme") or "medical")
+        # Order matters: a signed-in user's own choice beats the clinic's
+        # default, which beats the deployment's. The last fallback is the
+        # language a VISITOR sees - the sign-in page, the error pages, anything
+        # before a user row exists. Hardcoding "en" meant an Egyptian clinic's
+        # first screen was English on an Arabic-first product.
         lang  = (user.get("language") or session.get("lang")
+                 or _clinic_default("default_language")
                  or os.environ.get("PLATFORM_DEFAULT_LANG", "en"))
         # Whether to offer the Petsy button at all. A chat widget on every page
         # that can only answer "temporarily unavailable" is a broken promise on

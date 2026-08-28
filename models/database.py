@@ -342,8 +342,27 @@ def _fix_sql(sql: str) -> str:
     # ? -> %s placeholders, but never inside a single-quoted string literal
     # (e.g. "SET message = 'Confirm? reply YES'" must keep its literal ?).
     parts = _SQ_STRING_RE.split(s)
+
+    def _outside_literal(p: str) -> str:
+        p = p.replace("?", "%s")
+        # LIKE -> ILIKE. This module already carries the REVERSE rule for
+        # SQLite (search for 'ILIKE -> LIKE' below) and never had this one, so
+        # the house style of writing SQLite-flavoured LIKE meant every search
+        # in the application was case-INSENSITIVE in development and
+        # case-SENSITIVE on the engine clinics actually run.
+        #
+        # Nothing in CI can see it: the whole suite is SQLite, where LIKE is
+        # already caseless for ASCII. The symptom only ever appears in front of
+        # a client - a receptionist types "yasmine", the row says "Yasmine",
+        # and the software says there is no such person.
+        #
+        # \b will not match inside ILIKE (I and L are both word characters), so
+        # this is idempotent, and it is a no-op on the LOWER(...) LIKE sites
+        # that were already written correctly.
+        return re.sub(r"\bLIKE\b", "ILIKE", p, flags=re.IGNORECASE)
+
     # split() keeps the captured literals at odd indices; only touch the rest.
-    s = "".join(p if i % 2 else p.replace("?", "%s") for i, p in enumerate(parts))
+    s = "".join(p if i % 2 else _outside_literal(p) for i, p in enumerate(parts))
     # SQLite datetime function -> PostgreSQL NOW()
     #
     # Both spellings, and the two-argument form is not optional. Newer code
@@ -1089,6 +1108,25 @@ def _tenant_pool(dsn: str):
 
 
 def _sqlite_connect(path: str):
+    if not path:
+        # sqlite3.connect("") does NOT fail. It opens a private temporary
+        # database that is DELETED when the connection closes, so a script that
+        # never configured a path reads an empty database and writes into
+        # nowhere -- silently, with no error at any point.
+        #
+        # _db_path starts as "" and only create_app()/use_sqlite() fills it in,
+        # so every CLI script is one forgotten line away from this. It cost an
+        # afternoon once already: demo_topup_today.py reported "no such table:
+        # appointments" against a database that has 98 of them.
+        #
+        # Same family as the near-miss recorded on use_sqlite(): the danger in
+        # this module is never a loud failure, it is a connection that goes
+        # somewhere other than where the caller believes.
+        raise RuntimeError(
+            "No SQLite path is configured, so this would open a throwaway "
+            "database that vanishes on close. A CLI script must build the app "
+            "first (create_app(Config), as scripts/demo_check.py does) or call "
+            "db.use_sqlite(path) explicitly.")
     conn = sqlite3.connect(path, check_same_thread=False, factory=_SQLiteConn)
     conn.row_factory = sqlite3.Row
     # Performance PRAGMAs — applied once per connection

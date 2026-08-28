@@ -184,7 +184,23 @@ def dispense(rx_id):
                 dispensed_any = True
                 continue
 
-            qty_dispense = float(qty_form) if qty_form else qty_needed
+            # The quantity comes from the browser, so it is not trustworthy.
+            # A negative one would turn "dispense" into "restock" - the UPDATE
+            # below subtracts it - and a non-numeric one raised ValueError out
+            # of the whole loop, losing the items already dispensed.
+            #
+            # No upper cap against qty_needed on purpose: the template has no
+            # max either, and a pharmacist handing over a part-pack or an extra
+            # box is normal practice, not an error.
+            try:
+                qty_dispense = float(qty_form) if qty_form else qty_needed
+            except (TypeError, ValueError):
+                errors.append(f"Invalid quantity for {item['medication_name']}")
+                continue
+            if qty_dispense <= 0:
+                errors.append(
+                    f"Quantity for {item['medication_name']} must be more than zero")
+                continue
 
             # Validate batch
             if batch_id:
@@ -218,9 +234,28 @@ def dispense(rx_id):
                 use_batch_id = fefo["id"]
                 batch = fefo
 
-            # Deduct stock
-            conn.execute("UPDATE batches SET quantity=quantity-? WHERE id=?",
-                         (qty_dispense, use_batch_id))
+            # Deduct ONLY if the stock is actually there.
+            #
+            # The checks above are check-then-act: the batch was SELECTed, found
+            # sufficient, and then updated unconditionally. Two pharmacists
+            # dispensing the same batch at once both passed that check and both
+            # deducted, so the batch went negative and the clinic's controlled-
+            # drug register - the one an inspector reads - stopped matching the
+            # shelf. This is the same defect that was fixed in the POS in
+            # August; the condition below is the same shape as the proven one at
+            # blueprints/petshop/routes.py:557.
+            #
+            # errors.append + continue rather than the POS's raise: a
+            # prescription is a LIST of medicines, and one short item must not
+            # discard the ones already handed to the client.
+            _upd = conn.execute(
+                "UPDATE batches SET quantity=quantity-? WHERE id=? AND quantity >= ?",
+                (qty_dispense, use_batch_id, qty_dispense))
+            if not _upd.rowcount:
+                errors.append(
+                    f"Stock for {item['medication_name']} ran out while this "
+                    f"prescription was being dispensed - nothing was deducted")
+                continue
 
             # Log stock movement
             conn.execute("""

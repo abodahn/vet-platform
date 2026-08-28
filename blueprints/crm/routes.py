@@ -9,7 +9,7 @@ from blueprints.auth.routes import login_required
 import models.database as db
 import models.concurrency as concurrency
 from models.database import get_db, _try_stmt
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 
 # ─────────────────────────────────────────────────────────────
@@ -807,8 +807,15 @@ def pet_detail(pet_id):
 
     today = date.today()
     today_str = today.strftime("%Y-%m-%d")
-    soon_str  = (today.replace(month=today.month + 1) if today.month < 12
-                 else today.replace(year=today.year + 1, month=1)).strftime("%Y-%m-%d")
+    # Thirty days, not "the same day next month".
+    #
+    # date.replace(month=today.month + 1) raises ValueError whenever that day
+    # does not exist in the next month, so the pet file - the screen the demo
+    # script calls the moment the sale happens - returned a 500 on 31 January,
+    # 31 March, 31 May, 31 AUGUST, 31 October and every 29th-to-31st of a month
+    # landing on February. Seven-ish days a year, invisible on all the others,
+    # and the next one is three days from the day this was found.
+    soon_str  = (today + timedelta(days=30)).strftime("%Y-%m-%d")
 
     return render_template(
         "crm/pet_detail.html",

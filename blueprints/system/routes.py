@@ -414,21 +414,21 @@ def settings():
                  f.get("instapay_link","").strip()) + logo_val
             )
             conn.commit()
+            conn.close()
             # Appearance settings
             username = session["user"]["username"]
-            for key, category in [("default_theme","appearance"),("default_language","appearance")]:
-                val = f.get(key,"")
+            # db.set_setting() rather than the same upsert written out again
+            # here. It invalidates the "setting:<key>" cache, which this copy
+            # did not - so with the context processor now actually READING
+            # these, a hand-rolled write would have left the clinic staring at
+            # the old language for five minutes after saving it. That is the
+            # exact complaint the cache_invalidate("clinic_row") call below
+            # was added to fix.
+            for key, category in [("default_theme", "appearance"),
+                                  ("default_language", "appearance")]:
+                val = f.get(key, "")
                 if val:
-                    conn.execute(
-                        "INSERT INTO settings(key,value,category,updated_at,updated_by) "
-                        "VALUES(?,?,?,datetime('now'),?) "
-                        "ON CONFLICT(key) DO UPDATE SET value=excluded.value, "
-                        "category=excluded.category, updated_at=excluded.updated_at, "
-                        "updated_by=excluded.updated_by",
-                        (key, val, category, username)
-                    )
-            conn.commit()
-            conn.close()
+                    db.set_setting(key, val, category, username)
             # get_clinic() caches for 5 minutes and every page, invoice and
             # certificate reads through it. Without this the clinic saves its own
             # name and watches nothing change, then saves again.
@@ -1073,6 +1073,30 @@ _EXPORT_SKIP = {
     "app_logs", "backend_logs", "frontend_logs", "audit_logs", "sync_queue",
     "sync_conflicts", "rate_hits", "user_sessions", "ai_conversations",
     "petsy_usage", "login_attempts", "sqlite_sequence",
+    # Every row is a hashed second factor and nothing else, so there is no
+    # useful non-secret part of it to export.
+    "totp_backup_codes",
+}
+
+# Columns blanked in the export, wherever they appear.
+#
+# This export is the clinic's own data and the README tells them to open it in
+# Excel and keep a copy - so it is emailed, put on a USB stick, and forwarded.
+# users.csv was carrying every staff member's bcrypt hash and TOTP seed, which
+# means one click handed over enough to log in as any of them, forever, second
+# factor included. It was unconditional and it shipped on every install.
+#
+# The columns are still PRESENT so the CSV keeps its shape and the file remains
+# a faithful table dump - they are simply empty. Matched by column NAME rather
+# than by table, so a new table carrying one of these is covered on the day it
+# is added rather than the day somebody remembers.
+#
+# last_totp_counter is deliberately NOT here: it is a replay counter, not a
+# secret, and blanking it would lose real audit information.
+_EXPORT_REDACT = {
+    "password_hash",     # users - bcrypt
+    "totp_secret",       # users - the second-factor seed itself
+    "room_token",        # telemedicine_sessions - a live join-this-call secret
 }
 
 
@@ -1121,7 +1145,7 @@ def export_everything():
                 w = csv.writer(s)
                 w.writerow(cols)
                 for r in rows:
-                    w.writerow([r[c] for c in cols])
+                    w.writerow(["" if c in _EXPORT_REDACT else r[c] for c in cols])
                 # utf-8-sig: without the BOM, Excel on a Windows machine in
                 # Egypt opens Arabic names as mojibake, and the clinic concludes
                 # its data is corrupt.

@@ -584,8 +584,23 @@ def transfer():
 
         try:
             with conn:
-                # Deduct from source batch
-                conn.execute("UPDATE batches SET quantity=quantity-? WHERE id=?", (qty, batch_id))
+                # Deduct from source batch, but only if it still holds that much.
+                #
+                # Without the condition a transfer is a check-then-act like the
+                # dispensing and POS paths were: the batch was read, found
+                # sufficient, and then decremented unconditionally, so two
+                # concurrent transfers of the same box both succeeded and the
+                # source went negative - inventing stock at the destination that
+                # the clinic never had.
+                _upd = conn.execute(
+                    "UPDATE batches SET quantity=quantity-? WHERE id=? AND quantity >= ?",
+                    (qty, batch_id, qty))
+                if not _upd.rowcount:
+                    # The `with conn:` block rolls back and the except below
+                    # flashes this message, so no dedicated exception type is
+                    # needed to get the right behaviour in front of the user.
+                    raise ValueError(
+                        "that batch no longer holds %s units, so nothing was moved" % qty)
 
                 # Find or create matching batch at destination
                 existing = conn.execute("""

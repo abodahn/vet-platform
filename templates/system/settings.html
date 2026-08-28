@@ -33,6 +33,10 @@
 .theme-swatch { width:40px; height:40px; border-radius:8px; border:3px solid transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#fff; }
 .theme-swatch.selected { border-color:var(--cl-primary); }
 .hint { font-size:12px; color:var(--cl-muted); margin-top:3px; }
+/* A value the clinic can see but not change. Deliberately not a disabled
+   <select>: a greyed-out dropdown still reads as "broken", where plain text
+   reads as "fixed", which is what it is. */
+.static-value { font-size:15px; font-weight:600; padding:11px 0 2px; color:var(--cl-text); }
 .logo-row { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
 .logo-frame { width:104px; height:104px; flex:0 0 auto; border:1.5px dashed var(--cl-border); border-radius:12px;
   display:flex; align-items:center; justify-content:center; background:#fff; overflow:hidden; }
@@ -196,22 +200,36 @@
   <div class="form-card">
     <div class="form-card-title">{{ t('🌍 Preferences', '🌍 التفضيلات') }}</div>
     <div class="form-grid">
+      {#
+        Currency and timezone are shown, not chosen.
+
+        Both were dropdowns. Both saved. Both flashed "Settings saved
+        successfully." and redisplayed the saved value on the next load - and
+        both were read by NOTHING: 66 templates write "EGP" as literal text and
+        no code path has ever consulted clinic.timezone. Picking USD changed
+        precisely one thing, which was the contents of a column nobody reads.
+
+        Honouring the dropdown means a money filter threaded through all 66
+        templates. That is a real piece of work and not a thing to do the week
+        of a deploy, and it buys nothing yet: every clinic this is sold to is
+        Egyptian and bills in pounds. So the control tells the truth instead of
+        offering a choice it cannot keep. The hidden inputs preserve whatever is
+        already stored, because the route defaults a missing field and would
+        otherwise quietly rewrite the row on every save.
+      #}
       <div class="form-group">
         <label>{{ t('Currency', 'العملة') }}</label>
-        <select name="currency">
-          {% for cur in ['EGP','USD','EUR','GBP','SAR','AED'] %}
-          <option value="{{ cur }}" {% if clinic.get('currency','EGP') == cur %}selected{% endif %}>{{ cur }}</option>
-          {% endfor %}
-        </select>
-        <div class="hint">{{ t('Used on invoices and financial reports', 'تُستخدم في الفواتير والتقارير المالية') }}</div>
+        <input type="hidden" name="currency" value="{{ clinic.get('currency','EGP') }}">
+        <div class="static-value">{{ clinic.get('currency','EGP') }}</div>
+        <div class="hint">{{ t('Egyptian pounds throughout. Contact us if you need another currency.',
+                               'بالجنيه المصري في كل النظام. تواصل معنا إذا كنت تحتاج عملة أخرى.') }}</div>
       </div>
       <div class="form-group">
         <label>{{ t('Timezone', 'المنطقة الزمنية') }}</label>
-        <select name="timezone">
-          {% for tz in ['Africa/Cairo','UTC','Asia/Riyadh','Asia/Dubai','Europe/London','America/New_York'] %}
-          <option value="{{ tz }}" {% if clinic.get('timezone','Africa/Cairo') == tz %}selected{% endif %}>{{ tz }}</option>
-          {% endfor %}
-        </select>
+        <input type="hidden" name="timezone" value="{{ clinic.get('timezone','Africa/Cairo') }}">
+        <div class="static-value">{{ clinic.get('timezone','Africa/Cairo') }}</div>
+        <div class="hint">{{ t('Taken from the clinic computer clock.',
+                               'مأخوذة من ساعة جهاز العيادة.') }}</div>
       </div>
     </div>
   </div>
