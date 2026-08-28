@@ -26,6 +26,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import models.database as db
+from models import clock
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ _LOG_DIR_FRONT.mkdir(parents=True, exist_ok=True)
 # ════════════════════════════════════════════════════════════════
 
 def _today_log_path(channel: str = "backend") -> Path:
-    day = datetime.utcnow().strftime("%Y-%m-%d")
+    day = clock.utcnow().strftime("%Y-%m-%d")
     base = _LOG_DIR_BACK if channel == "backend" else _LOG_DIR_FRONT
     return base / f"{channel}-{day}.log"
 
@@ -61,7 +62,7 @@ def _write_file_log(channel: str, record: dict) -> None:
 
 def cleanup_old_logs() -> int:
     """Delete log files older than LOG_FILE_RETENTION_DAYS. Returns count deleted."""
-    cutoff = datetime.utcnow() - timedelta(days=_RETENTION)
+    cutoff = clock.utcnow() - timedelta(days=_RETENTION)
     deleted = 0
     for directory in (_LOG_DIR_BACK, _LOG_DIR_FRONT):
         for log_file in directory.glob("*.log"):
@@ -108,7 +109,7 @@ def log_backend(
 ) -> None:
     correlation_id = correlation_id or str(uuid.uuid4())
     request_id     = request_id     or str(uuid.uuid4())
-    ts             = datetime.utcnow().isoformat(timespec="milliseconds")
+    ts             = clock.utcnow().isoformat(timespec="milliseconds")
 
     record = {
         "ts": ts, "level": level, "correlation_id": correlation_id,
@@ -159,7 +160,7 @@ def log_backend(
 # ════════════════════════════════════════════════════════════════
 
 def log_frontend(payload: dict) -> None:
-    ts = datetime.utcnow().isoformat(timespec="milliseconds")
+    ts = clock.utcnow().isoformat(timespec="milliseconds")
 
     record = {
         "ts": ts,
@@ -234,7 +235,7 @@ def log_audit(
     user_agent:  str  = "",
     correlation_id: str = "",
 ) -> None:
-    ts             = datetime.utcnow().isoformat(timespec="milliseconds")
+    ts             = clock.utcnow().isoformat(timespec="milliseconds")
     correlation_id = correlation_id or str(uuid.uuid4())
 
     try:

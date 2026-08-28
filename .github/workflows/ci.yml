@@ -38,11 +38,18 @@ jobs:
   tests-postgres:
     name: tests (PostgreSQL 16)
     runs-on: ubuntu-latest
-    # Not blocking yet — tests/test_postgres_full.py still targets a hardcoded
-    # `vetclinic` database instead of TEST_POSTGRES_DSN, so this job cannot go
-    # green until that file is fixed. Flip to `false` (or delete this line) once
-    # it honours the DSN and the job passes.
-    continue-on-error: true
+    # BLOCKING. It was not, and the reason has gone: test_postgres_full.py now
+    # honours TEST_POSTGRES_DSN instead of a hardcoded `vetclinic`.
+    #
+    # This matters more than any single test in it. Production runs PostgreSQL
+    # and the app writes SQLite-flavoured SQL translated by _fix_sql, so a
+    # query can pass every check on SQLite and fail on the engine a clinic
+    # actually runs. 47 of the 506 bugs in .wolf/buglog.json - nine percent -
+    # are that exact shape: %s versus ?, NOW() versus datetime('now'), ::text
+    # casts, "no such column", DDL that parses on one engine and not the other.
+    #
+    # While this job was advisory, a green build was a statement about SQLite.
+    # Now the build fails where a clinic would have.
     services:
       postgres:
         image: postgres:16
@@ -59,7 +66,13 @@ jobs:
           --health-retries 5
     env:
       # conftest.py drops and recreates this database at session start.
-      TEST_POSTGRES_DSN: postgresql://postgres@localhost:5432/vetclinic_ci
+      #
+      # The name MUST contain "test": tests/test_postgres_full.py issues DELETE
+      # statements and refuses outright to run against a database whose name
+      # does not say it is disposable. `vetclinic_ci` did not qualify, so the
+      # suite raised at import and the job could never go green - which is what
+      # kept it advisory, not the DSN handling the old comment blamed.
+      TEST_POSTGRES_DSN: postgresql://postgres@localhost:5432/vetclinic_ci_test
     steps:
       - uses: actions/checkout@v4
 

@@ -18,6 +18,7 @@ import time
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import session, request, abort, g
+from models import clock
 
 logger = logging.getLogger(__name__)
 
@@ -703,7 +704,7 @@ def confirm_totp_enrolment(user_id, code: str) -> bool:
     with conn:
         conn.execute(
             "UPDATE users SET totp_enabled=1, totp_confirmed_at=? WHERE id=?",
-            (datetime.utcnow().isoformat(timespec="seconds"), user_id))
+            (clock.utcnow().isoformat(timespec="seconds"), user_id))
     conn.close()
     return True
 
@@ -744,7 +745,7 @@ def generate_backup_codes(user_id) -> list:
     from models.database import get_db
     codes = [f"{secrets.token_hex(3)}-{secrets.token_hex(3)}"
              for _ in range(BACKUP_CODE_COUNT)]
-    now = datetime.utcnow().isoformat(timespec="seconds")
+    now = clock.utcnow().isoformat(timespec="seconds")
     conn = get_db()
     with conn:
         conn.execute("DELETE FROM totp_backup_codes WHERE user_id=?", (user_id,))
@@ -804,7 +805,7 @@ def consume_backup_code(user_id, code: str) -> bool:
         # with the same code cannot both see rowcount == 1.
         cur = conn.execute(
             "UPDATE totp_backup_codes SET used_at=? WHERE id=? AND used_at IS NULL",
-            (datetime.utcnow().isoformat(timespec="seconds"), matched))
+            (clock.utcnow().isoformat(timespec="seconds"), matched))
         conn.commit()
         return cur.rowcount == 1
     finally:

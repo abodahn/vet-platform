@@ -21,6 +21,7 @@ import sqlite3, hashlib, os, re, threading, time, logging
 import bcrypt as _bcrypt
 from datetime import datetime, date, timedelta
 from typing import Optional
+from models import clock
 
 logger = logging.getLogger(__name__)
 
@@ -2849,7 +2850,7 @@ def verify_credentials(username: str, password: str) -> Optional[dict]:
 
 def touch_last_login(user_id: int) -> None:
     from datetime import datetime
-    now = datetime.utcnow().isoformat(timespec='seconds')
+    now = clock.utcnow().isoformat(timespec='seconds')
     conn = get_db()
     with conn:
         conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (now, user_id))

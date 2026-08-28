@@ -19,6 +19,7 @@ import models.database as db
 import models.audit as audit
 import models.backup as bk
 from models.sync import get_sync_status_summary, resolve_conflict
+from models import clock
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ def monitor():
     # ── Error count last 24h ──────────────────────────────────────
     error_count_24h = 0
     try:
-        cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+        cutoff = (clock.utcnow() - timedelta(hours=24)).isoformat()
         error_count_24h = conn.execute(
             "SELECT COUNT(*) FROM backend_logs WHERE level IN ('ERROR','CRITICAL') AND timestamp >= ?",
             (cutoff,)
@@ -130,7 +131,7 @@ def monitor():
     # ── Active devices ────────────────────────────────────────────
     active_devices = 0
     try:
-        cutoff_dev = (datetime.utcnow() - timedelta(hours=1)).isoformat()
+        cutoff_dev = (clock.utcnow() - timedelta(hours=1)).isoformat()
         active_devices = conn.execute(
             "SELECT COUNT(*) FROM devices WHERE last_online_at >= ? AND is_active=1",
             (cutoff_dev,)
@@ -167,7 +168,7 @@ def monitor():
                 size_kb = round(os.path.getsize(f) / 1024, 1)
                 log_total_mb += size_kb / 1024
                 mtime = datetime.fromtimestamp(os.path.getmtime(f))
-                age_days = (datetime.utcnow() - mtime).days
+                age_days = (clock.utcnow() - mtime).days
                 log_files_info.append({
                     "name": os.path.basename(f),
                     "size_kb": size_kb,

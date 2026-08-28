@@ -9,10 +9,11 @@ from . import petshop_bp
 from blueprints.auth.routes import login_required, role_required
 import models.database as db
 from models import money
+from models import clock
 
 
 def _now():
-    return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    return clock.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _user():
@@ -129,7 +130,7 @@ def _next_order_number():
     row = conn.execute("SELECT MAX(id) FROM ps_orders").fetchone()
     conn.close()
     next_id = (row[0] or 0) + 1
-    return f"PS-{datetime.utcnow().strftime('%Y%m')}-{next_id:04d}"
+    return f"PS-{clock.utcnow().strftime('%Y%m')}-{next_id:04d}"
 
 
 _WALK_IN_NAME = "Walk-in Customer"
@@ -189,7 +190,7 @@ def _deduct_stock(product_id, qty, ref_type, ref_id, username):
 def index():
     ensure_petshop_tables()
     conn = _get_db()
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = clock.utcnow().strftime("%Y-%m-%d")
     stats = {
         "products":      conn.execute("SELECT COUNT(*) FROM ps_products WHERE is_active=1").fetchone()[0],
         "orders_today":  conn.execute("SELECT COUNT(*) FROM ps_orders WHERE date(created_at)=? AND status NOT IN ('cancelled','refunded')", (today,)).fetchone()[0],
@@ -734,8 +735,8 @@ def reports():
     # PostgreSQL as ''::date and 500'd the whole report — verified on the live
     # demo. Emptying a filter means "no bound", which is the same as not
     # setting it.
-    date_from = (request.args.get("date_from") or "").strip()         or datetime.utcnow().strftime("%Y-%m-01")
-    date_to = (request.args.get("date_to") or "").strip()         or datetime.utcnow().strftime("%Y-%m-%d")
+    date_from = (request.args.get("date_from") or "").strip()         or clock.utcnow().strftime("%Y-%m-01")
+    date_to = (request.args.get("date_to") or "").strip()         or clock.utcnow().strftime("%Y-%m-%d")
 
     # Aggregate stats
     agg = conn.execute(

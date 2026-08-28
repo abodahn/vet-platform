@@ -9,6 +9,7 @@ from config import Config
 import models.database as db
 from datetime import datetime, timedelta
 import random
+from models import clock
 
 db.set_path(Config.DATABASE_PATH)
 conn = db.get_db()
@@ -158,7 +159,7 @@ order_count = 0
 for days_ago in range(29, -1, -1):
     num_orders = random.randint(1, 5)
     for _ in range(num_orders):
-        dt = datetime.utcnow() - timedelta(days=days_ago,
+        dt = clock.utcnow() - timedelta(days=days_ago,
              hours=random.randint(8,20), minutes=random.randint(0,59))
         dt_str = dt.strftime("%Y-%m-%d %H:%M:%S")
 

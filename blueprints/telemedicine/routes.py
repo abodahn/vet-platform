@@ -12,6 +12,7 @@ from . import telemedicine_bp
 from blueprints.auth.routes import login_required
 from models.database import get_db
 import models.database as db
+from models import clock
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +204,7 @@ def session_detail(sid):
 def start_session(sid):
     _ensure_tables()
     conn = get_db()
-    now = datetime.utcnow().isoformat(timespec='seconds')
+    now = clock.utcnow().isoformat(timespec='seconds')
     conn.execute("""
         UPDATE telemedicine_sessions
         SET status='In Progress', started_at=?
@@ -257,7 +258,7 @@ def complete_session(sid):
         flash("Session not found.", "error")
         return redirect(url_for("telemedicine.dashboard"))
 
-    now = datetime.utcnow().isoformat(timespec='seconds')
+    now = clock.utcnow().isoformat(timespec='seconds')
     conn.execute("""
         UPDATE telemedicine_sessions
         SET status='Completed', ended_at=?, notes=?

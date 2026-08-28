@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Optional
 
 import models.database as db
+from models import clock
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ def enqueue(
     """Add an offline action to the sync queue. Returns the queue record UUID."""
     record_id = str(uuid.uuid4())
     local_uuid = local_uuid or record_id
-    ts = datetime.utcnow().isoformat(timespec="milliseconds")
+    ts = clock.utcnow().isoformat(timespec="milliseconds")
     offline_ts = created_offline_at or ts
 
     conn = db.get_db()
@@ -94,7 +95,7 @@ def get_pending(device_id: str = "", limit: int = 100) -> list:
 
 
 def mark_synced(queue_id: str, server_uuid: str = "") -> None:
-    ts = datetime.utcnow().isoformat(timespec="milliseconds")
+    ts = clock.utcnow().isoformat(timespec="milliseconds")
     conn = db.get_db()
     conn.execute(
         """UPDATE sync_queue SET status=?, server_uuid=?, synced_at=?, updated_at=?
@@ -106,7 +107,7 @@ def mark_synced(queue_id: str, server_uuid: str = "") -> None:
 
 
 def mark_failed(queue_id: str, error: str) -> None:
-    ts = datetime.utcnow().isoformat(timespec="milliseconds")
+    ts = clock.utcnow().isoformat(timespec="milliseconds")
     conn = db.get_db()
     row = conn.execute(
         "SELECT retry_count FROM sync_queue WHERE id=?", (queue_id,)
@@ -126,7 +127,7 @@ def mark_failed(queue_id: str, error: str) -> None:
 def mark_conflict(queue_id: str, local_payload: dict, server_payload: dict,
                   conflict_type: str = "UPDATE_CONFLICT") -> str:
     """Mark queue item as CONFLICT and create a conflict record."""
-    ts  = datetime.utcnow().isoformat(timespec="milliseconds")
+    ts  = clock.utcnow().isoformat(timespec="milliseconds")
     cid = str(uuid.uuid4())
 
     conn = db.get_db()
@@ -173,7 +174,7 @@ def resolve_conflict(conflict_id: str, resolved_by: str,
     for review rather than pushing it.
     """
     side = "LOCAL" if str(keep or "").strip().lower() == "local" else "SERVER"
-    ts = datetime.utcnow().isoformat(timespec="milliseconds")
+    ts = clock.utcnow().isoformat(timespec="milliseconds")
     conn = db.get_db()
     conn.execute(
         """UPDATE sync_conflicts
@@ -229,7 +230,7 @@ def get_sync_status_summary() -> dict:
 def register_device(device_id: str, device_name: str = "",
                     platform: str = "", app_version: str = "",
                     user_id: int = None, branch_id: int = None) -> None:
-    ts = datetime.utcnow().isoformat(timespec="milliseconds")
+    ts = clock.utcnow().isoformat(timespec="milliseconds")
     conn = db.get_db()
     existing = conn.execute(
         "SELECT id FROM devices WHERE device_id=?", (device_id,)
@@ -255,7 +256,7 @@ def register_device(device_id: str, device_name: str = "",
 
 
 def touch_device_online(device_id: str) -> None:
-    ts = datetime.utcnow().isoformat(timespec="milliseconds")
+    ts = clock.utcnow().isoformat(timespec="milliseconds")
     conn = db.get_db()
     conn.execute(
         "UPDATE devices SET last_online_at=?, updated_at=? WHERE device_id=?",

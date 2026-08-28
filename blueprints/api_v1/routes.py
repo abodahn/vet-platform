@@ -49,6 +49,7 @@ from models.sync import (
     enqueue, get_pending, resolve_conflict, get_sync_status_summary,
     register_device, touch_device_online,
 )
+from models import clock
 
 api_v1_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
@@ -72,7 +73,7 @@ def ok(data=None, status=200, meta=None):
         "meta": {
             "version": "1.0",
             "request_id": rid,
-            "timestamp": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+            "timestamp": clock.utcnow().isoformat(timespec="milliseconds") + "Z",
             **(meta or {}),
         },
     }
@@ -89,7 +90,7 @@ def err(message, status=400, code=None):
         "meta": {
             "version": "1.0",
             "request_id": rid,
-            "timestamp": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+            "timestamp": clock.utcnow().isoformat(timespec="milliseconds") + "Z",
         },
     }
     return jsonify(body), status
@@ -223,7 +224,7 @@ def health():
         "environment":   os.environ.get("FLASK_ENV", "development"),
         "database":      "ok" if db_ok else "unavailable",
         "db_latency_ms": db_latency_ms,
-        "uptime_check":  datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "uptime_check":  clock.utcnow().isoformat(timespec="seconds") + "Z",
     }, status=status_code)
 
 
@@ -291,7 +292,7 @@ def diagnostics():
     # Error count last 24h
     try:
         conn = db.get_db()
-        cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+        cutoff = (clock.utcnow() - timedelta(hours=24)).isoformat()
         err_count = conn.execute(
             "SELECT COUNT(*) FROM backend_logs WHERE level IN ('ERROR','CRITICAL') AND created_at>?",
             (cutoff,)
@@ -315,7 +316,7 @@ def diagnostics():
         "build":           BUILD_NUMBER,
         "environment":     os.environ.get("FLASK_ENV", "development"),
         "log_retention":   int(os.environ.get("LOG_FILE_RETENTION_DAYS", "7")),
-        "timestamp":       datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "timestamp":       clock.utcnow().isoformat(timespec="seconds") + "Z",
     }
 
     log_audit(
@@ -508,7 +509,7 @@ def logs_backend():
     level = request.args.get("level", "")
     limit = min(int(request.args.get("limit", 100)), 1000)
     hours = int(request.args.get("hours", 24))
-    cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+    cutoff = (clock.utcnow() - timedelta(hours=hours)).isoformat()
 
     conn = db.get_db()
     if level:
