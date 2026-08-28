@@ -6,6 +6,8 @@
     python scripts/market_db.py cohorts
     python scripts/market_db.py status
     python scripts/market_db.py export market.xlsx
+    python scripts/market_db.py update market.xlsx --apply
+    python scripts/market_db.py funnel
     python scripts/market_db.py why "Cairo Vet Hospital"
 
 WHY A DATABASE AND NOT AN AD AUDIENCE
@@ -163,6 +165,244 @@ def cmd_why(conn, name: str) -> int:
         print("  Already using: %s" % row["current_software"])
         print("  Not scored, deliberately - it points both ways. They have")
         print("  proven they will pay for software, and they are mid-contract.")
+    return 0
+
+
+def cmd_funnel(conn) -> int:
+    """Pillar 6: coverage, conversion, efficiency.
+
+    The number that matters is not how many clinics are mapped - it is how many
+    calls buy one demo. Without that you cannot tell a bad pitch from a bad
+    list, and you will keep doing whichever one is broken.
+
+    Deliberately says NOT ENOUGH DATA rather than printing a ratio off three
+    rows. A conversion rate computed from two conversations is a number that
+    will be quoted back later as though it meant something.
+    """
+    P.ensure_tables(conn)
+    counts = {r[0]: r[1] for r in conn.execute(
+        "SELECT status, COUNT(*) FROM prospects GROUP BY status").fetchall()}
+    total = sum(counts.values())
+    if not total:
+        print("  Nothing mapped yet.")
+        return 0
+
+    # Everything from this stage onward counts as having reached it.
+    ORDER = ["new", "researching", "contacted", "conversation",
+             "demo", "proposal", "won"]
+    reached, seen = {}, 0
+    for stage in reversed(ORDER):
+        seen += counts.get(stage, 0)
+        reached[stage] = seen
+    lost = counts.get("lost", 0)
+    unreachable = counts.get("unreachable", 0)
+
+    print("  COVERAGE")
+    print("    clinics mapped        : %d" % total)
+    callable_n = conn.execute(
+        "SELECT COUNT(*) FROM prospects WHERE COALESCE(phone,'') <> ''"
+        " OR COALESCE(whatsapp,'') <> ''").fetchone()[0]
+    print("    with a way to reach   : %d" % callable_n)
+    if callable_n < total:
+        print("    still need a number   : %d" % (total - callable_n))
+
+    print("")
+    print("  PIPELINE")
+    labels = {"contacted": "contacted", "conversation": "had a conversation",
+              "demo": "saw a demo", "proposal": "got a proposal", "won": "signed"}
+    prev = None
+    for stage in ("contacted", "conversation", "demo", "proposal", "won"):
+        n = reached.get(stage, 0)
+        line = "    %-20s %4d" % (labels[stage], n)
+        if prev is not None and prev >= 10:
+            line += "   %.0f%% of the previous step" % (100.0 * n / prev)
+        elif prev is not None and prev > 0:
+            line += "   (too few to rate)"
+        print(line)
+        prev = n
+    if lost or unreachable:
+        print("")
+        print("    lost                 %4d" % lost)
+        print("    unreachable          %4d" % unreachable)
+
+    print("")
+    print("  EFFICIENCY")
+    contacted = reached.get("contacted", 0)
+    demos = reached.get("demo", 0)
+    won = reached.get("won", 0)
+    if contacted < 10:
+        print("    NOT ENOUGH DATA. %d clinic(s) contacted." % contacted)
+        print("    A conversion rate off a handful of calls is a number that")
+        print("    gets quoted back later as though it meant something.")
+        print("    Come back at 10 and it will start being worth reading.")
+    else:
+        if demos:
+            print("    calls per demo        : %.1f" % (contacted / float(demos)))
+        else:
+            print("    calls per demo        : no demo yet after %d calls" % contacted)
+        if won:
+            print("    calls per signature   : %.1f" % (contacted / float(won)))
+            print("    demos per signature   : %.1f"
+                  % (demos / float(won) if won else 0))
+        else:
+            print("    calls per signature   : nothing signed yet")
+
+    print("")
+    print("  WHAT TO READ THIS FOR")
+    if contacted >= 10 and demos == 0:
+        print("    Calls are happening and no demo has come out of them. That")
+        print("    is a pitch problem or a list problem, and the two need")
+        print("    different fixes - check whether the calls that went nowhere")
+        print("    were the low scores or the high ones.")
+    elif demos >= 3 and won == 0:
+        print("    Demos are happening and nothing has closed. The product is")
+        print("    getting seen; the problem is after the demo - price, trust,")
+        print("    or no reason to decide today.")
+    elif contacted == 0:
+        print("    Nothing has been contacted. Every other number here is")
+        print("    waiting on that one.")
+    else:
+        print("    Keep going. The first ratio worth trusting arrives at about")
+        print("    ten conversations.")
+    return 0
+
+
+def cmd_update(conn, path: str, apply_it: bool) -> int:
+    """Read a worked-on workbook back into the database.
+
+    Without this the export is a printout: twenty calls get typed into Excel
+    and the next export overwrites them. A market database that loses the
+    afternoon's work is not a CRM foundation, it is a list.
+
+    Only the columns a PERSON fills in during a call are read back - status,
+    last contact, next action, notes, and any phone number found on the way.
+    Score, cohort and the service signals are left alone: those are researched
+    or computed, and a stale copy sitting in a spreadsheet must not overwrite
+    a fresher one in the database.
+
+    A row typed into the workbook that is not in the database is treated as a
+    clinic discovered during a call and offered as new, because that is exactly
+    when new clinics get discovered.
+    """
+    from openpyxl import load_workbook
+
+    if not os.path.isfile(path):
+        print("No such file: %s" % path)
+        return 2
+
+    P.ensure_tables(conn)
+    wb = load_workbook(path, data_only=True)
+    if "Call list" not in wb.sheetnames:
+        print("  %s has no 'Call list' sheet - is it the exported workbook?" % path)
+        return 2
+    ws = wb["Call list"]
+
+    # Find the header row rather than assuming it, so an inserted row at the
+    # top - which a person WILL do - does not silently shift every column.
+    head_row = None
+    for r in range(1, 12):
+        vals = [str(ws.cell(row=r, column=c).value or "").strip()
+                for c in range(1, 20)]
+        if "Clinic" in vals and "Score" in vals:
+            head_row = r
+            break
+    if not head_row:
+        print("  Could not find the header row in 'Call list'.")
+        return 2
+    cols = {str(ws.cell(row=head_row, column=c).value or "").strip(): c
+            for c in range(1, 20)}
+
+    # What a person edits during a call. Everything else is left alone.
+    EDITABLE = {
+        "Status": "status",
+        "Last contact": "last_contact",
+        "Next action": "next_action",
+        "Notes": "notes",
+        "Phone": "phone",
+        "WhatsApp": "whatsapp",
+    }
+
+    changed, added, unmatched, untouched = [], [], [], 0
+    for r in range(head_row + 1, ws.max_row + 1):
+        name = ws.cell(row=r, column=cols.get("Clinic", 3)).value
+        if not name or not str(name).strip():
+            continue
+        name = str(name).strip()
+        district = str(ws.cell(row=r, column=cols.get("District", 5)).value
+                       or "").strip()
+
+        row = conn.execute(
+            "SELECT * FROM prospects WHERE name=? AND COALESCE(district,'')=?",
+            (name, district)).fetchone()
+        if not row:
+            added.append((name, district))
+            continue
+        row = dict(row)
+
+        diffs = {}
+        for header, field in EDITABLE.items():
+            if header not in cols:
+                continue
+            new = ws.cell(row=r, column=cols[header]).value
+            new = "" if new is None else str(new).strip()
+            if field in ("phone", "whatsapp") and new:
+                new = P.clean_phone(new)
+            old = str(row.get(field) or "").strip()
+            # An emptied cell is not treated as "delete this". People clear
+            # cells by accident far more often than they mean to erase a
+            # phone number that took twenty minutes to find.
+            if new and new != old:
+                diffs[field] = (old, new)
+        if diffs:
+            changed.append((row["id"], name, district, diffs))
+        else:
+            untouched += 1
+
+    print("  rows in workbook : %d" % (ws.max_row - head_row))
+    print("  unchanged        : %d" % untouched)
+    print("  changed          : %d" % len(changed))
+    if added:
+        print("  not in database  : %d  (typed in during a call?)" % len(added))
+
+    for _pid, name, district, diffs in changed[:25]:
+        print("")
+        print("    %s%s" % (name, (" - " + district) if district else ""))
+        for field, (old, new) in diffs.items():
+            print("      %-13s %s -> %s" % (field, old or "(blank)", new))
+    if len(changed) > 25:
+        print("")
+        print("    ... and %d more" % (len(changed) - 25))
+
+    if added:
+        print("")
+        print("  These are in the workbook but not the database:")
+        for name, district in added[:12]:
+            print("    %s%s" % (name, (" - " + district) if district else ""))
+        print("")
+        print("  Add them with a CSV import - this command only updates rows")
+        print("  it can match, so a typo in a clinic name cannot quietly")
+        print("  create a duplicate.")
+
+    if not changed:
+        print("")
+        print("  Nothing to write back.")
+        return 0
+
+    if not apply_it:
+        print("")
+        print("  Re-run with --apply to save these. Nothing has been changed.")
+        return 0
+
+    for pid, _name, _district, diffs in changed:
+        sets = ", ".join("%s=?" % f for f in diffs)
+        conn.execute(
+            "UPDATE prospects SET %s, updated_at=datetime('now') WHERE id=?"
+            % sets, tuple(v[1] for v in diffs.values()) + (pid,))
+    conn.commit()
+    print("")
+    print("  Wrote %d clinic(s) back." % len(changed))
+    print("  Re-export whenever you want a fresh workbook - your notes are now")
+    print("  in the database and will come back out with it.")
     return 0
 
 
@@ -379,10 +619,12 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command",
-                    choices=["import", "score", "cohorts", "status", "export", "why"])
+                    choices=["import", "score", "cohorts", "status", "export", "update", "why", "funnel"])
     ap.add_argument("arg", nargs="?", default="")
     ap.add_argument("--strategy", default="spread", choices=["spread", "top"],
                     help="cohort fill order (default: spread)")
+    ap.add_argument("--apply", action="store_true",
+                    help="actually write (update): default is to show only")
     a = ap.parse_args()
 
     app = create_app(Config)
@@ -397,8 +639,12 @@ def main():
                 return cmd_cohorts(conn, a.strategy)
             if a.command == "status":
                 return cmd_status(conn)
+            if a.command == "update":
+                return cmd_update(conn, a.arg or "market.xlsx", a.apply)
             if a.command == "export":
                 return cmd_export(conn, a.arg or "market.xlsx")
+            if a.command == "funnel":
+                return cmd_funnel(conn)
             if a.command == "why":
                 if not a.arg:
                     print("  why needs a clinic name")

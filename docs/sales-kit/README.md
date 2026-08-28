@@ -13,6 +13,7 @@ Everything needed to sell the system **to a veterinary clinic**.
 | [`02_ONE_PAGER_AR.html`](02_ONE_PAGER_AR.html) | One-page Arabic sheet — open in a browser, print to PDF, send on WhatsApp | **The clinic** |
 | [`03_DEMO_SCRIPT.md`](03_DEMO_SCRIPT.md) | The 15-minute demo, minute by minute, with the five objections answered | **You** |
 | [`04_LICENSING.md`](04_LICENSING.md) | How activation works: issuing codes from the laptop or the phone, and renewals | **You** |
+| [`05_OFFLINE.md`](05_OFFLINE.md) | What happens when the internet drops, and why no sync was built | **You** |
 
 ## Before you send the one-pager
 
