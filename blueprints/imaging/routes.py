@@ -16,6 +16,8 @@ from werkzeug.utils import secure_filename
 
 from . import imaging_bp
 from blueprints.auth.routes import login_required
+# The magic-byte check lives with the general uploader; one copy, not two.
+from blueprints.uploads.routes import _EXT_MIME_MAP, _validate_mime_from_bytes
 
 import os as _os
 _BASE_URL     = _os.environ.get("AI_BASE_URL",    "http://localhost:3001/v1")
@@ -249,10 +251,27 @@ def upload():
             flash("Unsupported file type. Use JPG, PNG, GIF, WebP, or TIFF.", "danger")
         else:
             raw = file.read()
+            ext = file.filename.rsplit(".", 1)[1].lower()
+            # _allowed() above only checked the FILENAME, so anything at all
+            # could be written to the uploads directory by calling it .png. The
+            # uploads blueprint learned this already - its own comment records a
+            # .png containing "<?php ... ?>" being accepted and stored - and it
+            # has the check, so use that one rather than writing a second.
+            #
+            # The content must MATCH what the extension claims, not merely fail
+            # to contradict it: _detected_mime returns None for anything it does
+            # not recognise, and treating None as "fine" is how the original
+            # version of the uploads guard let everything through.
+            _detected = _validate_mime_from_bytes(io.BytesIO(raw))
+            _expected = _EXT_MIME_MAP.get(ext)
             if len(raw) > MAX_BYTES:
                 flash("File too large (max 10 MB).", "danger")
+            elif _expected and _detected != _expected:
+                current_app.logger.warning(
+                    "Imaging upload rejected: ext=%s expected=%s detected=%s",
+                    ext, _expected, _detected)
+                flash("That file is not the image type its name claims.", "danger")
             else:
-                ext = file.filename.rsplit(".", 1)[1].lower()
                 fname = f"{uuid.uuid4().hex}.{ext}"
                 save_path = os.path.join(_uploads_dir(), fname)
                 with open(save_path, "wb") as f:

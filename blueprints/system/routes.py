@@ -19,6 +19,7 @@ import models.database as db
 import models.audit as audit
 import models.backup as bk
 from models.sync import get_sync_status_summary, resolve_conflict
+from models.logging_db import log_frontend
 from models import clock
 
 logger = logging.getLogger(__name__)
@@ -1171,3 +1172,50 @@ def export_everything():
     return send_file(
         buf, mimetype="application/zip", as_attachment=True,
         download_name=f"aleefy-data-{date.today().isoformat()}.zip")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BROWSER ERROR TELEMETRY
+#
+# base.html has captured JS errors, buffered them, stored them in localStorage
+# while offline and flushed them on reconnect since it was written - and posted
+# them to /api/v1/logs/frontend, on a blueprint app.py has never registered. So
+# every batch 404'd, the .catch re-queued it, and the next flush 404'd again.
+# The clinic's browser errors have never been recorded anywhere.
+#
+# The route lives HERE rather than by registering api_v1_bp, because that
+# blueprint also exposes an unauthenticated /api/v1/health that echoes
+# FLASK_ENV, and turning on nine dormant endpoints to gain one is a poor trade.
+# The api_v1 copy stays where it is; it is documented as dormant by design.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@system_bp.route("/logs/frontend", methods=["POST"])
+def receive_frontend_log():
+    """Accept a batch of browser log entries from base.html.
+
+    NOT @login_required, deliberately. The sign-in page ships this script too,
+    and a redirect to the login page is not something a fetch() can do anything
+    with - it would turn every anonymous JS error into a confusing 302 in the
+    network tab. Anonymous batches are accepted and DISCARDED with a 204: the
+    endpoint writes attacker-controlled text into frontend_logs, so leaving it
+    genuinely open is a log-poisoning and disk-fill vector.
+
+    ponytail: batch capped at 50, no rate limit. Add one if a device ever loops.
+    """
+    if not session.get("user"):
+        return ("", 204)
+    try:
+        data = request.get_json(silent=True) or {}
+        entries = data.get("logs") or ([data] if data else [])
+        user = session.get("user") or {}
+        for entry in entries[:50]:
+            if not isinstance(entry, dict):
+                continue
+            entry.setdefault("user_id", user.get("id"))
+            entry.setdefault("username", user.get("username", ""))
+            log_frontend(entry)
+        return jsonify({"accepted": len(entries[:50])})
+    except Exception:
+        # A failure to record an error must never become an error itself.
+        logger.exception("frontend log ingestion failed")
+        return ("", 204)

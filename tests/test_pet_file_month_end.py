@@ -43,7 +43,26 @@ def a_real_pet(app):
                 cur = conn.execute(
                     "INSERT INTO pets (owner_id, pet_name, species) VALUES (?,?,?)",
                     (owner_id, "Monthend%d" % i, "Cat"))
-                return cur.lastrowid
+                pet_id = cur.lastrowid
+        finally:
+            conn.close()
+
+    yield pet_id
+
+    # Put the database back.
+    #
+    # The `app` fixture is SESSION-scoped, so all 130-odd test files share one
+    # SQLite file and rows written here are still there when later files run.
+    # This test is parametrised eight ways, so without this it left eight owners
+    # and eight pets behind - and every alphabetically later file that counts
+    # rows (test_workflow_page, test_visit_attribution, test_workflow_visit_
+    # safety) started failing on totals that had nothing to do with them.
+    with app.app_context():
+        conn = db.get_db()
+        try:
+            with conn:
+                conn.execute("DELETE FROM pets WHERE id=?", (pet_id,))
+                conn.execute("DELETE FROM owners WHERE id=?", (owner_id,))
         finally:
             conn.close()
 

@@ -630,10 +630,19 @@
                          margin-bottom:.8rem;list-style:none">
           ＋ {{ t('Request Lab Test','طلب فحص مخبري') }}
         </summary>
-        <form method="post" action="{{ url_for('clinical.lab_request_from_visit') if false else '#' }}"
+        {# The action was url_for('clinical.lab_request_from_visit') if false else '#'
+           - an endpoint that does not exist, guarded by a permanently false
+           condition so Jinja would never try to build it. A real action gives
+           the form somewhere to go if the JavaScript fails, and the hidden
+           token below is required with it: csrf_token is a VALUE in this app's
+           context processor, not a callable. #}
+        <form method="post" action="{{ url_for('clinical.lab_new') }}"
               style="background:var(--cl-bg);border:1px solid var(--cl-border);border-radius:8px;
                      padding:1rem;display:grid;gap:.8rem"
               onsubmit="submitLabRequest(event, {{ visit.id }})">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="visit_id" value="{{ visit.id }}">
+          <input type="hidden" name="pet_id" value="{{ visit.pet_id }}">
           <div class="vd-2col">
             <div>
               <label class="pf-label">{{ t('Test Name','اسم الفحص') }} <span style="color:var(--cl-danger)">*</span></label>
@@ -898,9 +907,14 @@ async function sendAiMsg() {
   document.getElementById('aiMsgs').scrollTop = 9999;
 
   try {
+    // Same header the photo-analysis call twenty lines below already sends.
+    // Without it /ai/chat answered 403 every time, so the assistant panel on
+    // the visit page could never reply - it only ever printed a connection
+    // error.
+    const _csrf = (document.querySelector('meta[name=csrf-token]')||{}).content || '';
     const r = await fetch('/ai/chat', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json', 'X-CSRF-Token': _csrf},
       body: JSON.stringify({ message: msg, visit_id: AI_VISIT_ID }),
     });
     const data = await r.json();
@@ -977,8 +991,19 @@ function submitLabRequest(e, visitId) {
   data.append('notes', form.querySelector('[name=lab_notes]').value);
   data.append('pet_id', '{{ visit.pet_id }}');
   data.append('owner_id', '{{ visit.owner_id }}');
+  // Without this the request is rejected before it reaches the route. Fixing
+  // only the URL below would have swapped a 404 for a 403 and the vet would
+  // have seen the same alert.
+  data.append('_csrf_token', (document.querySelector('meta[name=csrf-token]')||{}).content || '');
 
-  fetch('/clinical/lab/request', { method: 'POST', body: data })
+  // /clinical/lab/request has never existed. blueprints/clinical/routes.py
+  // defines /lab, /lab/new, /lab/<id> and /lab/<id>/results - nothing else - so
+  // every lab request a vet submitted from the visit page 404'd and was told
+  // "Please try from the Lab module." A core clinical workflow, broken 100% of
+  // the time, on the screen a doctor is on during a consult.
+  //
+  // /lab/new reads exactly the keys sent above: test_name, visit_id, pet_id.
+  fetch('/clinical/lab/new', { method: 'POST', body: data })
     .then(function(r) {
       if (r.ok || r.redirected) {
         window.location.href = window.location.pathname + '#lab';

@@ -31,6 +31,10 @@ ALLOWED_ENTITY_TYPES = frozenset(["pet", "visit", "staff", "supplier", "invoice"
 _EXT_MIME_MAP = {
     "jpg": "image/jpeg", "jpeg": "image/jpeg",
     "png": "image/png", "gif": "image/gif", "webp": "image/webp",
+    # TIFF and BMP added for the imaging module, which accepts both. Without an
+    # entry here expected_mime is None and the content check is skipped
+    # entirely, so ".tif" was the way past it.
+    "tif": "image/tiff", "tiff": "image/tiff", "bmp": "image/bmp",
     "pdf": "application/pdf",
     # Office docs are zip-based (PK header)
     "docx": "application/zip", "xlsx": "application/zip",
@@ -44,6 +48,9 @@ _MAGIC = {
     b"GIF87a":             "image/gif",
     b"GIF89a":             "image/gif",
     b"RIFF":               "image/webp",    # partial — webp has RIFF....WEBP
+    b"II\x2a\x00":        "image/tiff",     # little-endian (Intel)
+    b"MM\x00\x2a":        "image/tiff",     # big-endian (Motorola)
+    b"BM":                 "image/bmp",
     b"%PDF":               "application/pdf",
     b"PK\x03\x04":        "application/zip",  # docx/xlsx are zip-based
 }

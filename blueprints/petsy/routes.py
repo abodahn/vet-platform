@@ -208,6 +208,52 @@ def _detect_intents(msg: str) -> list[str]:
     return [name for name, rgx in _INTENTS if rgx.search(msg)]
 
 
+# Which module each data block belongs to.
+#
+# /petsy/chat is deliberately not @login_required - the widget is embeddable and
+# tests/test_access_sweep.py whitelists it - so nothing here ever ran the module
+# permission gate that every equivalent SCREEN runs. Anyone who could reach the
+# widget could type "revenue this month" and be told, in prose, what the clinic
+# earned. A groomer, a locum, a receptionist, or on the embed route nobody at
+# all.
+#
+# Gated on the money and staff blocks only. The clinical intents stay open:
+# anyone the widget lets in is already inside a consulting room, and a groomer
+# legitimately holds "patients". Gating those would delete Petsy for the doctor
+# who is its main user.
+#
+# Not solved with @login_required (that kills the public widget) and not with a
+# single has_permission("petshop") gate (reception HAS petshop and would still
+# see net profit, while a doctor does NOT and would lose Petsy entirely).
+_INTENT_PERM = {
+    "pending_invoices": "invoicing",
+    "revenue_today":    "accounting",
+    "revenue_month":    "accounting",
+    "low_stock":        "inventory",
+    "expiry_alerts":    "inventory",
+    # Not "attendance": that is on every role as self-service clock-in, so it
+    # would let anyone read the whole staff roster.
+    "attendance_today": "hr",
+}
+
+
+def _permitted_intents(intents: list[str], user: dict) -> list[str]:
+    """Drop the blocks this reader is not entitled to. Fails CLOSED."""
+    if not any(i in _INTENT_PERM for i in intents):
+        return intents
+    try:
+        from blueprints.auth.routes import has_permission
+    except ImportError:
+        return [i for i in intents if i not in _INTENT_PERM]
+    role = (user or {}).get("role") or None
+    out = []
+    for i in intents:
+        need = _INTENT_PERM.get(i)
+        if need is None or has_permission(need, role):
+            out.append(i)
+    return out
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  LIVE DATA FETCHER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -227,7 +273,7 @@ def _fetch_platform_data(message: str, user: dict) -> str:
     except ImportError:
         return ""
 
-    intents = _detect_intents(message)
+    intents = _permitted_intents(_detect_intents(message), user)
     if not intents:
         return ""
 
@@ -583,15 +629,22 @@ def _fetch_platform_data(message: str, user: dict) -> str:
             ls  = _q("SELECT i.id FROM items i LEFT JOIN batches b ON b.item_id=i.id "
                      "WHERE i.is_active=1 GROUP BY i.id, i.reorder_level "
                      "HAVING COALESCE(SUM(b.quantity),0) <= i.reorder_level")
-            blocks.append(
-                f"📊 CLINIC DASHBOARD — {today}:\n"
-                f"  Appointments today:   {c}\n"
-                f"  Visits today:         {v}\n"
-                f"  Open visits (active): {vo}\n"
-                f"  Unpaid invoices:      {pi}\n"
-                f"  Revenue today:        {float(rev or 0):,.2f} EGP\n"
-                f"  Low stock items:      {len(ls)}"
-            )
+            # The summary carries the same takings figure as revenue_today, so
+            # gating that intent alone would just move the leak one word over -
+            # "summary" instead of "revenue today". The money lines drop out for
+            # a reader without accounting; the clinical counts stay.
+            _money_ok = "revenue_today" in _permitted_intents(["revenue_today"], user)
+            _lines = [
+                f"📊 CLINIC DASHBOARD — {today}:",
+                f"  Appointments today:   {c}",
+                f"  Visits today:         {v}",
+                f"  Open visits (active): {vo}",
+            ]
+            if _money_ok:
+                _lines.append(f"  Unpaid invoices:      {pi}")
+                _lines.append(f"  Revenue today:        {float(rev or 0):,.2f} EGP")
+            _lines.append(f"  Low stock items:      {len(ls)}")
+            blocks.append("\n".join(_lines))
 
         # ── GROOMING TODAY ────────────────────────────────────────────────────
         if "grooming_today" in intents:

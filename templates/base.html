@@ -1215,9 +1215,13 @@
       }catch(e){}
       if(!_feLogBuffer.length)return;
       var batch=_feLogBuffer.splice(0,50);
-      fetch('/api/v1/logs/frontend',{
+      // Was /api/v1/logs/frontend, on a blueprint app.py has never registered,
+      // so every batch 404'd and was re-queued below to 404 again. The clinic's
+      // browser errors have never reached the server.
+      fetch('/system/logs/frontend',{
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{'Content-Type':'application/json',
+                 'X-CSRF-Token':(document.querySelector('meta[name=csrf-token]')||{}).content||''},
         body:JSON.stringify({logs:batch})
       }).catch(function(){
         // Re-queue failed logs

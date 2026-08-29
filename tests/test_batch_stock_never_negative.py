@@ -41,7 +41,20 @@ def a_batch(app):
                     "INSERT INTO batches (item_id, batch_number, quantity, unit_cost) "
                     "VALUES (?,?,?,?)",
                     (item_id, "NEG%d" % i, 10, 1.0))
-                return {"item_id": item_id, "batch_id": cur.lastrowid}
+                batch_id = cur.lastrowid
+        finally:
+            conn.close()
+
+    yield {"item_id": item_id, "batch_id": batch_id}
+
+    # The `app` fixture is session-scoped: one SQLite file for every test file
+    # in the run, so anything left here is still present for the next one.
+    with app.app_context():
+        conn = db.get_db()
+        try:
+            with conn:
+                conn.execute("DELETE FROM batches WHERE id=?", (batch_id,))
+                conn.execute("DELETE FROM items WHERE id=?", (item_id,))
         finally:
             conn.close()
 
