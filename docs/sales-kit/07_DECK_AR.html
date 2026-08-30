@@ -1,0 +1,369 @@
+<title>ديك اجتماع العيادة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=DM+Sans:wght@400;500;700&display=swap">
+
+<style>
+:root{
+  --paper:#F7F5F1; --card:#FFFFFF; --ink:#1C1A17; --muted:#6E675D;
+  --hair:#DFD9CF; --teal:#0B7A6B; --teal-deep:#064A40; --teal-wash:#EAF2F0;
+  --gold:#D4A017; --gold-wash:#FBF3DE; --red:#9B2C2C; --red-wash:#FBECEC;
+  /* The speaker-notes panel is deliberately inverted in BOTH themes, so it
+     needs its own pair. Painting it with --teal-deep was a bug: that token is
+     a DARK green in light mode and a PALE mint in dark mode, so the panel put
+     near-white text on a light ground the moment the viewer's OS was dark. */
+  --panel:#064A40; --panel-fg:#FFFFFF; --panel-accent:#F0CF72;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0E0C0A; --card:#1A1714; --ink:#F4F0E9; --muted:#A79E92;
+  --hair:#332E28; --teal:#3FB3A0; --teal-deep:#8FD6C8; --teal-wash:#122420;
+  --gold:#E8BC4A; --gold-wash:#2A2113; --red:#EE9A9A; --red-wash:#2A1616;
+  --panel:#07332C; --panel-fg:#EAF6F2; --panel-accent:#E8BC4A;
+}}
+:root[data-theme="dark"]{
+  --paper:#0E0C0A; --card:#1A1714; --ink:#F4F0E9; --muted:#A79E92;
+  --hair:#332E28; --teal:#3FB3A0; --teal-deep:#8FD6C8; --teal-wash:#122420;
+  --gold:#E8BC4A; --gold-wash:#2A2113; --red:#EE9A9A; --red-wash:#2A1616;
+  --panel:#07332C; --panel-fg:#EAF6F2; --panel-accent:#E8BC4A;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:'Cairo','DM Sans',system-ui,sans-serif;
+  direction:rtl;text-align:right;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+.num{font-family:'DM Sans',sans-serif;font-variant-numeric:tabular-nums;direction:ltr;display:inline-block}
+
+/* ── Stage ─────────────────────────────────────────────────────────────── */
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:clamp(20px,4vw,64px) clamp(20px,5vw,88px) 96px}
+.slide{display:none;width:100%;max-width:1040px;animation:in .34s cubic-bezier(.2,.7,.3,1)}
+.slide.on{display:block}
+@keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.slide{animation:none}}
+
+.eyebrow{
+  font-size:clamp(.68rem,1.3vw,.8rem);letter-spacing:.16em;font-weight:700;
+  color:var(--gold);margin-bottom:14px;
+}
+h1{font-size:clamp(2rem,5.6vw,4rem);font-weight:900;line-height:1.12;margin:0 0 18px;text-wrap:balance;letter-spacing:-.015em}
+h2{font-size:clamp(1.5rem,3.6vw,2.5rem);font-weight:800;line-height:1.2;margin:0 0 20px;text-wrap:balance}
+.lede{font-size:clamp(1rem,2vw,1.35rem);color:var(--muted);max-width:46ch;line-height:1.7;margin:0}
+.teal{color:var(--teal)}
+.gold{color:var(--gold)}
+
+/* ── Cost rows ─────────────────────────────────────────────────────────── */
+.rows{display:grid;gap:0;margin-top:8px}
+.row{
+  display:grid;grid-template-columns:1fr auto;gap:20px;align-items:baseline;
+  padding:clamp(10px,1.6vh,17px) 0;border-bottom:1px solid var(--hair);
+}
+.row:last-child{border-bottom:none}
+.row .what{font-size:clamp(.95rem,1.9vw,1.25rem);font-weight:600}
+.row .what small{display:block;font-weight:400;color:var(--muted);font-size:.82em;margin-top:2px}
+.row .cost{
+  font-family:'DM Sans',sans-serif;font-weight:700;color:var(--gold);
+  font-size:clamp(1rem,2.2vw,1.5rem);white-space:nowrap;font-variant-numeric:tabular-nums;
+}
+.total{
+  margin-top:18px;padding:16px 20px;background:var(--gold-wash);
+  border-inline-start:4px solid var(--gold);font-size:clamp(1rem,2vw,1.3rem);font-weight:700;
+}
+
+/* ── Day timeline ──────────────────────────────────────────────────────── */
+.day{display:grid;gap:0}
+.hr{
+  display:grid;grid-template-columns:clamp(58px,7vw,86px) 1fr;gap:clamp(14px,2vw,26px);
+  padding:clamp(9px,1.5vh,15px) 0;border-bottom:1px solid var(--hair);align-items:start;
+}
+.hr:last-child{border-bottom:none}
+.hr .t{font-family:'DM Sans',sans-serif;font-weight:700;color:var(--teal);
+       direction:ltr;text-align:left;font-size:clamp(.85rem,1.6vw,1.05rem);padding-top:3px}
+.hr b{display:block;font-size:clamp(.95rem,1.9vw,1.2rem);font-weight:700}
+.hr span{color:var(--muted);font-size:clamp(.82rem,1.5vw,1rem);line-height:1.6}
+
+/* ── Price ─────────────────────────────────────────────────────────────── */
+.pricewrap{display:flex;gap:clamp(20px,4vw,54px);flex-wrap:wrap;align-items:flex-start;margin-top:10px}
+.fig{
+  font-family:'DM Sans',sans-serif;font-size:clamp(4rem,13vw,8.5rem);font-weight:700;
+  color:var(--gold);line-height:.9;font-variant-numeric:tabular-nums;direction:ltr;
+}
+.figsub{font-size:clamp(.95rem,1.9vw,1.2rem);color:var(--muted);margin-top:10px}
+.incl{list-style:none;padding:0;margin:6px 0 0;display:grid;gap:clamp(7px,1.2vh,12px);flex:1;min-width:280px}
+.incl li{display:grid;grid-template-columns:20px 1fr;gap:11px;font-size:clamp(.9rem,1.7vw,1.1rem)}
+.incl li::before{content:"✓";color:var(--teal);font-weight:700}
+.after{
+  margin-top:20px;padding:15px 19px;background:var(--teal-wash);
+  border-inline-start:4px solid var(--teal);font-size:clamp(.9rem,1.7vw,1.1rem);
+}
+
+/* ── Guarantees ────────────────────────────────────────────────────────── */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:clamp(10px,1.6vw,16px);margin-top:8px}
+.c{background:var(--card);border:1px solid var(--hair);border-inline-start:3px solid var(--gold);padding:clamp(14px,2vw,20px)}
+.c b{display:block;font-size:clamp(.95rem,1.8vw,1.12rem);margin-bottom:5px}
+.c span{color:var(--muted);font-size:clamp(.82rem,1.5vw,.98rem);line-height:1.6}
+
+/* ── Honesty ───────────────────────────────────────────────────────────── */
+.honest{background:var(--red-wash);border:1px solid color-mix(in srgb,var(--red) 26%,transparent);padding:clamp(18px,3vw,30px)}
+.honest ul{margin:0;padding-inline-start:20px;display:grid;gap:clamp(7px,1.2vh,12px)}
+.honest li{font-size:clamp(.9rem,1.75vw,1.12rem);line-height:1.6}
+.honest .kicker{margin:18px 0 0;padding-top:15px;border-top:1px solid color-mix(in srgb,var(--red) 24%,transparent);font-weight:700;font-size:clamp(.92rem,1.8vw,1.15rem)}
+
+/* ── Plan ──────────────────────────────────────────────────────────────── */
+.plan{display:grid;gap:0}
+.st{display:grid;grid-template-columns:clamp(66px,8vw,104px) 1fr;gap:clamp(14px,2vw,24px);padding:clamp(8px,1.4vh,14px) 0;border-bottom:1px solid var(--hair)}
+.st:last-child{border-bottom:none}
+.st .w{font-weight:700;color:var(--teal);font-size:clamp(.82rem,1.5vw,1rem);padding-top:2px}
+.st b{display:block;font-size:clamp(.92rem,1.75vw,1.12rem)}
+.st span{color:var(--muted);font-size:clamp(.8rem,1.45vw,.98rem)}
+
+/* ── Ask slide ─────────────────────────────────────────────────────────── */
+.ask{text-align:center}
+.ask h1{font-size:clamp(1.9rem,6.4vw,4.4rem);color:var(--teal)}
+.ask .lede{margin:0 auto}
+
+/* ── Chrome ────────────────────────────────────────────────────────────── */
+#bar{
+  position:fixed;inset-inline:0;bottom:0;height:70px;
+  display:flex;align-items:center;gap:16px;
+  padding:0 clamp(16px,3vw,34px);background:var(--card);
+  border-top:1px solid var(--hair);
+}
+#bar button{
+  font:inherit;font-size:.9rem;font-weight:600;cursor:pointer;
+  background:transparent;color:var(--ink);border:1px solid var(--hair);
+  border-radius:6px;padding:8px 15px;
+}
+#bar button:hover{background:var(--teal-wash);border-color:var(--teal)}
+#bar button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+#count{font-family:'DM Sans',sans-serif;color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums;direction:ltr}
+#ttl{font-weight:700;font-size:.95rem;margin-inline-end:auto;color:var(--muted)}
+#prog{position:fixed;inset-inline:0;bottom:70px;height:3px;background:var(--hair)}
+#prog i{display:block;height:100%;background:var(--gold);width:0;transition:width .3s ease}
+@media (prefers-reduced-motion:reduce){#prog i{transition:none}}
+
+#notes{
+  position:fixed;inset-inline:0;bottom:73px;max-height:44vh;overflow:auto;
+  background:var(--panel);color:var(--panel-fg);padding:20px clamp(16px,3vw,34px);
+  display:none;border-top:3px solid var(--panel-accent);
+}
+#notes.on{display:block}
+#notes h4{margin:0 0 8px;font-size:.72rem;letter-spacing:.14em;color:var(--panel-accent)}
+#notes p{margin:0 0 9px;font-size:clamp(.9rem,1.6vw,1.05rem);line-height:1.75;max-width:74ch}
+#notes .say{border-inline-start:3px solid var(--panel-accent);padding-inline-start:13px;font-weight:600}
+@media (max-width:640px){#ttl{display:none}}
+</style>
+
+<div id="stage">
+
+  <section class="slide on"
+    data-t="الافتتاح"
+    data-n="ما تفتحش اللابتوب دلوقتي.|قوله: أنا مش جاي أفرجك على برنامج. أنا جاي أفهم العيادة شغالة إزاي، وبعدين أقولك لو أقدر أساعد ولا لأ.|لو قال «خلاص وريني» — استنى. الشريحة اللي بعدها هي السؤال، وإجابته هي اللي هتحدد إنت هتعرض إيه.">
+    <div class="eyebrow">أليفي · نظام إدارة العيادات البيطرية</div>
+    <h1>عيادة <span class="teal">[اسم العيادة]</span><br>في مكان واحد</h1>
+    <p class="lede">
+      المواعيد، الملفات الطبية، الفواتير، المخزن، والمحل —
+      بالعربي، وعلى جهازك إنت.
+    </p>
+  </section>
+
+  <section class="slide ask"
+    data-t="السؤال"
+    data-n="ده أهم سؤال في الاجتماع كله. اسأله وبعدين اسكت.|استنى الإجابة مهما طالت السكتة. أول حاجة هيقولها هي اللي هتعرضها الأول، وسيبك من الترتيب اللي إنت محضّره.|لو قال «المخزن» — ابدأ بالمخزن. لو قال «الحسابات آخر الشهر» — ابدأ بقفل اليوم. لو قال «مفيش مشكلة» — اسأله: طب آخر مرة عميل ما جاش في ميعاده كانت إمتى؟">
+    <div class="eyebrow">قبل أي حاجة</div>
+    <h1>إيه أكتر حاجة<br>بتضيّع وقتك في العيادة؟</h1>
+    <p class="lede">اسأل. واسكت. واسمع.</p>
+  </section>
+
+  <section class="slide"
+    data-t="تكلفة الوضع الحالي"
+    data-n="ما تقولش «إنت بتخسر». قول «دي الأرقام اللي بنشوفها في عيادات في نفس الحجم».|الأرقام دي تقديرات ومتقالة كده بصراحة. لو حاولت تبيعها كأنها حقيقة عن عيادته هو، هيمسكك في رقم غلط والاجتماع يخلص.|الجملة المهمة: «مش عايزك تصدق الأرقام دي. عايز أحسبها معاك بأرقام عيادتك إنت.»">
+    <div class="eyebrow">الوضع الحالي</div>
+    <h2>الدفتر مش بيغلط — بس بيضيّع</h2>
+    <div class="rows">
+      <div class="row"><div class="what">عملاء ما جمش في ميعادهم<small>من غير تذكير، النسبة بتوصل ٣٠٪</small></div><div class="cost">٤ – ٨ آلاف</div></div>
+      <div class="row"><div class="what">تطعيمات فات ميعادها<small>العميل نسي، ومحدش فكّره</small></div><div class="cost">٢ – ٥ آلاف</div></div>
+      <div class="row"><div class="what">أدوية وقعت منتهية<small>محدش شايف تاريخ التشغيلة</small></div><div class="cost">١ – ٣ آلاف</div></div>
+      <div class="row"><div class="what">خدمة اتعملت وما اتحسبتش<small>الكشف اتسجل، الحقنة اتنست</small></div><div class="cost">١ – ٤ آلاف</div></div>
+      <div class="row"><div class="what">وقتك إنت<small>ساعة ونص كل يوم تسجيل وحسبة</small></div><div class="cost">٣٠ ساعة</div></div>
+    </div>
+    <div class="total">في الشهر: <span class="num">٨</span> لـ <span class="num">٢٠</span> ألف جنيه — وأنت مش شايفها لأنها ما بتخرجش من الدرج.</div>
+  </section>
+
+  <section class="slide"
+    data-t="اليوم"
+    data-n="ده مش عرض مميزات. ده يومه هو.|لو عندك بياناته محمّلة — وده المفروض — افتح البرنامج دلوقتي عند الساعة اللي هو شكى منها. أسماء عملائه على الشاشة هي اللي بتقفل الاجتماع، مش الشرايح.|ما تعرضش حاجة هو ما سألش عنها. كل دقيقة في مميزة مش مهماله دي دقيقة بتخسره فيها.">
+    <div class="eyebrow">النظام في يوم شغل</div>
+    <h2>مش قايمة مميزات — ده يومك</h2>
+    <div class="day">
+      <div class="hr"><div class="t">9:00</div><div><b>مواعيد النهارده قدامك أول ما تفتح</b><span>والعميل استلم تذكير واتساب إمبارح من غير ما حد يبعته.</span></div></div>
+      <div class="hr"><div class="t">10:30</div><div><b>الحيوان داخل، وملفه كله قدامك</b><span>كل زيارة قبل كده، التطعيمات، الوزن، الأدوية. من غير تدوير في دفتر.</span></div></div>
+      <div class="hr"><div class="t">10:50</div><div><b>الروشتة بتخصم من المخزن لوحدها</b><span>بالتشغيلة الأقرب صلاحية. والفاتورة اتجهّزت من الزيارة.</span></div></div>
+      <div class="hr"><div class="t">14:00</div><div><b>البيع في المحل مع كل حاجة</b><span>أكل، أدوات، تجميل، فندقة. إيصال بيطلع والمخزون بينقص لحظتها.</span></div></div>
+      <div class="hr"><div class="t">21:00</div><div><b>تقفل اليوم في دقيقة</b><span>كاش وإنستاباي، واللي لسه ما دفعش، والمصاريف. من غير آلة حاسبة.</span></div></div>
+      <div class="hr"><div class="t">02:00</div><div><b>النسخة الاحتياطية وإنت نايم</b><span>ونسخة مشفّرة برّه العيادة، عشان لو الجهاز ضاع الشغل ما يضيعش.</span></div></div>
+    </div>
+  </section>
+
+  <section class="slide"
+    data-t="السعر"
+    data-n="قول الرقم بصوت عادي وبعدين اسكت. أي كلام بعد الرقم على طول بيتسمع اعتذار.|لو سكت هو كمان — استنى. أول واحد يتكلم بيخسر.|قول التجديد بنفسك قبل ما يسأل: «ومن الشهر السابع ١٨٠٠ في السنة، وباقولهالك دلوقتي مش بعد ٦ شهور.» ودي الجملة اللي بتبني الثقة كلها.|وبعدين على طول: «ولو ما جددتش، النظام بيفضل شغال. الدعم بس هو اللي بيقف.»">
+    <div class="eyebrow">السعر</div>
+    <h2>رخصة دائمة — بتشتريها مرة واحدة</h2>
+    <div class="pricewrap">
+      <div>
+        <div class="fig">7,000</div>
+        <div class="figsub">جنيه · مرة واحدة<br>رخصة دائمة باسم العيادة</div>
+      </div>
+      <ul class="incl">
+        <li><b>دعم ٦ شهور</b> — تليفون وواتساب وإصلاح عن بُعد</li>
+        <li><b>٣ طلبات تعديل</b> — لحد ٨ ساعات لكل واحد</li>
+        <li><b>نقل بياناتك مجانًا</b> — قبل ما تدفع مليم</li>
+        <li><b>تدريب الفريق</b> — جلستين</li>
+        <li><b>تركيب وتجهيز كامل</b> — بأسعارك وخدماتك وشعارك</li>
+      </ul>
+    </div>
+    <div class="after">
+      <b>من الشهر السابع: <span class="num">١٨٠٠</span> جنيه في السنة</b> — دعم وتحديثات.
+      <b>ولو ما جددتش، النظام بيفضل شغال زي ما هو.</b> الدعم بس اللي بيقف.
+    </div>
+  </section>
+
+  <section class="slide"
+    data-t="الضمانات"
+    data-n="دي أهم شريحة لو الدكتور اتلسع قبل كده من حد باعله برنامج ومشي.|ما تدافعش عن نفسك وما تقولش «أنا مش زيهم». وريه الترتيب اللي بيخلي كلامك ما يحتاجش تصديق.|أقوى جملة: «إنت هتشوف بياناتك إنت شغالة قدامك قبل ما تدفع مليم.» دي بتشيل الخوف كله مرة واحدة.">
+    <div class="eyebrow">الضمانات</div>
+    <h2>المخاطرة عليّا — مش عليك</h2>
+    <div class="cards">
+      <div class="c"><b>تشوف بياناتك قبل ما تدفع</b><span>ابعتلي كشف العملاء، أحمّله وأوريهولك شغال بأسماء عملائك. ما عجبكش؟ مفيش أي التزام.</span></div>
+      <div class="c"><b>٥٠٪ بس في الأول</b><span>والباقي يوم ما النظام يشتغل فعلًا في العيادة.</span></div>
+      <div class="c"><b>بياناتك بتخرج معاك</b><span>زرار واحد يطلّع كل حاجة إكسل. مش رهينة عندي ولا محتاج إذني.</span></div>
+      <div class="c"><b>أنا اللي بردّ</b><span>مش كول سنتر. أنا كاتب البرنامج وأنا اللي هتكلمني.</span></div>
+      <div class="c"><b>نسخة احتياطية كل ليلة</b><span>تلقائي، ونسخة مشفّرة برّه العيادة. وترجع لأي نسخة في أي وقت.</span></div>
+    </div>
+  </section>
+
+  <section class="slide"
+    data-t="الشفافية"
+    data-n="الشريحة دي هي اللي بتفرقك عن أي حد تاني قعد على الكرسي ده.|عدّي عليها بهدوء، وما تستعجلش. اللي قدامك بيسمع حاجة ما سمعهاش من حد قبل كده.|الجملة: «أي حد ممكن يوعدك بكل حاجة عشان ياخد الفلوس ويمشي. اللي بيقولك النظام مش بيعمل إيه، هو اللي هتلاقيه بعد ٦ شهور.»|ولو سأل عن حاسبة تداخل الأدوية: قوله بالحرف إنها لسه ما اتراجعتش من دكتور بيطري معتمد، وإنك مش هتبيعها. ما تعرضهاش خالص.">
+    <div class="eyebrow">الشفافية</div>
+    <div class="honest">
+      <h2 style="margin-bottom:16px">حاجات أليفي مش بيعملها</h2>
+      <ul>
+        <li><b>مش بيشتغل من غير جهاز العيادة شغال.</b> مفيش حد هيفتحه من بيته.</li>
+        <li><b>مفيش ربط بالضرايب ولا بأي بورتال حكومي.</b></li>
+        <li><b>مفيش ربط ببرنامج المحاسب ولا بأجهزة المعمل</b> — ممكن يتعمل، بس بيتسعّر لوحده.</li>
+        <li><b>حاسبة تداخل الأدوية لسه تحت المراجعة</b> ومش هبيعهالك لحد ما دكتور بيطري معتمد يراجعها.</li>
+        <li><b>مش هيخلّي العيادة تكسب أكتر لوحده.</b> هيوفّر وقت ويمنع ضياع. الباقي شغلك.</li>
+      </ul>
+      <p class="kicker">اللي بيقولك النظام مش بيعمل إيه — هو اللي هتلاقيه بعد ٦ شهور.</p>
+    </div>
+  </section>
+
+  <section class="slide"
+    data-t="خطة التنفيذ"
+    data-n="الشريحة دي بتحل اعتراض «مش فاضي» و«الفريق مش هيعرف».|ركّز على اليوم السابع: «هبقى معاك طول أول يوم شغل حقيقي.»|والجملة اللي بتنهي القلق: «والدفتر يفضل مفتوح جنبك أسبوع كمان. ما تقفلوش لحد ما تطمن.» ما حدش بيتوقعها، وهي اللي بتخلي التحويل يبان آمن.">
+    <div class="eyebrow">خطة التنفيذ</div>
+    <h2>من الاتفاق للشغل: أسبوع</h2>
+    <div class="plan">
+      <div class="st"><div class="w">اليوم ١</div><div><b>تبعتلي بياناتك</b><span>إكسل أو صور من الدفتر — أنا اللي بكتبها.</span></div></div>
+      <div class="st"><div class="w">اليوم ٢ – ٣</div><div><b>أجهّز النظام باسم عيادتك</b><span>الشعار، الأسعار، الخدمات، الأدوية، الفريق وصلاحياتهم.</span></div></div>
+      <div class="st"><div class="w">اليوم ٤</div><div><b>التركيب في العيادة</b><span>الجهاز والشبكة والطابعة — وبنطبع فاتورة حقيقية قدامك.</span></div></div>
+      <div class="st"><div class="w">اليوم ٥</div><div><b>تدريب الاستقبال</b><span>الحجز والفاتورة والبيع. ساعة ونص بالكتير.</span></div></div>
+      <div class="st"><div class="w">اليوم ٦</div><div><b>تدريب الدكاترة</b><span>الكشف والروشتة والملف الطبي.</span></div></div>
+      <div class="st"><div class="w">اليوم ٧</div><div><b>أول يوم شغل — وأنا معاك</b><span>والدفتر يفضل مفتوح أسبوع كمان لحد ما تطمن.</span></div></div>
+    </div>
+  </section>
+
+  <section class="slide ask"
+    data-t="الإغلاق"
+    data-n="ما تسألش «إيه رأيك؟» — ده بيدي فرصة لـ «هفكر».|اسأل السؤال اللي على الشريحة بالظبط، وبعدين اسكت خالص.|هو طلب صغير جدًا — مجرد ملف إكسل — ومفيش سبب منطقي للرفض. والموافقة عليه هي أول «أيوة»، واللي بعدها بيبقى أسهل بكتير.|لو قال «ابعتلي العرض وأنا أرد» — قوله: «تمام، هبعتهولك دلوقتي. وابعتلي الإكسل، عشان لما نتكلم تكون شايف عيادتك مش شايف نموذج.»">
+    <div class="eyebrow">الخطوة الجاية</div>
+    <h1>تبعتلي كشف عملائك<br><span class="teal">النهارده؟</span></h1>
+    <p class="lede">
+      إكسل أو صور من الدفتر — وأنا أجهّزلك النظام ببيانات عيادتك وأوريهولك
+      خلال يومين. من غير التزام ومن غير مقدم.
+    </p>
+  </section>
+
+</div>
+
+<div id="prog"><i></i></div>
+<div id="notes"><h4>تقولها إزاي</h4><div id="ntext"></div></div>
+
+<nav id="bar">
+  <span id="ttl"></span>
+  <button id="notesBtn" aria-pressed="false">الكلام (N)</button>
+  <button id="prev" aria-label="السابق">→ السابق</button>
+  <span id="count"></span>
+  <button id="next" aria-label="التالي">التالي ←</button>
+</nav>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var i = 0, notesOpen = false;
+  var prog  = document.querySelector('#prog i');
+  var count = document.getElementById('count');
+  var ttl   = document.getElementById('ttl');
+  var notes = document.getElementById('notes');
+  var ntext = document.getElementById('ntext');
+  var nBtn  = document.getElementById('notesBtn');
+
+  function render(){
+    slides.forEach(function(s,n){ s.classList.toggle('on', n === i); });
+    var s = slides[i];
+    count.textContent = (i+1) + ' / ' + slides.length;
+    ttl.textContent   = s.getAttribute('data-t') || '';
+    prog.style.width  = (((i+1)/slides.length)*100) + '%';
+    // Speaker notes: "|" separates paragraphs; the first is the headline move.
+    var raw = (s.getAttribute('data-n') || '').split('|').filter(Boolean);
+    ntext.innerHTML = '';
+    raw.forEach(function(p, n){
+      var el = document.createElement('p');
+      if (n === 0) el.className = 'say';
+      el.textContent = p;
+      ntext.appendChild(el);
+    });
+    try{ localStorage.setItem('aleefy_deck_slide', String(i)); }catch(e){}
+  }
+  function go(n){ i = Math.max(0, Math.min(slides.length-1, n)); render(); }
+  function toggleNotes(){
+    notesOpen = !notesOpen;
+    notes.classList.toggle('on', notesOpen);
+    nBtn.setAttribute('aria-pressed', notesOpen ? 'true' : 'false');
+  }
+
+  document.getElementById('next').onclick = function(){ go(i+1); };
+  document.getElementById('prev').onclick = function(){ go(i-1); };
+  nBtn.onclick = toggleNotes;
+
+  document.addEventListener('keydown', function(e){
+    // RTL deck: ArrowLeft advances, matching the reading direction.
+    if (e.key === 'ArrowLeft'  || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(i+1); }
+    else if (e.key === 'ArrowRight' || e.key === 'PageUp')               { e.preventDefault(); go(i-1); }
+    else if (e.key === 'Home')  go(0);
+    else if (e.key === 'End')   go(slides.length-1);
+    else if (e.key === 'n' || e.key === 'N') toggleNotes();
+  });
+
+  // Swipe, because this gets shown on a phone across a reception desk.
+  var x0 = null;
+  document.addEventListener('touchstart', function(e){ x0 = e.touches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    if (x0 === null) return;
+    var dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 55) go(dx > 0 ? i-1 : i+1);   // RTL: swipe right = back
+    x0 = null;
+  }, {passive:true});
+
+  // Come back to where the meeting was interrupted.
+  try{
+    var saved = parseInt(localStorage.getItem('aleefy_deck_slide'), 10);
+    if (!isNaN(saved) && saved >= 0 && saved < slides.length) i = saved;
+  }catch(e){}
+  render();
+})();
+</script>

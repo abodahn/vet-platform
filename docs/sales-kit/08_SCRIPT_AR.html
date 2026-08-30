@@ -1,0 +1,739 @@
+<title>سكريبت بيع أليفي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=DM+Sans:wght@400;500;700&display=swap">
+
+<style>
+:root{
+  --paper:#F7F5F1; --card:#FFFFFF; --ink:#1C1A17; --muted:#6E675D;
+  --hair:#DFD9CF; --teal:#0B7A6B; --teal-deep:#064A40; --teal-wash:#EAF2F0;
+  --gold:#D4A017; --gold-wash:#FBF3DE; --red:#9B2C2C; --red-wash:#FBECEC;
+  /* The cheat-sheet panel is inverted in BOTH themes, so it needs its own
+     pair. --teal lightens in dark mode, so painting it with that token put
+     white text on a pale ground for any viewer whose OS is dark. */
+  --panel:#064A40; --panel-fg:#FFFFFF; --panel-accent:#F0CF72;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#12100E; --card:#1B1815; --ink:#F2EEE7; --muted:#A79E92;
+  --hair:#332E28; --teal:#3FB3A0; --teal-deep:#8FD6C8; --teal-wash:#13251F;
+  --gold:#E8BC4A; --gold-wash:#2A2113; --red:#EE9A9A; --red-wash:#2B1717;
+  --panel:#07332C; --panel-fg:#EAF6F2; --panel-accent:#E8BC4A;
+}}
+:root[data-theme="dark"]{
+  --paper:#12100E; --card:#1B1815; --ink:#F2EEE7; --muted:#A79E92;
+  --hair:#332E28; --teal:#3FB3A0; --teal-deep:#8FD6C8; --teal-wash:#13251F;
+  --gold:#E8BC4A; --gold-wash:#2A2113; --red:#EE9A9A; --red-wash:#2B1717;
+  --panel:#07332C; --panel-fg:#EAF6F2; --panel-accent:#E8BC4A;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:'Cairo','DM Sans',system-ui,sans-serif;
+  font-size:16px;line-height:1.8;direction:rtl;text-align:right;
+  -webkit-font-smoothing:antialiased;
+}
+.sheet{max-width:840px;margin:0 auto;padding:0 22px 90px}
+p{margin:0 0 1em;max-width:64ch}
+.num{font-family:'DM Sans',sans-serif;font-variant-numeric:tabular-nums;direction:ltr;display:inline-block}
+
+/* ── Head ──────────────────────────────────────────────────────────────── */
+header.mast{padding:52px 0 26px;border-bottom:3px solid var(--teal)}
+header.mast h1{font-size:clamp(2rem,6vw,3rem);font-weight:900;margin:0;color:var(--teal);line-height:1.12}
+header.mast p{font-size:1.1rem;color:var(--muted);margin:12px 0 0;max-width:54ch}
+.rule{
+  margin-top:22px;padding:16px 20px;background:var(--gold-wash);
+  border-inline-start:4px solid var(--gold);font-weight:600;font-size:1.02rem;
+}
+
+/* ── Nav ───────────────────────────────────────────────────────────────── */
+nav.toc{
+  position:sticky;top:0;z-index:20;background:var(--paper);
+  border-bottom:1px solid var(--hair);padding:11px 0;margin-bottom:6px;
+  display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;
+}
+nav.toc a{
+  flex:0 0 auto;font-size:.82rem;font-weight:600;text-decoration:none;
+  color:var(--muted);border:1px solid var(--hair);border-radius:20px;
+  padding:6px 13px;white-space:nowrap;background:var(--card);
+}
+nav.toc a:hover,nav.toc a:focus-visible{color:var(--teal);border-color:var(--teal);background:var(--teal-wash)}
+
+/* ── Sections ──────────────────────────────────────────────────────────── */
+section{padding-top:46px;scroll-margin-top:64px}
+.stage{font-size:.72rem;letter-spacing:.15em;font-weight:700;color:var(--gold);margin-bottom:6px}
+h2{font-size:clamp(1.5rem,3.6vw,2.05rem);font-weight:800;margin:0 0 6px;text-wrap:balance;line-height:1.22}
+.when{color:var(--muted);font-size:.94rem;margin:0 0 20px}
+
+/* ── The two voices: what you SAY vs what you must NOT ─────────────────── */
+.say,.dont{padding:19px 22px;margin:0 0 15px;position:relative}
+.say{background:var(--card);border:1px solid var(--hair);border-inline-start:4px solid var(--teal)}
+.dont{background:var(--red-wash);border:1px solid color-mix(in srgb,var(--red) 24%,transparent);border-inline-start:4px solid var(--red)}
+.say .lbl,.dont .lbl{
+  font-size:.68rem;letter-spacing:.14em;font-weight:700;display:block;margin-bottom:8px;
+}
+.say .lbl{color:var(--teal)}
+.dont .lbl{color:var(--red)}
+.say q,.dont q{
+  display:block;font-size:1.12rem;line-height:1.85;font-weight:600;quotes:none;
+}
+.say q + q,.dont q + q{margin-top:11px}
+.say .why{margin:13px 0 0;padding-top:12px;border-top:1px solid var(--hair);color:var(--muted);font-size:.92rem;max-width:none}
+.dont .why{margin:13px 0 0;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--red) 22%,transparent);color:var(--muted);font-size:.92rem;max-width:none}
+
+/* Silence beat — the single most under-used move in the whole script */
+.beat{
+  display:flex;align-items:center;gap:13px;margin:0 0 15px;padding:13px 20px;
+  background:var(--teal-wash);border-inline-start:4px solid var(--teal-deep);
+  font-weight:700;color:var(--teal-deep);font-size:1rem;
+}
+.beat::before{content:"⏸";font-size:1.2rem;opacity:.75}
+
+/* ── Objection bank ────────────────────────────────────────────────────── */
+.obj{background:var(--card);border:1px solid var(--hair);margin:0 0 15px;overflow:hidden}
+.obj > summary{
+  cursor:pointer;padding:17px 21px;font-weight:700;font-size:1.06rem;
+  list-style:none;display:flex;gap:13px;align-items:flex-start;
+}
+.obj > summary::-webkit-details-marker{display:none}
+.obj > summary::after{content:"+";margin-inline-start:auto;color:var(--teal);font-weight:700;font-size:1.3rem;line-height:1}
+.obj[open] > summary::after{content:"–"}
+.obj > summary:hover{background:var(--teal-wash)}
+.obj > summary:focus-visible{outline:2px solid var(--teal);outline-offset:-2px}
+.tagl{
+  flex:0 0 auto;font-size:.64rem;letter-spacing:.1em;font-weight:700;
+  padding:4px 9px;border-radius:3px;margin-top:3px;
+}
+.t-kill{background:var(--red-wash);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 30%,transparent)}
+.t-real{background:var(--gold-wash);color:#8A6A0B;border:1px solid color-mix(in srgb,var(--gold) 40%,transparent)}
+.t-stall{background:var(--teal-wash);color:var(--teal-deep);border:1px solid color-mix(in srgb,var(--teal) 32%,transparent)}
+.obj .body{padding:0 21px 21px;border-top:1px solid var(--hair)}
+.fear{
+  margin:15px 0;padding:12px 16px;background:var(--gold-wash);
+  border-inline-start:3px solid var(--gold);font-size:.95rem;
+}
+.fear b{color:#8A6A0B}
+
+/* ── Cheat sheet ───────────────────────────────────────────────────────── */
+.sheetcard{background:var(--panel);color:var(--panel-fg);padding:30px 30px;margin-top:16px}
+.sheetcard h3{color:var(--panel-fg);margin:0 0 16px;font-size:1.35rem}
+.sheetcard ol{margin:0;padding-inline-start:22px;display:grid;gap:11px}
+.sheetcard li{font-size:1.03rem;line-height:1.7}
+.sheetcard b{color:var(--panel-accent)}
+
+footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--hair);color:var(--muted);font-size:.85rem}
+
+@media print{
+  :root{--paper:#fff;--card:#fff;--ink:#000;--muted:#444;--hair:#bbb}
+  nav.toc{display:none}
+  .obj .body{display:block!important}
+  .sheetcard{background:#fff;color:#000;border:2px solid #0B7A6B}
+  .sheetcard h3,.sheetcard b{color:#000}
+  section{break-inside:avoid}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="sheet">
+
+<header class="mast">
+  <h1>سكريبت البيع</h1>
+  <p>من أول مكالمة لحد ما يقول أيوة — بالعربي المصري، كلمة كلمة.</p>
+  <div class="rule">
+    القاعدة اللي بتفرق: <b>إنت مش بتبيع برنامج، إنت بتشيل عن دكتور خوف.</b>
+    الخوف إنه يدفع فلوس ويتلسع تاني. كل جملة تحت دي شغلتها إنها تقلل المخاطرة
+    عليه، مش إنها تمدح البرنامج.
+  </div>
+</header>
+
+<nav class="toc" aria-label="محتويات">
+  <a href="#call">المكالمة</a>
+  <a href="#wa">الواتساب</a>
+  <a href="#data">طلب البيانات</a>
+  <a href="#open">أول ٣ دقايق</a>
+  <a href="#demo">العرض</a>
+  <a href="#price">لحظة السعر</a>
+  <a href="#obj">الاعتراضات</a>
+  <a href="#close">الإغلاق</a>
+  <a href="#after">المتابعة</a>
+  <a href="#cheat">ورقة سريعة</a>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="call">
+  <div class="stage">المرحلة ١</div>
+  <h2>المكالمة الأولى</h2>
+  <p class="when">هدفها حاجة واحدة بس: تاخد ميعاد. مش تبيع، ومش تشرح النظام.</p>
+
+  <div class="say">
+    <span class="lbl">تقول</span>
+    <q>صباح الخير دكتور [الاسم]، معاك أحمد الجوهري.</q>
+    <q>أنا عملت نظام لإدارة العيادات البيطرية، وشغال دلوقتي في عيادات في [المنطقة].</q>
+    <q>مش هاخد من وقتك دلوقتي — بس سؤال واحد: بتسجّل المواعيد والملفات في دفتر ولا على برنامج؟</q>
+    <p class="why">
+      قصير، وباسمك، وفيه دليل إنك بتشتغل فعلًا، وبينتهي بسؤال سهل الرد عليه.
+      الجملة «مش هاخد من وقتك» بتفكّ التوتر لأنها بتقول إنك عارف إنه مشغول.
+    </p>
+  </div>
+
+  <div class="say">
+    <span class="lbl">لو قال «دفتر»</span>
+    <q>الغالبية كده. طب ممكن أسألك: آخر مرة عميل ما جاش في ميعاده وإنت ما كنتش فاكر تفكّره كانت إمتى؟</q>
+    <q>بص، أنا مش عايز أبيعلك حاجة في التليفون. عايز ربع ساعة أوريك النظام شغال <b>ببيانات عيادتك إنت</b>، مش ببيانات وهمية. إمتى بيبقى عندك وقت — الصبح ولا بعد العصر؟</q>
+    <p class="why">
+      «الصبح ولا بعد العصر» بتخليه يختار بين حاجتين، مش بين أيوة ولأ.
+      و«ببيانات عيادتك» هي الجملة اللي بتفرقك عن أي حد اتصل بيه قبل كده.
+    </p>
+  </div>
+
+  <div class="say">
+    <span class="lbl">لو قال «عندي برنامج»</span>
+    <q>تمام، كويس. وبيعمل معاك كل حاجة؟ يعني المخزن والصلاحيات والتذكيرات على الواتس؟</q>
+    <q>لو شغال معاك تمام، أنا مش هضايقك. بس لو في حاجة ناقصاك، خد رقمي واتصل بيا في أي وقت.</q>
+    <p class="why">
+      ما تهاجمش برنامجه. سيب الباب مفتوح وامشي بكرامة — نص العيادات دي بترجع
+      بعد شهور. ولو رجع، هيبقى هو اللي اتصل بيك.
+    </p>
+  </div>
+
+  <div class="dont">
+    <span class="lbl">ما تقولش</span>
+    <q>«عندنا نظام متكامل بأحدث التقنيات وبيشمل كل احتياجات العيادة…»</q>
+    <p class="why">
+      ده كلام كتالوج، وبيقفل الأذن على طول. وكمان بيدي انطباع إنك بتقرأ من ورقة.
+      لو مش عارف تقولها بكلامك إنت، ما تقولهاش.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="wa">
+  <div class="stage">المرحلة ٢</div>
+  <h2>رسايل الواتساب</h2>
+  <p class="when">بعد المكالمة على طول، وقبل الاجتماع بيوم.</p>
+
+  <div class="say">
+    <span class="lbl">بعد المكالمة بدقايق</span>
+    <q>دكتور [الاسم]، أحمد الجوهري — أليفي.<br>
+    اتفقنا على [اليوم] الساعة [كذا]. 🐾<br><br>
+    ده لينك تقدر تجرّب بيه النظام بنفسك قبل ما نتقابل:<br>
+    demo.aleefy.online<br><br>
+    ولو تقدر تبعتلي كشف العملاء — إكسل أو حتى صور من الدفتر — هجهّزلك النظام
+    ببيانات عيادتك عشان تشوفه وهو شغال بأسماء عملائك مش بأسماء وهمية.</q>
+    <p class="why">
+      بتثبّت الميعاد كتابةً، وبتديه حاجة يجربها لوحده، وبتطلب البيانات بدري.
+      الطلب ده هو أهم حاجة في العملية كلها.
+    </p>
+  </div>
+
+  <div class="say">
+    <span class="lbl">قبل الاجتماع بيوم</span>
+    <q>دكتور، فاكرين بكرة [اليوم] الساعة [كذا] إن شاء الله.<br>
+    محضّرلك النظام باسم العيادة وبأسعارك. هيبقى معايا لابتوب، مش محتاج أي حاجة منك.</q>
+    <p class="why">«مش محتاج أي حاجة منك» بتشيل عنه أي إحساس إنه هيتحرج أو هيتعب.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="data">
+  <div class="stage">المرحلة ٣</div>
+  <h2>طلب البيانات — الحركة اللي بتكسب الاجتماع</h2>
+  <p class="when">قبل الاجتماع بيومين على الأقل.</p>
+
+  <p>
+    ده مش تفصيلة إدارية، دي <b>أهم خطوة في السكريبت كله</b>. لما الدكتور يشوف
+    اسم «بيلا» و«سيمبا» وعميله اللي دايمًا مأخّر الفلوس على الشاشة، البرنامج
+    بيبطّل يبقى برنامج ويبقى عيادته. وكل اللي بعد كده تفاصيل.
+  </p>
+
+  <div class="say">
+    <span class="lbl">تقول</span>
+    <q>عشان أوريك النظام وهو شغّال ببيانات عيادتك مش ببيانات وهمية — ابعتلي ملف
+    الإكسل، أو حتى كشف العملاء بأي شكل، وأنا أجهّزه قبل ما نتقابل.</q>
+  </div>
+
+  <div class="say">
+    <span class="lbl">لو قال «مفيش عندي حاجة على الكمبيوتر»</span>
+    <q>ولا يهمك. صوّرلي صفحة واحدة بس من دفتر المواعيد بالموبايل وابعتهالي.
+    أنا اللي هكتبها.</q>
+    <p class="why">
+      اقعد اكتب العشرين اسم بنفسك. الساعة دي بتدفع تمنها في أول ٣٠ ثانية من
+      الاجتماع. ما تستهونش بيها.
+    </p>
+  </div>
+
+  <div class="dont">
+    <span class="lbl">ما تقولش</span>
+    <q>«هوريك النموذج التجريبي.»</q>
+    <p class="why">
+      نموذج تجريبي = بيانات ناس مش موجودين = ما يخصّهوش. لو مش هتلاقي بيانات
+      خالص، أجّل الاجتماع يومين بدل ما تحرقه.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="open">
+  <div class="stage">المرحلة ٤</div>
+  <h2>أول ٣ دقايق في العيادة</h2>
+  <p class="when">اللابتوب مقفول. مقفول فعلًا.</p>
+
+  <div class="say">
+    <span class="lbl">تقول</span>
+    <q>قبل ما أفتح أي حاجة — إيه أكتر حاجة بتضيّع وقتك في العيادة دلوقتي؟</q>
+  </div>
+
+  <div class="beat">اسكت. مهما طالت السكتة، اسكت.</div>
+
+  <p>
+    أول حاجة هيقولها هي اللي هتعرضها. لو قال «المخزن» ابدأ بالمخزن. لو قال
+    «الحسابات آخر الشهر» ابدأ بقفل اليوم. الترتيب اللي محضّره إنت مالوش لازمة
+    قدام إجابته هو.
+  </p>
+
+  <div class="say">
+    <span class="lbl">لو قال «مفيش مشكلة، كله تمام»</span>
+    <q>الحمد لله. طب آخر مرة اتصلت بعميل تفكّره بتطعيم كانت إمتى؟</q>
+    <q>ولو حد سألك دلوقتي: كام كلب أخد التطعيم الفلاني الشهر اللي فات؟ هتعرف تجاوب في قد إيه؟</q>
+    <p class="why">
+      ما تجادلش «كله تمام». اسأل سؤال إجابته بتوريه الفجوة بنفسه. الرقم اللي
+      ما يعرفهوش هو اللي بيفتح الباب.
+    </p>
+  </div>
+
+  <div class="dont">
+    <span class="lbl">ما تعملش</span>
+    <q>ما تفتحش اللابتوب في أول دقيقة. وما تبدأش بـ «أليفي نظام بيعمل…»</q>
+    <p class="why">
+      أول ما تفتح الشاشة، هو بقى متفرج وإنت بقيت بتلقي محاضرة. طول ما اللابتوب
+      مقفول، إنت بتتكلم مع بني آدم عن شغله.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="demo">
+  <div class="stage">المرحلة ٥</div>
+  <h2>العرض — ١٥ دقيقة، وابدأ من عنده</h2>
+  <p class="when">افتح على الشاشة اللي بتخص اللي هو شكى منه.</p>
+
+  <div class="say">
+    <span class="lbl">أول جملة وإنت بتفتح</span>
+    <q>بص، دي بيانات عيادتك إنت اللي بعتهالي. مش بيانات وهمية.</q>
+    <q>دي شاشة مواعيد النهارده — لو النظام كان شغال عندك، ده اللي كنت هتلاقيه أول ما تفتح.</q>
+    <p class="why">أسماء عملائه على الشاشة. اسكت شوية وسيبه يبصّ.</p>
+  </div>
+
+  <div class="say">
+    <span class="lbl">وإنت بتفتح ملف حيوان</span>
+    <q>دي [اسم حيوان من بياناته]. كل زيارة، وكل تطعيم، والوزن بيتغير إزاي — في شاشة واحدة.</q>
+    <q>عايز تدوّر على حاجة في الدفتر دلوقتي؟ خد وقتك، أنا مستني.</q>
+    <p class="why">
+      المقارنة دي أقوى من أي كلام تقوله. سيبه يجرب يدوّر في الدفتر قدامك.
+      الفرق في الوقت هو اللي بيتكلم، مش إنت.
+    </p>
+  </div>
+
+  <div class="say">
+    <span class="lbl">التذكير على الواتس</span>
+    <q>وده التذكير اللي العميل بيستلمه. تحب أبعتلك واحد دلوقتي على رقمك عشان تشوفه بنفسك؟</q>
+    <p class="why">
+      <b>ابعته فعلًا.</b> موبايله بيرن قدامه — دي أقوى لحظة في العرض كله.
+      بس بشرط: كنت جرّبته الصبح على رقمك إنت. لو فشل قدامه، خسرت الاجتماع.
+    </p>
+  </div>
+
+  <div class="dont">
+    <span class="lbl">ما تعرضش</span>
+    <q>حاسبة تداخل الأدوية. خالص. ولا حتى تفتحها بالغلط.</q>
+    <p class="why">
+      لسه ما اتراجعتش من دكتور بيطري معتمد ومكتوب عليها كده جوه البرنامج.
+      لو عرضتها وحصلت مشكلة، دي مش مشكلة بيع — دي مشكلة تانية خالص.
+    </p>
+  </div>
+
+  <div class="dont">
+    <span class="lbl">وكمان ما تعرضش</span>
+    <q>أي شاشة هو ما سألش عنها.</q>
+    <p class="why">
+      كل دقيقة في مميزة مش مهماله دي دقيقة بتخسره فيها. لو خلصت اللي يهمه في
+      ٧ دقايق — اقفل اللابتوب واتكلم في السعر. ما تكمّلش الـ ١٥ عشان تكمّلها.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="price">
+  <div class="stage">المرحلة ٦</div>
+  <h2>لحظة السعر</h2>
+  <p class="when">أهم ١٠ ثواني في الاجتماع.</p>
+
+  <div class="say">
+    <span class="lbl">تقول — بصوت عادي خالص</span>
+    <q>الرخصة سبعة آلاف جنيه، مرة واحدة، وبتفضل ملك العيادة.</q>
+  </div>
+
+  <div class="beat">اسكت. أول واحد يتكلم بعد الرقم هو اللي بيخسر.</div>
+
+  <p>
+    السكتة دي هي الفرق بين «سبعة آلاف» و«سبعة آلاف بس يعني ممكن نتفاهم».
+    أي كلام تقوله بعد الرقم على طول بيتسمع اعتذار عن الرقم.
+  </p>
+
+  <div class="say">
+    <span class="lbl">وبعد ما يرد — قول التجديد بنفسك قبل ما يسأل</span>
+    <q>وحاجة عايز أقولهالك دلوقتي مش بعدين: الدعم ٦ شهور داخل في السعر، ومن
+    الشهر السابع بيبقى ١٨٠٠ جنيه في السنة.</q>
+    <q>وباقولهالك دلوقتي عشان ما تبقاش مفاجأة بعد ٦ شهور. وأهم حاجة —
+    <b>لو قررت ما تجددش، النظام بيفضل شغال زي ما هو.</b> الدعم بس هو اللي بيقف.
+    مش هقفل عليك نظام فيه ملفات مرضاك.</q>
+    <p class="why">
+      دي الجملة اللي بتبني الثقة كلها. إنك بتقول التكلفة المستقبلية بنفسك، وإنك
+      مش هتمسك بياناته رهينة — دول الحاجتين اللي كل واحد اتلسع قبل كده بيخاف منهم.
+    </p>
+  </div>
+
+  <div class="dont">
+    <span class="lbl">ما تقولش</span>
+    <q>«سبعة آلاف بس…» أو «سبعة آلاف، بس ممكن نشوف حاجة…»</q>
+    <p class="why">
+      كلمة «بس» بتقول إن الرقم كبير قبل ما هو يقرر ده. وعرض الخصم قبل ما يطلبه
+      بيخلي كل رقم بعد كده قابل للتفاوض.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="obj">
+  <div class="stage">المرحلة ٧</div>
+  <h2>الاعتراضات</h2>
+  <p class="when">
+    القاعدة في كلهم: <b>ما تجادلش الخوف — سمّيه بنفسك قبل ما هو يقوله.</b>
+    الاعتراض مش سؤال عن معلومة، ده طلب طمأنينة.
+  </p>
+
+  <details class="obj">
+    <summary><span class="tagl t-kill">قاتل</span>«غالي / السعر كتير»</summary>
+    <div class="body">
+      <div class="fear"><b>الخوف الحقيقي:</b> مش إن الرقم كبير — إنه يدفع ويطلع مش مستاهل.</div>
+      <div class="say">
+        <span class="lbl">تقول</span>
+        <q>أنا فاهمك، وسبعة آلاف فلوس. بس خليني أسألك سؤال: في الشهر اللي فات،
+        كام عميل ما جاش في ميعاده؟</q>
+        <q>لو اتنين بس في الأسبوع، ده تمانية في الشهر. الكشف عندك بكام؟ … يبقى
+        دي [الرقم] جنيه في الشهر رايحة من غير ما حد ياخد باله. النظام بيدفع تمنه
+        في أقل من شهرين.</q>
+        <q>وعشان تبقى مطمّن أكتر: بتدفع ٥٠٪ بس في الأول، والباقي يوم ما يشتغل
+        فعلًا في العيادة.</q>
+      </div>
+      <div class="dont">
+        <span class="lbl">ما تقولش</span>
+        <q>«طيب ممكن أعملك خصم.»</q>
+        <p class="why">
+          أول ما تنزل السعر من غير ما يطلب، بتقول إن الرقم كان مضروب. ولو نزلته
+          هنا، هينزل تاني في التجديد. رد على القيمة، مش على الرقم.
+        </p>
+      </div>
+    </div>
+  </details>
+
+  <details class="obj">
+    <summary><span class="tagl t-kill">قاتل</span>«اتلسعت قبل كده — واحد باعلي برنامج ومشي»</summary>
+    <div class="body">
+      <div class="fear"><b>الخوف الحقيقي:</b> مش الفلوس — إنه يبان غلطان قدام فريقه تاني.</div>
+      <div class="say">
+        <span class="lbl">تقول</span>
+        <q>الله يسامحه. وأنا مش هقولك «أنا مش زيه» — ده كلام أي حد يقوله.</q>
+        <q>هقولك حاجة تانية: خد رقم [اسم عيادة] واتصل بالدكتور من غير ما تقوللي.
+        اسأله أنا بردّ عليه في قد إيه، وآخر مرة كلمني كانت إمتى.</q>
+        <q>وكمان — أنا مش شركة فيها كول سنتر. أنا اللي كاتب البرنامج وأنا اللي
+        بردّ على التليفون. الرقم ده رقمي الشخصي.</q>
+      </div>
+      <div class="dont">
+        <span class="lbl">ما تقولش</span>
+        <q>«أنا مختلف» أو «إحنا شركة محترمة».</q>
+        <p class="why">
+          اللي باعله ومشي قال نفس الكلام بالحرف. الكلام مش هيفرق — الترتيب هو
+          اللي بيفرق: مرجع يكلمه، و٥٠٪ بعد التشغيل، وبياناته بتخرج معاه في أي وقت.
+        </p>
+      </div>
+    </div>
+  </details>
+
+  <details class="obj">
+    <summary><span class="tagl t-kill">قاتل</span>«الفريق مش هيعرف يستخدمه / البنت مش هتظبط»</summary>
+    <div class="body">
+      <div class="fear"><b>الخوف الحقيقي:</b> الأسبوع اللي مش هيبقى فيه لا الدفتر شغال ولا البرنامج.</div>
+      <div class="say">
+        <span class="lbl">تقول</span>
+        <q>ده أكتر سؤال بيتسألي، وهو سؤال في محله.</q>
+        <q>عشان كده الدفتر بيفضل مفتوح جنبكم أسبوع كامل بعد التشغيل. ما تقفلوهوش
+        لحد ما تطمنوا. لو النظام وقف، الشغل ما بيقفش.</q>
+        <q>وأنا بكون موجود في العيادة طول أول يوم شغل حقيقي. مش بسلّم وأمشي.</q>
+        <q>وبصراحة — الاستقبال أصعب حاجة عندها هي إنها تحجز ميعاد، ودي بتاخد
+        عشر دقايق تدريب.</q>
+      </div>
+      <div class="say">
+        <span class="lbl">ولو الاستقبال موجودة — كلّمها هي</span>
+        <q>يا [اسمها]، إنتي اللي هتستخدميه أكتر واحد. تحبي تجربي تحجزي ميعاد دلوقتي بنفسك؟</q>
+        <p class="why">
+          لو الاستقبال حسّت إن رأيها مهم، بتبقى في صفك. ولو حسّت إن البرنامج
+          هيوريها إنها بطيئة، هتحارب الصفقة من ورا الدكتور — ودي بتموّت صفقات
+          كتير من غير ما تعرف السبب.
+        </p>
+      </div>
+    </div>
+  </details>
+
+  <details class="obj">
+    <summary><span class="tagl t-real">جاد</span>«لو الكمبيوتر باظ أو اتسرق؟ بياناتي تروح؟»</summary>
+    <div class="body">
+      <div class="fear"><b>الخوف الحقيقي:</b> ملفات المرضى بتاعة ١٠ سنين تروح في لحظة.</div>
+      <div class="say">
+        <span class="lbl">تقول</span>
+        <q>كل ليلة الساعة ٢ بالليل النظام بياخد نسخة لوحده، من غير ما حد يفتكر.</q>
+        <q>ونسخة تانية مشفّرة بتتحفظ برّه العيادة — على هارد أو على السحابة، زي
+        ما تحب. يعني لو العيادة اتحرقت، البيانات موجودة.</q>
+        <q>وسؤال بالمناسبة: الدفتر اللي عندك دلوقتي، فيه منه نسخة تانية فين؟</q>
+        <p class="why">
+          السؤال الأخير بيقلب الاعتراض. الدفتر هو اللي مالهوش نسخة احتياطية،
+          مش النظام.
+        </p>
+      </div>
+    </div>
+  </details>
+
+  <details class="obj">
+    <summary><span class="tagl t-real">جاد</span>«ولو النت فصل؟»</summary>
+    <div class="body">
+      <div class="fear"><b>الخوف الحقيقي:</b> إن العيادة تقف في نص يوم شغل.</div>
+      <div class="say">
+        <span class="lbl">تقول</span>
+        <q>النظام بيتركب على جهاز جوّه العيادة، والفريق بيدخل عليه من الشبكة
+        الداخلية. النت مش في النص أصلًا.</q>
+        <q>يعني النت لو فصل، الكشف والفواتير والمخزن كله ماشي عادي. اللي بيقف بس
+        هو تذكير الواتساب، وبيتبعت لوحده أول ما النت يرجع.</q>
+      </div>
+      <div class="dont">
+        <span class="lbl">ما تقولش</span>
+        <q>«آه بيشتغل أوفلاين» وتسيبها كده.</q>
+        <p class="why">
+          هو هيفهم إنه يقدر يفتحه من بيته وهو مش هيقدر. قول بالظبط: جهاز العيادة
+          لازم يكون شغال. الوضوح دلوقتي أرخص من خلاف بعد شهر.
+        </p>
+      </div>
+    </div>
+  </details>
+
+  <details class="obj">
+    <summary><span class="tagl t-real">جاد</span>«ولو إنت مشيت أو حصلك حاجة؟»</summary>
+    <div class="body">
+      <div class="fear"><b>الخوف الحقيقي:</b> إنه يبقى معتمد على شخص واحد.</div>
+      <div class="say">
+        <span class="lbl">تقول</span>
+        <q>سؤال محترم، وباجاوب عليه بصراحة: أنا شخص واحد، مش شركة كبيرة. وده
+        ليه ميزة وليه عيب.</q>
+        <q>الميزة إنك بتكلمني أنا مباشرة. والعيب اللي إنت بتقول عليه — وعشان كده
+        بياناتك مش رهينة عندي: في زرار في النظام بيطلّعلك كل حاجة ملفات إكسل،
+        تفتحها من غير أي برنامج مني. في أي وقت، من غير ما تسألني.</q>
+        <q>يعني أسوأ حالة، تبقى ماسك بياناتك كاملة والنظام شغال عندك زي ما هو.</q>
+      </div>
+    </div>
+  </details>
+
+  <details class="obj">
+    <summary><span class="tagl t-stall">تسويف</span>«خليني أفكر / كلمني الأسبوع الجاي»</summary>
+    <div class="body">
+      <div class="fear"><b>الخوف الحقيقي:</b> في حاجة مقلقاه ومش عايز يقولها قدامك.</div>
+      <div class="say">
+        <span class="lbl">تقول</span>
+        <q>طبعًا، خد وقتك. بس ممكن أسألك سؤال واحد بصراحة؟</q>
+        <q>لو كان لازم تقرر دلوقتي أيوة أو لأ — إيه الحاجة اللي مخلياك متردد؟
+        مش عشان أقنعك، عشان لو حاجة أنا مش شارحها كويس أبقى أعرف.</q>
+      </div>
+      <div class="beat">واسكت تاني.</div>
+      <p>
+        غالبًا هيقول السبب الحقيقي هنا — وغالبًا هيبقى حاجة تقدر ترد عليها في
+        جملة. «هفكر» لوحدها مش اعتراض، دي غطا على اعتراض.
+      </p>
+      <div class="say">
+        <span class="lbl">ولو فضل مصمّم</span>
+        <q>تمام. أنا هسيبلك النظام شغال ببيانات عيادتك أسبوع، تفتحه إنت والفريق
+        وقت ما تحبوا. وأكلمك يوم [حدد اليوم] الساعة [حدد]. يناسبك؟</q>
+        <p class="why">
+          ما تخرجش من غير ميعاد محدد. «هكلمك بعدين» معناها خلاص.
+        </p>
+      </div>
+    </div>
+  </details>
+
+  <details class="obj">
+    <summary><span class="tagl t-stall">تسويف</span>«لازم أتكلم مع شريكي / المحاسب»</summary>
+    <div class="body">
+      <div class="fear"><b>الخوف الحقيقي:</b> ساعات حقيقي، وساعات دي طريقة مؤدبة للرفض.</div>
+      <div class="say">
+        <span class="lbl">تقول</span>
+        <q>طبعًا. وأنا أفضّل أكون موجود لما تتكلموا، مش عشان أقنعه — عشان
+        الأسئلة اللي هيسألها أنا عارفها وهجاوب عليها في دقيقة بدل ما تنقلها إنت.</q>
+        <q>تحب نعمل مكالمة تلاتة سوا؟ ١٠ دقايق تكفي.</q>
+      </div>
+      <p>
+        لو رفض إنك تحضر: ابعتله العرض مكتوب، وحدد ميعاد المتابعة قبل ما تسيب
+        العيادة. العرض المكتوب مهم هنا تحديدًا — لأن اللي هيقرأه شخص ما شافش
+        العرض.
+      </p>
+    </div>
+  </details>
+
+  <details class="obj">
+    <summary><span class="tagl t-stall">تسويف</span>«ابعتلي عرض سعر وأنا أرد عليك»</summary>
+    <div class="body">
+      <div class="fear"><b>الخوف الحقيقي:</b> عايز ينهي المقابلة بأدب.</div>
+      <div class="say">
+        <span class="lbl">تقول</span>
+        <q>تمام، هبعتهولك النهارده على الواتس.</q>
+        <q>وابعتلي إنت كشف العملاء — عشان لما نتكلم تكون شايف عيادتك على الشاشة
+        مش شايف نموذج.</q>
+        <q>أكلمك [يوم] الساعة [كذا] يناسبك؟</q>
+        <p class="why">
+          تلات حاجات في نفس الوقت: وافقت عليه، وأخدت منه التزام صغير (البيانات)،
+          وثبّت ميعاد. من غير التلاتة دول، «ابعتلي عرض» معناها انتهينا.
+        </p>
+      </div>
+    </div>
+  </details>
+
+  <details class="obj">
+    <summary><span class="tagl t-real">جاد</span>«أنا مش فاضي للكلام ده دلوقتي»</summary>
+    <div class="body">
+      <div class="fear"><b>الخوف الحقيقي:</b> إن التركيب والتدريب هياخدوا منه أيام.</div>
+      <div class="say">
+        <span class="lbl">تقول</span>
+        <q>عشان كده بالظبط. اللي بياخد وقتك دلوقتي هو التسجيل والحسبة، مش أنا.</q>
+        <q>واللي مطلوب منك حرفيًا: تبعتلي ملف، وتقعد معايا ساعة ونص يوم التدريب.
+        الباقي كله عليّا.</q>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="close">
+  <div class="stage">المرحلة ٨</div>
+  <h2>الإغلاق</h2>
+  <p class="when">ما تسألش «إيه رأيك؟» — دي بتفتح باب «هفكر».</p>
+
+  <div class="say">
+    <span class="lbl">الإغلاق الأساسي — اطلب خطوة صغيرة مش قرار كبير</span>
+    <q>تحب نبدأ الأسبوع ده ولا الأسبوع الجاي أحسن ليك؟</q>
+    <p class="why">
+      اختيار بين حاجتين، والاتنين معناهم أيوة. أسهل بكتير من «موافق؟».
+    </p>
+  </div>
+
+  <div class="say">
+    <span class="lbl">لو حاسس إنه لسه متردد — صغّر الطلب</span>
+    <q>خلاص، مش لازم تقرر دلوقتي. ابعتلي كشف العملاء بس، وأنا أجهّزلك النظام
+    ببيانات عيادتك وأوريهولك خلال يومين. من غير التزام ومن غير مقدم.</q>
+    <q>لو عجبك نبدأ، ولو مش عجبك تكون شفته ببياناتك وما دفعتش حاجة.</q>
+    <p class="why">
+      الطلب ده مفيش سبب منطقي لرفضه، وأول «أيوة» بتخلي اللي بعدها أسهل بكتير.
+      دي أقوى قفلة في السكريبت كله لو الاجتماع كان فاتر.
+    </p>
+  </div>
+
+  <div class="say">
+    <span class="lbl">لو قال أيوة — ثبّتها فورًا</span>
+    <q>تمام. يبقى أنا هبعتلك دلوقتي على الواتس التفاصيل مكتوبة: ٧٠٠٠ رخصة
+    دائمة، ٥٠٪ دلوقتي و٥٠٪ يوم التشغيل، ٦ شهور دعم، والتجديد ١٨٠٠ من الشهر السابع.</q>
+    <q>وابعتلي البيانات، ونبدأ يوم [حدد اليوم]. ماشي؟</q>
+    <p class="why">
+      اكتبها على الواتس وهو قدامك. الاتفاق الشفهي في العربية بينسى، والمكتوب
+      بيمنع أي خلاف بعدين على التجديد أو على اللي داخل واللي مش داخل.
+    </p>
+  </div>
+
+  <div class="dont">
+    <span class="lbl">ما تعملش</span>
+    <q>ما تكملش كلام بعد ما يقول أيوة.</q>
+    <p class="why">
+      أكتر غلطة بيعملها اللي بيبيع لأول مرة: بيفضل يمدح البرنامج بعد الموافقة،
+      فيفتح باب لسؤال جديد وشك جديد. قال أيوة؟ اكتب الاتفاق واقفل الموضوع.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="after">
+  <div class="stage">المرحلة ٩</div>
+  <h2>المتابعة — واللي بعد «لأ»</h2>
+
+  <div class="say">
+    <span class="lbl">بعد الاجتماع بساعة</span>
+    <q>دكتور، تشرفت بيك النهارده. 🐾<br>
+    ده العرض مكتوب زي ما اتكلمنا: [لينك العرض]<br>
+    ولينك تجرّب بيه بنفسك: demo.aleefy.online<br><br>
+    وزي ما اتفقنا هكلمك [اليوم] الساعة [كذا].</q>
+  </div>
+
+  <div class="say">
+    <span class="lbl">لو ما ردش على رسالتين — الرسالة التالتة</span>
+    <q>دكتور، أكيد مشغول ومش عايز أضايقك.<br><br>
+    لو التوقيت مش مناسب دلوقتي قوللي بس «مش دلوقتي» وأنا مش هزعجك تاني،
+    وأكلمك بعد ٣ شهور.<br>
+    ولو في حاجة في العرض نفسه مش مظبوطة، قوللي إيه هي وأنا أفهم.</q>
+    <p class="why">
+      إنك تدّيله طريقة مؤدبة يقولك بيها لأ، دي بتخلي ناس كتير ترد. والرد —
+      حتى لو «مش دلوقتي» — أحسن من صمت، لأنك بتعرف تحط ميعاد للمكالمة الجاية.
+    </p>
+  </div>
+
+  <div class="say">
+    <span class="lbl">لو قال لأ نهائي</span>
+    <q>تمام يا دكتور، وشكرًا لوقتك بجد.</q>
+    <q>ممكن أطلب منك حاجة واحدة بس: تعرف دكتور تاني ممكن النظام ده يفيده؟
+    كلمة منك بتوصل أسرع من أي إعلان.</q>
+    <p class="why">
+      اخرج بكرامة ومعاك حاجة. سوق العيادات في مصر صغير والدكاترة بيتكلموا مع
+      بعض — واللي رفض النهارده ممكن يرشحك بكرة، وممكن يرجع هو نفسه بعد شهور.
+    </p>
+  </div>
+
+  <div class="dont">
+    <span class="lbl">ما تعملش</span>
+    <q>ما تبعتش أكتر من ٣ رسايل من غير رد.</q>
+    <p class="why">
+      الرابعة بتحوّلك من حد بيعرض حاجة مفيدة لحد بيلح. والسمعة دي في سوق صغير
+      بتتكلف أغلى من أي صفقة.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="cheat">
+  <div class="stage">قبل ما تدخل</div>
+  <h2>ورقة سريعة</h2>
+  <div class="sheetcard">
+    <h3>اقراها في العربية قبل ما تنزل</h3>
+    <ol>
+      <li><b>بياناته محمّلة؟</b> لو لأ — أجّل الاجتماع.</li>
+      <li><b>بعتّ رسالة واتساب حقيقية على رقمك النهارده؟</b> لو فشلت قدامه، خسرت.</li>
+      <li><b>اسم العيادة وشعارها على الشاشة</b> — مش «أليفي» ومش «Premium Animal Hospital».</li>
+      <li><b>اللغة عربي، والشاشة فل سكرين، وإنت داخل بالفعل.</b></li>
+      <li><b>الموبايل مشحون والهوت سبوت جاهز</b> — ما تعتمدش على نت العيادة أبدًا.</li>
+      <li><b>أول سؤال:</b> «إيه أكتر حاجة بتضيّع وقتك؟» — وبعدها <b>اسكت</b>.</li>
+      <li><b>بعد الرقم:</b> اسكت. أول واحد يتكلم بيخسر.</li>
+      <li><b>قول التجديد بنفسك</b> قبل ما يسأل، وقول إن النظام بيفضل شغال لو ما جددش.</li>
+      <li><b>ما تعرضش حاسبة تداخل الأدوية</b> — ولا مرة.</li>
+      <li><b>ما تخرجش من غير ميعاد محدد</b> للخطوة الجاية.</li>
+    </ol>
+  </div>
+</section>
+
+<footer>
+  السكريبت ده مبني على عرض ٧٠٠٠ جنيه رخصة دائمة + ١٨٠٠ سنويًا من الشهر السابع،
+  وعلى قاعدة إن النظام ما بيتقفلش على العيادة لو ما جددتش. لو غيّرت العرض،
+  غيّر السكريبت معاه.
+</footer>
+
+</div>
